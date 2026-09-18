@@ -488,6 +488,87 @@ Month abbreviations are pinned (`Sep`, not ICU `en-GB` `Sept`) so they match the
 None.
 
 ### Notes for later
-- Task 10: style guide replaces this temporary playground; list every `Ank*` variant.
 - Sprint 4: map booking statuses onto pills, including filled `.p-over` and `.p-full`.
 - Apps set `NUXT_PUBLIC_API_BASE` if the API is not `http://localhost:8000`. Live `useApi()` CORS is tasks 11–12.
+
+## Task 10 · Style guide and release v0.1.0
+
+### What was built
+The temporary Task 07–09 playground page is gone. `.playground` route `/` is a style guide: colour tokens with live computed hex/rgba, easing tokens, type scale (including visible Manrope 400/500/600), every Task 08 Nuxt UI control in default / hover / focus / disabled / error, every `Ank*` variant, and side-by-side cropped RMS screenshots.
+
+Token values are read with `getComputedStyle` on the section. `useColorMode()` is watched; after each change a `nextTick` re-reads so the printed values flip with `AnkThemeToggle`.
+
+`package.json` is `0.1.0`. `README.md` documents the layer, local `../anakata-ui` consumption, the `@nuxt/ui` / `tailwindcss` version rule, and the release steps. `CHANGELOG.md` has the `v0.1.0` entry. Tag / commit / push were **not** run (Git: read-only).
+
+### Files touched
+- `../anakata-ui/package.json` — `0.1.0`
+- `../anakata-ui/README.md`
+- `../anakata-ui/CHANGELOG.md`
+- `../anakata-ui/.playground/nuxt.config.ts` — playground CSS
+- `../anakata-ui/.playground/app/pages/index.vue`
+- `../anakata-ui/.playground/app/assets/css/styleguide.css`
+- `../anakata-ui/.playground/app/components/Sg{Tokens,Type,Ank,Compare,State,UiButtons,UiFields,UiTable,UiChrome,UiOverlays,UiControls}.vue`
+- `../anakata-ui/.playground/public/reference/{02-bookings,03-payments,07-rates,14-booking-overview}.png`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Screenshot mapping
+
+| File | Shown beside |
+|---|---|
+| `02-bookings.png` | table, pills, solid header button, date filters |
+| `03-payments.png` | KPI row, payments table, overdue / confirmed pills |
+| `07-rates.png` | rate inputs, Discard / Save & Publish |
+| `14-booking-overview.png` | slideover, underline tabs, outline drawer actions |
+
+No screenshot shows a `.modal` / `.mbox`. The modal is live-only; the drawer uses `14-booking-overview.png`.
+
+### Verification
+- `pnpm lint`, `pnpm typecheck`, `pnpm test` (24), `pnpm build` pass in `anakata-ui`.
+- Playground on **3010** (already running). Dark default: `--forest` `#202B26`. Toggle to light: printed `--forest` `#EFEDDD`, `--forest-950` `#FAF9F0`, `--ivory` `#202B26`, `--iv38` `rgba(32,43,38,.52)`. Toggle back: `#202B26` / `◐ Light`.
+- All 12 reference images load (1500×1000). Modal opened. Field error / disabled present.
+
+### Deviations
+- No `v0.1.0` tag or push. Core rule Git: read-only. Commands for the user are below.
+- Solid-button hover column is the same as default (prototype has no hover fill).
+- Screenshot crops are CSS `object-fit: none` + `object-position` on the full-page PNGs, not new cropped files.
+
+### Open questions
+None.
+
+### Notes for later
+- Tasks 11–12: panel and engine `extends: ['../anakata-ui']`.
+- A dedicated modal screenshot would make the overlay compare row complete.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-ui (branch dev, origin https://github.com/anakata-project/anakata-ui.git)
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add package.json README.md CHANGELOG.md \
+  .playground/nuxt.config.ts \
+  .playground/app/pages/index.vue \
+  .playground/app/assets/css/styleguide.css \
+  .playground/app/components \
+  .playground/public/reference
+git commit -m "$(cat <<'EOF'
+Release v0.1.0 with the playground style guide.
+
+EOF
+)"
+git tag v0.1.0
+git push origin HEAD
+git push origin v0.1.0
+
+# anakata-api (REPORT only)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-00/REPORT.md
+git commit -m "$(cat <<'EOF'
+Document sprint 0 task 10 in REPORT.
+
+EOF
+)"
+git push origin HEAD
+```
+
