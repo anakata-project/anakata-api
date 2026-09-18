@@ -1,0 +1,49 @@
+services:
+  test:
+    image: webdevops/php-nginx:8.4-alpine
+    container_name: anakata-test
+    working_dir: /app
+    user: application
+    environment:
+      APP_ENV: testing
+      DB_CONNECTION: mysql
+      DB_HOST: test-db
+      DB_PORT: 3306
+      DB_DATABASE: testing
+      DB_USERNAME: laravel
+      DB_PASSWORD: secret
+      COMPOSER_HOME: /tmp/composer
+    volumes:
+      - .:/app
+    depends_on:
+      test-db:
+        condition: service_healthy
+    entrypoint: ["sh", "/app/.docker/test.sh"]
+    networks:
+      - test-network
+
+  test-db:
+    image: mysql:8.4
+    container_name: anakata-test-db
+    environment:
+      MYSQL_DATABASE: testing
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: secret
+    command:
+      - --innodb-flush-log-at-trx-commit=0
+      - --sync-binlog=0
+      - --skip-log-bin
+      - --performance-schema=OFF
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-psecret"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    networks:
+      - test-network
+
+networks:
+  test-network:
