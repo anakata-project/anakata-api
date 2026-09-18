@@ -27,14 +27,18 @@ All commands run as `docker compose exec app sh -c "…"`.
      - Add the cases you can derive with certainty from doc 01 §19: view all, create, change status, move, delete, manage users, the finance flag abilities (mark wires, refunds), and the director flag abilities (commission > 12%, OPS-007 decisions, refunds, rates, business rules).
      - Add `label()` and `group()` methods.
      - Leave a `// TODO(Sprint 1)` noting the list is completed there. No roles table and no gates yet.
+   - `Shared\SensitiveData\SensitiveFields`: a registry/enum of sensitive field names. Initial list: `passport_no`, `medical_note`, `dietary_note`, `accessibility_note`, `dob`, `nationality`. Unit-tested.
+   - `Shared\Http\Middleware\GuardCrmSensitiveData`: middleware on `/api/crm/*` that inspects every JSON response. If a sensitive field appears it throws in local/testing and strips + logs in production. Feature-tested for both modes.
+   - Pest helper `assertNoSensitiveFields()`: used in every CRM endpoint test (the helper is added here; CRM endpoints apply it as they land in later sprints). Unit-tested.
 4. **`GET /api/health`** (public, outside the module prefixes). It returns:
    ```json
    { "status": "ok", "app": "anakata-api", "time": "<ISO-8601 UTC>",
-     "checks": { "rms_db": "ok", "crm_db": "ok", "redis": "ok", "queue": "ok" } }
+     "checks": { "db": "ok", "redis": "ok", "queue": "ok" } }
    ```
    Each check catches its own failure and reports `"fail"`. If any check fails, the endpoint returns HTTP 503 with `"status": "degraded"`.
 5. **Pest arch tests:**
    - `App\Modules\Crm` does not use `App\Modules\Rms`, and vice versa.
+   - `App\Modules\Crm` does not use the RMS guest/passenger models.
    - `App\Modules\Shared` uses neither.
    - `App\Modules\Engine` does not use `App\Modules\Crm`.
    - Every PHP file in `app/` declares strict types.

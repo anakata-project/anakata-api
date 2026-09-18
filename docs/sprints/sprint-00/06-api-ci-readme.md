@@ -11,15 +11,14 @@ Every push is checked automatically, and a new developer can run the API from th
 ## Do
 1. **`.github/workflows/ci.yml`**, triggered on push and pull request:
    - MySQL 8 and Redis as services.
-   - A step that creates the four databases and the two users with the same grants as the Docker init script. Reuse the script where possible.
+   - A step that creates the two databases (`anakata`, `anakata_test`) and the single user with the same grants as the Docker init script. Reuse the script where possible.
    - PHP matching the Dockerfile's version and extensions, and `composer install` with a cache.
    - `.env.testing` values supplied through workflow env.
    - Then `composer check`. Any failure fails the build.
 2. **`README.md`**, rewritten around daily use. Every PHP command in the form `docker compose exec app sh -c "…"`:
-   - Prerequisites and first-time setup (`.env`, build, migrate both databases)
+   - Prerequisites and first-time setup (`.env`, build, `php artisan migrate` — runs both modules' migrations)
    - Start and stop
    - Running artisan and composer commands
-   - `anakata:migrate` with its options
    - Tests, lint, static analysis (`composer check`)
    - URLs: API, `/api/health`, `/docs/api`, `/horizon`, Mailpit
    - Where the requirements and sprints live

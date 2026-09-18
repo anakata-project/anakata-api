@@ -1,7 +1,7 @@
 # Sprint 0 · Foundations
 
 **Goal:** the four repos run together with the final architecture in place, and there are no business features yet.
-- **anakata-api:** two databases with separate MySQL users, modules with enforced boundaries, Sanctum/CORS, OpenAPI and CI.
+- **anakata-api:** one database + test database (one user), sensitive-data guard middleware, modules with enforced boundaries, Sanctum/CORS, OpenAPI and CI.
 - **anakata-ui:** the shared layer makes Nuxt UI look exactly like the prototypes.
 - **anakata-panel:** one staff app containing the RMS and the CRM, with a header switch that swaps the navigation.
 - **anakata-engine:** the public site's shell.
@@ -14,8 +14,8 @@ After each task, Cursor appends a section to `REPORT.md` in this folder. Review 
 | # | Repo | Task |
 |---|---|---|
 | 01 | anakata-api | Verify the documentation paths, write `INDEX.md` |
-| 02 | anakata-api | Extend the Docker setup (MySQL with two databases and two users, Redis, Mailpit) |
-| 03 | anakata-api | Two database connections, migration folders, `anakata:migrate`, isolation test |
+| 02 | anakata-api | Extend the Docker setup (MySQL with one database + test database, one user, Redis, Mailpit) |
+| 03 | anakata-api | Database connection and module migrations (single connection, `loadMigrationsFrom`, `crm_` prefix) |
 | 04 | anakata-api | Packages: Sanctum, Horizon, Scramble, Pest, Larastan, Pint |
 | 05 | anakata-api | Module skeleton, routes, `Permission` enum stub, Money, health endpoint, arch tests |
 | 06 | anakata-api | CI and README |
