@@ -147,3 +147,46 @@ Searched the four workspace repos for `Modules`, `module`, `outbox`, `EventEnvel
 ### Notes for later
 - Task 05 creates the conventional folders, route files in `bootstrap/app.php`, `App\Enums\Permission`, `App\Support` Money + sensitive-field registry, health endpoint, and the CRM write-path arch test (`App\Http\Controllers\Crm` ↛ Bookings, Payments, Refunds, Commissions, Documents, `App\Services\Pricing`).
 - Task 04 still installs Horizon (queued side-effect listeners under the new A4).
+
+## Task 04 · Packages and quality tools
+
+### What was built
+Sanctum SPA cookie auth, Horizon on Redis, Scramble OpenAPI (local only, `api/` routes), and the Pest / Larastan / Pint quality gate. `composer check` runs tests, `pint --test`, and `phpstan analyse` (level 6).
+
+Latest package releases all support Laravel 13. Installed: `laravel/sanctum` v4.3.3, `laravel/horizon` v5.49.0, `dedoc/scramble` v0.13.44, `pestphp/pest` v5.2.1 + Laravel/arch plugins, `larastan/larastan` v3.12.1. Did not install `spatie/laravel-permission` or `laravel/boost`. `laravel/pao` kept.
+
+**Supervisor:** no project Dockerfile. [docker-compose.yml](../../../docker-compose.yml) mounts `.docker/prod.supervisord.conf` → `/opt/docker/etc/supervisor.d/jobs.conf`. Confirmed in the running `app` container. Horizon (`php artisan horizon`) and `schedule:work` are enabled there. Horizon dashboard is local-only (default `viewHorizon` gate). Horizon process is running.
+
+**Scramble:** UI `/docs/api`, JSON `/docs/api.json`, `api_path` = `api`, `RestrictedDocsAccess` (local only). Spec is empty until task 05 registers `/api/*` routes; the UI loads.
+
+### Files touched
+- `composer.json`, `composer.lock`
+- `bootstrap/app.php` (`statefulApi()`)
+- `bootstrap/providers.php` (`HorizonServiceProvider`)
+- `app/Providers/HorizonServiceProvider.php`
+- `config/cors.php`, `config/sanctum.php`, `config/horizon.php`, `config/scramble.php`
+- `database/migrations/2026_09_18_103102_create_personal_access_tokens_table.php`
+- `.env.example`, `.env` (gitignored), `.env.testing` (gitignored), `.env.testing.example`
+- `phpunit.xml`
+- `tests/Pest.php`, `tests/Unit/ExampleTest.php`, `tests/Feature/ExampleTest.php`, `tests/Feature/Database/DatabaseSetupTest.php`, `tests/Feature/Sanctum/CsrfCookieTest.php`
+- `pint.json`, `phpstan.neon`
+- `.docker/prod.supervisord.conf` (Horizon + scheduler)
+- deleted `.docker/dev.supervisord.conf`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Deviations
+- **PHPUnit:** the skeleton’s direct `phpunit/phpunit: ^12.5.12` blocked Pest 5 (needs `phpunit/phpunit: ^13.3.4`). Removed the root PHPUnit require-dev line. Pest 5.2.1 now brings PHPUnit 13.3.4. `composer require` as a partial update still could not replace the locked PHPUnit 12; used `composer update pestphp/pest … --with-dependencies` (`-w`, not `-W`) so only Pest’s own deps upgraded. `laravel/pao` remains.
+- **PHP:** `composer.json` `php` constraint `^8.3` → `^8.4` because Pest 5 requires `^8.4`. Compose was already `webdevops/php-nginx:8.4-alpine` (container PHP 8.4.23); no image change.
+- Horizon files published with `vendor:publish --tag=horizon-provider|horizon-config` and registered in `bootstrap/providers.php` instead of `php artisan horizon:install` (same files).
+- Queue worker is the supervisor program in `.docker/prod.supervisord.conf`, not a separate Compose service (Task 02).
+- Deleted unused `.docker/dev.supervisord.conf` (wrong schedule command: `queue:work` instead of `schedule:work`) so nobody edits the wrong file.
+- Pint was already in the skeleton; added `pint.json` with the Laravel preset.
+- Scramble pulled `spatie/laravel-package-tools` as its own dependency. That is not a permissions package.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 05: route files, health endpoint (must appear in `/docs/api`), Pest arch tests, `Permission` stub.
+- Task 06: CI runs `composer check`; README lists `/docs/api` and `/horizon`.
+- Task 09: panel/engine `useApi()` calls `/sanctum/csrf-cookie` before mutating requests.

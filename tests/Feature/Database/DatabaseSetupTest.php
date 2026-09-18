@@ -2,37 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Database;
-
 use Illuminate\Support\Facades\Schema;
-use Tests\TestCase;
 
-class DatabaseSetupTest extends TestCase
-{
-    public function test_default_connection_is_mysql_anakata_test(): void
-    {
-        $connection = config('database.default');
-        $driver = config("database.connections.{$connection}.driver");
-        $database = config("database.connections.{$connection}.database");
+test('default connection is mysql anakata_test', function (): void {
+    $connection = config('database.default');
+    $driver = config("database.connections.{$connection}.driver");
+    $database = config("database.connections.{$connection}.database");
 
-        $this->assertSame(
-            'mysql',
-            $driver,
-            "Tests must use the mysql driver on the default connection, got [{$driver}]. Check phpunit.xml (DB_CONNECTION=mysql).",
-        );
+    expect($driver)->toBe('mysql', "Tests must use the mysql driver on the default connection, got [{$driver}]. Check phpunit.xml (DB_CONNECTION=mysql).");
+    expect($database)->toBe('anakata_test', "Tests must use the anakata_test database, got [{$database}]. Check phpunit.xml (DB_DATABASE=anakata_test) so tests never hit the app database.");
+});
 
-        $this->assertSame(
-            'anakata_test',
-            $database,
-            "Tests must use the anakata_test database, got [{$database}]. Check phpunit.xml (DB_DATABASE=anakata_test) so tests never hit the app database.",
-        );
-    }
-
-    public function test_core_tables_exist_after_migration(): void
-    {
-        $this->assertTrue(Schema::hasTable('users'), 'users table missing after migration.');
-        $this->assertTrue(Schema::hasTable('sessions'), 'sessions table missing after migration.');
-        $this->assertTrue(Schema::hasTable('cache'), 'cache table missing after migration.');
-        $this->assertTrue(Schema::hasTable('jobs'), 'jobs table missing after migration.');
-    }
-}
+test('core tables exist after migration', function (): void {
+    expect(Schema::hasTable('users'))->toBeTrue('users table missing after migration.');
+    expect(Schema::hasTable('sessions'))->toBeTrue('sessions table missing after migration.');
+    expect(Schema::hasTable('cache'))->toBeTrue('cache table missing after migration.');
+    expect(Schema::hasTable('jobs'))->toBeTrue('jobs table missing after migration.');
+});
