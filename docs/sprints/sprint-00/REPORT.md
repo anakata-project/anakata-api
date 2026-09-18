@@ -572,3 +572,239 @@ EOF
 git push origin HEAD
 ```
 
+## Task 11 · Panel shell (RMS ⇄ CRM)
+
+### What was built
+`anakata-panel` is no longer the Nuxt UI starter. It is an SPA on **port 3001** (`ssr: false`) that `extends: ['../anakata-ui']`. Current section is the route prefix only (`/rms` vs `/crm`). Last path per section lives in `localStorage` (`anakata.section.last.rms` / `.crm`). Homes: RMS Calendar, CRM Pipeline.
+
+`nuxt.config` declares `i18n.locales` (`en` + `en.json`) so the panel file **merges** with the layer’s `theme.*` keys. `@nuxtjs/i18n` is not re-listed in `modules`. `@nuxtjs/tailwindcss` is gone; `@nuxt/ui` `^4.11.1` and `tailwindcss` `^4.3.3` stay. Starter `app.config.ts` (green / slate) was deleted so the layer theme wins.
+
+The header switch is a two-option `role="radiogroup"` styled after RMS **`.fchip`** (hairline, IBM Plex Mono 9px, `.16em`, uppercase; `.on` = coral border + coral text). Arrow keys + Enter/Space. Unknown slugs 404. Every known item is an `AnkPanel` + “Coming in Sprint N”.
+
+`GET /api/health` via `useApi().request` → `API · OK` / `API · DOWN`.
+
+### Navigation trees (prototypes are static HTML)
+
+The prototypes’ nav is **static HTML**, not JS-generated (task file said JS; the HTML files themselves are the source). Encoded in `app/navigation/rms.ts` and `crm.ts`.
+
+**RMS** (doc 01; home = Calendar):
+
+| Group | Item | Glyph | Route | Sprint |
+|---|---|---|---|---|
+| Reservations | Booking Requests | ◍ | `/rms/reservations/booking-requests` | 4 (badge slot, no fake “2”) |
+| Reservations | Calendar | ◫ | `/rms/reservations/calendar` | 3 |
+| Reservations | Yacht Layout | ⛵ | `/rms/reservations/yacht-layout` | 3 |
+| Reservations | Bookings | ≣ | `/rms/reservations/bookings` | 4 |
+| Commercial | Payments & Revenue | ◈ | `/rms/commercial/payments` | 5 |
+| Commercial | Rates & Promotions | ◆ | `/rms/commercial/rates` | 2 |
+| Commercial | B2B & Agent Portal | ⬡ | `/rms/commercial/b2b` | 11 |
+| Commercial | Contacts In | ◉ | `/rms/commercial/contacts-in` | 6 |
+| Operations | Holds & Waitlist | ◔ | `/rms/operations/holds` | 3 |
+| Operations | Refund Approvals | ↺ | `/rms/operations/refunds` | 5 |
+| Operations | Internal Blocks | ▦ | `/rms/operations/blocks` | 3 |
+| Operations | Documents & Manifests | ▤ | `/rms/operations/documents` | 7 |
+| Operations | Guest Experience | ✧ | `/rms/operations/guest-experience` | 11 |
+| Booking Engine | Itineraries | ◇ | `/rms/booking-engine/itineraries` | 3 |
+| Booking Engine | Departures | ◷ | `/rms/booking-engine/departures` | 3 |
+| Booking Engine | Offers | ✦ | `/rms/booking-engine/offers` | **8** (engine API: offers + promo codes) |
+| Booking Engine | Engine Settings | ⚙ | `/rms/booking-engine/settings` | 2 |
+| Booking Engine | Engine Map | ⌗ | `/rms/booking-engine/map` | **8** (same sprint as the published feed) |
+| Admin | Permissions | ◈ | `/rms/admin/permissions` | 2 |
+| Admin | Business Rules | ⚖ | `/rms/admin/business-rules` | 2 |
+
+Prototype **hides** Business Rules unless admin. The role switcher is a no-op this sprint, so **Business Rules is always shown**.
+
+**CRM** (prototype groups; doc 07 §9 is a subset):
+
+| Group | Item | Glyph | Route | Sprint |
+|---|---|---|---|---|
+| Sales | Pipeline & Forecast | ⊞ | `/crm/sales/pipeline` | 10 |
+| Sales | Tasks & SLA | ✓ | `/crm/sales/tasks` | 10 |
+| Sales | Inbox — Email · WhatsApp | ✉ | `/crm/sales/inbox` | 9 |
+| Sales | Contacts | ◉ | `/crm/sales/contacts` | 9 |
+| Sales | B2B Partners | ⬡ | `/crm/sales/b2b-partners` | 9 |
+| Sales | Documents & Delivery | ▤ | `/crm/sales/documents` | 10 |
+| Marketing | Journeys / Nurture | ➤ | `/crm/marketing/journeys` | 10 |
+| Marketing | Segments | ◫ | `/crm/marketing/segments` | 10 |
+| Marketing | Campaigns & Offers | ◈ | `/crm/marketing/campaigns` | 10 |
+| Engine | Web & Engine Activity | ⌁ | `/crm/engine/activity` | 9 |
+| Engine | Automations | ↻ | `/crm/engine/automations` | 10 |
+| Engine | Internal Alerts | ▲ | `/crm/engine/alerts` | 11 |
+| System | Sync & Field Ownership | ⇄ | `/crm/system/sync` | 9 |
+| System | Consent & Data Rights | ⛉ | `/crm/system/consent` | 10 |
+
+Doc 07 §9 tabs all exist. Extra prototype items kept (prototypes win): Inbox, Contacts, B2B Partners, Journeys, Segments, Automations, Internal Alerts.
+
+Redirects: `/` and `/rms` → `/rms/reservations/calendar`; `/crm` and `/crm/pipeline` → `/crm/sales/pipeline`.
+
+### Shell diffs (RMS vs CRM HTML)
+
+- Brand subtitle: `RMS · REVENUE ENGINE` vs `CRM · REVENUE ENGINE`
+- Tophead gap / margin: `20px` / `26px` RMS vs `16px` / `24px` CRM
+- RMS has **＋ New Reservation**; CRM has **⇄ RMS · ENGINE SYNCED** `.sysbadge`
+- CRM CSS has no `.who { display:flex }` (RMS does) — used the RMS flex so the switch + controls align in both
+- Role labels are identical (`CAROLINA — ADMIN`, `MATEO — MANAGER`, `LUCÍA — SALES EXEC`)
+- Date-range `.drbar` is RMS-only (empty header slot this sprint; injected per view later)
+
+Wordmarks and the aside prow were extracted from the prototype PNGs into `public/brand/` (no megabyte base64 in Vue).
+
+### Files touched
+- `../anakata-panel/nuxt.config.ts`, `package.json`, `eslint.config.mjs`, `.env.example`, `README.md`
+- `../anakata-panel/app/app.vue`, `app/error.vue`, `app/layouts/default.vue`, `app/assets/css/shell.css`
+- `../anakata-panel/app/sections.ts`, `app/composables/useSystem.ts`
+- `../anakata-panel/app/navigation/{types,rms,crm}.ts`
+- `../anakata-panel/app/pages/index.vue`, `pages/rms/index.vue`, `pages/crm/index.vue`, `pages/crm/pipeline.vue`, `pages/{rms,crm}/[group]/[item].vue`
+- `../anakata-panel/app/components/shell/{SectionSwitch,ApiStatus,PlaceholderPage}.vue`
+- `../anakata-panel/i18n/locales/en.json`
+- `../anakata-panel/public/brand/{wordmark-dark,wordmark-light,prow}.png`
+- Deleted starter: `app/pages/index.vue` (rewritten), `AppLogo.vue`, `TemplateMenu.vue`, `app/assets/css/main.css`, `app/app.config.ts`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Deviations
+- Offers and Engine Map are **sprint 8**, not 2 (engine API / published feed).
+- Business Rules always visible (role switcher is a no-op).
+- Nav encoded from static HTML; the task’s “generated by JavaScript” note does not match the files.
+- Booking Requests has a badge **slot** only — no fake count.
+- Section switch is new (not in either prototype). Styled after `.fchip`.
+
+### Open questions
+None.
+
+### Notes for later
+- Login and `panel.rms` / `panel.crm` (Sprint 1).
+- Role switcher wiring / hide Business Rules unless admin.
+- Live request badge on Booking Requests.
+- Date-range `.drbar` in the page body.
+- New Reservation modal.
+- CRM sync lamp from a real bus (none exists — B9).
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-panel (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add -A
+git commit -m "$(cat <<'EOF'
+Add the RMS ⇄ CRM staff panel shell on port 3001.
+
+EOF
+)"
+git push origin HEAD
+
+# anakata-api (REPORT only)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-00/REPORT.md
+git commit -m "$(cat <<'EOF'
+Document sprint 0 task 11 in REPORT.
+
+EOF
+)"
+git push origin HEAD
+```
+
+---
+
+## Task 12 · Engine app shell
+
+SSR public booking-engine shell on port **3000**. Extends `anakata-ui`, applies engine-only visual overrides from `booking_engine_index.html`, and shows the prototype chrome with Sprint 8 placeholder pages. English only (B1).
+
+### What was built
+
+**Layer wiring (Task 11 pattern)**
+- `extends: ['../anakata-ui']`. Modules: `@nuxt/ui` + `@nuxt/eslint`. No `@nuxtjs/tailwindcss`. No `ssr: false`. No prerender `routeRules` (home is live SSR so `API · OK` is not frozen at build).
+- `@nuxt/ui` `^4.11.1` and `tailwindcss` `^4.3.3`. i18n locales declared so engine `en.json` merges with the layer’s `theme.*` keys — `@nuxtjs/i18n` is not re-listed in `modules`.
+- `runtimeConfig.public.apiBase` + `.env.example` (`NUXT_PUBLIC_API_BASE=http://localhost:8000`; CORS via `FRONTEND_ENGINE_URL`).
+- ESLint `entryPoint` → layer `main.css`; engine chrome class names ignored.
+
+**Engine overrides**
+- Body: `background: var(--forest)`, Archivo 300, line-height **1.7**, antialiased.
+- `.mono` tracking **`.24em`**.
+- `UButton` md: IBM Plex Mono 11px, `.24em`, padding `15px 32px`, transitions on `--eo`. Solid hover `--coral-600` in CSS (not `compoundVariants` — `defu` would replace the layer array).
+- `.btn` / `.btn.cta` / `.btn.o` ported for Sprint 8. `prefers-reduced-motion` collapses animation/transition durations and disables `stageIn`.
+- Tokens and fonts stay in the layer (`--ease` / `--eo` / `--eio` kept).
+
+**Chrome (prototype-faithful)**
+- Always: topbar + footer.
+- **Hero band only on `/`** (step 1). Coords, display heading, sub, sky gradients, light-theme ivory-on-sky.
+- **Crumbs on the five later flow routes only** (hidden on `/` and `/charter`). Labels: `1 · Dates & Guests` … `6 · Confirmation`. States `cur` / `done` / upcoming.
+- Top nav: Expeditions → `/` (`.on` on every flow route), Private Charter → `/charter`. **No EN/ES**. `AnkThemeToggle` restyled as the prototype `.lang` chip.
+- Footer: prototype lines + coords + prow + `ApiStatus`.
+- Wordmarks and prow extracted to `public/brand/` (no megabyte base64). Prototype has no favicon — kept the existing `/favicon.ico`.
+- 375px: topbar / topnav / crumbs wrap at `980px`; no horizontal overflow. Checked in the browser.
+
+**Routes (placeholders)**
+
+| Route | Step | Chrome |
+|---|---|---|
+| `/` | 1 | hero only |
+| `/itineraries` | 2 | crumbs |
+| `/itineraries/[slug]` | 3 | crumbs |
+| `/book/cabins` | 4 | crumbs |
+| `/book/details` | 5 | crumbs |
+| `/book/confirmation` | 6 | crumbs |
+| `/charter` | — | neither |
+
+Each page: panel + i18n “Coming in Sprint 8”. `useFlowStep()` drives crumb `cur`/`done` and Expeditions `.on`. `useSeoMeta` title template `%s · Anakata`; `html lang=en`. Error page keeps the engine layout.
+
+**ApiStatus**
+- SSR: `useAsyncData` + `useApi().request('/api/health')` — view-source already shows `API · OK` when the API is up.
+- Client: fetch immediately on mount, then every 30s. A browser `fetch` from `http://localhost:3000` to `http://localhost:8000/api/health` succeeds; `curl -H 'Origin: http://localhost:3000'` returns `Access-Control-Allow-Origin: http://localhost:3000`.
+
+### Files touched
+- `../anakata-engine/nuxt.config.ts`, `package.json`, `pnpm-lock.yaml`, `eslint.config.mjs`, `.env.example`, `README.md`
+- `../anakata-engine/app/app.vue`, `app/app.config.ts`, `app/error.vue`, `app/layouts/default.vue`, `app/assets/css/engine.css`
+- `../anakata-engine/app/composables/useFlowStep.ts`
+- `../anakata-engine/app/components/shell/{EngineHeader,EngineHero,EngineCrumbs,EngineFooter,ApiStatus,PlaceholderPage}.vue`
+- `../anakata-engine/app/pages/{index,charter,itineraries/index,itineraries/[slug],book/cabins,book/details,book/confirmation}.vue`
+- `../anakata-engine/i18n/locales/en.json`
+- `../anakata-engine/public/brand/{wordmark-dark,wordmark-light,prow}.png`
+- Deleted starter: `app/assets/css/main.css`, `AppLogo.vue`, `TemplateMenu.vue`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Chrome vs prototype
+- Hero only on `/`. Crumbs hidden on step 1 and `/charter` (follows the prototype — not a deviation).
+- No locale switch. Theme toggle kept (`.lang` chip; button `uppercase` → `◐ LIGHT` / `◑ DARK`).
+- No favicon from the prototype (none in the HTML).
+- `ApiStatus` in the footer is a Task 12 addition (prototype has no health chip).
+
+### Deviations
+- Placeholder pages use local `.engine-placeholder` markup that copies `AnkPanel`’s look (forest-900, Oswald title, hairline), not `<AnkPanel>`. The layer component SSR’d correctly then vanished on client hydration (`useSlots()` + Nuxt UI “SSR-optimized slot function” warning). Same empty-state copy.
+- `UButton` override is size-only; hover fill is CSS. `compoundVariants` would replace the layer array via `defu`.
+- `info@anakata.co` is `info{'@'}anakata.co` in i18n — vue-i18n treats `@` as linked-message syntax.
+
+### Open questions
+None.
+
+### Notes for later (Sprint 8)
+- Search bar, itinerary cards, departures, pricing, cabins, guest forms, charter form, Pinia booking state, analytics.
+- Wire `.btn.cta` / `.btn.o` onto real actions.
+- Revisit `<AnkPanel>` once the layer component hydrates cleanly under SSR.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-engine (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add -A
+git commit -m "$(cat <<'EOF'
+Add the public booking-engine shell on port 3000.
+
+EOF
+)"
+git push origin HEAD
+
+# anakata-api (REPORT only)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-00/REPORT.md
+git commit -m "$(cat <<'EOF'
+Document sprint 0 task 12 in REPORT.
+
+EOF
+)"
+git push origin HEAD
+```
+
