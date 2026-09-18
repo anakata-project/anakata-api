@@ -1,18 +1,37 @@
 <?php
 
+use App\Http\Middleware\GuardCrmSensitiveData;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function (): void {
+            Route::middleware('api')
+                ->prefix('api/rms')
+                ->group(base_path('routes/api/rms.php'));
+
+            Route::middleware(['api', 'crm.sensitive'])
+                ->prefix('api/crm')
+                ->group(base_path('routes/api/crm.php'));
+
+            Route::middleware(['api', 'throttle:engine'])
+                ->prefix('api/engine')
+                ->group(base_path('routes/api/engine.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->alias([
+            'crm.sensitive' => GuardCrmSensitiveData::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

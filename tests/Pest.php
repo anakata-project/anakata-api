@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Support\SensitiveFields;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /*
@@ -10,3 +12,10 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)->in('Feature');
+
+function assertNoSensitiveFields(TestResponse $response): void
+{
+    $json = $response->json();
+
+    expect(SensitiveFields::keysIn(is_array($json) ? $json : []))->toBeEmpty();
+}

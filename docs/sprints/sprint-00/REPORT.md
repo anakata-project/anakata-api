@@ -190,3 +190,60 @@ None.
 - Task 05: route files, health endpoint (must appear in `/docs/api`), Pest arch tests, `Permission` stub.
 - Task 06: CI runs `composer check`; README lists `/docs/api` and `/horizon`.
 - Task 09: panel/engine `useApi()` calls `/sanctum/csrf-cookie` before mutating requests.
+
+## Task 05 · Conventional structure and health endpoint
+
+### What was built
+Conventional Laravel folders (empty domains keep `.gitkeep`), route sections registered in `bootstrap/app.php`, a `Permission` enum stub from doc 01 §19, `Money` / `SensitiveFields`, CRM sensitive-data guard middleware, Pest helper `assertNoSensitiveFields()`, and public `GET /api/health` (db / redis / queue). Arch tests guard the CRM write path, `declare(strict_types=1)` in `app/`, and ban `dd` / `dump` / `var_dump` / `ray` / `env()` in `App`.
+
+`curl http://localhost:8000/api/health` → 200, every check `ok`. The operation appears in `/docs/api` as `/health` (Scramble strips the `api` prefix). `composer check` passes (22 tests).
+
+### Permission cases
+- `bookings.view_all`, `bookings.create`, `bookings.change_status`, `bookings.move`, `bookings.delete` — group `bookings`
+- `users.manage` — group `users`
+- `payments.mark_wire_received`, `refunds.execute` — group `finance`
+- `commissions.override_cap`, `bookings.overdue_decision`, `refunds.approve`, `rates.manage`, `rules.manage` — group `director`
+
+No `panel.rms` / `panel.crm`. No roles table, no gates. `// TODO(Sprint 1)` on the enum.
+
+### §19 items that were unclear
+- Whether view / create / change-status / move / delete apply only to bookings or to other RMS resources. Stubbed as bookings-only.
+- Refunds named on both finance and director flags. Stubbed as `refunds.execute` (finance) vs `refunds.approve` (director).
+- §19 says “own only for Manager/Agent”; intro roles are Admin / Manager / Sales Exec. Own-records is policy, not a Permission case.
+- `panel.rms` / `panel.crm` deferred to Sprint 1.
+
+### Files touched
+- `app/Actions/{Bookings,Payments,Refunds,Commissions,Documents}/.gitkeep`
+- `app/Services/{Pricing,Availability}/.gitkeep`
+- `app/Policies/.gitkeep`, `app/Events/.gitkeep`, `app/Listeners/.gitkeep`
+- `app/Http/Controllers/{Rms,Crm,Engine}/.gitkeep`
+- `app/Http/Requests/{Rms,Crm,Engine}/.gitkeep`
+- `app/Http/Resources/{Rms,Crm,Engine}/.gitkeep`
+- `app/Enums/Permission.php`
+- `app/Support/Money.php`, `SensitiveFields.php`, `HealthChecker.php`
+- `app/Http/Controllers/HealthController.php`, `Controller.php` (strict types)
+- `app/Http/Middleware/GuardCrmSensitiveData.php`
+- `app/Models/User.php` (strict types)
+- `app/Providers/AppServiceProvider.php` (strict types + `engine` limiter)
+- `bootstrap/app.php`
+- `routes/api.php`, `routes/api/rms.php`, `routes/api/crm.php`, `routes/api/engine.php`
+- `tests/Pest.php` (`assertNoSensitiveFields`)
+- `tests/Unit/Support/MoneyTest.php`, `SensitiveFieldsTest.php`
+- `tests/Feature/Support/AssertNoSensitiveFieldsTest.php`
+- `tests/Feature/Health/HealthEndpointTest.php`
+- `tests/Feature/Crm/GuardCrmSensitiveDataTest.php`
+- `tests/Arch/ArchTest.php`
+- `phpunit.xml` (Arch suite)
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Deviations
+- `HealthChecker` is not `final` so Laravel `partialMock` can replace `redis()` in the 503 feature test. Mockery cannot replace methods on a final class that is type-hinted.
+- Added an `Arch` testsuite in `phpunit.xml`. Pest only ran `tests/Unit` and `tests/Feature`; `tests/Arch` would otherwise be skipped.
+
+### Open questions
+None beyond the §19 ambiguities above.
+
+### Notes for later
+- Sprint 1 completes the Permission list, `roles` table, and Gate registration.
+- Every CRM endpoint test should call `assertNoSensitiveFields()`.
+- Task 06: CI runs `composer check`; README lists `/docs/api` and `/horizon`.
