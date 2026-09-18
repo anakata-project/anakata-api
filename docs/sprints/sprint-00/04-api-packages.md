@@ -12,9 +12,9 @@ The packages the architecture needs are installed and configured, and there is o
 All commands run as `docker compose exec app sh -c "…"`.
 
 1. **`laravel/sanctum`**, set up for SPA cookie auth:
-   - `SANCTUM_STATEFUL_DOMAINS=localhost:3000,localhost:3001,localhost:3002`
+   - `SANCTUM_STATEFUL_DOMAINS=localhost:3000,localhost:3001`
    - `SESSION_DOMAIN=localhost`, session driver `redis`
-   - `config/cors.php`: paths `api/*` and `sanctum/csrf-cookie`; allowed origins are the three frontend URLs from env; `supports_credentials: true`
+   - `config/cors.php`: paths `api/*` and `sanctum/csrf-cookie`; allowed origins are the two frontend URLs (engine and panel) from env; `supports_credentials: true`
 2. **`laravel/horizon`** on Redis. Enable the queue-worker service from task 02 (run it as `php artisan horizon`). Make the Horizon dashboard accessible in the local environment only.
 3. **`dedoc/scramble`** for OpenAPI: UI at `/docs/api`, JSON at `/docs/api.json`, local environment only. Document only routes under `api/`.
 4. **Dev tools:**

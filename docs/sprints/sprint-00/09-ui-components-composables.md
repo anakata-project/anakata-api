@@ -34,5 +34,5 @@ The first shared building blocks exist and are tested: labels, pills, panels, KP
 ## Acceptance criteria
 - [ ] `pnpm test`, `pnpm lint` and `pnpm typecheck` pass.
 - [ ] Components match their prototype counterparts in both themes.
-- [ ] `useApi()` is covered by unit tests with mocked fetch. (The live end-to-end call is verified in the app shells, tasks 11–13, whose origins are in the API's CORS list.)
+- [ ] `useApi()` is covered by unit tests with mocked fetch. (The live end-to-end call is verified in the app shells, tasks 11–12, whose origins are in the API's CORS list.)
 - [ ] A "Task 09" section appended to `REPORT.md`, listing pill variants and date formats found.

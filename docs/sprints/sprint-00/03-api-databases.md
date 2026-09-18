@@ -16,7 +16,7 @@ All commands run as `docker compose exec app sh -c "…"`.
 2. **Testing environment.** Create `.env.testing` pointing both connections at the `_test` databases. The base `TestCase` uses `RefreshDatabase` with `protected array $connectionsToTransact = ['rms', 'crm'];`.
 3. **Migration folders.** Create `database/migrations/rms/` and `database/migrations/crm/`. Move Laravel's default migrations (users, password reset tokens, sessions, cache, jobs) into `rms/`. Each connection keeps its own `migrations` table.
 4. **`anakata:migrate` command.** Options: `--fresh`, `--seed`, `--env-testing` (optional). It migrates `rms` with `--database=rms --path=database/migrations/rms`, then `crm` the same way. It prints what it did per connection. From now on this command is used everywhere instead of `migrate`.
-5. **Environment files.** `.env.example` must be complete and commented: both databases, Redis, mail → Mailpit, app URL, and the three frontend URLs (`http://localhost:3000/3001/3002`).
+5. **Environment files.** `.env.example` must be complete and commented: both databases, Redis, mail → Mailpit, app URL, and the two frontend URLs (`http://localhost:3000` engine, `http://localhost:3001` panel).
 6. **Isolation tests (Pest).**
    - The `crm` connection cannot read the RMS database: `DB::connection('crm')->select('SELECT 1 FROM anakata_rms_test.migrations LIMIT 1')` throws a `QueryException` (access denied).
    - The reverse: `rms` cannot read `anakata_crm_test`.

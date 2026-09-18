@@ -1,9 +1,11 @@
 # Sprint 0 · Foundations
 
-**Goal:** the five repos run together with the final architecture in place, and there are no business features yet.
+**Goal:** the four repos run together with the final architecture in place, and there are no business features yet.
 - **anakata-api:** two databases with separate MySQL users, modules with enforced boundaries, Sanctum/CORS, OpenAPI and CI.
 - **anakata-ui:** the shared layer makes Nuxt UI look exactly like the prototypes.
-- **anakata-rms / anakata-crm / anakata-engine:** each app shows its prototype's shell and reaches the API.
+- **anakata-panel:** one staff app containing the RMS and the CRM, with a header switch that swaps the navigation.
+- **anakata-engine:** the public site's shell.
+- Both apps reach the API.
 
 ## How this sprint is run
 Tasks are given to Cursor **one at a time, in order**. Each task names its repo at the top; open Cursor's agent in that repo (inside the multi-root workspace).
@@ -21,20 +23,20 @@ After each task, Cursor appends a section to `REPORT.md` in this folder. Review 
 | 08 | anakata-ui | Nuxt UI component theme (`app.config.ts`) |
 | 09 | anakata-ui | Shared `Ank*` components and composables |
 | 10 | anakata-ui | Style guide, CI, release `v0.1.0` |
-| 11 | anakata-rms | App shell |
-| 12 | anakata-crm | App shell |
-| 13 | anakata-engine | App shell |
+| 11 | anakata-panel | Panel shell: RMS ⇄ CRM switch, both navigations, placeholders |
+| 12 | anakata-engine | App shell |
 
-Tasks 07–10 can run in parallel with 01–06, **except** that `useApi()` (task 09) is only tested end-to-end once task 05's health endpoint exists. Tasks 11–13 need both 06 and 10 done.
+Tasks 07–10 can run in parallel with 01–06, **except** that `useApi()` (task 09) is only tested end-to-end once task 05's health endpoint exists. Tasks 11–12 need both 06 and 10 done.
 
 ## Context every task needs
 - Rules: `.cursor/rules/*.mdc` in each repo (loaded automatically).
 - Architecture and resolved contradictions: `anakata-api/docs/requirements/08-dev-decisions.md`.
 - **anakata-api commands run inside Docker**: `docker compose exec app sh -c "<command>"`. Never on the host.
 - **No permissions package.** Permissions are a PHP enum, roles are a table (Sprint 1 builds them; task 05 only creates the enum file).
-- Local ports: engine 3000, RMS 3001, CRM 3002, API 8000.
+- Local ports: engine 3000, panel 3001, API 8000, ui playground 3010.
+- Laravel 13.
 
 ## Definition of done for the sprint
-- "Anakata: start everything" (workspace task) runs the API, the queue and the three apps.
-- Every app shows `API · OK`, and its shell matches its prototype in both themes.
+- "Anakata: start everything" (workspace task) runs the API, the queue, the panel and the engine.
+- Both apps show `API · OK`; the panel's RMS and CRM sides match their prototypes, and the engine matches its prototype, in both themes.
 - All CI pipelines are green, and `anakata-ui` is tagged `v0.1.0`.
