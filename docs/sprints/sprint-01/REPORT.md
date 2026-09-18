@@ -120,3 +120,95 @@ EOF
 
 Leave `docs/requirements/08-dev-decisions.md` unstaged; it is not part of this task.
 
+## Task 02 · Audit columns and append-only history
+
+### What was built
+Every model gets `created_by` / `updated_by` through `Blueprint::auditColumns()` and `HasAuditColumns`. `users` gained the columns in a new migration; `roles` already had them from task 01. On create, both columns use `??= Auth::id()`. On update, `updated_by` is set to `Auth::id()` unless it is already dirty; a System update writes `null`.
+
+`change_history` is append-only. Eloquent `save()` on an existing row, `update()`, and `delete()` throw. MySQL `BEFORE UPDATE` and `BEFORE DELETE` triggers `SIGNAL SQLSTATE '45000'`. `History` is the only writer: actor or System, source from the `/api/*` prefix (`rms` / `crm` / `engine` / `auth`, else `system`), redaction of `SensitiveFields` plus `password` and `remember_token` (key kept, value `[redacted]`), `diff()` after save via `getChanges()` / `getPrevious()`. The transaction guard compares `DB::transactionLevel()` to `History::$baseTransactionLevel` (set in `TestCase::setUp()` after RefreshDatabase begins its wrapping transaction).
+
+`Relation::enforceMorphMap()` registers `user` and `role`. `ChangeHistoryResource` is ready for task 04; no history routes yet.
+
+`composer check` passes (73 tests, Pint, Larastan level 6).
+
+### Action base-class decision
+Abstract `App\Actions\Action` with a `transaction()` helper, not a documented convention. Task 04 will add many user/role Actions that must share “one DB transaction, one `History::record`, events after commit”. A typed `handle()` stays on each subclass (Larastan). Side-effect events stay on the event classes via `ShouldDispatchAfterCommit`; the base does not dispatch. No concrete Action in this task.
+
+### Trigger privileges
+`GRANT ALL` on `anakata` / `anakata_test` was not enough. MySQL 8.4 has binary logging on, so `CREATE TRIGGER` as the app user failed with error 1419 (`SUPER` or `log_bin_trust_function_creators`).
+
+Fix:
+- `docker/mysql/init/01-databases.sh`: `SET GLOBAL` + `SET PERSIST log_bin_trust_function_creators = 1` (new volumes only)
+- `docker/mysql/conf.d/triggers.cnf` mounted at `/etc/mysql/conf.d` in `docker-compose.yml` so existing volumes pick it up on recreate
+- `docker-compose.test.yml` `test-db`: `--log-bin-trust-function-creators=1` (that compose already uses `--skip-log-bin`)
+
+The running app MySQL was given `SET GLOBAL` so tests could run. Recreate it so the cnf mount sticks: `docker compose up -d mysql`.
+
+RefreshDatabase: triggers are part of the migration, so `migrate:fresh` recreates them. A `SIGNAL` did not poison the Pest wrapping transaction.
+
+### Files touched
+- `app/Models/Concerns/HasAuditColumns.php`, `app/Models/ChangeHistory.php`, `app/Models/User.php`, `app/Models/Role.php`
+- `app/Support/History/History.php`
+- `app/Actions/Action.php`
+- `app/Http/Resources/Rms/ChangeHistoryResource.php`
+- `app/Providers/AppServiceProvider.php`
+- `database/migrations/2026_09_18_200003_add_audit_columns_to_users_table.php`
+- `database/migrations/2026_09_18_200004_create_change_history_table.php`
+- `tests/TestCase.php`, `tests/Arch/ArchTest.php`
+- `tests/Feature/History/*`
+- `.cursor/rules/laravel.mdc` (History section)
+- `docker/mysql/init/01-databases.sh`, `docker/mysql/conf.d/triggers.cnf`, `docker-compose.yml`, `docker-compose.test.yml`
+- `docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- `ChangeHistory` sets `protected $table = 'change_history'` because Eloquent would otherwise use `change_histories`.
+- The HasAuditColumns arch test also ignores the trait itself (`App\Models\Concerns` is under `App\Models`). `ChangeHistory` remains the only model exception.
+- Pest has `toUseTrait`, not `toHaveTrait`.
+- `Action::transaction()` wraps `DB::transaction()` with a void inner closure so Larastan 6 can resolve Laravel's `TCallbackReturnType` template.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 04: first concrete Actions write `user.*` / `role.*` history and mount `GET /roles/{role}/history` and `GET /users/{user}/history` on `ChangeHistoryResource`.
+- Task 05: exclude the reference-sequence model from the `HasAuditColumns` arch test (one more line in the ignoring list).
+- **Go-live sprint: managed MySQL in production must allow trigger creation** (`log_bin_trust_function_creators=1` or equivalent SUPER/TRIGGER setup). Without it, `migrate` cannot create the append-only triggers.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# Recreate MySQL so the conf.d mount applies (existing volume). Then migrate the app DB.
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+docker compose up -d mysql
+docker compose exec app sh -c "php artisan migrate"
+
+# anakata-api (branch dev)
+git add \
+  app/Models/Concerns/HasAuditColumns.php \
+  app/Models/ChangeHistory.php \
+  app/Models/User.php \
+  app/Models/Role.php \
+  app/Support/History/History.php \
+  app/Actions/Action.php \
+  app/Http/Resources/Rms/ChangeHistoryResource.php \
+  app/Providers/AppServiceProvider.php \
+  database/migrations/2026_09_18_200003_add_audit_columns_to_users_table.php \
+  database/migrations/2026_09_18_200004_create_change_history_table.php \
+  tests/TestCase.php \
+  tests/Arch/ArchTest.php \
+  tests/Feature/History \
+  .cursor/rules/laravel.mdc \
+  docker/mysql/init/01-databases.sh \
+  docker/mysql/conf.d/triggers.cnf \
+  docker-compose.yml \
+  docker-compose.test.yml \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add audit columns and an append-only change history.
+
+EOF
+)"
+```
+

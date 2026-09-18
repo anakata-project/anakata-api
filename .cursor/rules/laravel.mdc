@@ -72,6 +72,13 @@ app/
 - Every `Permission` case is registered as a Gate ability (loop over `Permission::cases()`), so `$user->can(Permission::BookingsCreate->value)` and `@can` work. Policies combine the permission with record rules (own-records rule for Manager / Sales Exec).
 - The API exposes the enum (value + label + group) so the RMS role editor can list permissions without hard-coding them.
 
+## History
+- Event names are `{subject}.{verb}` in dot notation (`user.invited`, `role.updated`).
+- Every Action writes exactly one `change_history` entry per logical change, through `App\Support\History\History`, inside the Action's transaction. A no-op (nothing changed) writes no entry.
+- A reason is required where a document says so (cancellations, manual FULLY_PAID, OPS-007 decisions, deletion, release). Validate it in the FormRequest; do not invent it in the Action.
+- Sensitive values (and `password` / `remember_token`) are redacted automatically by `History`. The key stays; the value becomes `[redacted]`.
+- History is never written from controllers. Controllers call Actions; Actions call `History`.
+
 ## Events
 - Laravel events + queued listeners are only for side effects (emails, Stripe, engine availability push, CRM tasks raised by booking changes). Dispatch after commit (`ShouldDispatchAfterCommit`).
 - No outbox, no `EventEnvelope`, no internal sync bus. CRM data derived from bookings is computed from the booking tables directly.

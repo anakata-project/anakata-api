@@ -34,6 +34,7 @@ services:
       - --innodb-flush-log-at-trx-commit=0
       - --sync-binlog=0
       - --skip-log-bin
+      - --log-bin-trust-function-creators=1
       - --performance-schema=OFF
     tmpfs:
       - /var/lib/mysql

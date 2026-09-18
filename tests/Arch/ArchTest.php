@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\ChangeHistory;
+use App\Models\Concerns\HasAuditColumns;
+use App\Support\History\History;
+
 arch('crm controllers do not use money or booking write paths')
     ->expect('App\Http\Controllers\Crm')
     ->not->toUse([
@@ -12,6 +16,18 @@ arch('crm controllers do not use money or booking write paths')
         'App\Actions\Documents',
         'App\Services\Pricing',
     ]);
+
+arch('models use HasAuditColumns')
+    ->expect('App\Models')
+    ->toUseTrait(HasAuditColumns::class)
+    ->ignoring([
+        ChangeHistory::class,
+        HasAuditColumns::class,
+    ]);
+
+arch('controllers do not write history')
+    ->expect('App\Http\Controllers')
+    ->not->toUse(History::class);
 
 arch('every class in app uses strict types')
     ->expect('App')

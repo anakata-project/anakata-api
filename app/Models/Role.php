@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Casts\PermissionCollection;
 use App\Enums\Permission;
+use App\Models\Concerns\HasAuditColumns;
 use Database\Factories\RoleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +22,7 @@ use LogicException;
 class Role extends Model
 {
     /** @use HasFactory<RoleFactory> */
-    use HasFactory;
+    use HasAuditColumns, HasFactory;
 
     /**
      * @return array<string, string>
