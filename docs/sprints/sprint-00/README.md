@@ -1,7 +1,7 @@
 # Sprint 0 · Foundations
 
 **Goal:** the four repos run together with the final architecture in place, and there are no business features yet.
-- **anakata-api:** one database + test database (one user), sensitive-data guard middleware, modules with enforced boundaries, Sanctum/CORS, OpenAPI and CI.
+- **anakata-api:** one database + test database (one user), conventional Laravel folders, route sections, sensitive-data guard middleware, Sanctum/CORS, OpenAPI and CI.
 - **anakata-ui:** the shared layer makes Nuxt UI look exactly like the prototypes.
 - **anakata-panel:** one staff app containing the RMS and the CRM, with a header switch that swaps the navigation.
 - **anakata-engine:** the public site's shell.
@@ -15,9 +15,9 @@ After each task, Cursor appends a section to `REPORT.md` in this folder. Review 
 |---|---|---|
 | 01 | anakata-api | Verify the documentation paths, write `INDEX.md` |
 | 02 | anakata-api | Extend the Docker setup (MySQL with one database + test database, one user, Redis, Mailpit) |
-| 03 | anakata-api | Database connection and module migrations (single connection, `loadMigrationsFrom`, `crm_` prefix) |
+| 03 | anakata-api | Database connection and standard `database/migrations` (single connection, no `crm_` prefix) |
 | 04 | anakata-api | Packages: Sanctum, Horizon, Scramble, Pest, Larastan, Pint |
-| 05 | anakata-api | Module skeleton, routes, `Permission` enum stub, Money, health endpoint, arch tests |
+| 05 | anakata-api | Conventional folders, route files, `Permission` enum stub, Money, health endpoint, arch tests |
 | 06 | anakata-api | CI and README |
 | 07 | anakata-ui | Layer setup, fonts, design tokens, mapping to Nuxt UI |
 | 08 | anakata-ui | Nuxt UI component theme (`app.config.ts`) |

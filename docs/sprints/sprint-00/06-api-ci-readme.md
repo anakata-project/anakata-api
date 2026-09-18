@@ -16,7 +16,7 @@ Every push is checked automatically, and a new developer can run the API from th
    - `.env.testing` values supplied through workflow env.
    - Then `composer check`. Any failure fails the build.
 2. **`README.md`**, rewritten around daily use. Every PHP command in the form `docker compose exec app sh -c "…"`:
-   - Prerequisites and first-time setup (`.env`, build, `php artisan migrate` — runs both modules' migrations)
+   - Prerequisites and first-time setup (`.env`, build, `php artisan migrate`)
    - Start and stop
    - Running artisan and composer commands
    - Tests, lint, static analysis (`composer check`)
