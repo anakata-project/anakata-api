@@ -48,3 +48,14 @@ Decisions taken by the development team at the start of the build. They sit **ab
 | B6 (doc 05) | On-board charging | Extras can be added after departure with status "on board"; settlement mechanics deferred. |
 | B7 (doc 05) | Photography | Gradient fallbacks (already in the itinerary model). |
 | Engine route maps | Northern Passage + Festive maps; SCY→Baltra vs SCY→SCY | Western map only; per-itinerary map slot kept. |
+
+## D · Sprint 1 decisions (18 Sep 2026)
+
+| # | Decision |
+|---|---|
+| D1 | **Sign-in**: email and password, plus "forgot password". No two-factor authentication yet (to be revisited before go-live; Sanctum sessions leave room for it). |
+| D2 | **Users**: no self-registration. An admin creates a user, who receives an invitation email with a link, valid 7 days, to set a password. The first admin in each environment is created with `php artisan anakata:create-admin`. Users are never deleted, only disabled. |
+| D3 | **Roles**: three seeded system roles, Admin, Manager and Sales Exec. System roles cannot be deleted or renamed. **Admin always holds every permission** (including permissions added later) and cannot be edited. Manager and Sales Exec permissions can be edited. Admins can add roles. One role per user: a user who needs a flag their role lacks (the prototype's "CFO (external) · Agent + finance") gets a role that includes it. |
+| D4 | **Permissions per area** (`bookings.*`, `requests.*`, `offers.*`…). Refunds are split into `refunds.approve` (director group) and `refunds.execute` (finance group). The own-records rule lives in policies, not in the enum. The one related permission is `records.act_on_any`, which lets a role bypass the rule (Admin by default). |
+| D5 | **One append-only `change_history` table** for every entity: when, who, event, before/after, reason where required. Rows are never updated or deleted (enforced in code and by database triggers). **Sensitive values are never written to history**, only the field name. Rates, business rules and engine settings additionally keep their own publish history (doc 02). |
+| D6 | **Time**: everything is stored and exchanged in UTC (ISO-8601 with `Z`). The panel shows timestamps in Galápagos time (`Pacific/Galapagos`, UTC−6, no daylight saving). Calendar dates (departure dates, date of birth) are dates and are never shifted. The business time zone also decides the year in references (`ANK-2026-…`) and, later, business-hour calculations. |

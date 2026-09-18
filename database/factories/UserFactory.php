@@ -1,7 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Factories;
 
+use App\Enums\SystemRole;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -18,8 +22,6 @@ class UserFactory extends Factory
     protected static ?string $password;
 
     /**
-     * Define the model's default state.
-     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -33,13 +35,27 @@ class UserFactory extends Factory
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn (array $attributes): array => [
             'email_verified_at' => null,
         ]);
+    }
+
+    public function withRole(SystemRole $role): static
+    {
+        return $this->state(function () use ($role): array {
+            $model = Role::query()->firstOrCreate(
+                ['slug' => $role->value],
+                [
+                    'name' => $role->label(),
+                    'description' => null,
+                    'permissions' => $role->defaultPermissions(),
+                    'is_system' => true,
+                ],
+            );
+
+            return ['role_id' => $model->id];
+        });
     }
 }

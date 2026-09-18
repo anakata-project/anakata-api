@@ -4,61 +4,145 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-// TODO(Sprint 1) Complete the Permission list (panel.rms / panel.crm, remaining
-// resource verbs). This stub is only the cases that can be derived with certainty
-// from doc 01 §19. No roles table and no gates yet.
+use InvalidArgumentException;
 
+/**
+ * Staff permissions are code, not data. Adding a case is a code change and
+ * needs a default decision for the Manager and Sales Exec roles.
+ */
 enum Permission: string
 {
+    case PanelRms = 'panel.rms';
+    case PanelCrm = 'panel.crm';
+
+    case UsersManage = 'users.manage';
+    case RolesManage = 'roles.manage';
+    case RecordsActOnAny = 'records.act_on_any';
+
     case BookingsViewAll = 'bookings.view_all';
     case BookingsCreate = 'bookings.create';
     case BookingsChangeStatus = 'bookings.change_status';
     case BookingsMove = 'bookings.move';
     case BookingsDelete = 'bookings.delete';
-    case UsersManage = 'users.manage';
+
+    case RequestsConfirm = 'requests.confirm';
+    case RequestsRelease = 'requests.release';
+
+    case DeparturesManage = 'departures.manage';
+    case ItinerariesManage = 'itineraries.manage';
+    case BlocksManage = 'blocks.manage';
+
+    case RatesManage = 'rates.manage';
+    case RulesView = 'rules.view';
+    case RulesManage = 'rules.manage';
+    case EngineSettingsManage = 'engine_settings.manage';
+    case OffersManage = 'offers.manage';
+    case OffersApprove = 'offers.approve';
+    case ExtrasManage = 'extras.manage';
+    case AgenciesManage = 'agencies.manage';
+
+    case GuestsViewSensitive = 'guests.view_sensitive';
+
+    case PipelineMoveStage = 'pipeline.move_stage';
+
     case PaymentsMarkWireReceived = 'payments.mark_wire_received';
     case RefundsExecute = 'refunds.execute';
+
+    case RefundsApprove = 'refunds.approve';
     case CommissionsOverrideCap = 'commissions.override_cap';
     case BookingsOverdueDecision = 'bookings.overdue_decision';
-    case RefundsApprove = 'refunds.approve';
-    case RatesManage = 'rates.manage';
-    case RulesManage = 'rules.manage';
 
     public function label(): string
     {
         return match ($this) {
-            self::BookingsViewAll => 'View all bookings',
-            self::BookingsCreate => 'Create bookings',
-            self::BookingsChangeStatus => 'Change booking status',
-            self::BookingsMove => 'Move bookings',
-            self::BookingsDelete => 'Delete bookings',
+            self::PanelRms => 'Access RMS',
+            self::PanelCrm => 'Access CRM',
             self::UsersManage => 'Manage users',
-            self::PaymentsMarkWireReceived => 'Mark wires received',
+            self::RolesManage => 'Manage roles',
+            self::RecordsActOnAny => 'Act on any record',
+            self::BookingsViewAll => 'View all reservations',
+            self::BookingsCreate => 'Create reservation',
+            self::BookingsChangeStatus => 'Change reservation status',
+            self::BookingsMove => 'Move reservation',
+            self::BookingsDelete => 'Delete reservation',
+            self::RequestsConfirm => 'Confirm requests',
+            self::RequestsRelease => 'Release requests',
+            self::DeparturesManage => 'Manage departures',
+            self::ItinerariesManage => 'Manage itineraries',
+            self::BlocksManage => 'Manage internal blocks',
+            self::RatesManage => 'Edit rates, deposit terms and discount rules',
+            self::RulesView => 'View business rules',
+            self::RulesManage => 'View and adjust business rules',
+            self::EngineSettingsManage => 'Manage engine settings',
+            self::OffersManage => 'Manage offers',
+            self::OffersApprove => 'Approve offers',
+            self::ExtrasManage => 'Manage extras catalog',
+            self::AgenciesManage => 'Manage agencies',
+            self::GuestsViewSensitive => 'View sensitive guest data',
+            self::PipelineMoveStage => 'Move lead stage',
+            self::PaymentsMarkWireReceived => 'Mark wire received',
             self::RefundsExecute => 'Execute refunds',
-            self::CommissionsOverrideCap => 'Override commission cap',
-            self::BookingsOverdueDecision => 'OPS-007 overdue decisions',
             self::RefundsApprove => 'Approve refunds',
-            self::RatesManage => 'Manage rates',
-            self::RulesManage => 'Manage business rules',
+            self::CommissionsOverrideCap => 'Approve commission above cap',
+            self::BookingsOverdueDecision => 'OPS-007 overdue decisions',
         };
     }
 
     public function group(): string
     {
         return match ($this) {
+            self::PanelRms,
+            self::PanelCrm => 'sections',
+            self::UsersManage,
+            self::RolesManage,
+            self::RecordsActOnAny => 'admin',
             self::BookingsViewAll,
             self::BookingsCreate,
             self::BookingsChangeStatus,
             self::BookingsMove,
             self::BookingsDelete => 'bookings',
-            self::UsersManage => 'users',
+            self::RequestsConfirm,
+            self::RequestsRelease => 'requests',
+            self::DeparturesManage,
+            self::ItinerariesManage,
+            self::BlocksManage => 'inventory',
+            self::RatesManage,
+            self::RulesView,
+            self::RulesManage,
+            self::EngineSettingsManage,
+            self::OffersManage,
+            self::OffersApprove,
+            self::ExtrasManage,
+            self::AgenciesManage => 'commercial',
+            self::GuestsViewSensitive => 'guests',
+            self::PipelineMoveStage => 'crm',
             self::PaymentsMarkWireReceived,
             self::RefundsExecute => 'finance',
-            self::CommissionsOverrideCap,
-            self::BookingsOverdueDecision,
             self::RefundsApprove,
-            self::RatesManage,
-            self::RulesManage => 'director',
+            self::CommissionsOverrideCap,
+            self::BookingsOverdueDecision => 'director',
+        };
+    }
+
+    public function isFlag(): bool
+    {
+        return in_array($this->group(), ['finance', 'director'], true);
+    }
+
+    public static function groupLabel(string $group): string
+    {
+        return match ($group) {
+            'sections' => 'Sections',
+            'admin' => 'Admin',
+            'bookings' => 'Bookings',
+            'requests' => 'Requests',
+            'inventory' => 'Inventory',
+            'commercial' => 'Commercial',
+            'guests' => 'Guests',
+            'crm' => 'CRM',
+            'finance' => 'Finance',
+            'director' => 'Director',
+            default => throw new InvalidArgumentException("Unknown permission group [{$group}]."),
         };
     }
 }
