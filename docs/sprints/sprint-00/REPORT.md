@@ -409,3 +409,85 @@ None.
 - Task 09: `AnkPill` / `AnkPanel` / `AnkLabel` (status tones belong there, not on `UBadge`).
 - Task 10: style guide replaces this temporary playground.
 - Task 12: engine shell (larger buttons, `--forest` page bg, easing).
+
+## Task 09 · Shared components and composables
+
+### What was built
+Shared `Ank*` components and `useMoney` / `useDates` / `useApi` in the layer. Vitest is in the repo (`pnpm test`). `runtimeConfig.public.apiBase` defaults to `http://localhost:8000`. Theme-toggle copy lives in `i18n/locales/en.json`.
+
+The temporary playground at `http://localhost:3010` now starts with the `Ank*` gallery and `AnkThemeToggle` (replaces `UColorModeButton`). Task 10 still replaces this page.
+
+### Files touched
+- `../anakata-ui/package.json`, `../anakata-ui/pnpm-lock.yaml` — `vitest`, `@nuxt/test-utils`, `@vue/test-utils`, `happy-dom`; `test` script
+- `../anakata-ui/vitest.config.ts` — unit (node) + nuxt (playground) projects
+- `../anakata-ui/nuxt.config.ts` — `runtimeConfig.public.apiBase`
+- `../anakata-ui/i18n/locales/en.json`
+- `../anakata-ui/app/composables/useMoney.ts`, `useDates.ts`, `useApi.ts`
+- `../anakata-ui/app/components/AnkLabel.vue`, `AnkPill.vue`, `AnkPanel.vue`, `AnkKpi.vue`, `AnkMoney.vue`, `AnkThemeToggle.vue`
+- `../anakata-ui/tests/unit/useMoney.test.ts`, `useDates.test.ts`, `useApi.test.ts`
+- `../anakata-ui/tests/components/Ank{Label,Pill,Panel,Kpi,Money,ThemeToggle}.test.ts`
+- `../anakata-ui/.playground/app/pages/index.vue`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Pill classes found (RMS + CRM)
+
+AnkPill tones are only `neutral | ok | warn | coral | sand`. Booking status colours stay for Sprint 4.
+
+| Prototype class | Look | Tone |
+|---|---|---|
+| `.pill` | hair border | `neutral` |
+| `.p-conf` | `--ok` | `ok` |
+| `.p-hold` | `--warn` | `warn` |
+| `.p-canc` | `--coral` | `coral` |
+| `.p-pend` | `--sand` | `sand` |
+| `.p-req` | `--coral-400` | `coral` |
+| `.p-comp` | `--iv38` / `--iv62` | `neutral` |
+| `.p-wait` | `--iv38` | `neutral` |
+| CRM `.pill.ok` | `--ok` | `ok` |
+| CRM `.pill.hi` | `--coral` / `--coral-400` | `coral` |
+| CRM `.pill.mid` | `--sand` | `sand` |
+| CRM `.pill.new` | muted | `neutral` |
+| `.p-full` | hardcoded `#8FBF8A` (light `#43704F`) | not a 5th colour — listed only |
+| `.p-over` | filled coral, ink `#141B17` | booking-status; Sprint 4 |
+
+Not pills (omitted): `.sg-*` (segment), `.slat`, `.fchip`, calendar `.c-req`. Engine prototype has no `.pill`. RMS tracking `.14em` wins over CRM `.12em`.
+
+### Date formats found
+
+Always UTC. `null` / `undefined` → `—`. Malformed ISO throws.
+
+| Style | Source | Example |
+|---|---|---|
+| `iso` | `ymd` / `DEPS.iso` | `2027-11-07` |
+| `short` | RMS `fmtD`, calendar `DEPS.d`, bookings, engine `fmtDate` | `7 Nov 2027` |
+| `shortPadded` | CRM `fmtISO` (`day: '2-digit'`) | `07 Nov 2027` |
+| `long` | invoice / documents (`en-US` long weekday) | `Sunday, November 7, 2027` |
+| `dateTime` | RMS `nowStr` / history | `18 Sep 2026, 18:22` |
+
+Month abbreviations are pinned (`Sep`, not ICU `en-GB` `Sept`) so they match the prototype seed strings.
+
+### useApi()
+
+- `credentials: 'include'`, `baseURL` from `runtimeConfig.public.apiBase`
+- Client only (`isClient` / `import.meta.client`): first mutating request shares one `GET /sanctum/csrf-cookie` promise; every mutation re-reads `XSRF-TOKEN` (never cached) and sends `X-XSRF-TOKEN`
+- SSR: no csrf-cookie call, no cookie read, no XSRF header
+- 419: reset the promise, fetch csrf-cookie again, retry once; a second 419 throws `ApiError` 419
+- `ApiError` statuses: 401, 403, 409, 419, 422 (plus 422 `errors`)
+- Helpers: `request` (`$fetch`-style) and `useFetch`
+
+### Verification
+- `pnpm test` — 24 tests
+- `pnpm lint` and `pnpm typecheck` pass
+- Playground dark then light: pill tones, panel (Oswald header, hair, `--forest-900`), KPI 18px 20px / Oswald 23px, `USD 28,520` / `USD 28,520.00`, theme toggle `◐ LIGHT` / `◑ DARK` padding `9px 14px`
+
+### Deviations
+- Task said AnkPanel header is a “mono title”. Prototype `.panel h3` is Oswald 300 / 13px / `.2em` / `--sand` (same as the task 08 `UCard` header). Oswald shipped.
+- `useDates` does not call `toLocaleDateString` for short months: Node ICU `en-GB` prints `Sept`. Abbreviations are the prototype’s three-letter set.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 10: style guide replaces this temporary playground; list every `Ank*` variant.
+- Sprint 4: map booking statuses onto pills, including filled `.p-over` and `.p-full`.
+- Apps set `NUXT_PUBLIC_API_BASE` if the API is not `http://localhost:8000`. Live `useApi()` CORS is tasks 11–12.
