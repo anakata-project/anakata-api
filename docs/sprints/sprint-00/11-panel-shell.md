@@ -23,16 +23,14 @@ One staff app, running on port **3001** as an SPA (`ssr: false`), that contains 
 3. `nuxt.config.ts`:
    ```ts
    extends: [
-     process.env.ANAKATA_UI_LOCAL
-       ? '../anakata-ui'
-       : ['github:<org>/anakata-ui#v0.1.0', { install: true, auth: process.env.GITHUB_TOKEN }],
+     '../anakata-ui',
    ],
    modules: ['@nuxt/ui'],
    ssr: false,
    devServer: { port: 3001 },
    runtimeConfig: { public: { apiBase: 'http://localhost:8000' } },
    ```
-4. `.env.example` with `ANAKATA_UI_LOCAL=1`, `NUXT_PUBLIC_API_BASE=http://localhost:8000` and `GITHUB_TOKEN=`, each explained in a comment.
+4. `.env.example` with `NUXT_PUBLIC_API_BASE=http://localhost:8000`, explained in a comment.
 
 ## Do — structure (see `panel.mdc`)
 5. One codebase (no local Nuxt layers):
@@ -70,8 +68,7 @@ One staff app, running on port **3001** as an SPA (`ssr: false`), that contains 
 
 ## Do — tooling
 14. `pnpm lint`, `pnpm typecheck` and `pnpm build` pass.
-15. `.github/workflows/ci.yml`: install (layer pulled with the `GITHUB_TOKEN` secret), lint, typecheck, build.
-16. `README.md`: running locally, env vars, the CI secret, and the structure (one app, `/rms` + `/crm` pages, one `useApi()`).
+15. `README.md`: running locally, env vars, and the structure (one app, `/rms` + `/crm` pages, one `useApi()`).
 
 ## Out of scope
 Login, real roles, access permissions (Sprint 1), and any page content.
@@ -82,8 +79,7 @@ Login, real roles, access permissions (Sprint 1), and any page content.
 - [ ] The RMS side is visually identical to the RMS prototype's shell, and the CRM side to the CRM prototype's, in dark and light (compare with screenshots).
 - [ ] Every nav item of both sections routes to its placeholder; labels, glyphs and order match the prototypes.
 - [ ] Changing a token in `../anakata-ui` appears instantly in the running app.
-- [ ] With `ANAKATA_UI_LOCAL` unset and `GITHUB_TOKEN` set, `pnpm build` succeeds using `v0.1.0` from GitHub.
-- [ ] Lint, typecheck and build pass; CI is green.
+- [ ] Lint, typecheck and build pass.
 - [ ] A "Task 11" section appended to `../anakata-api/docs/sprints/sprint-00/REPORT.md`, with:
   - both navigation trees as found in the prototypes
   - the shell differences between RMS and CRM

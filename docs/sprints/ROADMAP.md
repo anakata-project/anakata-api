@@ -3,7 +3,7 @@ Follows the build order in `docs/requirements/06-build-backlog.md`. Each sprint 
 
 | Sprint | anakata-api | Frontends |
 |---|---|---|
-| **0** | Docker extension, one database + test database, packages, conventional folder skeleton + route files, health, CORS/Sanctum config, CI | anakata-ui: tokens, Nuxt UI theme, fonts, base `Ank*` components, style guide · panel: shell with RMS ⇄ CRM switch, both navigations, placeholders · engine: shell |
+| **0** | Docker extension, one database + test database, packages, conventional folder skeleton + route files, health, CORS/Sanctum config | anakata-ui: tokens, Nuxt UI theme, fonts, base `Ank*` components, style guide · panel: shell with RMS ⇄ CRM switch, both navigations, placeholders · engine: shell |
 | **1** | Users, login (Sanctum), `Permission` enum + `roles` table (finance/director flags and `panel.rms` / `panel.crm` section access as permissions), own-records policy, append-only history, sequence service for references | panel: login, role-aware navigation and section switch, role editor (Admin), topbar, theme toggle |
 | **2** | Rates, business rules (33, with source codes), engine settings — as data, draft → publish with approval reference + history; seed from seed-data.json | panel · RMS: Rates & Promotions (incl. price check), Business Rules, Engine Settings, Permissions |
 | **3** | Yachts, cabins, itineraries, departures (generate season, Sunday-only, locks), internal blocks, holds, waitlist, **computed availability** | panel · RMS: Calendar, Yacht Layout, Itineraries, Departures, Internal Blocks, Holds & Waitlist |

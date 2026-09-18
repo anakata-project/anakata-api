@@ -17,20 +17,17 @@ The public booking engine runs on port **3000** with **SSR**, extends the layer 
 3. `nuxt.config.ts`:
    ```ts
    extends: [
-     process.env.ANAKATA_UI_LOCAL
-       ? '../anakata-ui'
-       : ['github:<org>/anakata-ui#v0.1.0', { install: true, auth: process.env.GITHUB_TOKEN }],
+     '../anakata-ui',
    ],
    modules: ['@nuxt/ui'],
    runtimeConfig: { public: { apiBase: 'http://localhost:8000' } },
    ```
    Also set the dev server port (see below).
-4. `.env.example` with `ANAKATA_UI_LOCAL=1`, `NUXT_PUBLIC_API_BASE=http://localhost:8000` and `GITHUB_TOKEN=`, each explained in a comment.
+4. `.env.example` with `NUXT_PUBLIC_API_BASE=http://localhost:8000`, explained in a comment.
 5. **API status indicator.** A small `ApiStatus` component styled like the prototype's small mono status text, placed in the footer or top bar. It calls `GET /api/health` through `useApi()` and shows `API · OK` or `API · DOWN`. It proves the base URL and CORS work.
 6. **Tooling:**
    - `pnpm lint`, `pnpm typecheck` and `pnpm build` pass.
-   - `.github/workflows/ci.yml`: install (layer pulled with the `GITHUB_TOKEN` secret), lint, typecheck, build.
-   - `README.md`: running locally, env vars, the CI secret.
+   - `README.md`: running locally and env vars.
 
 ## Do — the engine shell
 7. **SSR on**, dev port **3000**.
@@ -57,8 +54,7 @@ Search, itineraries, departures, pricing, cabins, forms (Sprint 8).
 ## Acceptance criteria
 - [ ] Running with the workspace task "Anakata: start everything", the app is on its port and shows `API · OK`.
 - [ ] Changing a token in `../anakata-ui` appears instantly in the running app.
-- [ ] With `ANAKATA_UI_LOCAL` unset and `GITHUB_TOKEN` set, `pnpm build` succeeds using `v0.1.0` from GitHub.
-- [ ] Lint, typecheck and build pass; CI is green.
+- [ ] Lint, typecheck and build pass.
 - [ ] Pages are server-rendered: view-source shows the chrome's HTML.
 - [ ] The chrome is visually identical to the prototype in dark and light, and at 375px width.
 - [ ] No locale switch anywhere.

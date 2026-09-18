@@ -1,7 +1,7 @@
 # Sprint 0 · Foundations
 
 **Goal:** the four repos run together with the final architecture in place, and there are no business features yet.
-- **anakata-api:** one database + test database (one user), conventional Laravel folders, route sections, sensitive-data guard middleware, Sanctum/CORS, OpenAPI and CI.
+- **anakata-api:** one database + test database (one user), conventional Laravel folders, route sections, sensitive-data guard middleware, Sanctum/CORS, OpenAPI.
 - **anakata-ui:** the shared layer makes Nuxt UI look exactly like the prototypes.
 - **anakata-panel:** one staff app containing the RMS and the CRM, with a header switch that swaps the navigation.
 - **anakata-engine:** the public site's shell.
@@ -18,11 +18,11 @@ After each task, Cursor appends a section to `REPORT.md` in this folder. Review 
 | 03 | anakata-api | Database connection and standard `database/migrations` (single connection, no `crm_` prefix) |
 | 04 | anakata-api | Packages: Sanctum, Horizon, Scramble, Pest, Larastan, Pint |
 | 05 | anakata-api | Conventional folders, route files, `Permission` enum stub, Money, health endpoint, arch tests |
-| 06 | anakata-api | CI and README |
+| 06 | anakata-api | README |
 | 07 | anakata-ui | Layer setup, fonts, design tokens, mapping to Nuxt UI |
 | 08 | anakata-ui | Nuxt UI component theme (`app.config.ts`) |
 | 09 | anakata-ui | Shared `Ank*` components and composables |
-| 10 | anakata-ui | Style guide, CI, release `v0.1.0` |
+| 10 | anakata-ui | Style guide, release `v0.1.0` |
 | 11 | anakata-panel | Panel shell: RMS ⇄ CRM switch, both navigations, placeholders |
 | 12 | anakata-engine | App shell |
 
@@ -39,4 +39,4 @@ Tasks 07–10 can run in parallel with 01–06, **except** that `useApi()` (task
 ## Definition of done for the sprint
 - "Anakata: start everything" (workspace task) runs the API, the queue, the panel and the engine.
 - Both apps show `API · OK`; the panel's RMS and CRM sides match their prototypes, and the engine matches its prototype, in both themes.
-- All CI pipelines are green, and `anakata-ui` is tagged `v0.1.0`.
+- No CI. Local checks pass (`composer check` in the API; `pnpm lint` / `typecheck` / `build` in the apps; ui layer also `test`). `anakata-ui` is tagged `v0.1.0` locally.

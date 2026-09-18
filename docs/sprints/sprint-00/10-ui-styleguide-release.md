@@ -1,8 +1,8 @@
-# Task 10 · anakata-ui · Style guide, CI and release v0.1.0
+# Task 10 · anakata-ui · Style guide and release v0.1.0
 **Repo:** anakata-ui · **Sprint:** 0 (read `../anakata-api/docs/sprints/sprint-00/README.md` first)
 
 ## Goal
-A style-guide page proves visual parity with the prototypes, CI guards the layer, and `v0.1.0` is released for the apps.
+A style-guide page proves visual parity with the prototypes, and `v0.1.0` is tagged for the apps.
 
 ## Read first
 - `.cursor/rules/ui-layer.mdc`
@@ -22,16 +22,15 @@ A style-guide page proves visual parity with the prototypes, CI guards the layer
 2. **Tooling:**
    - `@nuxt/eslint`, `vue-tsc`, Vitest
    - Scripts: `dev` (playground on port **3010**, so it never collides with the engine on 3000), `lint`, `typecheck`, `test`, `build` (builds the playground)
-3. **CI.** `.github/workflows/ci.yml`: pnpm install with cache, then `lint`, `typecheck`, `test`, `build`.
-4. **README.md:**
+3. **README.md:**
    - What the layer provides
-   - How apps consume it: local path with `ANAKATA_UI_LOCAL=1`; pinned GitHub tag with `install: true` and `GITHUB_TOKEN` in CI
+   - How apps consume it: local path `../anakata-ui` only. Remote consumption will be decided with the git host.
    - The rule that `@nuxt/ui` and `tailwindcss` versions must match the apps
    - How to release
-5. **CHANGELOG.md** with the `v0.1.0` entry. Commit, then tag and push `v0.1.0`.
+4. **CHANGELOG.md** with the `v0.1.0` entry. Commit, then tag `v0.1.0` locally and push it to whatever remote exists.
 
 ## Acceptance criteria
 - [ ] The style guide shows every token and component. It is dark by default, and light works via the toggle.
 - [ ] Side by side with the reference screenshots, the components are indistinguishable.
-- [ ] CI is green, and tag `v0.1.0` is on GitHub.
+- [ ] Tag `v0.1.0` exists locally (and is pushed to the remote if one exists).
 - [ ] A "Task 10" section appended to `REPORT.md`.

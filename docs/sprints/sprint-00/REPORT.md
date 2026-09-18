@@ -188,7 +188,7 @@ None.
 
 ### Notes for later
 - Task 05: route files, health endpoint (must appear in `/docs/api`), Pest arch tests, `Permission` stub.
-- Task 06: CI runs `composer check`; README lists `/docs/api` and `/horizon`.
+- Task 06 rewrites the README; `composer check` must pass locally. README lists `/docs/api` and `/horizon`.
 - Task 09: panel/engine `useApi()` calls `/sanctum/csrf-cookie` before mutating requests.
 
 ## Task 05 · Conventional structure and health endpoint
@@ -246,4 +246,37 @@ None beyond the §19 ambiguities above.
 ### Notes for later
 - Sprint 1 completes the Permission list, `roles` table, and Gate registration.
 - Every CRM endpoint test should call `assertNoSensitiveFields()`.
-- Task 06: CI runs `composer check`; README lists `/docs/api` and `/horizon`.
+- Task 06 rewrites the README; `composer check` must pass locally. README lists `/docs/api` and `/horizon`.
+
+## Task 06 · README
+
+### What was built
+Replaced the Laravel skeleton README with daily-use instructions for this repo. Every PHP/Composer command is `docker compose exec app sh -c "…"`. Covers prerequisites (including the two external networks), first-time `.env` / keys / migrate, start and stop, artisan/composer, `composer check`, the URLs from the task, and where requirements and sprints live.
+
+First-time start is two-step (`mysql`/`redis`/`mailpit` with `--wait`, then `app`) because compose has no `depends_on`. After `docker compose down -v` the README says to run those start + migrate steps again.
+
+### Files touched
+- `README.md`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Verification
+Walked the documented start / `composer install` / `migrate` path on the already-running stack (`.env` and `vendor/` already present):
+
+- `GET http://localhost:8000/api/health` → 200, `status: ok`, `db` / `redis` / `queue` all `ok`
+- `http://localhost:8000/docs/api` → 200
+- `http://localhost:8000/horizon` → 200
+- `http://localhost:8025` (Mailpit) → 200
+- `docker compose exec app sh -c "composer check"` → 22 tests, Pint 51 files, Larastan clean
+
+`docker compose down -v` was not run: the approval prompt for wiping `mysql-data` was skipped. A first clone with empty passwords or missing external networks was not exercised.
+
+### Deviations
+- Did not `docker compose down -v` (see Verification). The README still documents that path: wipe empties MySQL; init recreates `anakata` / `anakata_test`; migrate again.
+- Composer inside the container prints a git `safe.directory` warning for `/app`. Noted in the README; no compose change.
+
+### Open questions
+None.
+
+### Notes for later
+- Confirm the wipe path once (`docker compose down -v`, then README steps 2–4) if a clean-volume check is needed.
+- The `safe.directory` warning can be silenced later with a container `GIT_CONFIG_*` / `safe.directory=/app` if it keeps confusing people.

@@ -1,58 +1,115 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# anakata-api
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 13 API for Anakata (Galápagos yacht expeditions). RMS and CRM are two sections of this one app. The public booking engine is a separate frontend.
 
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+PHP, Composer, Artisan, Pest, Pint and Larastan run **inside Docker**. Do not run them on the host.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+docker compose exec app sh -c "…"
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Prerequisites
 
-## Contributing
+- Docker Compose
+- Two **external** Docker networks (shared infra). Create them once if they do not exist:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+docker network create traefik-network
+docker network create mysql-network
+```
 
-## Code of Conduct
+## First-time setup
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+From this directory:
 
-## Security Vulnerabilities
+1. Copy the env files and set the MySQL passwords. Use the **same** password for `MYSQL_PASSWORD` and `DB_PASSWORD`. Leave no password blank.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+cp .env.example .env
+cp .env.testing.example .env.testing
+```
 
-## License
+2. Start MySQL, Redis and Mailpit first (the app image has no wait-for-db of its own), then the app:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+docker compose up -d --wait mysql redis mailpit
+docker compose up -d app
+```
+
+3. Install PHP dependencies, generate keys, migrate:
+
+```bash
+docker compose exec app sh -c "composer install"
+docker compose exec app sh -c "php artisan key:generate"
+docker compose exec app sh -c "php artisan key:generate --env=testing"
+docker compose exec app sh -c "php artisan migrate"
+```
+
+4. Confirm the API is up:
+
+```bash
+curl http://localhost:8000/api/health
+```
+
+A 200 response with `"status":"ok"` and `db` / `redis` / `queue` all `ok` means setup is done.
+
+If `.env` already exists (you have run this before), skip step 1. After `docker compose down -v` the MySQL volume is empty — run steps 2–4 again (Composer and keys can be skipped if `vendor/` and `APP_KEY` are already there).
+
+## Start and stop
+
+```bash
+docker compose up -d
+docker compose ps
+docker compose logs app
+
+docker compose stop
+docker compose down
+```
+
+`docker compose down -v` also deletes the MySQL volume. The next start recreates `anakata` and `anakata_test` via `docker/mysql/init/01-databases.sh`; you must migrate again.
+
+## Artisan and Composer
+
+```bash
+docker compose exec app sh -c "php artisan migrate"
+docker compose exec app sh -c "php artisan tinker"
+docker compose exec app sh -c "composer install"
+docker compose exec app sh -c "composer require package/name"
+```
+
+Do not run `docker compose exec app sh` on its own (an interactive shell). Composer may print a `safe.directory` warning for `/app`; it is harmless and the command still runs.
+
+## Tests, lint, static analysis
+
+```bash
+docker compose exec app sh -c "composer check"
+```
+
+That runs Pest, Pint (`--test`) and Larastan (level 6). Individually:
+
+```bash
+docker compose exec app sh -c "composer test"
+docker compose exec app sh -c "composer lint"
+docker compose exec app sh -c "composer analyse"
+```
+
+Tests use the `anakata_test` database (pinned in `phpunit.xml`). Credentials come from `.env.testing`.
+
+## URLs
+
+| What | URL |
+|---|---|
+| API | http://localhost:8000 |
+| Health | http://localhost:8000/api/health |
+| OpenAPI (Scramble, local only) | http://localhost:8000/docs/api |
+| Horizon (local only) | http://localhost:8000/horizon |
+| Mailpit | http://localhost:8025 |
+
+Horizon runs inside the `app` container (supervisor). Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`.
+
+Sibling apps (separate repos): booking engine `http://localhost:3000`, staff panel `http://localhost:3001`.
+
+## Requirements and sprints
+
+- Requirements: [`docs/requirements/`](docs/requirements/) — start with [`INDEX.md`](docs/requirements/INDEX.md) and [`08-dev-decisions.md`](docs/requirements/08-dev-decisions.md) (highest authority when documents disagree).
+- Sprints: [`docs/sprints/`](docs/sprints/) — roadmap in [`ROADMAP.md`](docs/sprints/ROADMAP.md); the current sprint is a folder `sprint-NN/` with a `README.md` and ordered task files.
