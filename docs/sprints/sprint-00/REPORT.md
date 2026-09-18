@@ -808,3 +808,94 @@ EOF
 git push origin HEAD
 ```
 
+---
+
+## Sprint 0 cleanup
+
+Hygiene only. No features.
+
+### What was built
+
+- **anakata-api agent files:** Replaced the Laravel Boost bootstrap in `AGENTS.md` and `CLAUDE.md` (install PHP on the host, `composer require laravel/boost`) with the same short Docker-only note. PHP / Composer / Artisan / Pest / Pint / Larastan run via `docker compose exec app sh -c "…"`. Never install PHP or Laravel Boost on the host. Rules live in `.cursor/rules/*.mdc`; architecture in `docs/requirements/08-dev-decisions.md`.
+- **Cursor rules committable:** Removed `/.cursor/` from `.gitignore`. Only `.cursor/rules/laravel.mdc` and `.cursor/rules/anakata-core.mdc` exist under `.cursor/`.
+- **Horizon boot:** `app` now `depends_on` `mysql` and `redis` with `condition: service_healthy`. Both supervisor programs have `startsecs=5` and `startretries=10`. README first-time start is a single `docker compose up -d --wait`.
+- **anakata-ui postinstall:** `package.json` runs `nuxt prepare .playground` after install so component tests have `.playground/.nuxt`.
+- **Starter leftovers:** Deleted `anakata-panel/.github/` (Nuxt UI CI; 08 A13 = no CI for now). Deleted `LICENSE` and `renovate.json` from panel and engine (Nuxt UI Templates MIT / `github>nuxt/renovate-config-nuxt`).
+
+### Files touched
+
+- `AGENTS.md`, `CLAUDE.md`
+- `.gitignore`
+- `docker-compose.yml`
+- `.docker/prod.supervisord.conf`
+- `README.md`
+- `../anakata-ui/package.json`
+- deleted `../anakata-panel/.github/workflows/ci.yml` (and the empty `.github/` tree)
+- deleted `../anakata-panel/LICENSE`, `../anakata-panel/renovate.json`
+- deleted `../anakata-engine/LICENSE`, `../anakata-engine/renovate.json`
+- `docs/sprints/sprint-00/REPORT.md`
+
+### Verification
+
+- `docker compose down && docker compose up -d`: compose waited for MySQL and Redis healthy, then started `app`.
+- `docker compose exec app sh -c "php artisan horizon:status"` → `Horizon is running.`
+- `rm -rf .playground/.nuxt` then `pnpm run postinstall` → types generated in `.playground/.nuxt`. `pnpm test` → 24 passed (9 files). `pnpm-lock.yaml` unchanged.
+
+### Deviations
+
+- `pnpm install` on an already-installed tree printed `Already up to date` and did not run `postinstall` (pnpm 11). A clean clone `pnpm install` will run it. Verification used `pnpm run postinstall` after deleting `.playground/.nuxt` instead of wiping `node_modules`.
+- Did not `rm -rf node_modules` to force a full reinstall.
+
+### Open questions
+
+None.
+
+### Notes for later
+
+None.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add AGENTS.md CLAUDE.md .gitignore docker-compose.yml \
+  .docker/prod.supervisord.conf README.md \
+  .cursor/rules/laravel.mdc .cursor/rules/anakata-core.mdc \
+  docs/sprints/sprint-00/REPORT.md
+git commit -m "$(cat <<'EOF'
+Stop host PHP bootstrap and make Horizon survive compose up.
+
+EOF
+)"
+
+# anakata-ui (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add package.json
+git commit -m "$(cat <<'EOF'
+Prepare the playground on install so component tests can run.
+
+EOF
+)"
+
+# anakata-panel (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add .github/workflows/ci.yml LICENSE renovate.json
+git commit -m "$(cat <<'EOF'
+Remove Nuxt UI starter CI, license, and Renovate config.
+
+EOF
+)"
+
+# anakata-engine (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add LICENSE renovate.json
+git commit -m "$(cat <<'EOF'
+Remove Nuxt UI starter license and Renovate config.
+
+EOF
+)"
+```
+

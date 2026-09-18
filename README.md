@@ -29,11 +29,10 @@ cp .env.example .env
 cp .env.testing.example .env.testing
 ```
 
-2. Start MySQL, Redis and Mailpit first (the app image has no wait-for-db of its own), then the app:
+2. Start the stack. The app waits until MySQL and Redis are healthy:
 
 ```bash
-docker compose up -d --wait mysql redis mailpit
-docker compose up -d app
+docker compose up -d --wait
 ```
 
 3. Install PHP dependencies, generate keys, migrate:
