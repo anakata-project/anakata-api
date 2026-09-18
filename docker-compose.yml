@@ -7,6 +7,7 @@ services:
     networks:
       - traefik-network
       - mysql-network
+      - anakata-net
     working_dir: /app
     ports:
       - 8000:80
@@ -24,14 +25,67 @@ services:
       - "traefik.http.routers.anakata-ws.service=anakata-ws"
       - "traefik.http.services.anakata-ws.loadbalancer.server.port=8080"
       - "traefik.docker.network=traefik-network"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     logging:
       driver: "json-file"
       options:
         max-size: "50m"
         max-file: "5"
 
+  mysql:
+    image: mysql:8.4
+    container_name: anakata-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    networks:
+      - mysql-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: anakata-redis
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - anakata-net
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: anakata-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8025/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - anakata-net
+
 networks:
   traefik-network:
     external: true
   mysql-network:
     external: true
+  anakata-net:
+
+volumes:
+  mysql-data:
