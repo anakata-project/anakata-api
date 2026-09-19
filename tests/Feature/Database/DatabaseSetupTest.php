@@ -18,4 +18,7 @@ test('core tables exist after migration', function (): void {
     expect(Schema::hasTable('sessions'))->toBeTrue('sessions table missing after migration.');
     expect(Schema::hasTable('cache'))->toBeTrue('cache table missing after migration.');
     expect(Schema::hasTable('jobs'))->toBeTrue('jobs table missing after migration.');
+    expect(Schema::hasTable('test_config_versions'))->toBeTrue(
+        'test_config_versions missing — tests/database/migrations must be registered for the whole suite.',
+    );
 });

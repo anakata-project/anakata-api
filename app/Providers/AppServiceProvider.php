@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\Permission;
+use App\Events\ConfigPublished;
+use App\Listeners\ClearCurrentConfigCache;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Config\CurrentConfig;
 use App\Support\Iso;
 use DateTimeInterface;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -16,6 +19,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -29,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(CurrentConfig::class);
     }
 
     /**
@@ -80,5 +84,11 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Date::serializeUsing(fn (DateTimeInterface $date): string => Iso::utc($date));
+
+        Event::listen(ConfigPublished::class, ClearCurrentConfigCache::class);
+
+        if ($this->app->runningUnitTests()) {
+            $this->loadMigrationsFrom(base_path('tests/database/migrations'));
+        }
     }
 }

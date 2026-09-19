@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Enums\SystemRole;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Config\ConfigRegistry;
 use App\Support\SensitiveFields;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\Config\TestConfigDocument;
+use Tests\Support\Config\TestConfigVersion;
 use Tests\TestCase;
 use Tests\TruncatingTestCase;
 
@@ -79,6 +83,39 @@ function externalFinanceUser(array $attributes = []): User
         'role_id' => $role->id,
         ...$attributes,
     ]);
+}
+
+/**
+ * @param  array<string, mixed>|null  $initial
+ */
+function registerTestConfig(?array $initial = null): void
+{
+    ConfigRegistry::register(
+        ConfigKind::Rates,
+        TestConfigVersion::class,
+        TestConfigDocument::class,
+        $initial,
+    );
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array{terms: array{cabin_deposit_pct: int}, title: string, bands: list<array{min: int, pct: int}>}
+ */
+function testConfigDocument(array $overrides = []): array
+{
+    /** @var array{terms: array{cabin_deposit_pct: int}, title: string, bands: list<array{min: int, pct: int}>} $document */
+    $document = array_replace_recursive([
+        'terms' => [
+            'cabin_deposit_pct' => 10,
+        ],
+        'title' => 'Cabin terms',
+        'bands' => [
+            ['min' => 120, 'pct' => 5],
+        ],
+    ], $overrides);
+
+    return $document;
 }
 
 function limitedAdminRole(): Role

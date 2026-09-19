@@ -84,6 +84,12 @@ app/
 - `App\Services\References\ReferenceService` is the only generator. Nothing derives a reference from `id`.
 - Draw inside the creating Action's transaction so a rollback also rolls the counter back.
 
+## Configuration documents
+- Business values (rates, rules, engine settings) are read only through `App\Services\Config\CurrentConfig`, never from `config()` or constants.
+- `App\Services\Config\ConfigPublisher` is the only writer. Drafts are never stored; the editor holds the draft and publish sends the whole document.
+- Published versions are immutable: `save()` on an existing row, `update()` and `delete()` throw. A change is a new version.
+- Each kind is a typed `ConfigDocument` (validation `rules()`, soft `warnings()`, `labels()` for the change list) and a `ConfigVersion` table.
+
 ## Events
 - Laravel events + queued listeners are only for side effects (emails, Stripe, engine availability push, CRM tasks raised by booking changes). Dispatch after commit (`ShouldDispatchAfterCommit`).
 - No outbox, no `EventEnvelope`, no internal sync bus. CRM data derived from bookings is computed from the booking tables directly.
