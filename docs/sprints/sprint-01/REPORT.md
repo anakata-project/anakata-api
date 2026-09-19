@@ -1389,4 +1389,92 @@ EOF
 )"
 ```
 
+## Sprint 1 · review fixes
+
+### What was built
+Three review fixes. No product behaviour change beyond schema and type guarantees the panel already assumed.
+
+**anakata-ui (blocking).** `app/types/nuxt.d.ts` was never committed because `.gitignore` ignores every `nuxt.d.ts` (Nuxt’s generated file). A fresh clone then failed typecheck in ui, panel and engine (`'anakata:api-error' not in RuntimeNuxtHooks`). The augmentation now lives in committed `app/types/anakata-augment.d.ts`: `RuntimeNuxtHooks` in `#app`, and `AppConfig.anakata.displayTimeZone` in `nuxt/schema` (`AppConfig`, not `AppConfigInput`). `.gitignore` is unchanged. Layer bumped to `0.2.1`.
+
+**anakata-api · `users.role_id` NOT NULL.** New migration lists emails and throws before altering if any user has a null `role_id`, then changes the column to NOT NULL while keeping the existing `restrictOnDelete` foreign key. `UserFactory` always assigns a role (`Role::factory()`). The no-role branches in `User::hasPermission()` / `permissions()`, `ChecksAssignableRole`, `UserResource`, `MeResource`, `LastAdminGuard`, `SendUserInvitation` and `UpdateUser` are gone; `@property-read Role $role` on `User` is the type guarantee.
+
+**anakata-api · dummy login hash.** `LoginUser` no longer uses a hardcoded `$2y$10$…` hash (cost 10). It lazily caches `Hash::make(Str::random(32))`, so the cost follows `BCRYPT_ROUNDS` in every environment (4 in tests, 12 locally).
+
+### Files touched
+**anakata-ui**
+- `app/types/anakata-augment.d.ts` (new; `app/types/nuxt.d.ts` deleted, was untracked)
+- `package.json` (`0.2.1`)
+- `CHANGELOG.md`
+
+**anakata-api**
+- `database/migrations/2026_09_19_200008_make_users_role_id_not_nullable.php`
+- `database/factories/UserFactory.php`
+- `app/Models/User.php`
+- `app/Actions/Auth/LoginUser.php`, `SendUserInvitation.php`
+- `app/Actions/Users/UpdateUser.php`
+- `app/Policies/Concerns/ChecksAssignableRole.php`
+- `app/Http/Resources/Rms/UserResource.php`, `app/Http/Resources/MeResource.php`
+- `app/Support/Users/LastAdminGuard.php`
+- `tests/Feature/Auth/UserPermissionsTest.php`, `LoginTest.php`
+- `docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- No `migrate:rollback` / `migrate` test. Schema changes implicitly commit MySQL’s wrapping transaction and leak into later `RefreshDatabase` tests. The guard is a few lines and reviewable by eye. Kept “inserting `role_id` null fails at the database” (failed insert inside the transaction is safe) and “factory always assigns a role”.
+- Also dropped the matching no-role branches in `MeResource`, `LastAdminGuard`, `SendUserInvitation` and `UpdateUser`. After `@property-read Role $role`, Larastan flagged them (`instanceof.alwaysTrue`, `nullsafe.neverNull`).
+
+### Open questions
+None.
+
+### Notes for later
+A local `users` row with `role_id` null will fail this migration until that user is given a role or deleted. That is the guard.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 163 tests, Pint, Larastan OK.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout so `extends: ['../anakata-ui']` resolves). Overlayed the uncommitted ui files onto the ui clone. Confirmed the clone has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: `pnpm typecheck` pass
+  - panel / engine: `pnpm build` pass
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# --- anakata-ui ---
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  app/types/anakata-augment.d.ts \
+  package.json \
+  CHANGELOG.md
+git commit -m "$(cat <<'EOF'
+Ship the Nuxt hook and AppConfig types on a fresh clone.
+
+EOF
+)"
+git tag v0.2.1
+```
+
+```bash
+# --- anakata-api ---
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  database/migrations/2026_09_19_200008_make_users_role_id_not_nullable.php \
+  database/factories/UserFactory.php \
+  app/Models/User.php \
+  app/Actions/Auth/LoginUser.php \
+  app/Actions/Auth/SendUserInvitation.php \
+  app/Actions/Users/UpdateUser.php \
+  app/Policies/Concerns/ChecksAssignableRole.php \
+  app/Http/Resources/Rms/UserResource.php \
+  app/Http/Resources/MeResource.php \
+  app/Support/Users/LastAdminGuard.php \
+  tests/Feature/Auth/UserPermissionsTest.php \
+  tests/Feature/Auth/LoginTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Require users.role_id and match the dummy login hash cost.
+
+EOF
+)"
+```
+
 

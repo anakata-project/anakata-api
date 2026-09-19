@@ -16,7 +16,7 @@ final class LastAdminGuard
     {
         $target->loadMissing('role');
 
-        if ($target->role === null || ! $target->role->isAdmin()) {
+        if (! $target->role->isAdmin()) {
             return;
         }
 

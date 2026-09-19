@@ -15,7 +15,7 @@ trait ChecksAssignableRole
     {
         $actor->loadMissing('role');
 
-        return $actor->role instanceof Role && $actor->role->isAdmin();
+        return $actor->role->isAdmin();
     }
 
     protected function isAssignable(User $actor, Role $role): bool
@@ -55,12 +55,6 @@ trait ChecksAssignableRole
     {
         $target->loadMissing('role');
 
-        $role = $target->role;
-
-        if (! $role instanceof Role) {
-            return $this->canBypassEscalation($actor);
-        }
-
-        return $this->isAssignable($actor, $role);
+        return $this->isAssignable($actor, $target->role);
     }
 }

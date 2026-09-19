@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 
 /**
  * @property UserStatus $status
+ * @property-read Role $role
  * @property Carbon|null $invited_at
  * @property Carbon|null $activated_at
  * @property Carbon|null $disabled_at
@@ -82,10 +83,6 @@ class User extends Authenticatable
     {
         $this->loadMissing('role');
 
-        if ($this->role === null) {
-            return false;
-        }
-
         if ($this->role->isAdmin()) {
             return true;
         }
@@ -100,20 +97,14 @@ class User extends Authenticatable
     {
         $this->loadMissing('role');
 
-        $role = $this->role;
-
-        if ($role === null) {
-            return collect();
-        }
-
-        if ($role->isAdmin()) {
+        if ($this->role->isAdmin()) {
             /** @var Collection<int, Permission> $permissions */
             $permissions = collect(Permission::cases());
 
             return $permissions;
         }
 
-        return $role->permissions;
+        return $this->role->permissions;
     }
 
     /**

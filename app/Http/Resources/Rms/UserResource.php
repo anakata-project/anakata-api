@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Rms;
 
-use App\Models\Role;
 use App\Models\User;
 use App\Support\Iso;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use LogicException;
 
 /**
  * @mixin User
@@ -35,10 +33,6 @@ class UserResource extends JsonResource
         $this->resource->loadMissing('role');
 
         $role = $this->role;
-
-        if (! $role instanceof Role) {
-            throw new LogicException('Users must have a role.');
-        }
 
         return [
             'id' => $this->id,

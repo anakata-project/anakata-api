@@ -26,7 +26,7 @@ final class UpdateUser extends Action
 
         return $this->transaction(function () use ($actor, $user, $name, $nameChanged, $newRole): User {
             $previousName = $user->name;
-            $previousRoleName = $user->role?->name;
+            $previousRoleName = $user->role->name;
 
             if ($newRole !== null) {
                 LastAdminGuard::assertCanLoseAdmin($user);

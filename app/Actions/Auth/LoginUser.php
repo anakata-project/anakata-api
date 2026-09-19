@@ -18,8 +18,9 @@ final class LoginUser
     /**
      * A valid bcrypt hash used only so unknown emails spend comparable time
      * in Hash::check as known emails. Never used as a real password.
+     * Generated with Hash::make so the cost follows BCRYPT_ROUNDS.
      */
-    private const DUMMY_PASSWORD_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+    private static ?string $dummyPasswordHash = null;
 
     public function handle(Request $request, string $email, string $password): User
     {
@@ -28,7 +29,7 @@ final class LoginUser
 
         $hash = is_string($user?->getAuthPassword()) && $user->getAuthPassword() !== ''
             ? $user->getAuthPassword()
-            : self::DUMMY_PASSWORD_HASH;
+            : self::dummyPasswordHash();
 
         $passwordMatches = Hash::check($password, $hash);
 
@@ -49,5 +50,10 @@ final class LoginUser
         $user->forceFill(['last_login_at' => now()])->save();
 
         return $user->fresh(['role']) ?? $user;
+    }
+
+    private static function dummyPasswordHash(): string
+    {
+        return self::$dummyPasswordHash ??= Hash::make(Str::random(32));
     }
 }

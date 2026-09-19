@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Auth;
 
-use App\Models\Role;
 use App\Models\User;
 use App\Notifications\UserInvitation;
 use Illuminate\Support\Facades\Password;
@@ -17,12 +16,10 @@ final class SendUserInvitation
 
         $token = Password::broker('invitations')->createToken($user);
 
-        $role = $user->role;
-
         $user->notify(new UserInvitation(
             $token,
             $inviterName,
-            $role instanceof Role ? $role->name : '',
+            $user->role->name,
         ));
 
         return self::url($user, $token);

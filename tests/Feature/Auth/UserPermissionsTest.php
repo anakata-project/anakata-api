@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Enums\SystemRole;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 
 test('admin has every permission even when stored json is empty', function (): void {
     $user = User::factory()->withRole(SystemRole::Admin)->create();
@@ -40,11 +41,14 @@ test('sales exec cannot approve refunds', function (): void {
     expect($user->sections())->toBe(['rms', 'crm']);
 });
 
-test('a user without a role has no permissions', function (): void {
+test('the user factory always assigns a role', function (): void {
     $user = User::factory()->create();
 
-    expect($user->hasPermission(Permission::PanelRms))->toBeFalse();
-    expect($user->can('panel.rms'))->toBeFalse();
-    expect($user->permissions())->toBeEmpty();
-    expect($user->sections())->toBe([]);
+    expect($user->role_id)->not->toBeNull();
+    expect($user->role)->toBeInstanceOf(Role::class);
+});
+
+test('inserting a user with a null role_id fails at the database', function (): void {
+    expect(fn () => User::factory()->create(['role_id' => null]))
+        ->toThrow(QueryException::class);
 });

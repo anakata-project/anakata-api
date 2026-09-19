@@ -35,6 +35,7 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'status' => UserStatus::Active,
             'activated_at' => now(),
+            'role_id' => Role::factory(),
         ];
     }
 

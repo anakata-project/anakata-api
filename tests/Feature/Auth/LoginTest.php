@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\LoginUser;
 use App\Enums\Permission;
 use App\Enums\SystemRole;
 use App\Enums\UserStatus;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use ReflectionClass;
 
 function failedLoginBody(): array
 {
@@ -111,6 +114,19 @@ test('login while already signed in switches the session', function (): void {
         ->getJson('/api/auth/me')
         ->assertOk()
         ->assertJsonPath('id', $mateo->id);
+});
+
+test('the dummy login hash uses the same bcrypt cost as real passwords', function (): void {
+    withPanelCsrf()->postJson('/api/auth/login', [
+        'email' => 'missing@anakata.test',
+        'password' => 'password',
+    ])->assertStatus(422);
+
+    $hash = (new ReflectionClass(LoginUser::class))->getStaticPropertyValue('dummyPasswordHash');
+
+    expect($hash)->toBeString();
+    expect(password_get_info($hash)['options']['cost'])
+        ->toBe(password_get_info(Hash::make('password'))['options']['cost']);
 });
 
 test('cfo me payload lists only the rms section', function (): void {
