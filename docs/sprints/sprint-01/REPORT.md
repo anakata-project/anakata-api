@@ -674,3 +674,121 @@ EOF
 )"
 ```
 
+## Task 07 · Panel sign-in, session, signed-in header, permission-aware nav
+
+### What was built
+Nobody reaches a panel page without a session. `useAuth()` holds the typed `Me`, talks to `/api/auth/*`, and exposes `can` / `hasSection`. A client plugin awaits `fetchMe()` **before** registering `anakata:api-error`, so a signed-out startup 401 never navigates — middleware keeps `/accept-invitation?…` (and the other auth pages) in place. A later 401 with a user clears that user and `clearNuxtData()`, then goes to `/login` or `/login?redirect=…`. `sanitizeRedirect` returning null always yields plain `/login` (never `?redirect=null`).
+
+The demo role `USelect` is gone. The header shows `NAME — ROLE` (uppercase, prototype `.who select` styling) in a `UDropdownMenu` with the email (not a button) and Sign out. The section switch appears only with both `panel.rms` and `panel.crm`. ＋ New Reservation only with `bookings.create`. Sidebar, `currentItem`, last-path memory and the page guard all use `visibleNav`. Permissions is `sprint: 1` with `['users.manage', 'roles.manage']`; Business Rules is `'rules.view'`.
+
+Display time zone is `Pacific/Galapagos` in the panel `app.config.ts`.
+
+### Auth pages — prototype elements (no design exists)
+
+Built only from existing prototype / layer pieces. Check these with the client (both themes):
+
+| Page | Built from |
+|---|---|
+| All | aside `.brand` (wordmarks + `RMS · REVENUE ENGINE`), `AnkThemeToggle` in the corner, 400px column on `--forest` |
+| All forms | `AnkPanel` / `.panel` + Oswald `h3` title; `UFormField` (= `.field label`); themed `UInput` (= `.field input`); full-width `UButton` (= `.btn`); mono link (= `.btn.o` alternative) |
+| Errors | `.warnbox` (coral border, tinted fill) |
+| Confirmations | `.notice` (dashed sand) |
+
+| Route | What to look at |
+|---|---|
+| `/login` | Title “Sign in”. 422 shows one form message, not a field. 429 copy: “Too many attempts. Try again in a minute.” Success uses `redirect` or the first allowed section. `?notice=password-changed` is a `.notice`. |
+| `/forgot-password` | Always the same confirmation after submit. |
+| `/reset-password` | Hint “At least 12 characters.” Missing `token`/`email` → expired/invalid + “Request a new one”. Success → `/login` with “Password changed”. |
+| `/accept-invitation` | Heading “Set your password”. Missing/invalid token → “This invitation has expired. Ask an admin to resend it.” Success signs in and goes home (`clearNuxtData()` first). |
+| `/no-access` | Signed-in, neither section. A user who *has* a section is sent to `firstAllowedHome`. |
+
+### Browser check (local API + demo seed)
+
+- Signed out `/rms/reservations/bookings` → `/login?redirect=/rms/reservations/bookings` → Mateo → Bookings. Header `MATEO R. — MANAGER`. No Admin group. New Reservation + RMS/CRM switch visible.
+- Mateo `/rms/admin/permissions` and `/rms/admin/business-rules` → Calendar + toast “You don't have permission to do that.”
+- Carolina: Admin → Permissions and Business Rules in the sidebar. Header `CAROLINA M. — ADMIN`.
+- CFO: no section switch, no New Reservation. `/crm/sales/pipeline` → RMS Calendar. `/no-access` → RMS Calendar. Header `CFO (EXTERNAL) — EXTERNAL FINANCE`.
+- Mailpit invitation for `you@example.com` → accept-invitation → `YOU — ADMIN` on Calendar (session swapped).
+- Login page checked in dark (default) and light.
+
+### Files touched
+- `anakata-panel/app/app.config.ts`, `app/app.vue`
+- `anakata-panel/app/composables/useAuth.ts`, `useSystem.ts`, `useForbiddenToast.ts`
+- `anakata-panel/app/plugins/auth.client.ts`
+- `anakata-panel/app/middleware/auth.global.ts`
+- `anakata-panel/app/navigation/types.ts`, `guards.ts`, `rms.ts`
+- `anakata-panel/app/types/api.ts`
+- `anakata-panel/app/utils/httpStatus.ts`
+- `anakata-panel/app/layouts/default.vue`, `auth.vue`
+- `anakata-panel/app/components/shell/WhoMenu.vue`
+- `anakata-panel/app/pages/index.vue`, `login.vue`, `forgot-password.vue`, `reset-password.vue`, `accept-invitation.vue`, `no-access.vue`
+- `anakata-panel/app/assets/css/shell.css`
+- `anakata-panel/i18n/locales/en.json`
+- `anakata-panel/eslint.config.mjs`
+- `anakata-panel/package.json`, `pnpm-lock.yaml`
+- `anakata-panel/vitest.config.ts`, `tests/unit/guards.test.ts`
+- `anakata-api/docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- `useToast()` / `useI18n()` cannot run inside a route middleware after (or as) setup — Nuxt throws “Must be called at the top of a setup function”. The page guard and the API 403 hook set a `useState` flag; `app.vue` flushes it with `{ immediate: true }`.
+- Adding `@nuxt/test-utils` pulled a second Vue (`3.5.43` vs Nuxt’s `3.5.40`) and blanked the app (`ConfigProvider` / `renderSlot`). `vue@3.5.43` is now a direct dependency so there is one copy. pnpm 12 ignores `package.json` `pnpm.overrides`.
+- 429 is not an `ApiError` in the layer. Login reads `status` off the thrown ofetch error. Layer unchanged.
+- Local API had no demo users until `php artisan db:seed`, and `storage/logs/security-*.log` owned by root 500’d failed-login logging. Fixed in the container only (not committed).
+
+### Open questions
+None.
+
+### Notes for later
+- Tasks 08–09: Permissions page content.
+- Change-own-password and idle-timeout remain out of scope.
+- Forgot-password 200’d; Mailpit at the time only held the existing invitation, so the reset click-through was not re-run from a new mail. The reset page itself (missing params → expired + request-new-link) was checked.
+- `GET /api/health` is public, so a disabled user is not kicked until the next authenticated request (matches the task: “next navigation that hits the API”).
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (19), `pnpm build` — pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# anakata-panel (branch as you have it)
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/app.config.ts \
+  app/app.vue \
+  app/composables \
+  app/plugins \
+  app/middleware \
+  app/navigation \
+  app/types \
+  app/utils \
+  app/layouts \
+  app/components/shell/WhoMenu.vue \
+  app/pages \
+  app/assets/css/shell.css \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  package.json \
+  pnpm-lock.yaml \
+  vitest.config.ts \
+  tests
+git commit -m "$(cat <<'EOF'
+Add panel sign-in, session, and permission-aware navigation.
+
+EOF
+)"
+```
+
+```bash
+# anakata-api (report only)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 1 task 07 (panel auth shell).
+
+EOF
+)"
+```
+
+
