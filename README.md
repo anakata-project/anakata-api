@@ -104,9 +104,24 @@ Tests use the `anakata_test` database (pinned in `phpunit.xml`). Credentials com
 | Horizon (local only) | http://localhost:8000/horizon |
 | Mailpit | http://localhost:8025 |
 
-Horizon runs inside the `app` container (supervisor). Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`.
+Horizon runs inside the `app` container (supervisor). Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`, `/api/auth/*`.
 
 Sibling apps (separate repos): booking engine `http://localhost:3000`, staff panel `http://localhost:3001`.
+
+## Staff sign-in
+
+Sanctum SPA cookie sessions. There is no “remember me”. The session lasts **480 minutes** of idle time (one working day). Role and permission changes apply on the user’s **next request** — permissions are read from the role on every request, not stored in the cookie.
+
+Local demo users (seeded only in `local` and `testing`, password `password`):
+
+| Name | Email | Role |
+|---|---|---|
+| Carolina M. | carolina@anakata.test | Admin |
+| Mateo R. | mateo@anakata.test | Manager |
+| Lucía B. | lucia@anakata.test | Sales Exec |
+| CFO (external) | cfo@anakata.test | External finance (RMS only) |
+
+The first admin in a non-demo environment: `php artisan anakata:create-admin you@example.com "You"`. The invitation email appears in Mailpit (`http://localhost:8025`); the command also prints the link.
 
 ## Requirements and sprints
 

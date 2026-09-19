@@ -44,10 +44,11 @@ final class History
         ?array $before = null,
         ?array $after = null,
         ?string $reason = null,
+        ?User $actor = null,
     ): ChangeHistory {
         self::guardTransaction();
 
-        $actor = Auth::user();
+        $actor ??= Auth::user();
         $actor = $actor instanceof User ? $actor : null;
 
         $entry = new ChangeHistory([

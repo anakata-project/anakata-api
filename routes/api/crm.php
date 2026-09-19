@@ -2,4 +2,6 @@
 
 declare(strict_types=1);
 
-// CRM endpoints land in later sprints.
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', fn () => response()->json(['ok' => true]));

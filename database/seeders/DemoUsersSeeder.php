@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use App\Enums\Permission;
+use App\Enums\SystemRole;
+use App\Enums\UserStatus;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+
+final class DemoUsersSeeder extends Seeder
+{
+    public function run(): void
+    {
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        $admin = Role::query()->where('slug', SystemRole::Admin->value)->firstOrFail();
+        $manager = Role::query()->where('slug', SystemRole::Manager->value)->firstOrFail();
+        $salesExec = Role::query()->where('slug', SystemRole::SalesExec->value)->firstOrFail();
+
+        $externalFinance = Role::query()->firstOrCreate(
+            ['slug' => 'external-finance'],
+            [
+                'name' => 'External finance',
+                'description' => null,
+                'permissions' => [
+                    Permission::PanelRms,
+                    Permission::BookingsViewAll,
+                    Permission::PaymentsMarkWireReceived,
+                    Permission::RefundsExecute,
+                ],
+                'is_system' => false,
+            ],
+        );
+
+        $this->seedUser('Carolina M.', 'carolina@anakata.test', $admin);
+        $this->seedUser('Mateo R.', 'mateo@anakata.test', $manager);
+        $this->seedUser('Lucía B.', 'lucia@anakata.test', $salesExec);
+        $this->seedUser('CFO (external)', 'cfo@anakata.test', $externalFinance);
+    }
+
+    private function seedUser(string $name, string $email, Role $role): void
+    {
+        User::query()->firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => $name,
+                'password' => 'password',
+                'role_id' => $role->id,
+                'status' => UserStatus::Active,
+                'activated_at' => now(),
+                'email_verified_at' => now(),
+            ],
+        );
+    }
+}

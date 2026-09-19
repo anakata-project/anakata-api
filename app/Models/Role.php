@@ -12,11 +12,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
 use LogicException;
 
 /**
  * @property Collection<int, Permission> $permissions
+ * @property-read int|null $users_count
  */
 #[Fillable(['name', 'slug', 'description', 'permissions', 'is_system'])]
 class Role extends Model
@@ -61,5 +63,47 @@ class Role extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * @return MorphMany<ChangeHistory, $this>
+     */
+    public function history(): MorphMany
+    {
+        return $this->morphMany(ChangeHistory::class, 'subject');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function permissionValues(): array
+    {
+        if ($this->isAdmin()) {
+            return array_map(
+                fn (Permission $permission): string => $permission->value,
+                Permission::cases(),
+            );
+        }
+
+        return $this->permissions
+            ->map(fn (Permission $permission): string => $permission->value)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function flagValues(): array
+    {
+        $permissions = $this->isAdmin()
+            ? collect(Permission::cases())
+            : $this->permissions;
+
+        return $permissions
+            ->filter(fn (Permission $permission): bool => $permission->isFlag())
+            ->map(fn (Permission $permission): string => $permission->value)
+            ->values()
+            ->all();
     }
 }

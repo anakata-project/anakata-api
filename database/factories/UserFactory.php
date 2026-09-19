@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\SystemRole;
+use App\Enums\UserStatus;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -32,6 +33,8 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'status' => UserStatus::Active,
+            'activated_at' => now(),
         ];
     }
 
@@ -39,6 +42,25 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function invited(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => UserStatus::Invited,
+            'password' => null,
+            'invited_at' => now(),
+            'activated_at' => null,
+            'email_verified_at' => null,
+        ]);
+    }
+
+    public function disabled(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => UserStatus::Disabled,
+            'disabled_at' => now(),
         ]);
     }
 

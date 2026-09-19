@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\GuardCrmSensitiveData;
+use App\Http\Middleware\RequirePermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,10 +17,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function (): void {
             Route::middleware('api')
+                ->prefix('api/auth')
+                ->group(base_path('routes/api/auth.php'));
+
+            Route::middleware(['api', 'auth:sanctum', 'active', 'permission:panel.rms'])
                 ->prefix('api/rms')
                 ->group(base_path('routes/api/rms.php'));
 
-            Route::middleware(['api', 'crm.sensitive'])
+            Route::middleware(['api', 'auth:sanctum', 'active', 'permission:panel.crm', 'crm.sensitive'])
                 ->prefix('api/crm')
                 ->group(base_path('routes/api/crm.php'));
 
@@ -31,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         $middleware->alias([
             'crm.sensitive' => GuardCrmSensitiveData::class,
+            'active' => EnsureUserIsActive::class,
+            'permission' => RequirePermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

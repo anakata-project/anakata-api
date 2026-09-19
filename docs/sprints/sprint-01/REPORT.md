@@ -212,3 +212,266 @@ EOF
 )"
 ```
 
+## Task 03 · Staff users and authentication
+
+### What was built
+Sanctum SPA cookie sessions for staff. Users have `status` (`invited` | `active` | `disabled`) and invitation tokens in `user_invitation_tokens` (7 days). Password resets stay on the default broker (60 minutes). Invited users have a nullable password.
+
+`/api/auth` endpoints: login, logout, me, forgot-password, reset-password, accept-invitation. No `guest` middleware — login while signed in regenerates the session; accept-invitation logs out any current session first so an admin can test an invite in the same browser. Only `invited` users can accept; disabled (including invited-then-disabled) gets the same 422 on `token`. Login failures (unknown, wrong password, invited, disabled) all return `__('auth.failed')` on `email`. Unknown emails still run `Hash::check` against a dummy bcrypt hash.
+
+`anakata:create-admin` creates an invited Admin and prints the panel link. Local/testing `DemoUsersSeeder` replaces the skeleton Test User.
+
+`composer check` passes (102 tests, Pint, Larastan level 6).
+
+### Endpoints
+
+| Method · path | Middleware | Notes |
+|---|---|---|
+| `POST /api/auth/login` | `api`, `throttle:login` (5/min per `email\|ip`) | Active only. 200 `MeResource`. |
+| `POST /api/auth/logout` | `api`, `auth:sanctum`, `active` | 204. |
+| `GET /api/auth/me` | `api`, `auth:sanctum`, `active` | 200 `MeResource`. |
+| `POST /api/auth/forgot-password` | `api`, `throttle:auth-email` (6/min per IP) | Always 200. Notifies active users only. |
+| `POST /api/auth/reset-password` | `api`, `throttle:auth-email` | Active only. History `user.password_reset`. Stays signed out. |
+| `POST /api/auth/accept-invitation` | `api`, `throttle:auth-email` | Invited only. History `user.activated`. Signs in. |
+
+### Middleware order
+
+| Group | Middleware |
+|---|---|
+| `/api/auth/*` | `api` (+ per-route auth/throttle as above) |
+| `/api/rms/*` | `api`, `auth:sanctum`, `active`, `permission:panel.rms` |
+| `/api/crm/*` | `api`, `auth:sanctum`, `active`, `permission:panel.crm`, `crm.sensitive` |
+| `/api/engine/*` | `api`, `throttle:engine` |
+| `/api/health` | `api` (public) |
+
+`GET /api/rms` and `GET /api/crm` return `{ "ok": true }` so the stack is exercisable before task 04 adds real resources.
+
+### Demo users (local / testing, password `password`)
+
+| Name | Email | Role |
+|---|---|---|
+| Carolina M. | carolina@anakata.test | Admin |
+| Mateo R. | mateo@anakata.test | Manager |
+| Lucía B. | lucia@anakata.test | Sales Exec |
+| CFO (external) | cfo@anakata.test | External finance (`panel.rms`, `bookings.view_all`, `payments.mark_wire_received`, `refunds.execute`) |
+
+### Files touched
+- `app/Enums/UserStatus.php`
+- `app/Models/User.php`, `app/Support/History/History.php`
+- `app/Actions/Auth/*`, `app/Notifications/UserInvitation.php`, `app/Notifications/ResetPasswordNotification.php`
+- `app/Http/Controllers/Auth/AuthController.php`, `app/Http/Requests/Auth/*`, `app/Http/Resources/MeResource.php`
+- `app/Http/Middleware/EnsureUserIsActive.php`, `app/Http/Middleware/RequirePermission.php`
+- `app/Console/Commands/CreateAdminCommand.php`
+- `app/Providers/AppServiceProvider.php`, `bootstrap/app.php`
+- `config/auth.php`, `config/anakata.php`, `config/logging.php`
+- `routes/api/auth.php`, `routes/api/rms.php`, `routes/api/crm.php`
+- `database/migrations/2026_09_18_200005_add_auth_columns_to_users_table.php`
+- `database/migrations/2026_09_18_200006_create_user_invitation_tokens_table.php`
+- `database/factories/UserFactory.php`
+- `database/seeders/DemoUsersSeeder.php`, `database/seeders/DatabaseSeeder.php`
+- `.env.example`, `README.md`
+- `tests/Pest.php`, `tests/Feature/Auth/*`, `tests/Feature/Crm/GuardCrmSensitiveDataTest.php`, `tests/Feature/History/HistoryWriterTest.php`
+- `docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- No `guest` middleware (approved): accept-invitation must work while another user is signed in.
+- `History::record` gained an optional `?User $actor` so reset/accept record the subject, not a leftover session user.
+- `GET /` pings on `/api/rms` and `/api/crm` so 401/403/200 can be asserted before real endpoints exist.
+- Demo emails are not in the prototype; they are local fixtures (`*.@anakata.test`) documented in the README.
+- Logout tests call `Auth::forgetGuards()` before the next request. The session is cleared; the leftover guard cache is a same-process HTTP-test artefact, not production behaviour.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 04 `InviteUser` / `ResendInvitation` should call `SendUserInvitation`.
+- Task 07 signs in with the demo emails above.
+- Task 05 will consume `config('anakata.business_timezone')`.
+- **The running local `.env` still has `SESSION_LIFETIME=120`.** Only `.env.example` was changed to `480`. Update `.env` (and recreate the app container if it caches env) so idle sessions last one working day.
+- Production cookie settings (`SESSION_DOMAIN`, secure cookies, SameSite) wait for the domain decision.
+- `Password::defaults()` adds `->uncompromised()` only in production (HIBP). Local and tests stay at min 12 characters, no composition rules.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# Set idle session to one working day in the running env (not committed).
+# Edit anakata-api/.env: SESSION_LIFETIME=480
+
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/UserStatus.php \
+  app/Models/User.php \
+  app/Support/History/History.php \
+  app/Actions/Auth \
+  app/Notifications/UserInvitation.php \
+  app/Notifications/ResetPasswordNotification.php \
+  app/Http/Controllers/Auth \
+  app/Http/Requests/Auth \
+  app/Http/Resources/MeResource.php \
+  app/Http/Middleware/EnsureUserIsActive.php \
+  app/Http/Middleware/RequirePermission.php \
+  app/Console/Commands/CreateAdminCommand.php \
+  app/Providers/AppServiceProvider.php \
+  bootstrap/app.php \
+  config/auth.php \
+  config/anakata.php \
+  config/logging.php \
+  routes/api/auth.php \
+  routes/api/rms.php \
+  routes/api/crm.php \
+  database/migrations/2026_09_18_200005_add_auth_columns_to_users_table.php \
+  database/migrations/2026_09_18_200006_create_user_invitation_tokens_table.php \
+  database/factories/UserFactory.php \
+  database/seeders/DemoUsersSeeder.php \
+  database/seeders/DatabaseSeeder.php \
+  .env.example \
+  README.md \
+  tests/Pest.php \
+  tests/Feature/Auth \
+  tests/Feature/Crm/GuardCrmSensitiveDataTest.php \
+  tests/Feature/History/HistoryWriterTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add staff Sanctum sessions, invitations and section access.
+
+EOF
+)"
+```
+
+## Task 04 · User and role management
+
+### What was built
+Admins manage users and roles through `/api/rms`. Every mutation is an Action that writes one history entry per logical change (name and role on the same user PATCH write two). `InviteUser` / `ResendInvitation` reuse `SendUserInvitation`. Admin's stored permissions stay `[]`; `GET /roles` expands them to every `Permission` value and sets `is_admin: true`.
+
+Policies enforce `users.manage` / `roles.manage` and the no-escalation subset rule (Admin bypasses). Last-admin uses `lockForUpdate` on active Admin users; invited admins do not count. Create-role slugs skip reserved system slugs and append `-2`, `-3`… so a custom role never gets `admin`.
+
+`composer check` passes (140 tests, Pint, Larastan level 6).
+
+### Endpoints
+
+All under `/api/rms` (`auth:sanctum`, `active`, `permission:panel.rms`). Timestamps are ISO-8601 UTC with `Z`.
+
+| Method · path | Policy | Action / notes |
+|---|---|---|
+| `GET /permissions` | `RolePolicy::viewAny` | Enum catalogue `{ value, label, group, group_label, is_flag }` in case order |
+| `GET /roles` | `RolePolicy::viewAny` | All roles + `users_count`; Admin, Manager, Sales Exec, then custom by name |
+| `POST /roles` | `RolePolicy::create` | `CreateRole` — slug from name, `is_system=false`, 201 |
+| `PATCH /roles/{role}` | `RolePolicy::update` | `UpdateRole` — no-op is 200 with no history |
+| `DELETE /roles/{role}` | `RolePolicy::delete` | `DeleteRole` — 204 |
+| `GET /roles/{role}/history` | `RolePolicy::viewHistory` | Paginated `ChangeHistoryResource`, newest first |
+| `GET /users` | `UserPolicy::viewAny` | Filters `status`, `role_id`, `q`; default 25 / max 100 |
+| `POST /users` | `UserPolicy::create` | `InviteUser` — 201, sends `UserInvitation` |
+| `PATCH /users/{user}` | `UserPolicy::update` | `UpdateUser` — `role_id` is `sometimes\|required`, never nullable |
+| `POST /users/{user}/disable` | `UserPolicy::disable` | `DisableUser` — already disabled is a no-op |
+| `POST /users/{user}/enable` | `UserPolicy::enable` | `EnableUser` — `active`, or `invited` if never accepted |
+| `POST /users/{user}/resend-invitation` | `UserPolicy::resendInvitation` | New token replaces the old one |
+| `GET /users/{user}/history` | `UserPolicy::viewHistory` | Subject history, newest first |
+
+`GET /` ping `{ "ok": true }` is unchanged.
+
+### Guardrails
+
+**403** `{ "message": "This action is unauthorized." }`:
+- Missing `panel.rms`, `users.manage`, or `roles.manage`
+- **No privilege escalation** (non-Admin only; Admin bypasses):
+  - Invite / change role: target role is Admin, or its permissions are not ⊆ the actor's
+  - User mutations (`update`, `disable`, `enable`, `resendInvitation`): the target's **current** role is not assignable (Admin, or current ⊈ actor)
+  - Create role: initial permissions not ⊆ the actor's
+  - Update / delete role: the target's **current** permissions are not assignable (Admin, or current ⊈ actor)
+  - Update role: adding a permission the actor does not hold, or editing the actor's own role
+
+**409** `{ "message": "..." }`:
+- Admin role: change of `name` or `permissions`, or `DELETE` (description-only PATCH is allowed)
+- System roles (Manager, Sales Exec): `DELETE`, or a change of name. Permissions may change
+- Delete a role that still has users — message includes the count
+- A user disabling themself, or changing their own role (last-admin is checked first, so a last active admin gets the last-admin message)
+- Last active admin: disable, or role change away from Admin. Invited admins do not count. `lockForUpdate` on active Admin users
+- Resend invitation when status is not `invited`
+
+**422** (Laravel validation JSON):
+- Unknown permission values (`Rule::enum(Permission)`)
+- Duplicate email, case-insensitive (stored lowercase)
+- Duplicate role name
+- `role_id` missing on invite; `role_id` present but null on update
+- `per_page` over 100
+
+### History events
+
+| Event | Content |
+|---|---|
+| `user.invited` | |
+| `user.updated` | `{ name }` before / after |
+| `user.role_changed` | `{ role: "<name>" }` before / after |
+| `user.disabled` | reason when provided |
+| `user.enabled` | |
+| `user.invitation_resent` | |
+| `role.created` | |
+| `role.updated` | sorted `permissions` plus `added` / `removed` in `after` |
+| `role.deleted` | `subject_label` keeps the name |
+
+`user.activated` is still written by task 03's accept-invitation.
+
+### Files touched
+- `app/Http/Controllers/Controller.php` (`AuthorizesRequests`)
+- `app/Http/Controllers/Rms/PermissionController.php`, `RoleController.php`, `UserController.php`
+- `app/Http/Requests/Rms/*`, `app/Http/Resources/Rms/PermissionResource.php`, `RoleResource.php`, `UserResource.php`
+- `app/Policies/UserPolicy.php`, `RolePolicy.php`, `app/Policies/Concerns/ChecksAssignableRole.php`
+- `app/Actions/Users/*`, `app/Actions/Roles/*`
+- `app/Exceptions/ConflictException.php`
+- `app/Support/Roles/UniqueRoleSlug.php`, `app/Support/Users/LastAdminGuard.php`
+- `app/Models/User.php`, `app/Models/Role.php` (`history()`, `permissionValues()`, `flagValues()`)
+- `routes/api/rms.php`
+- `tests/Pest.php`, `tests/Feature/Rms/**`
+- `docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- Last-admin is checked **before** the self-disable / self-role-change 409s, so the last active admin disabling or demoting themselves gets `This would leave no active admin.` rather than the self message. Two-admin self-disable still uses the self message.
+- `GET /roles` is ordered Admin → Manager → Sales Exec → custom by name (helps task 09; not specified in the task table).
+- A non-Admin with `users.manage` cannot disable/demote Carolina (current role is Admin → 403). Last-admin 409 for another actor is only reachable by an Admin, which in sequential requests means self-action as the last active admin. Task 08's "limited operator disables Carolina → 409" is now 403 under the escalation rule.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08 should map user `flags` (permission values such as `refunds.approve`) to prototype group labels (`director · finance`).
+- Task 06 generates types from these FormRequests and Resources.
+- After a `/api/rms` call in the same HTTP test process, `Auth::shouldUse('web')` is needed before `POST /api/auth/accept-invitation` (`Auth::login` is not on Sanctum's `RequestGuard`). Production SPA sessions are unaffected.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Controller.php \
+  app/Http/Controllers/Rms \
+  app/Http/Requests/Rms \
+  app/Http/Resources/Rms/PermissionResource.php \
+  app/Http/Resources/Rms/RoleResource.php \
+  app/Http/Resources/Rms/UserResource.php \
+  app/Policies/UserPolicy.php \
+  app/Policies/RolePolicy.php \
+  app/Policies/Concerns/ChecksAssignableRole.php \
+  app/Actions/Users \
+  app/Actions/Roles \
+  app/Exceptions/ConflictException.php \
+  app/Support/Roles \
+  app/Support/Users \
+  app/Models/User.php \
+  app/Models/Role.php \
+  routes/api/rms.php \
+  tests/Pest.php \
+  tests/Feature/Rms \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add RMS user and role management with last-admin and no-escalation guards.
+
+EOF
+)"
+```
+

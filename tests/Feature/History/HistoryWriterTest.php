@@ -45,6 +45,19 @@ test('no authenticated user is stored as System', function (): void {
     expect($entry->actor_label)->toBe('System');
 });
 
+test('an explicit actor overrides the authenticated user', function (): void {
+    $sessionUser = User::factory()->create(['name' => 'Carolina']);
+    $actor = User::factory()->create(['name' => 'Mateo']);
+    $role = Role::factory()->create();
+
+    $this->actingAs($sessionUser);
+
+    $entry = DB::transaction(fn () => History::record($role, 'role.updated', actor: $actor));
+
+    expect($entry->actor_id)->toBe($actor->id);
+    expect($entry->actor_label)->toBe('Mateo');
+});
+
 test('diff after save puts the old value in before', function (): void {
     $role = Role::factory()->create(['name' => 'Before']);
 
