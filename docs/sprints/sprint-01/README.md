@@ -73,3 +73,5 @@ Dependencies:
   - panel: `pnpm lint`, `pnpm typecheck`, `pnpm build`
   - ui: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`
 - `anakata-ui` is tagged `v0.2.0` locally.
+
+**E2E scenarios:** AUTH-01–AUTH-08, USR-01–USR-03, ROLE-01–ROLE-05, SMK-02 (`anakata-api/tests/e2e/scenarios/`). P1 from this sprint: SMK-02, AUTH-01, AUTH-03, AUTH-04, AUTH-08, ROLE-01.

@@ -65,3 +65,6 @@ When a task mentions committing, tagging or pushing, don't do it. Finish the wor
 3. Write tests for every rule and calculation you implement.
 4. The task's checks (lint, typecheck, tests) must pass before you say you are done. In anakata-api, run them inside Docker (see `laravel.mdc`).
 5. Finish by **appending a section** to the sprint's `REPORT.md` (`anakata-api/docs/sprints/sprint-NN/REPORT.md`): task number and title, what was built, files touched, deviations from the task and why, open questions, notes for later.
+
+## E2E scenarios
+Every sprint **adds or updates** its browser scenarios in `anakata-api/tests/e2e/scenarios/` and lists the ids on an **E2E scenarios** line in that sprint's README. The sprint's last task runs the P1 set. [`tests/e2e/scenarios/INDEX.md`](../../tests/e2e/scenarios/INDEX.md) is the single catalogue. If a product change makes a scenario wrong, update the scenario in the **same** task that changed the product. Agent rules and how to run the stack: `anakata-api/tests/e2e/README.md`.

@@ -1,0 +1,8 @@
+{
+  "build": {
+    "context": "..",
+    "dockerfile": "../tests/e2e/environment/Dockerfile"
+  },
+  "install": "tests/e2e/bin/install.sh",
+  "start": "sudo service docker start || (sudo dockerd > /tmp/dockerd.log 2>&1 &)"
+}

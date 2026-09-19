@@ -25,3 +25,10 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# e2e run reports (keep the template and the committed example)
+/tests/e2e/runs/*
+!/tests/e2e/runs/.gitkeep
+!/tests/e2e/runs/_RUN_TEMPLATE.md
+!/tests/e2e/runs/example-run.md
+/tests/e2e/runs/.logs/

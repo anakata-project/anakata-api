@@ -87,3 +87,5 @@ Dependencies:
   - ui: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`
   - panel: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`
 - `anakata-ui` is tagged `v0.3.0` locally.
+
+**E2E scenarios:** RATE-01–RATE-06, ENG-01–ENG-05, BR-01–BR-06, VIS-01 (`anakata-api/tests/e2e/scenarios/`). P1 from this sprint: RATE-03, RATE-05, RATE-06, ENG-01, ENG-02, BR-01, BR-02.
