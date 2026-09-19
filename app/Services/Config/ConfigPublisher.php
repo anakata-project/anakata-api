@@ -11,7 +11,6 @@ use App\Exceptions\ConflictException;
 use App\Models\ConfigVersion;
 use App\Models\User;
 use App\Support\Config\Change;
-use App\Support\Config\DocumentDiff;
 use App\Support\History\History;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Validator;
@@ -71,11 +70,11 @@ final class ConfigPublisher extends Action
         $this->validateDocument($document, $documentClass::rules());
 
         $typed = $documentClass::fromArray($document);
-        $publishedArray = $current instanceof ConfigVersion
-            ? $current->asDocument()->toArray()
-            : [];
+        $published = $current instanceof ConfigVersion
+            ? $current->asDocument()
+            : null;
 
-        $changes = DocumentDiff::compare($publishedArray, $typed->toArray(), $documentClass::labels());
+        $changes = $typed->changesAgainst($published);
 
         if ($changes === []) {
             throw ValidationException::withMessages([

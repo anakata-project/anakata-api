@@ -7,7 +7,6 @@ namespace App\Services\Config;
 use App\Enums\ConfigKind;
 use App\Models\ConfigVersion;
 use App\Support\Config\ConfigDocument;
-use App\Support\Config\DocumentDiff;
 use Illuminate\Support\Facades\Validator;
 
 final class ConfigValidator
@@ -33,12 +32,22 @@ final class ConfigValidator
         return new ValidationReport(
             [],
             $typed->warnings($published),
-            DocumentDiff::compare(
-                $published?->toArray() ?? [],
-                $typed->toArray(),
-                $documentClass::labels(),
-            ),
+            $typed->changesAgainst($published),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     */
+    public function assertValid(ConfigKind $kind, array $document): void
+    {
+        $prefixed = [];
+
+        foreach ($kind->documentClass()::rules() as $path => $rule) {
+            $prefixed['document.'.$path] = $rule;
+        }
+
+        Validator::validate(['document' => $document], $prefixed);
     }
 
     private function publishedDocument(ConfigKind $kind): ?ConfigDocument

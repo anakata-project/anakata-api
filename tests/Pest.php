@@ -8,6 +8,7 @@ use App\Enums\SystemRole;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Config\ConfigRegistry;
+use App\Support\Config\Documents\RatesDocument;
 use App\Support\SensitiveFields;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\Config\TestConfigDocument;
@@ -90,7 +91,7 @@ function externalFinanceUser(array $attributes = []): User
  */
 function registerTestConfig(?array $initial = null): void
 {
-    ConfigRegistry::register(
+    app(ConfigRegistry::class)->register(
         ConfigKind::Rates,
         TestConfigVersion::class,
         TestConfigDocument::class,
@@ -114,6 +115,18 @@ function testConfigDocument(array $overrides = []): array
             ['min' => 120, 'pct' => 5],
         ],
     ], $overrides);
+
+    return $document;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function ratesDocument(array $overrides = []): array
+{
+    /** @var array<string, mixed> $document */
+    $document = array_replace_recursive(RatesDocument::initial(), $overrides);
 
     return $document;
 }

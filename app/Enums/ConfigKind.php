@@ -47,7 +47,7 @@ enum ConfigKind: string
      */
     public function modelClass(): string
     {
-        return ConfigRegistry::modelClass($this);
+        return app(ConfigRegistry::class)->modelClass($this);
     }
 
     /**
@@ -55,6 +55,6 @@ enum ConfigKind: string
      */
     public function documentClass(): string
     {
-        return ConfigRegistry::documentClass($this);
+        return app(ConfigRegistry::class)->documentClass($this);
     }
 }

@@ -7,6 +7,7 @@ namespace App\Services\Config;
 use App\Enums\ConfigKind;
 use App\Models\ConfigVersion;
 use App\Support\Config\ConfigDocument;
+use App\Support\Config\Documents\RatesDocument;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
@@ -45,9 +46,15 @@ final class CurrentConfig
         return $this->version($kind)->asDocument();
     }
 
-    public function rates(): ConfigDocument
+    public function rates(): RatesDocument
     {
-        return $this->document(ConfigKind::Rates);
+        $document = $this->document(ConfigKind::Rates);
+
+        if (! $document instanceof RatesDocument) {
+            throw new RuntimeException('Published rates are not a RatesDocument.');
+        }
+
+        return $document;
     }
 
     public function businessRules(): ConfigDocument

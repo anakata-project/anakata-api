@@ -35,6 +35,23 @@ test('object key order does not count as a change', function (): void {
     expect($changes)->toBe([]);
 });
 
+test('a newly added associative object recurses to its leaves', function (): void {
+    $changes = DocumentDiff::compare(
+        ['years' => ['2027' => ['suite_pp' => 13300]]],
+        ['years' => ['2027' => ['suite_pp' => 13300], '2030' => ['suite_pp' => 15396, 'owner_pp' => 1]]],
+        [
+            'years.2030.suite_pp' => 'Suite 2030',
+            'years.2030.owner_pp' => "Owner's Suite 2030",
+        ],
+    );
+
+    expect($changes)->toHaveCount(2);
+    expect($changes[0]->path)->toBe('years.2030.suite_pp');
+    expect($changes[0]->label)->toBe('Suite 2030');
+    expect($changes[0]->from)->toBeNull();
+    expect($changes[0]->to)->toBe(15396);
+});
+
 test('an unlabelled path falls back to the path itself', function (): void {
     $changes = DocumentDiff::compare(
         ['title' => 'Old'],

@@ -35,10 +35,18 @@ final class DocumentDiff
             $left = $hasFrom ? $from[$key] : null;
             $right = $hasTo ? $to[$key] : null;
 
-            if ($hasFrom && $hasTo && self::isAssociative($left) && self::isAssociative($right)) {
-                /** @var array<string, mixed> $left */
-                /** @var array<string, mixed> $right */
-                $changes = [...$changes, ...self::walk($left, $right, $labels, $path)];
+            $leftAssoc = self::isAssociative($left);
+            $rightAssoc = self::isAssociative($right);
+
+            if (($leftAssoc || $rightAssoc)
+                && ($left === null || $leftAssoc)
+                && ($right === null || $rightAssoc)
+            ) {
+                /** @var array<string, mixed> $leftWalk */
+                $leftWalk = $leftAssoc ? $left : [];
+                /** @var array<string, mixed> $rightWalk */
+                $rightWalk = $rightAssoc ? $right : [];
+                $changes = [...$changes, ...self::walk($leftWalk, $rightWalk, $labels, $path)];
 
                 continue;
             }

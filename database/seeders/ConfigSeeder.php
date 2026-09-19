@@ -13,16 +13,18 @@ class ConfigSeeder extends Seeder
 {
     public const APPROVAL_REFERENCE = 'Initial values — Procesos Comerciales v5 and Anakata decisions of 12 Sep 2026';
 
+    public function __construct(private readonly ConfigRegistry $registry) {}
+
     public function run(): void
     {
-        foreach (ConfigRegistry::kinds() as $kind) {
+        foreach ($this->registry->kinds() as $kind) {
             $modelClass = $kind->modelClass();
 
             if ($modelClass::query()->exists()) {
                 continue;
             }
 
-            $initial = ConfigRegistry::initialDocument($kind);
+            $initial = $this->registry->initialDocument($kind);
 
             if ($initial === null) {
                 continue;

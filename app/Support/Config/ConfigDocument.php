@@ -45,6 +45,18 @@ abstract class ConfigDocument
     }
 
     /**
+     * @return list<Change>
+     */
+    public function changesAgainst(?self $published): array
+    {
+        return DocumentDiff::compare(
+            $published?->toArray() ?? [],
+            $this->toArray(),
+            static::labels(),
+        );
+    }
+
+    /**
      * @param  list<Change>  $changes
      */
     public function requiresApprovalReference(array $changes): bool

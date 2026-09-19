@@ -148,3 +148,131 @@ EOF
 
 The rest of `docs/sprints/sprint-02/` (README and task files) is also untracked; add it only if you want those files in this commit.
 
+## Task 02 · Rates document, pricing calculator, price check
+
+### What was built
+The rates document is the first production configuration kind. `RatesDocument` (with `RateYear`, `RateTerms`, `RateRules`) is the HTTP/storage shape from the task JSON: USD integers, whole-number percents, `back_to_back_pct` (the prototype’s `b2b`). Approval is always required.
+
+`rules()` mirrors `rIssues()`: USD only, unique years 2020–2100 sorted ascending, prices `> 0`, percents 0–100, child caps 0–3, festive supplements `≥ 0`, balance days 1–365, charter deposit business days 1–30. Soft `warnings()`: year-on-year drop, move `> 15%` vs published, Owner’s Suite not above Suite.
+
+**Year-list change list:** `toArray()` keeps `years` as a list. `ConfigDocument::changesAgainst()` is the default `DocumentDiff` walk. `RatesDocument` overrides it: flatten to `years.{year}.{suite_pp|owner_pp|charter_week}` (associative, so `DocumentDiff` recurses) and label dynamically (`Suite 2028`, `Owner's Suite 2028`, `Charter 2028`). `DocumentDiff` now also recurses when one side is missing an associative object, so adding a year lists three leaves, not one `years.2030` blob. Publisher and validator use `changesAgainst()`.
+
+**ConfigRegistry** was static (process-wide maps + `reset()`). It is now a container singleton (instance maps, no `reset()`). `AppServiceProvider` binds it and registers Rates on that instance. `registerTestConfig()` overrides on the test app. `ConfigKind` and `ConfigSeeder` resolve the registry from the container. Isolation test: harness override, then a following test still sees `RateVersion` / `RatesDocument`.
+
+`rate_versions` is immutable (model + MySQL triggers). Morph alias `rate_version`. View = `panel.rms`, publish = `rates.manage`. `CurrentConfig::rates()` returns `RatesDocument`.
+
+**CabinPricer** is pure (no DB). Guest-count / child-age limits are the caller’s job. Steps match the prototype `quote()`. **Rounding:** `App\Support\Rounding::halfUp()` — `round(..., PHP_ROUND_HALF_UP)`, tested at `.5`. Line codes: `base`, `child_discount`, `single_supplement`, `triple_discount`, `back_to_back`, `festive_supplement`. Discount amounts are negative.
+
+**Calculator line labels** (prototype `quote()`):
+
+- `2 adults @ USD 13,300 ppdo (2027)`
+- `Child discount −15% ppdo × 1`
+- `Single supplement +75% ppdo`
+- `Triple sharing −10% ppdo × 3`
+- `Back-to-back −5%`
+- `Festive supplement +USD 750 × 2`
+- `Charter — full yacht, 7 nights (2027 rate)`
+- `Festive supplement — charter`
+
+`GET/POST /api/rms/rates` uses the task 01 controller. `POST /price-check` runs the eight `rRefresh()` scenarios. Invalid document → Laravel 422 keyed `document.<path>` (same as publish). `/validate` stays the only 200-with-errors endpoint.
+
+Seeder version 1 matches `seed-data.json` → `rates` (asserted by reading the JSON file).
+
+### Files touched
+- `app/Support/Config/ConfigDocument.php`
+- `app/Support/Config/DocumentDiff.php`
+- `app/Support/Config/Documents/RatesDocument.php`
+- `app/Support/Config/Documents/RateYear.php`
+- `app/Support/Config/Documents/RateTerms.php`
+- `app/Support/Config/Documents/RateRules.php`
+- `app/Support/Rounding.php`
+- `app/Enums/ConfigKind.php`
+- `app/Services/Config/ConfigRegistry.php`
+- `app/Services/Config/ConfigPublisher.php`
+- `app/Services/Config/ConfigValidator.php`
+- `app/Services/Config/CurrentConfig.php`
+- `app/Services/Pricing/CabinPricer.php`
+- `app/Services/Pricing/QuoteInput.php`
+- `app/Services/Pricing/Quote.php`
+- `app/Services/Pricing/QuoteLine.php`
+- `app/Services/Pricing/NoRate.php`
+- `app/Services/Pricing/QuoteType.php`
+- `app/Services/Pricing/CabinCategory.php`
+- `app/Models/RateVersion.php`
+- `app/Policies/RateVersionPolicy.php`
+- `app/Providers/AppServiceProvider.php`
+- `app/Http/Controllers/Rms/RatesController.php`
+- `app/Http/Requests/Rms/PriceCheckRequest.php`
+- `app/Http/Resources/Rms/PriceCheckResource.php`
+- `database/migrations/2026_09_19_200009_create_rate_versions_table.php`
+- `database/seeders/ConfigSeeder.php`
+- `routes/api/rms.php`
+- `tests/Pest.php`
+- `tests/TestCase.php`
+- `tests/TruncatingTestCase.php`
+- `tests/Feature/Database/DatabaseSetupTest.php`
+- `tests/Feature/Config/RatesDocumentTest.php`
+- `tests/Feature/Config/RatesEndpointsTest.php`
+- `tests/Feature/Config/RatesSeederTest.php`
+- `tests/Feature/Config/ConfigRegistryIsolationTest.php`
+- `tests/Unit/Support/RoundingTest.php`
+- `tests/Unit/Support/Config/DocumentDiffTest.php`
+- `tests/Unit/Services/Pricing/CabinPricerTest.php`
+- `docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- `POST /price-check` invalid documents use Laravel 422 `document.<path>` (same as publish), not a 200 body. `/validate` is the only 200-with-errors endpoint (plan correction).
+- `years.*.year` is restricted to 2020–2100 (plan correction).
+- `DocumentDiff` recurses when one side of an associative object is missing, so a new year is three leaves. Task 01 only recursed when both sides had the key.
+- Price-check response is `{ scenarios: [...] }` so Scramble has a typed object, not a bare array.
+
+### Open questions
+None.
+
+### Notes for later
+- Sprint 3: warn when departures exist in a year with no rates; reject removing a year that has departures (`TODO(Sprint 3)` in `RatesDocument::warnings()`).
+- Task 03: `requiresApprovalReference()` for copy-only engine changes; `authorizePublish` receives the change-path set.
+- Engine push listener on `ConfigPublished`.
+- Append-only triggers on business-rule and engine-settings version tables (rates has them).
+- `08-dev-decisions.md` still ends at D6; E1–E8 live only in the sprint README.
+- `CurrentConfig` forever-cache caveat from task 01 still applies.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Config \
+  app/Support/Rounding.php \
+  app/Enums/ConfigKind.php \
+  app/Services/Config \
+  app/Services/Pricing \
+  app/Models/RateVersion.php \
+  app/Policies/RateVersionPolicy.php \
+  app/Providers/AppServiceProvider.php \
+  app/Http/Controllers/Rms/RatesController.php \
+  app/Http/Requests/Rms/PriceCheckRequest.php \
+  app/Http/Resources/Rms/PriceCheckResource.php \
+  database/migrations/2026_09_19_200009_create_rate_versions_table.php \
+  database/seeders/ConfigSeeder.php \
+  routes/api/rms.php \
+  tests/Pest.php \
+  tests/TestCase.php \
+  tests/TruncatingTestCase.php \
+  tests/Feature/Database/DatabaseSetupTest.php \
+  tests/Feature/Config \
+  tests/Unit/Support \
+  tests/Unit/Services \
+  docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the rates document, cabin pricer and RMS rates API.
+
+Prices, terms and discount rules publish as an immutable versioned
+document; the calculator matches the eight reference prices exactly.
+EOF
+)"
+```
+

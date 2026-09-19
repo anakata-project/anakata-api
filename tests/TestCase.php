@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests;
 
-use App\Services\Config\ConfigRegistry;
 use App\Services\References\ReferenceService;
 use App\Support\History\History;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,8 +28,6 @@ abstract class TestCase extends BaseTestCase
 
     protected function tearDown(): void
     {
-        ConfigRegistry::reset();
-
         History::$baseTransactionLevel = 0;
         ReferenceService::$baseTransactionLevel = 0;
 

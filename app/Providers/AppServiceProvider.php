@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Events\ConfigPublished;
 use App\Listeners\ClearCurrentConfigCache;
+use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Config\ConfigRegistry;
 use App\Services\Config\CurrentConfig;
+use App\Support\Config\Documents\RatesDocument;
 use App\Support\Iso;
 use DateTimeInterface;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -34,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(CurrentConfig::class);
+        $this->app->singleton(ConfigRegistry::class);
     }
 
     /**
@@ -77,7 +82,15 @@ class AppServiceProvider extends ServiceProvider
         Relation::enforceMorphMap([
             'user' => User::class,
             'role' => Role::class,
+            'rate_version' => RateVersion::class,
         ]);
+
+        $this->app->make(ConfigRegistry::class)->register(
+            ConfigKind::Rates,
+            RateVersion::class,
+            RatesDocument::class,
+            RatesDocument::initial(),
+        );
 
         foreach (Permission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user): bool => $user->hasPermission($permission));
