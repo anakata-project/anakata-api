@@ -791,4 +791,149 @@ EOF
 )"
 ```
 
+## Task 08 · Panel team members
+
+### What was built
+`GET /rms/admin/permissions` is a real page (wins over the `[group]/[item]` catch-all). Two `AnkPanel`s in prototype order: the permission-matrix stub (task 09) and **Team members**, which is shown only when `can('users.manage')`. A `roles.manage`-only actor sees the stub and nothing else.
+
+Team members loads `GET /api/rms/users` and `GET /api/rms/roles` through `useApi().useFetch`. Mutations use `request()`, then refresh the list (no optimistic updates). Search waits 300 ms after the last keystroke before sending `q`; status and role filters refetch immediately. Filter or query changes reset the page.
+
+Row actions: Edit (every row), Disable (hidden on self and on already-disabled), Enable, Resend (invited only), History. Own-row Edit keeps Name writable and locks Role with the hint *You can't change your own role*; PATCH sends `name` only. 422 field errors stay on the modal. 409 and disable/edit 403 `{ message }` render in a `.warnbox` inside the open modal (the global 403 toast still fires).
+
+History is a reusable `HistoryDrawer` + `HistoryTimeline` on the layer's 600px / `--forest` / hairline `USlideover`. Sentences come from `describe.ts` and `after.role` for *Invited as {role}* — never the list row's current role. Missing `after.role` → *Invited*.
+
+### API first — `user.invited` records the role
+`InviteUser` and `CreateInvitedAdmin` now write:
+
+```php
+History::record($user, 'user.invited', after: ['role' => $role->name]);
+```
+
+`UserCrudTest` asserts `after === ['role' => 'Manager']`. `CreateAdminCommandTest` asserts `['role' => 'Admin']`.
+
+### Status pills
+
+| Status | Tone | Prototype class |
+|---|---|---|
+| `active` | `ok` | `p-conf` |
+| `invited` | `sand` | `p-pend` |
+| `disabled` | `coral` | `p-canc` |
+
+Tooltip when `last_login_at` is set: *Last sign-in {dateTime}* in Galápagos time.
+
+### History sentences
+
+| Event | Sentence |
+|---|---|
+| `user.invited` | Invited as {after.role}; if `after.role` missing → Invited |
+| `user.activated` | Invitation accepted |
+| `user.invitation_resent` | Invitation resent |
+| `user.updated` | Name changed · {before} → {after} |
+| `user.role_changed` | Role changed · {before} → {after} |
+| `user.disabled` | Disabled |
+| `user.enabled` | Enabled |
+| `role.created` | Role created |
+| `role.updated` | Permissions changed · added: …, removed: … |
+| `role.deleted` | Role deleted |
+| unknown | `{event} · field: before → after` (never raw JSON) |
+
+### Elements without a prototype source on `v-perm`
+- Filter bar: name/email search, status (`all` / active / invited / disabled), role (`GET /roles`), plus primary **＋ Invite user** on the right (`.list-toolbar` / `.list-filters`, from `.drbar` / `.ebtool`).
+- Email under the name, IBM Plex Mono `--iv62` (prototype user cell has no email).
+- Right-aligned row actions (Edit / Disable / Enable / Resend / History) as small outline buttons.
+- Pager: mono **Previous · {from}–{to} of {total} · Next** from `meta`.
+- Empty row: `tr.dr-empty` *No team members.*
+- Own-role hint under the locked Role select.
+- Drawer note uses the task wording (*Every change — who, when, what and why…*), not the booking-specific “to this booking”. Zone label next to the note.
+
+`USelect` cannot use `value: ''` (`SelectItem` throws). Status “all” is the sentinel `'all'`, same as roles.
+
+### Browser check
+- Logged in as `you@example.com` (Admin). Table: Carolina / CFO / Lucía / Mateo / You. Flags `director · finance` / `finance` / `—`. Own row has Edit + History only.
+- Invite Task Eight (`task08@anakata.test`, Manager) → toast *Invitation sent*, row **Invited** + Resend. Mailpit *Set your Anakata password*.
+- History drawer (dark): Oswald `TASK EIGHT`, coral `USER`, note + *Galápagos time · UTC−6*, coral-dot timeline. After invite: *19 Sep 2026, 02:49 · You — Invited as Manager*. Compared to screenshot 18 chrome (600px forest slide, hairline, no booking tabs).
+- Own-row Edit: name *You* editable, Role disabled, hint *You can't change your own role*.
+- Light and dark themes both checked.
+- Accept-invitation page opened from the Mailpit link. Browser password fill was blocked in this agent session, so activation + `user.activated` were written with artisan (same history payload as `AcceptInvitation`). List then showed Task Eight **Active**; drawer newest-first: *Invitation accepted* then *Invited as Manager*.
+- Limited operator (`panel.rms` + `users.manage`): Disable Carolina stayed in the modal and showed **This action is unauthorized.** in the warnbox (403, not 409). Global 403 toast still fired.
+- Manager (no `users.manage` / `roles.manage`): `/rms/admin/permissions` → Calendar. Permissions gone from the sidebar. Lucía (Sales Exec) is the same guard.
+- `roles.manage` only: matrix stub, no Team members panel.
+
+Local-only data used for the check (not committed): deleted leftover `test@example.com` (`role_id` null, which 500'd `UserResource`); temporary roles `limited-ops` / `roles-only` and user `limited@anakata.test`.
+
+### Files touched
+**anakata-api**
+- `app/Actions/Users/InviteUser.php`
+- `app/Actions/Auth/CreateInvitedAdmin.php`
+- `tests/Feature/Rms/Users/UserCrudTest.php`
+- `tests/Feature/Auth/CreateAdminCommandTest.php`
+- `docs/sprints/sprint-01/REPORT.md`
+
+**anakata-panel**
+- `app/pages/rms/admin/permissions.vue`
+- `app/components/admin/TeamMembersPanel.vue`, `InviteUserModal.vue`, `EditUserModal.vue`, `DisableUserModal.vue`, `formatFlags.ts`
+- `app/components/history/HistoryDrawer.vue`, `HistoryTimeline.vue`, `describe.ts`
+- `app/assets/css/lists.css`, `nuxt.config.ts`
+- `app/types/api.ts`, `app/utils/apiForm.ts`
+- `i18n/locales/en.json`, `eslint.config.mjs`
+- `tests/unit/describe.test.ts`, `tests/unit/formatFlags.test.ts`
+
+### Deviations
+- Task 08 AC said a limited `users.manage` actor disabling Carolina is **409**. Task 04 no-escalation wins: that actor cannot mutate an Admin → **403** `{ "This action is unauthorized." }`. Last-admin **409** is only reachable as self-disable by the last active admin, and Disable stays hidden on the own row. The modal still surfaces 409 *and* 403 `{ message }` on Disable/Edit. Disable was not un-hidden on self to force a 409.
+- `UserResource` still throws if a user has no role. A leftover `test@example.com` with `role_id` null 500'd the list until it was deleted locally. Not a product change.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 09: permission matrix / role CRUD. `describe.ts` already maps `role.*`.
+- Bulk actions, CSV, and change-own-password stay out of scope.
+- Accept-invitation click-through from Mailpit was not completed in the browser (password field blocked for the agent). The page itself loaded; history after activation was checked.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 161 tests, Pint, Larastan OK.
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (26), `pnpm build` — pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# 1. anakata-api — invite history, then this report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Actions/Users/InviteUser.php \
+  app/Actions/Auth/CreateInvitedAdmin.php \
+  tests/Feature/Rms/Users/UserCrudTest.php \
+  tests/Feature/Auth/CreateAdminCommandTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record invited role on user.invited history.
+
+EOF
+)"
+```
+
+```bash
+# 2. anakata-panel — team members page (do not add .pnpm-store)
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/admin/permissions.vue \
+  app/components/admin \
+  app/components/history \
+  app/assets/css/lists.css \
+  app/types/api.ts \
+  app/utils/apiForm.ts \
+  nuxt.config.ts \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  tests/unit/describe.test.ts \
+  tests/unit/formatFlags.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS team members panel and user history drawer.
+
+EOF
+)"
+```
+
 

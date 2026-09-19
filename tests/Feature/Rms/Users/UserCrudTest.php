@@ -102,6 +102,7 @@ test('inviting a user sends mail, writes history and can be accepted', function 
 
     $invited = ChangeHistory::query()->where('event', 'user.invited')->where('subject_id', $invitee?->id)->first();
     expect($invited?->actor_id)->toBe($carolina->id);
+    expect($invited?->after)->toBe(['role' => 'Manager']);
 
     Auth::forgetGuards();
     Auth::shouldUse('web');

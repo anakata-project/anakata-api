@@ -33,6 +33,7 @@ test('create-admin invites an admin and prints the panel link', function (): voi
     expect($entry)->not->toBeNull();
     expect($entry?->actor_id)->toBeNull();
     expect($entry?->actor_label)->toBe('System');
+    expect($entry?->after)->toBe(['role' => 'Admin']);
 });
 
 test('create-admin refuses a duplicate email', function (): void {

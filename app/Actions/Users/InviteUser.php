@@ -31,7 +31,7 @@ final class InviteUser extends Action
                 'password' => null,
             ]);
 
-            History::record($user, 'user.invited');
+            History::record($user, 'user.invited', after: ['role' => $role->name]);
 
             app(SendUserInvitation::class)->handle($user, $inviterName);
 
