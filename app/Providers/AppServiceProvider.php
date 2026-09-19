@@ -52,7 +52,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Password::defaults(function (): Password {
-            $rule = Password::min(12);
+            $rule = Password::min(8);
 
             return App::isProduction() ? $rule->uncompromised() : $rule;
         });

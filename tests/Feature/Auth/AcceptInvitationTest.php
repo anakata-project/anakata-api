@@ -105,6 +105,27 @@ test('accepting an invitation while signed in as carolina returns the new user',
     expect($entry?->actor_id)->toBe($invitee->id);
 });
 
+test('accept invitation requires at least eight characters', function (): void {
+    $user = User::factory()->invited()->withRole(SystemRole::Manager)->create();
+    $token = Password::broker('invitations')->createToken($user);
+
+    withPanelCsrf()->postJson('/api/auth/accept-invitation', [
+        'token' => $token,
+        'email' => $user->email,
+        'password' => '1234567',
+        'password_confirmation' => '1234567',
+    ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['password']);
+
+    withPanelCsrf()->postJson('/api/auth/accept-invitation', [
+        'token' => $token,
+        'email' => $user->email,
+        'password' => '12345678',
+        'password_confirmation' => '12345678',
+    ])->assertOk();
+});
+
 test('an invited then disabled user cannot accept', function (): void {
     $user = User::factory()->invited()->withRole(SystemRole::Admin)->create();
     $token = Password::broker('invitations')->createToken($user);
