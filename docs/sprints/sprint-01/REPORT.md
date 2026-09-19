@@ -581,3 +581,96 @@ EOF
 )"
 ```
 
+## Task 06 · API types, error hook, display time zone, v0.2.0
+
+### What was built
+The layer now ships committed TypeScript types generated from Scramble (`/docs/api.json`), a single `anakata:api-error` hook for `ApiError`s, and a zone-aware `useDates()`. Released as `0.2.0` (tag not applied here).
+
+**openapi-typescript path B.** Latest published `openapi-typescript@7.13.0` still peers `typescript@^5.x`. It is **not** in `package.json`. `pnpm types:api` runs `pnpm dlx openapi-typescript@7.13.0` (isolated TS 5) then `eslint --fix` on `app/types/api.d.ts`.
+
+**Generated schema names and aliases** (`app/types/index.ts`):
+
+| Alias | Scramble schema |
+|---|---|
+| `Me` | `MeResource` |
+| `Role` | `RoleResource` |
+| `PermissionItem` | `PermissionResource` |
+| `UserListItem` | `UserResource` |
+| `ChangeHistoryEntry` | `ChangeHistoryResource` |
+| `Paginated<T>` | `LaravelPaginator<T>` (helper; Scramble inlines the envelope, no named paginator schema) |
+
+The generated file includes `/auth/me` and `/rms/users` (Scramble strips the `/api` prefix). `LaravelPaginator` matches the inline envelope: `data`, `links.{first,last,prev,next}`, `meta.{current_page,from,last_page,links,path,per_page,to,total}` (`path` nullable).
+
+`createApiClient` takes optional `onError`. It fires just before an `ApiError` is thrown, not on a 419 that succeeds on retry, once if the 419 retry also fails, and never for 500s. `useApi()` wires it to `nuxtApp.callHook('anakata:api-error', error)` without changing the `{ request, useFetch }` return.
+
+`useDates()` reads `anakata.displayTimeZone` from app config (default `UTC`). Date-only `YYYY-MM-DD` never shifts. Instants (`Z` / offset, or `Date`) convert with `Intl.DateTimeFormat` + `hourCycle: 'h23'`. Naive datetimes (`2026-12-31T23:30:00`) throw. New `time` style and `zoneLabel()` (`Galápagos time · UTC−6` with a real minus).
+
+Playground **Dates** section: instant `2026-12-31T23:30:00Z` as `31 Dec 2026, 23:30` (UTC) / `31 Dec 2026, 17:30` (Galápagos); calendar `2027-01-07` stays `7 Jan 2027` in both.
+
+### Files touched
+- `anakata-ui/package.json` (`0.2.0`, `types:api`)
+- `anakata-ui/scripts/types-api.sh`
+- `anakata-ui/app/types/api.d.ts`, `index.ts`, `nuxt.d.ts`
+- `anakata-ui/app/composables/useApi.ts`, `useDates.ts`
+- `anakata-ui/app/app.config.ts`
+- `anakata-ui/tests/unit/useApi.test.ts`, `useDates.test.ts`
+- `anakata-ui/.playground/app/components/SgDates.vue`, `.playground/app/pages/index.vue`
+- `anakata-ui/README.md`, `CHANGELOG.md`
+- `anakata-api/docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- Path B (`pnpm dlx`), as pre-approved: no `openapi-typescript` dependency.
+- `AppConfigInput` is augmented on `@nuxt/schema`, not `nuxt/schema`. Declaring it on `nuxt/schema` made Nuxt UI treat `defineAppConfig` as `DeepRequired` and failed typecheck.
+- `dateTime` no longer zero-pads the day (`1 Jan 2027, 00:00`), so the midnight Galápagos case matches the approved test. `shortPadded` still pads.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 07: panel `anakata.displayTimeZone: 'Pacific/Galapagos'` and `hook('anakata:api-error')` for 401 → login.
+- Re-run `pnpm types:api` after any API change the apps consume.
+
+### Quality
+- anakata-ui: `pnpm lint`, `pnpm typecheck`, `pnpm test` (34), `pnpm build` — pass.
+- anakata-panel: `pnpm typecheck`, `pnpm build` — pass.
+- anakata-engine: `pnpm typecheck`, `pnpm build` — pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  scripts/types-api.sh \
+  app/types \
+  app/composables/useApi.ts \
+  app/composables/useDates.ts \
+  app/app.config.ts \
+  tests/unit/useApi.test.ts \
+  tests/unit/useDates.test.ts \
+  .playground/app/components/SgDates.vue \
+  .playground/app/pages/index.vue \
+  README.md \
+  CHANGELOG.md
+git commit -m "$(cat <<'EOF'
+Generate API types, add the API error hook, and show dates in a display time zone.
+
+EOF
+)"
+git tag v0.2.0
+```
+
+```bash
+# anakata-api (report only)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 1 task 06 (anakata-ui v0.2.0 types, error hook, dates).
+
+EOF
+)"
+```
+
