@@ -10,8 +10,6 @@ use App\Support\Config\Change;
 use App\Support\Config\ConfigDocument;
 use App\Support\Config\Warning;
 use Illuminate\Validation\Rule;
-use RuntimeException;
-use Throwable;
 
 final class EngineSettingsDocument extends ConfigDocument
 {
@@ -431,21 +429,45 @@ final class EngineSettingsDocument extends ConfigDocument
             }
         }
 
+        $rules = self::publishedBusinessRules();
+
+        if ($rules instanceof BusinessRulesDocument) {
+            $step = $this->copy->confirmationSteps[0] ?? '';
+            $stepHours = self::firstInt($step, '/(\d+) hours/i');
+
+            if ($stepHours !== null && $stepHours !== $rules->sla->responseHours) {
+                $warnings[] = new Warning(
+                    'copy.confirmation_steps',
+                    'Confirmation step 1 says '.$stepHours.' h but the response SLA is '.$rules->sla->responseHours.' h.',
+                );
+            }
+        }
+
         // TODO(Sprint 3): warn when the default search starts before the first bookable month.
-        // TODO(task 04): warn when confirmation step 1 hours differ from the business-rules response SLA.
 
         return $warnings;
     }
 
     private static function publishedRates(): ?RatesDocument
     {
-        try {
-            return app(CurrentConfig::class)->rates();
-        } catch (RuntimeException) {
-            return null;
-        } catch (Throwable) {
+        $current = app(CurrentConfig::class);
+
+        if (! $current->has(ConfigKind::Rates)) {
             return null;
         }
+
+        return $current->rates();
+    }
+
+    private static function publishedBusinessRules(): ?BusinessRulesDocument
+    {
+        $current = app(CurrentConfig::class);
+
+        if (! $current->has(ConfigKind::BusinessRules)) {
+            return null;
+        }
+
+        return $current->businessRules();
     }
 
     private static function firstInt(string $text, string $pattern): ?int

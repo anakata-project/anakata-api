@@ -1,0 +1,180 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\ConfigKind;
+use App\Services\Config\CurrentConfig;
+use App\Support\Config\Documents\BusinessRulesDocument;
+use Database\Seeders\ConfigSeeder;
+use Illuminate\Support\Facades\Validator;
+
+test('rules reject ranges, default above cap, reminder order and band shape', function (): void {
+    $invalid = businessRulesDocument([
+        'commission' => [
+            'cap_pct' => 31,
+            'default_pct' => 40,
+            'payable_days_after_cruise' => 121,
+        ],
+        'modification_fee_usd' => 10001,
+        'payments' => [
+            'extras_due_hours' => 2161,
+            'wire_window_hours' => 11,
+            'balance_reminder_days' => [7, 21],
+        ],
+        'discounts' => [
+            'online_deposit_discount_pct' => 101,
+            'max_total_discount_pct' => 101,
+        ],
+        'holds' => [
+            'web_minutes' => 4,
+            'web_extension_minutes' => 61,
+            'near_term_business_hours' => 3,
+            'long_lead_business_days' => 16,
+        ],
+        'sla' => [
+            'response_hours' => 0,
+            'refund_business_days' => 61,
+            'agency_approval_business_days' => 11,
+        ],
+        'manifests' => [
+            'dpng_fit_days' => 0,
+            'dpng_charter_days' => 91,
+        ],
+        'alerts' => [
+            'low_occupancy_pct' => 0,
+            'low_occupancy_days_before' => 366,
+        ],
+        'retention' => [
+            'passport_months_after_cruise' => 0,
+            'medical_days_after_cruise' => 3651,
+        ],
+    ]);
+    $invalid['cancellation']['bands'] = [];
+
+    $errors = Validator::make($invalid, BusinessRulesDocument::rules())->errors();
+
+    expect($errors->has('commission.cap_pct'))->toBeTrue();
+    expect($errors->has('commission.default_pct'))->toBeTrue();
+    expect($errors->has('commission.payable_days_after_cruise'))->toBeTrue();
+    expect($errors->has('modification_fee_usd'))->toBeTrue();
+    expect($errors->has('payments.extras_due_hours'))->toBeTrue();
+    expect($errors->has('payments.wire_window_hours'))->toBeTrue();
+    expect($errors->has('payments.balance_reminder_days'))->toBeTrue();
+    expect($errors->has('discounts.online_deposit_discount_pct'))->toBeTrue();
+    expect($errors->has('discounts.max_total_discount_pct'))->toBeTrue();
+    expect($errors->has('holds.web_minutes'))->toBeTrue();
+    expect($errors->has('holds.web_extension_minutes'))->toBeTrue();
+    expect($errors->has('holds.near_term_business_hours'))->toBeTrue();
+    expect($errors->has('holds.long_lead_business_days'))->toBeTrue();
+    expect($errors->has('sla.response_hours'))->toBeTrue();
+    expect($errors->has('sla.refund_business_days'))->toBeTrue();
+    expect($errors->has('sla.agency_approval_business_days'))->toBeTrue();
+    expect($errors->has('manifests.dpng_fit_days'))->toBeTrue();
+    expect($errors->has('manifests.dpng_charter_days'))->toBeTrue();
+    expect($errors->has('alerts.low_occupancy_pct'))->toBeTrue();
+    expect($errors->has('alerts.low_occupancy_days_before'))->toBeTrue();
+    expect($errors->has('retention.passport_months_after_cruise'))->toBeTrue();
+    expect($errors->has('retention.medical_days_after_cruise'))->toBeTrue();
+    expect($errors->has('cancellation.bands'))->toBeTrue();
+});
+
+test('rules reject duplicate band days and a missing zero band', function (): void {
+    $document = businessRulesDocument();
+    $document['cancellation']['bands'] = [
+        ['min_days' => 120, 'penalty_pct' => 5],
+        ['min_days' => 120, 'penalty_pct' => 10],
+    ];
+
+    $errors = Validator::make($document, BusinessRulesDocument::rules())->errors();
+
+    expect($errors->has('cancellation.bands'))->toBeTrue();
+
+    $document['cancellation']['bands'] = [
+        ['min_days' => 120, 'penalty_pct' => 5],
+        ['min_days' => 90, 'penalty_pct' => 50],
+    ];
+
+    $errors = Validator::make($document, BusinessRulesDocument::rules())->errors();
+
+    expect($errors->first('cancellation.bands'))->toBe('The last cancellation band must start at 0 days.');
+});
+
+test('fromArray sorts bands descending', function (): void {
+    $document = BusinessRulesDocument::fromArray(businessRulesDocument([
+        'cancellation' => [
+            'bands' => [
+                ['min_days' => 0, 'penalty_pct' => 100],
+                ['min_days' => 90, 'penalty_pct' => 50],
+                ['min_days' => 120, 'penalty_pct' => 5],
+            ],
+        ],
+    ]));
+
+    expect($document->bands[0]->minDays)->toBe(120);
+    expect($document->bands[2]->minDays)->toBe(0);
+});
+
+test('warnings skip the engine sla check when engine settings are unpublished', function (): void {
+    $draft = businessRulesDocument([
+        'sla' => ['response_hours' => 12],
+    ]);
+
+    expect(app(CurrentConfig::class)->has(ConfigKind::EngineSettings))->toBeFalse();
+
+    $messages = array_map(
+        fn ($warning): string => $warning->message,
+        BusinessRulesDocument::fromArray($draft)->warnings(null),
+    );
+
+    expect($messages)->not->toContain(
+        'Charter page promises 24 h but the response SLA is 12 h — align in Engine Settings.',
+    );
+    expect($messages)->toContain(
+        'OPS-009 · Quote / first-response SLA (FIT, groups, charter) differs from the CEO-confirmed value (24 hours).',
+    );
+});
+
+test('warnings flag a shorter charter manifest, a dropping penalty and an engine sla mismatch', function (): void {
+    $this->seed(ConfigSeeder::class);
+
+    $draft = businessRulesDocument([
+        'manifests' => [
+            'dpng_fit_days' => 30,
+            'dpng_charter_days' => 15,
+        ],
+        'cancellation' => [
+            'bands' => [
+                ['min_days' => 120, 'penalty_pct' => 50],
+                ['min_days' => 90, 'penalty_pct' => 5],
+                ['min_days' => 0, 'penalty_pct' => 100],
+            ],
+        ],
+        'sla' => ['response_hours' => 12],
+    ]);
+
+    $messages = array_map(
+        fn ($warning): string => $warning->message,
+        BusinessRulesDocument::fromArray($draft)->warnings(null),
+    );
+
+    expect($messages)->toContain(
+        'Charter manifest deadline is shorter than FIT — the source has charter earlier (30 vs 15 days).',
+    );
+    expect($messages)->toContain('Penalty drops closer to departure (90 days) — check the bands.');
+    expect($messages)->toContain(
+        'Charter page promises 24 h but the response SLA is 12 h — align in Engine Settings.',
+    );
+});
+
+test('CurrentConfig has is false for an unpublished kind and does not cache a miss', function (): void {
+    $current = app(CurrentConfig::class);
+
+    expect($current->has(ConfigKind::BusinessRules))->toBeFalse();
+    expect(cache()->has(ConfigKind::BusinessRules->cacheKey()))->toBeFalse();
+
+    $this->seed(ConfigSeeder::class);
+    $current->forget(ConfigKind::BusinessRules);
+
+    expect($current->has(ConfigKind::BusinessRules))->toBeTrue();
+    expect($current->businessRules()->commission->capPct)->toBe(12);
+});

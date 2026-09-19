@@ -430,3 +430,138 @@ EOF
 )"
 ```
 
+## Task 04 · Business rules and the rules registry
+
+### What was built
+The business rules document is the third production configuration kind. Commission, holds, SLAs, reminders, cancellation bands, discounts, occupancy alerts and retention periods publish as one immutable version. Approval is always required. Viewing needs `rules.view`; publishing needs `rules.manage` (Mateo and Lucía are 403).
+
+`BusinessRulesDocument` (plus nested `CommissionRules`, `PaymentsRules`, `DiscountsRules`, `HoldsRules`, `SlaRules`, `ManifestsRules`, `AlertsRules`, `RetentionRules`, `CancellationBand`) uses the task JSON shape. `fromArray()` sorts bands by `min_days` descending. `penaltyFor()` is the prototype `band()`. Cross-field checks live in `BusinessRulesConstraint`.
+
+`CurrentConfig::has(ConfigKind)` queries the kind’s table (or the request memo) and never writes a negative forever-cache entry. Cross-document warnings call `has()` then the typed reader — they do not catch `RuntimeException`. `EngineSettingsDocument::publishedRates()` was rewritten the same way, and confirmation step 1 now warns when its hours ≠ `sla.response_hours`.
+
+`DocumentDiff::equal()` is the public canonical compare (associative keys sorted, lists keep order). Registry `here` rows use it, so a reordered band object / a `fromArray()`-sorted band list / JSON-round-tripped `[21, 7]` is not a difference.
+
+`GET /api/rms/business-rules` adds `registry` and `counts`. After a fresh seed, `differs_or_flagged` is **6**: five pending-status rows plus OPS-006 (PRO-001 note). No confirmed `here` row differs.
+
+**Registry count by group (45 rows)**
+
+| Group | Count |
+|---|---|
+| Pricing & payments | 17 |
+| Holds & service levels | 9 |
+| Cancellation | 1 |
+| Guests & capacity | 6 |
+| Data retention | 2 |
+| Structural — locked | 10 |
+
+`here` 20 · other pages 15 · locked 10.
+
+**Lock reasons written for rows the prototype lacks**
+
+- **OPS-005** — Passenger's responsibility — the declaration is mandatory at booking step 5 and is not a tunable setting.
+- **§4.4 never overbook** — Inventory rule — the last cabin on hold shows Limited Availability; the system never sells past physical capacity.
+- **§10 availability** — Feed freshness is an engineering constraint, not an editable SLA — the engine consumes what the RMS publishes.
+
+**Doc 03 rows not in the registry**
+
+- R-B6 Internal blocks — configured on Internal Blocks (Sprint 3)
+- §4.4 hold-release job — nightly job, not a setting
+- TEC-001 / TEC-002 / TEC-003 — infrastructure
+- §6.4 consent architecture — Guests tab; retention *periods* are here
+- §5.5 agent-portal behaviour (net rates only) — B2B; the 2-day approval SLA is here
+- §10 commission *execution* — Payments; payable days are here
+
+### Files touched
+- `app/Support/Config/DocumentDiff.php`
+- `app/Support/Config/Documents/BusinessRulesDocument.php`
+- `app/Support/Config/Documents/BusinessRulesConstraint.php`
+- `app/Support/Config/Documents/CommissionRules.php`
+- `app/Support/Config/Documents/PaymentsRules.php`
+- `app/Support/Config/Documents/DiscountsRules.php`
+- `app/Support/Config/Documents/HoldsRules.php`
+- `app/Support/Config/Documents/SlaRules.php`
+- `app/Support/Config/Documents/ManifestsRules.php`
+- `app/Support/Config/Documents/AlertsRules.php`
+- `app/Support/Config/Documents/RetentionRules.php`
+- `app/Support/Config/Documents/CancellationBand.php`
+- `app/Support/Config/Documents/EngineSettingsDocument.php`
+- `app/Support/BusinessRules/Registry.php`
+- `app/Support/BusinessRules/RuleDefinition.php`
+- `app/Enums/RuleStatus.php`
+- `app/Enums/RuleWhere.php`
+- `app/Enums/RuleGroup.php`
+- `app/Models/BusinessRuleVersion.php`
+- `app/Policies/BusinessRuleVersionPolicy.php`
+- `app/Services/Config/CurrentConfig.php`
+- `app/Providers/AppServiceProvider.php`
+- `app/Http/Controllers/Rms/BusinessRulesController.php`
+- `app/Http/Resources/Rms/BusinessRulesCurrentResource.php`
+- `database/migrations/2026_09_19_200012_create_business_rule_versions_table.php`
+- `routes/api/rms.php`
+- `tests/Pest.php`
+- `tests/Feature/Database/DatabaseSetupTest.php`
+- `tests/Feature/Config/BusinessRulesDocumentTest.php`
+- `tests/Feature/Config/BusinessRulesSeederTest.php`
+- `tests/Feature/Config/BusinessRulesRegistryTest.php`
+- `tests/Feature/Config/BusinessRulesEndpointsTest.php`
+- `tests/Feature/Config/EngineSettingsDocumentTest.php`
+- `tests/Unit/Support/BusinessRules/PenaltyForTest.php`
+- `tests/Unit/Support/Config/DocumentDiffTest.php`
+- `docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- Fresh-seed `differs_or_flagged` is 6, not “only the pending rows”: the chip rule is `differs === true` **or** pending status **or** a non-empty `note`, so OPS-006 (PRO-001) is flagged. No confirmed `here` value differs from source.
+- FIN-004 does not carry the prototype’s “still to do on the engine” note (Task 03 already stored the full fee table).
+- `source_value` for two-path rows is an object keyed by those full paths; one-path rows use the leaf.
+
+### Open questions
+None.
+
+### Notes for later
+- First-bookable-month warning once departures exist (engine settings).
+- Engine push listener on `ConfigPublished`.
+- `08-dev-decisions.md` still ends at D6; E1–E8 live only in the sprint README.
+- `CurrentConfig` forever-cache caveat from task 01 still applies.
+- Using these values in holds, SLAs, reminders, refunds and alerts (later sprints read `CurrentConfig`).
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Config/DocumentDiff.php \
+  app/Support/Config/Documents \
+  app/Support/BusinessRules \
+  app/Enums/RuleStatus.php \
+  app/Enums/RuleWhere.php \
+  app/Enums/RuleGroup.php \
+  app/Models/BusinessRuleVersion.php \
+  app/Policies/BusinessRuleVersionPolicy.php \
+  app/Services/Config/CurrentConfig.php \
+  app/Providers/AppServiceProvider.php \
+  app/Http/Controllers/Rms/BusinessRulesController.php \
+  app/Http/Resources/Rms/BusinessRulesCurrentResource.php \
+  database/migrations/2026_09_19_200012_create_business_rule_versions_table.php \
+  routes/api/rms.php \
+  tests/Pest.php \
+  tests/Feature/Database/DatabaseSetupTest.php \
+  tests/Feature/Config/BusinessRulesDocumentTest.php \
+  tests/Feature/Config/BusinessRulesSeederTest.php \
+  tests/Feature/Config/BusinessRulesRegistryTest.php \
+  tests/Feature/Config/BusinessRulesEndpointsTest.php \
+  tests/Feature/Config/EngineSettingsDocumentTest.php \
+  tests/Unit/Support/BusinessRules \
+  tests/Unit/Support/Config/DocumentDiffTest.php \
+  docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the business rules document, rules registry and RMS API.
+
+Operating rules publish as a versioned document; the registry compares
+each rule to its source, including rates and engine settings.
+EOF
+)"
+```
+

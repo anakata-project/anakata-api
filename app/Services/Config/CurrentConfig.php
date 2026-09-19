@@ -7,6 +7,7 @@ namespace App\Services\Config;
 use App\Enums\ConfigKind;
 use App\Models\ConfigVersion;
 use App\Support\Config\ConfigDocument;
+use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use Illuminate\Support\Facades\Cache;
@@ -18,6 +19,17 @@ final class CurrentConfig
      * @var array<string, ConfigVersion>
      */
     private array $memo = [];
+
+    public function has(ConfigKind $kind): bool
+    {
+        if (isset($this->memo[$kind->value])) {
+            return true;
+        }
+
+        $modelClass = $kind->modelClass();
+
+        return $modelClass::query()->exists();
+    }
 
     public function version(ConfigKind $kind): ConfigVersion
     {
@@ -58,9 +70,15 @@ final class CurrentConfig
         return $document;
     }
 
-    public function businessRules(): ConfigDocument
+    public function businessRules(): BusinessRulesDocument
     {
-        return $this->document(ConfigKind::BusinessRules);
+        $document = $this->document(ConfigKind::BusinessRules);
+
+        if (! $document instanceof BusinessRulesDocument) {
+            throw new RuntimeException('Published business rules are not a BusinessRulesDocument.');
+        }
+
+        return $document;
     }
 
     public function engineSettings(): EngineSettingsDocument

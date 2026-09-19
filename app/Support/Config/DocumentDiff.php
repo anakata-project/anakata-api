@@ -51,7 +51,7 @@ final class DocumentDiff
                 continue;
             }
 
-            if (! self::same($left, $right)) {
+            if (! self::equal($left, $right)) {
                 $changes[] = new Change(
                     $path,
                     $labels[$path] ?? $path,
@@ -69,9 +69,37 @@ final class DocumentDiff
         return is_array($value) && $value !== [] && ! array_is_list($value);
     }
 
-    private static function same(mixed $left, mixed $right): bool
+    /**
+     * Canonical equality: associative keys are sorted, lists keep order.
+     */
+    public static function equal(mixed $left, mixed $right): bool
     {
         return json_encode(self::canonicalise($left)) === json_encode(self::canonicalise($right));
+    }
+
+    /**
+     * Leaf paths using the same walk as compare() — associative objects recurse, lists are one leaf.
+     *
+     * @param  array<string, mixed>  $tree
+     * @return list<string>
+     */
+    public static function leafPaths(array $tree, string $prefix = ''): array
+    {
+        $paths = [];
+
+        foreach ($tree as $key => $value) {
+            $path = $prefix === '' ? (string) $key : $prefix.'.'.$key;
+
+            if (is_array($value) && $value !== [] && ! array_is_list($value)) {
+                $paths = [...$paths, ...self::leafPaths($value, $path)];
+
+                continue;
+            }
+
+            $paths[] = $path;
+        }
+
+        return $paths;
     }
 
     private static function canonicalise(mixed $value): mixed

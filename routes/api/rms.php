@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
@@ -40,4 +41,11 @@ Route::post('engine-settings/validate', [EngineSettingsController::class, 'valid
 Route::post('engine-settings/versions', [EngineSettingsController::class, 'store']);
 Route::get('engine-settings/versions', [EngineSettingsController::class, 'index']);
 Route::get('engine-settings/versions/{version}', [EngineSettingsController::class, 'show'])
+    ->whereNumber('version');
+
+Route::get('business-rules', [BusinessRulesController::class, 'current']);
+Route::post('business-rules/validate', [BusinessRulesController::class, 'validateDocument']);
+Route::post('business-rules/versions', [BusinessRulesController::class, 'store']);
+Route::get('business-rules/versions', [BusinessRulesController::class, 'index']);
+Route::get('business-rules/versions/{version}', [BusinessRulesController::class, 'show'])
     ->whereNumber('version');

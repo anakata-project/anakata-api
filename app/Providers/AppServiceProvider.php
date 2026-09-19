@@ -8,12 +8,14 @@ use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Events\ConfigPublished;
 use App\Listeners\ClearCurrentConfigCache;
+use App\Models\BusinessRuleVersion;
 use App\Models\EngineSettingsVersion;
 use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Config\ConfigRegistry;
 use App\Services\Config\CurrentConfig;
+use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Iso;
@@ -85,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'role' => Role::class,
             'rate_version' => RateVersion::class,
+            'business_rule_version' => BusinessRuleVersion::class,
             'engine_settings_version' => EngineSettingsVersion::class,
         ]);
 
@@ -100,6 +103,13 @@ class AppServiceProvider extends ServiceProvider
             EngineSettingsVersion::class,
             EngineSettingsDocument::class,
             EngineSettingsDocument::initial(),
+        );
+
+        $this->app->make(ConfigRegistry::class)->register(
+            ConfigKind::BusinessRules,
+            BusinessRuleVersion::class,
+            BusinessRulesDocument::class,
+            BusinessRulesDocument::initial(),
         );
 
         foreach (Permission::cases() as $permission) {

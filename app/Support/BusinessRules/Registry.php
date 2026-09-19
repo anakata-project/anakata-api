@@ -1,0 +1,1040 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\BusinessRules;
+
+use App\Enums\ConfigKind;
+use App\Enums\RuleGroup;
+use App\Enums\RuleStatus;
+use App\Enums\RuleWhere;
+use App\Services\Config\CurrentConfig;
+use App\Support\Config\DocumentDiff;
+use App\Support\Config\Documents\BusinessRulesDocument;
+use App\Support\Config\Documents\EngineSettingsDocument;
+use App\Support\Config\Documents\RatesDocument;
+use App\Support\Money;
+
+final class Registry
+{
+    private const LINK_RATES = '/rms/commercial/rates';
+
+    private const LINK_ENGINE = '/rms/booking-engine/settings';
+
+    private const LINK_DEPARTURES = '/rms/booking-engine/departures';
+
+    /**
+     * @return list<RuleDefinition>
+     */
+    public static function definitions(): array
+    {
+        $initial = BusinessRulesDocument::initial();
+
+        return [
+            ...self::pricingRows($initial),
+            ...self::holdsRows($initial),
+            self::here(
+                'cancellation-bands',
+                RuleGroup::Cancellation,
+                '§4.1.5',
+                'Cabin cancellation penalty bands',
+                RuleStatus::TextInDrafting,
+                ['cancellation.bands'],
+                BusinessRulesDocument::sourceDisplay('cancellation.bands'),
+                data_get($initial, 'cancellation.bands'),
+                'Refund Approvals, penalty engine',
+            ),
+            ...self::guestsRows(),
+            self::here(
+                'retention-passport',
+                RuleGroup::DataRetention,
+                '§6.4',
+                'Passport retention after cruise',
+                RuleStatus::PendingLegal,
+                ['retention.passport_months_after_cruise'],
+                BusinessRulesDocument::sourceDisplay('retention.passport_months_after_cruise'),
+                data_get($initial, 'retention.passport_months_after_cruise'),
+                'Guests tab, retention jobs',
+            ),
+            self::here(
+                'retention-medical',
+                RuleGroup::DataRetention,
+                'LEG-002',
+                'Medical notes retention after disembarkation',
+                RuleStatus::PendingLegal,
+                ['retention.medical_days_after_cruise'],
+                BusinessRulesDocument::sourceDisplay('retention.medical_days_after_cruise'),
+                data_get($initial, 'retention.medical_days_after_cruise'),
+                'Guests tab, retention jobs',
+            ),
+            ...self::lockedRows(),
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public static function rows(CurrentConfig $current): array
+    {
+        $evaluated = [];
+
+        foreach (self::definitions() as $definition) {
+            $snapshot = self::current($definition, $current);
+
+            $evaluated[] = [
+                'key' => $definition->key,
+                'group' => $definition->group->value,
+                'group_label' => $definition->group->label(),
+                'source_code' => $definition->sourceCode,
+                'name' => $definition->name,
+                'status' => $definition->status->value,
+                'where' => $definition->where->value,
+                'paths' => $definition->paths,
+                'source_display' => $definition->sourceDisplay,
+                'source_value' => $definition->sourceValue,
+                'current_display' => $snapshot['display'],
+                'differs' => $snapshot['differs'],
+                'used_in' => $definition->usedIn,
+                'lock_reason' => $definition->lockReason,
+                'note' => $definition->note,
+                'link' => $definition->link,
+            ];
+        }
+
+        return $evaluated;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{all: int, here: int, other_pages: int, locked: int, differs_or_flagged: int}
+     */
+    public static function counts(array $rows): array
+    {
+        $other = 0;
+        $here = 0;
+        $locked = 0;
+        $flagged = 0;
+
+        foreach ($rows as $row) {
+            $where = $row['where'];
+
+            if ($where === RuleWhere::Here->value) {
+                $here++;
+            } elseif ($where === RuleWhere::Locked->value) {
+                $locked++;
+            } elseif (in_array($where, [
+                RuleWhere::Rates->value,
+                RuleWhere::EngineSettings->value,
+                RuleWhere::Departures->value,
+            ], true)) {
+                $other++;
+            }
+
+            $status = RuleStatus::tryFrom((string) $row['status']);
+            $pending = $status instanceof RuleStatus && $status->isPending();
+
+            if ($row['differs'] === true || $pending || ($row['note'] ?? null) !== null) {
+                $flagged++;
+            }
+        }
+
+        return [
+            'all' => count($rows),
+            'here' => $here,
+            'other_pages' => $other,
+            'locked' => $locked,
+            'differs_or_flagged' => $flagged,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function herePaths(): array
+    {
+        $paths = [];
+
+        foreach (self::definitions() as $definition) {
+            if ($definition->where !== RuleWhere::Here) {
+                continue;
+            }
+
+            foreach ($definition->paths as $path) {
+                $paths[] = $path;
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * @return array{display: string, differs: bool|null}
+     */
+    private static function current(RuleDefinition $definition, CurrentConfig $current): array
+    {
+        return match ($definition->where) {
+            RuleWhere::Here => self::hereCurrent($definition, $current),
+            RuleWhere::Rates => self::ratesCurrent($definition, $current),
+            RuleWhere::EngineSettings => self::engineCurrent($definition, $current),
+            RuleWhere::Departures => [
+                'display' => 'Set in Departures (Sprint 3)',
+                'differs' => null,
+            ],
+            RuleWhere::Locked => [
+                'display' => self::lockedDisplay($definition->key),
+                'differs' => null,
+            ],
+        };
+    }
+
+    /**
+     * @return array{display: string, differs: bool|null}
+     */
+    private static function hereCurrent(RuleDefinition $definition, CurrentConfig $current): array
+    {
+        $document = $current->businessRules()->toArray();
+
+        if (count($definition->paths) === 1) {
+            $value = data_get($document, $definition->paths[0]);
+
+            return [
+                'display' => self::formatHere($definition, $document),
+                'differs' => ! DocumentDiff::equal($value, $definition->sourceValue),
+            ];
+        }
+
+        $values = [];
+
+        foreach ($definition->paths as $path) {
+            $values[$path] = data_get($document, $path);
+        }
+
+        return [
+            'display' => self::formatHere($definition, $document),
+            'differs' => ! DocumentDiff::equal($values, $definition->sourceValue),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     */
+    private static function formatHere(RuleDefinition $definition, array $document): string
+    {
+        return match ($definition->key) {
+            'fin-005-commission-cap' => data_get($document, 'commission.cap_pct').'%',
+            'rms-default-commission' => data_get($document, 'commission.default_pct').'%',
+            'commission-payable-days' => data_get($document, 'commission.payable_days_after_cruise').' days',
+            'fin-006-modification-fee' => Money::format((int) data_get($document, 'modification_fee_usd')),
+            'extras-due-hours' => data_get($document, 'payments.extras_due_hours').' hours',
+            'wire-window-hours' => data_get($document, 'payments.wire_window_hours').' hours',
+            'balance-reminders' => implode(' / ', data_get($document, 'payments.balance_reminder_days') ?? []).' days',
+            'online-deposit-discount' => data_get($document, 'discounts.online_deposit_discount_pct').'%',
+            'max-total-discount' => data_get($document, 'discounts.max_total_discount_pct') === null
+                ? 'no cap'
+                : data_get($document, 'discounts.max_total_discount_pct').'%',
+            'web-checkout-hold' => data_get($document, 'holds.web_minutes').' / '.data_get($document, 'holds.web_extension_minutes').' min',
+            'hold-near-term' => data_get($document, 'holds.near_term_business_hours').' business hours',
+            'hold-long-lead' => data_get($document, 'holds.long_lead_business_days').' business days',
+            'response-sla' => data_get($document, 'sla.response_hours').' hours',
+            'refund-sla' => data_get($document, 'sla.refund_business_days').' business days',
+            'agency-approval-sla' => data_get($document, 'sla.agency_approval_business_days').' business days',
+            'dpng-manifest' => data_get($document, 'manifests.dpng_fit_days').' / '.data_get($document, 'manifests.dpng_charter_days').' days',
+            'low-occupancy-alert' => data_get($document, 'alerts.low_occupancy_pct').'% / '.data_get($document, 'alerts.low_occupancy_days_before').' days',
+            'retention-passport' => data_get($document, 'retention.passport_months_after_cruise').' months',
+            'retention-medical' => data_get($document, 'retention.medical_days_after_cruise').' days',
+            'cancellation-bands' => self::bandDisplay(data_get($document, 'cancellation.bands') ?? []),
+            default => $definition->sourceDisplay,
+        };
+    }
+
+    /**
+     * @param  list<array{min_days?: int, penalty_pct?: int}>  $bands
+     */
+    private static function bandDisplay(array $bands): string
+    {
+        usort($bands, fn (array $a, array $b): int => ((int) ($b['min_days'] ?? 0)) <=> ((int) ($a['min_days'] ?? 0)));
+
+        $parts = [];
+
+        foreach ($bands as $index => $band) {
+            $min = (int) ($band['min_days'] ?? 0);
+            $pct = (int) ($band['penalty_pct'] ?? 0);
+            $range = $index === 0
+                ? '≥'.$min.' days'
+                : $min.'–'.(((int) ($bands[$index - 1]['min_days'] ?? 0)) - 1).' days';
+            $parts[] = $range.' '.$pct.'%';
+        }
+
+        return implode(' · ', $parts);
+    }
+
+    /**
+     * @return array{display: string, differs: bool|null}
+     */
+    private static function ratesCurrent(RuleDefinition $definition, CurrentConfig $current): array
+    {
+        if (! $current->has(ConfigKind::Rates)) {
+            return ['display' => '—', 'differs' => null];
+        }
+
+        $rates = $current->rates();
+
+        return match ($definition->key) {
+            'fin-001-base-rates' => self::fin001Base($rates),
+            'fin-001-annual-increase' => self::fin001Annual($rates),
+            'fin-002-cabin-deposit' => [
+                'display' => $rates->terms->cabinDepositPct.'% · balance T−'.$rates->terms->cabinBalanceDays,
+                'differs' => ! ($rates->terms->cabinDepositPct === 10 && $rates->terms->cabinBalanceDays === 120),
+            ],
+            'fin-003-charter-deposit' => [
+                'display' => $rates->terms->charterDepositPct.'% within '.$rates->terms->charterDepositBusinessDays.' business days · T−'.$rates->terms->charterBalanceDays,
+                'differs' => ! ($rates->terms->charterDepositPct === 20
+                    && $rates->terms->charterDepositBusinessDays === 5
+                    && $rates->terms->charterBalanceDays === 120),
+            ],
+            'single-triple' => [
+                'display' => '+'.$rates->rules->singleSupplementPct.'% · −'.$rates->rules->tripleDiscountPct.'% × 3',
+                'differs' => ! ($rates->rules->singleSupplementPct === 75 && $rates->rules->tripleDiscountPct === 10),
+            ],
+            'ops-004-child-discount' => [
+                'display' => '−'.$rates->rules->childDiscountPct.'% · max '.$rates->rules->childDiscountsPerAdult.'/adult, '.$rates->rules->childDiscountsPerCabin.'/cabin',
+                'differs' => ! ($rates->rules->childDiscountPct === 15
+                    && $rates->rules->childDiscountsPerAdult === 1
+                    && $rates->rules->childDiscountsPerCabin === 2),
+            ],
+            'back-to-back' => [
+                'display' => '−'.$rates->rules->backToBackPct.'% both weeks · cabins only',
+                'differs' => $rates->rules->backToBackPct !== 5,
+            ],
+            'festive-supplement' => [
+                'display' => '+'.Money::format($rates->rules->festiveSupplementPp).' / guest · +'.Money::format($rates->rules->festiveSupplementCharter).' / charter',
+                'differs' => ! ($rates->rules->festiveSupplementPp === 750 && $rates->rules->festiveSupplementCharter === 12000),
+            ],
+            default => ['display' => '—', 'differs' => null],
+        };
+    }
+
+    /**
+     * @return array{display: string, differs: bool}
+     */
+    private static function fin001Base(RatesDocument $rates): array
+    {
+        $year = $rates->year(2027);
+
+        return [
+            'display' => $year === null
+                ? '—'
+                : Money::format($year->suitePp).' · '.Money::format($year->ownerPp).' · '.Money::format($year->charterWeek),
+            'differs' => ! ($year !== null
+                && $year->suitePp === 13300
+                && $year->ownerPp === 25000
+                && $year->charterWeek === 199500),
+        ];
+    }
+
+    /**
+     * @return array{display: string, differs: bool}
+     */
+    private static function fin001Annual(RatesDocument $rates): array
+    {
+        $years = $rates->years;
+        $parts = [];
+        $matches = count($years) > 1;
+
+        for ($index = 1, $count = count($years); $index < $count; $index++) {
+            $previous = $years[$index - 1]->suitePp;
+            $current = $years[$index]->suitePp;
+            $pct = $previous > 0 ? (($current - $previous) / $previous) * 100 : 0.0;
+            $parts[] = $years[$index]->year.' '.number_format($pct, 1).'%';
+
+            if ($previous <= 0 || abs($pct - 5) >= 0.1) {
+                $matches = false;
+            }
+        }
+
+        return [
+            'display' => $parts === [] ? '—' : 'published '.implode(', ', $parts),
+            'differs' => ! $matches,
+        ];
+    }
+
+    /**
+     * @return array{display: string, differs: bool|null}
+     */
+    private static function engineCurrent(RuleDefinition $definition, CurrentConfig $current): array
+    {
+        if (! $current->has(ConfigKind::EngineSettings)) {
+            return ['display' => '—', 'differs' => null];
+        }
+
+        $engine = $current->engineSettings();
+
+        return match ($definition->key) {
+            'ops-004-child-age' => [
+                'display' => $engine->guests->childMinAge.' years',
+                'differs' => $engine->guests->childMinAge !== 6,
+            ],
+            'ops-002-guests-per-yacht' => [
+                'display' => $engine->guests->maxPerYacht.' guests',
+                'differs' => $engine->guests->maxPerYacht !== 16,
+            ],
+            'guests-per-cabin' => [
+                'display' => $engine->guests->maxPerCabin.' guests',
+                'differs' => $engine->guests->maxPerCabin !== 3,
+            ],
+            'fin-004-galapagos-fees' => self::fin004($engine),
+            'ops-009-charter-sla' => self::charterSla($engine, $current),
+            'language' => [
+                'display' => 'English only',
+                'differs' => ! DocumentDiff::equal(
+                    $engine->locale->toArray(),
+                    ['default' => 'en', 'live' => ['en'], 'currency' => 'USD'],
+                ),
+            ],
+            default => ['display' => '—', 'differs' => null],
+        };
+    }
+
+    /**
+     * @return array{display: string, differs: bool}
+     */
+    private static function fin004(EngineSettingsDocument $engine): array
+    {
+        $png = $engine->fees->png;
+        $source = [
+            'foreign_over_12' => 200,
+            'foreign_12_and_under' => 100,
+            'can_adult' => 100,
+            'can_minor' => 30,
+            'national_or_resident' => 30,
+            'exempt_under_age' => 2,
+            'tct_pp' => 20,
+        ];
+        $current = [
+            ...$png->toArray(),
+            'tct_pp' => $engine->fees->tctPp,
+        ];
+
+        return [
+            'display' => Money::format($png->foreignOver12).' / '.Money::format($png->foreign12AndUnder).' · TCT '.Money::format($engine->fees->tctPp),
+            'differs' => ! DocumentDiff::equal($current, $source),
+        ];
+    }
+
+    /**
+     * @return array{display: string, differs: bool}
+     */
+    private static function charterSla(EngineSettingsDocument $engine, CurrentConfig $current): array
+    {
+        $hours = $engine->charter->responseSlaHours;
+        $response = $current->has(ConfigKind::BusinessRules)
+            ? $current->businessRules()->sla->responseHours
+            : 24;
+
+        return [
+            'display' => $hours.' hours',
+            'differs' => $hours !== 24 || $hours !== $response,
+        ];
+    }
+
+    private static function lockedDisplay(string $key): string
+    {
+        return match ($key) {
+            'ops-001-duration' => '7 nights · Sunday → Sunday',
+            'ops-002-cabins' => "8 Suites + 1 Owner's Suite · ANAMARA and ANATIVA are identical twins",
+            'ops-003-home-port' => 'San Cristóbal (SCY)',
+            'ops-005-travel-insurance' => "Passenger's responsibility — declaration mandatory at step 5",
+            'ops-007-overdue' => 'Alert the team — never auto-cancel',
+            'ops-008-fit-groups' => 'Same rates, same process · coordinator only',
+            'r-b5-waitlist' => 'First in, first out',
+            'offers-festive' => 'Never',
+            'never-overbook' => 'Never — last cabin on hold shows Limited Availability',
+            'availability-sla' => 'Under 30 s after any RMS change',
+            default => '',
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $initial
+     * @return list<RuleDefinition>
+     */
+    private static function pricingRows(array $initial): array
+    {
+        $g = RuleGroup::PricingPayments;
+
+        return [
+            new RuleDefinition(
+                'fin-001-base-rates',
+                $g,
+                'FIN-001',
+                "Base rates 2027 — Suite / Owner's / Charter",
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                'USD 13,300 · 25,000 · 199,500',
+                null,
+                'Engine prices, quotes, feed',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'fin-001-annual-increase',
+                $g,
+                'FIN-001',
+                'Annual increase',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '+5% per year',
+                null,
+                'Rate helper, future years',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'fin-002-cabin-deposit',
+                $g,
+                'FIN-002',
+                'Cabin deposit / balance',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '10% · 90% at T−120',
+                null,
+                'Quotes, Payments, invoices',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'fin-003-charter-deposit',
+                $g,
+                'FIN-003',
+                'Charter deposit / balance',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '20% within 5 business days · 80% at T−120',
+                null,
+                'Charter quotes, Payments',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'single-triple',
+                $g,
+                '§3.4.1',
+                'Single supplement / triple discount',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '+75% · −10% × 3',
+                null,
+                'Engine price panel, quotes',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'ops-004-child-discount',
+                $g,
+                'OPS-004',
+                'Child discount',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '−15% · max 1/adult, 2/couple',
+                null,
+                'Engine price panel, quotes',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'back-to-back',
+                $g,
+                '§3.4.1',
+                'Back-to-back discount',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '−5% · cabin bookings only (Anakata 12 Sep 2026)',
+                null,
+                'Cabin quotes',
+                link: self::LINK_RATES,
+            ),
+            new RuleDefinition(
+                'festive-supplement',
+                $g,
+                '§3.4.1',
+                'Festive supplement',
+                RuleStatus::Confirmed,
+                RuleWhere::Rates,
+                [],
+                '+USD 750 / PAX · +USD 12,000 / charter',
+                null,
+                'Engine, quotes',
+                link: self::LINK_RATES,
+            ),
+            self::here(
+                'fin-005-commission-cap',
+                $g,
+                'FIN-005',
+                'Max agency commission (above → Director approval)',
+                RuleStatus::Confirmed,
+                ['commission.cap_pct'],
+                BusinessRulesDocument::sourceDisplay('commission.cap_pct'),
+                data_get($initial, 'commission.cap_pct'),
+                'New reservation, Offers, Payments, B2B',
+            ),
+            self::here(
+                'rms-default-commission',
+                $g,
+                'RMS',
+                'Default agency commission',
+                RuleStatus::Confirmed,
+                ['commission.default_pct'],
+                BusinessRulesDocument::sourceDisplay('commission.default_pct'),
+                data_get($initial, 'commission.default_pct'),
+                'New reservation form, B2B offers',
+            ),
+            self::here(
+                'commission-payable-days',
+                $g,
+                '§10',
+                'Commission payable after cruise',
+                RuleStatus::Confirmed,
+                ['commission.payable_days_after_cruise'],
+                BusinessRulesDocument::sourceDisplay('commission.payable_days_after_cruise'),
+                data_get($initial, 'commission.payable_days_after_cruise'),
+                'Payments, commissions',
+            ),
+            self::here(
+                'fin-006-modification-fee',
+                $g,
+                'FIN-006',
+                'Date-change / modification fee',
+                RuleStatus::Confirmed,
+                ['modification_fee_usd'],
+                BusinessRulesDocument::sourceDisplay('modification_fee_usd'),
+                data_get($initial, 'modification_fee_usd'),
+                'Booking drawer (move departure)',
+            ),
+            self::here(
+                'extras-due-hours',
+                $g,
+                'Anakata',
+                'Extras & collected fees — due before departure',
+                RuleStatus::Confirmed,
+                ['payments.extras_due_hours'],
+                BusinessRulesDocument::sourceDisplay('payments.extras_due_hours'),
+                data_get($initial, 'payments.extras_due_hours'),
+                'Invoice payment schedule, Extras tab',
+            ),
+            self::here(
+                'wire-window-hours',
+                $g,
+                'RMS',
+                'Wire transfer window before auto-release',
+                RuleStatus::Confirmed,
+                ['payments.wire_window_hours'],
+                BusinessRulesDocument::sourceDisplay('payments.wire_window_hours'),
+                data_get($initial, 'payments.wire_window_hours'),
+                'Pending-payment bookings',
+            ),
+            self::here(
+                'balance-reminders',
+                $g,
+                '§4.1.4',
+                'Balance reminders — days before due',
+                RuleStatus::Confirmed,
+                ['payments.balance_reminder_days'],
+                BusinessRulesDocument::sourceDisplay('payments.balance_reminder_days'),
+                data_get($initial, 'payments.balance_reminder_days'),
+                'Payment reminder automation',
+            ),
+            self::here(
+                'online-deposit-discount',
+                $g,
+                '08 B2',
+                'Online-deposit advantage',
+                RuleStatus::PendingClient,
+                ['discounts.online_deposit_discount_pct'],
+                BusinessRulesDocument::sourceDisplay('discounts.online_deposit_discount_pct'),
+                data_get($initial, 'discounts.online_deposit_discount_pct'),
+                'Pricing engine, engine checkout',
+            ),
+            self::here(
+                'max-total-discount',
+                $g,
+                '08 B2',
+                'Max total discount',
+                RuleStatus::PendingClient,
+                ['discounts.max_total_discount_pct'],
+                BusinessRulesDocument::sourceDisplay('discounts.max_total_discount_pct'),
+                data_get($initial, 'discounts.max_total_discount_pct'),
+                'Pricing engine, offers',
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $initial
+     * @return list<RuleDefinition>
+     */
+    private static function holdsRows(array $initial): array
+    {
+        $g = RuleGroup::HoldsServiceLevels;
+
+        return [
+            self::here(
+                'web-checkout-hold',
+                $g,
+                'R-B2',
+                'Web checkout hold (+ one silent extension)',
+                RuleStatus::Confirmed,
+                ['holds.web_minutes', 'holds.web_extension_minutes'],
+                BusinessRulesDocument::sourceDisplay('holds.web_minutes'),
+                [
+                    'holds.web_minutes' => data_get($initial, 'holds.web_minutes'),
+                    'holds.web_extension_minutes' => data_get($initial, 'holds.web_extension_minutes'),
+                ],
+                'Holds & Waitlist, engine checkout',
+            ),
+            self::here(
+                'hold-near-term',
+                $g,
+                'TEC-004',
+                'Request / agency hold — near-term',
+                RuleStatus::Confirmed,
+                ['holds.near_term_business_hours'],
+                BusinessRulesDocument::sourceDisplay('holds.near_term_business_hours'),
+                data_get($initial, 'holds.near_term_business_hours'),
+                'Booking Requests, Holds',
+            ),
+            self::here(
+                'hold-long-lead',
+                $g,
+                'TEC-004',
+                'Request / agency hold — long-lead',
+                RuleStatus::Confirmed,
+                ['holds.long_lead_business_days'],
+                BusinessRulesDocument::sourceDisplay('holds.long_lead_business_days'),
+                data_get($initial, 'holds.long_lead_business_days'),
+                'Booking Requests, Holds, charter quotes (OPS-010)',
+            ),
+            self::here(
+                'response-sla',
+                $g,
+                'OPS-009',
+                'Quote / first-response SLA (FIT, groups, charter)',
+                RuleStatus::Confirmed,
+                ['sla.response_hours'],
+                BusinessRulesDocument::sourceDisplay('sla.response_hours'),
+                data_get($initial, 'sla.response_hours'),
+                'Booking Requests, engine confirmation copy',
+            ),
+            new RuleDefinition(
+                'ops-009-charter-sla',
+                $g,
+                'OPS-009',
+                'Charter enquiry response (charter page)',
+                RuleStatus::Confirmed,
+                RuleWhere::EngineSettings,
+                [],
+                '24 hours',
+                null,
+                'Charter page',
+                link: self::LINK_ENGINE,
+            ),
+            self::here(
+                'refund-sla',
+                $g,
+                'RMS',
+                'Refund execution SLA',
+                RuleStatus::Confirmed,
+                ['sla.refund_business_days'],
+                BusinessRulesDocument::sourceDisplay('sla.refund_business_days'),
+                data_get($initial, 'sla.refund_business_days'),
+                'Refund Approvals',
+            ),
+            self::here(
+                'agency-approval-sla',
+                $g,
+                '§5.5',
+                'Agency approval SLA',
+                RuleStatus::Confirmed,
+                ['sla.agency_approval_business_days'],
+                BusinessRulesDocument::sourceDisplay('sla.agency_approval_business_days'),
+                data_get($initial, 'sla.agency_approval_business_days'),
+                'B2B & Agent Portal',
+            ),
+            self::here(
+                'dpng-manifest',
+                $g,
+                'OPS-013',
+                'DPNG manifest deadline — FIT / charter',
+                RuleStatus::Confirmed,
+                ['manifests.dpng_fit_days', 'manifests.dpng_charter_days'],
+                BusinessRulesDocument::sourceDisplay('manifests.dpng_fit_days'),
+                [
+                    'manifests.dpng_fit_days' => data_get($initial, 'manifests.dpng_fit_days'),
+                    'manifests.dpng_charter_days' => data_get($initial, 'manifests.dpng_charter_days'),
+                ],
+                'Guest-details reminders, booking drawer',
+            ),
+            self::here(
+                'low-occupancy-alert',
+                $g,
+                '§10',
+                'Low-occupancy alert',
+                RuleStatus::Confirmed,
+                ['alerts.low_occupancy_pct', 'alerts.low_occupancy_days_before'],
+                BusinessRulesDocument::sourceDisplay('alerts.low_occupancy_pct'),
+                [
+                    'alerts.low_occupancy_pct' => data_get($initial, 'alerts.low_occupancy_pct'),
+                    'alerts.low_occupancy_days_before' => data_get($initial, 'alerts.low_occupancy_days_before'),
+                ],
+                'Departure alerts',
+            ),
+        ];
+    }
+
+    /**
+     * @return list<RuleDefinition>
+     */
+    private static function guestsRows(): array
+    {
+        $g = RuleGroup::GuestsCapacity;
+
+        return [
+            new RuleDefinition(
+                'ops-004-child-age',
+                $g,
+                'OPS-004',
+                'Minimum child age (on departure day)',
+                RuleStatus::Confirmed,
+                RuleWhere::EngineSettings,
+                [],
+                '6 years',
+                null,
+                'Engine guest picker, New reservation',
+                link: self::LINK_ENGINE,
+            ),
+            new RuleDefinition(
+                'ops-002-guests-per-yacht',
+                $g,
+                'OPS-002',
+                'Guests per yacht',
+                RuleStatus::Confirmed,
+                RuleWhere::EngineSettings,
+                [],
+                '16 PAX',
+                null,
+                'Engine, charter capacity',
+                link: self::LINK_ENGINE,
+            ),
+            new RuleDefinition(
+                'guests-per-cabin',
+                $g,
+                'Anakata',
+                'Guests per cabin',
+                RuleStatus::Confirmed,
+                RuleWhere::EngineSettings,
+                [],
+                '3 guests (confirmed 12 Sep 2026)',
+                null,
+                'Engine cabin step, New reservation',
+                link: self::LINK_ENGINE,
+            ),
+            new RuleDefinition(
+                'fin-004-galapagos-fees',
+                $g,
+                'FIN-004',
+                'Galápagos fees (PNG foreign >12 / ≤12, TCT)',
+                RuleStatus::Confirmed,
+                RuleWhere::EngineSettings,
+                [],
+                'USD 200 / 100 · TCT 20 (CAN & nationals lower; <2 exempt)',
+                null,
+                'Invoice fees section, Guests tab',
+                link: self::LINK_ENGINE,
+            ),
+            new RuleDefinition(
+                'language',
+                $g,
+                'Anakata',
+                'Language',
+                RuleStatus::Confirmed,
+                RuleWhere::EngineSettings,
+                [],
+                'English only',
+                null,
+                'Engine, documents, panel',
+                link: self::LINK_ENGINE,
+            ),
+            new RuleDefinition(
+                'ops-006-sales-open',
+                $g,
+                'OPS-006',
+                'Sales open / first cruise',
+                RuleStatus::Confirmed,
+                RuleWhere::Departures,
+                [],
+                'Sales open 1 Nov 2026 · first cruise 7 Nov 2027',
+                null,
+                'Engine calendar',
+                note: 'Anakata 12 Sep 2026: keep OPS-006 — sales open 1 Nov 2026, first cruise 7 Nov 2027. The rest of the 2027 itinerary calendar is still pending (PRO-001).',
+                link: self::LINK_DEPARTURES,
+            ),
+        ];
+    }
+
+    /**
+     * @return list<RuleDefinition>
+     */
+    private static function lockedRows(): array
+    {
+        $g = RuleGroup::StructuralLocked;
+
+        return [
+            self::locked(
+                'ops-001-duration',
+                $g,
+                'OPS-001',
+                'Duration',
+                '7 nights, Sun → Sun',
+                'Every departure, rate and itinerary assumes 7 nights — changing it is a rebuild, not a setting.',
+                'Departures, engine',
+            ),
+            self::locked(
+                'ops-002-cabins',
+                $g,
+                'OPS-002',
+                'Cabins per yacht',
+                '9 cabins',
+                'Physical inventory — fixed by the yacht. Both yachts share the same hull, layout, cabin numbering and rates (Anakata 12 Sep 2026).',
+                'Calendar, Yacht Layout, engine deck plan',
+            ),
+            self::locked(
+                'ops-003-home-port',
+                $g,
+                'OPS-003',
+                'Home port',
+                'SCY',
+                'Set per itinerary (embark/disembark) — change it in Itineraries.',
+                'Itineraries, engine',
+            ),
+            self::locked(
+                'ops-005-travel-insurance',
+                $g,
+                'OPS-005',
+                'Travel insurance declaration',
+                "Passenger's responsibility; declaration mandatory at step 5",
+                "Passenger's responsibility — the declaration is mandatory at booking step 5 and is not a tunable setting.",
+                'Engine checkout, booking documents',
+            ),
+            self::locked(
+                'ops-007-overdue',
+                $g,
+                'OPS-007',
+                'Overdue balance',
+                'No auto-cancel; decision logged in CRM',
+                'CEO decision — switching to auto-cancel needs a new automation and legal review.',
+                'Bookings, Payments',
+            ),
+            self::locked(
+                'ops-008-fit-groups',
+                $g,
+                'OPS-008',
+                'FIT vs groups',
+                'Same conditions',
+                'Process decision.',
+                'Bookings, quotes',
+            ),
+            new RuleDefinition(
+                'r-b5-waitlist',
+                $g,
+                'R-B5',
+                'Waitlist order',
+                RuleStatus::RmsSpec,
+                RuleWhere::Locked,
+                [],
+                'not in v5',
+                null,
+                'Holds & Waitlist',
+                lockReason: 'Fairness rule — FIFO by request time.',
+            ),
+            self::locked(
+                'offers-festive',
+                $g,
+                'Offers',
+                'Offers on festive departures',
+                'Festive blocks all discounts',
+                'Follows the festive rule in §3.4.1.',
+                'Offers, engine',
+            ),
+            self::locked(
+                'never-overbook',
+                $g,
+                '§4.4',
+                'Never overbook',
+                'Never',
+                'Inventory rule — the last cabin on hold shows Limited Availability; the system never sells past physical capacity.',
+                'Calendar, engine, holds',
+            ),
+            self::locked(
+                'availability-sla',
+                $g,
+                '§10',
+                'Availability to the site',
+                'Under 30 s',
+                'Feed freshness is an engineering constraint, not an editable SLA — the engine consumes what the RMS publishes.',
+                'Engine feed',
+            ),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private static function here(
+        string $key,
+        RuleGroup $group,
+        string $sourceCode,
+        string $name,
+        RuleStatus $status,
+        array $paths,
+        string $sourceDisplay,
+        mixed $sourceValue,
+        string $usedIn,
+    ): RuleDefinition {
+        return new RuleDefinition(
+            $key,
+            $group,
+            $sourceCode,
+            $name,
+            $status,
+            RuleWhere::Here,
+            $paths,
+            $sourceDisplay,
+            $sourceValue,
+            $usedIn,
+        );
+    }
+
+    private static function locked(
+        string $key,
+        RuleGroup $group,
+        string $sourceCode,
+        string $name,
+        string $sourceDisplay,
+        string $lockReason,
+        string $usedIn,
+    ): RuleDefinition {
+        return new RuleDefinition(
+            $key,
+            $group,
+            $sourceCode,
+            $name,
+            RuleStatus::Confirmed,
+            RuleWhere::Locked,
+            [],
+            $sourceDisplay,
+            null,
+            $usedIn,
+            lockReason: $lockReason,
+        );
+    }
+}

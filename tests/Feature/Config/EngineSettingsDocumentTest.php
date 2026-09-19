@@ -142,6 +142,48 @@ test('warnings flag yacht capacity, under-age message and copy versus sla', func
     expect($messages)->toContain('Charter thank-you says "within 24 hours" but the SLA is 12 h.');
 });
 
+test('confirmation step 1 hours versus the business-rules sla is skipped when unpublished', function (): void {
+    $draft = engineSettingsDocument([
+        'copy' => [
+            'confirmation_steps' => [
+                'Within 48 hours a member of our team confirms your cabins.',
+                'You receive your booking confirmation and deposit link (10%).',
+                'After the deposit, we gather guest details.',
+            ],
+        ],
+    ]);
+
+    $messages = array_map(
+        fn ($warning): string => $warning->message,
+        EngineSettingsDocument::fromArray($draft)->warnings(null),
+    );
+
+    expect($messages)->not->toContain(
+        'Confirmation step 1 says 48 h but the response SLA is 24 h.',
+    );
+});
+
+test('warnings flag confirmation step 1 hours that differ from the business-rules sla', function (): void {
+    $this->seed(ConfigSeeder::class);
+
+    $draft = engineSettingsDocument([
+        'copy' => [
+            'confirmation_steps' => [
+                'Within 48 hours a member of our team confirms your cabins.',
+                'You receive your booking confirmation and deposit link (10%).',
+                'After the deposit, we gather guest details.',
+            ],
+        ],
+    ]);
+
+    $messages = array_map(
+        fn ($warning): string => $warning->message,
+        EngineSettingsDocument::fromArray($draft)->warnings(null),
+    );
+
+    expect($messages)->toContain('Confirmation step 1 says 48 h but the response SLA is 24 h.');
+});
+
 test('copy with no numbers produces no copy-versus-rates or copy-versus-sla warnings', function (): void {
     $this->seed(ConfigSeeder::class);
 

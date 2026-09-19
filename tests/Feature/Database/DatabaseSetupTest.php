@@ -23,4 +23,5 @@ test('core tables exist after migration', function (): void {
     );
     expect(Schema::hasTable('rate_versions'))->toBeTrue('rate_versions table missing after migration.');
     expect(Schema::hasTable('engine_settings_versions'))->toBeTrue('engine_settings_versions table missing after migration.');
+    expect(Schema::hasTable('business_rule_versions'))->toBeTrue('business_rule_versions table missing after migration.');
 });

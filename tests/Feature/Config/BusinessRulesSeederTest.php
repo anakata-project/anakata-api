@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\BusinessRuleVersion;
+use App\Services\Config\CurrentConfig;
+use App\Support\Config\Documents\BusinessRulesDocument;
+use Database\Seeders\ConfigSeeder;
+
+test('the seeded business rules document matches seed-data.json plus the new fields', function (): void {
+    $this->seed(ConfigSeeder::class);
+
+    $path = base_path('docs/requirements/examples/seed-data.json');
+    /** @var array{policies: array<string, mixed>, cancellation_bands: list<array{min: int, pct: int}>} $seed */
+    $seed = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+    $policies = $seed['policies'];
+    $document = BusinessRulesDocument::initial();
+
+    expect($document['commission']['cap_pct'])->toBe($policies['commCap']);
+    expect($document['commission']['default_pct'])->toBe($policies['commDefault']);
+    expect($document['commission']['payable_days_after_cruise'])->toBe(30);
+    expect($document['modification_fee_usd'])->toBe($policies['modFee']);
+    expect($document['payments']['extras_due_hours'])->toBe($policies['extrasDueH']);
+    expect($document['payments']['wire_window_hours'])->toBe($policies['wireHours']);
+    expect($document['payments']['balance_reminder_days'])->toBe([$policies['remind1'], $policies['remind2']]);
+    expect($document['discounts']['online_deposit_discount_pct'])->toBe(5);
+    expect($document['discounts']['max_total_discount_pct'])->toBeNull();
+    expect($document['holds']['web_minutes'])->toBe($policies['webHoldMin']);
+    expect($document['holds']['web_extension_minutes'])->toBe($policies['webExtMin']);
+    expect($document['holds']['near_term_business_hours'])->toBe($policies['holdNearH']);
+    expect($document['holds']['long_lead_business_days'])->toBe($policies['holdLongD']);
+    expect($document['sla']['response_hours'])->toBe($policies['reqSla']);
+    expect($document['sla']['refund_business_days'])->toBe($policies['refundSla']);
+    expect($document['sla']['agency_approval_business_days'])->toBe(2);
+    expect($document['manifests']['dpng_fit_days'])->toBe($policies['manifestFit']);
+    expect($document['manifests']['dpng_charter_days'])->toBe($policies['manifestCh']);
+    expect($document['alerts']['low_occupancy_pct'])->toBe(40);
+    expect($document['alerts']['low_occupancy_days_before'])->toBe(90);
+    expect($document['retention']['passport_months_after_cruise'])->toBe(24);
+    expect($document['retention']['medical_days_after_cruise'])->toBe(90);
+
+    $bands = array_map(
+        fn (array $band): array => ['min_days' => $band['min'], 'penalty_pct' => $band['pct']],
+        $seed['cancellation_bands'],
+    );
+    expect($document['cancellation']['bands'])->toBe($bands);
+    expect($document['cancellation']['bands'])->toBe(array_map(
+        fn (array $band): array => ['min_days' => $band['min'], 'penalty_pct' => $band['pct']],
+        $policies['cancel'],
+    ));
+
+    $row = BusinessRuleVersion::query()->firstOrFail();
+    expect($row->version)->toBe(1);
+    expect($row->asDocument()->toArray())->toBe($document);
+    expect(app(CurrentConfig::class)->businessRules()->toArray())->toBe($document);
+});
+
+test('the business rules seeder is idempotent', function (): void {
+    $this->seed(ConfigSeeder::class);
+    $this->seed(ConfigSeeder::class);
+
+    expect(BusinessRuleVersion::query()->count())->toBe(1);
+});

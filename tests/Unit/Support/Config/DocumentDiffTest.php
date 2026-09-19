@@ -52,6 +52,16 @@ test('a newly added associative object recurses to its leaves', function (): voi
     expect($changes[0]->to)->toBe(15396);
 });
 
+test('equal ignores associative key order and treats lists as ordered', function (): void {
+    expect(DocumentDiff::equal(
+        ['min_days' => 120, 'penalty_pct' => 5],
+        ['penalty_pct' => 5, 'min_days' => 120],
+    ))->toBeTrue();
+
+    expect(DocumentDiff::equal([21, 7], json_decode((string) json_encode([21, 7]), true)))->toBeTrue();
+    expect(DocumentDiff::equal([21, 7], [7, 21]))->toBeFalse();
+});
+
 test('an unlabelled path falls back to the path itself', function (): void {
     $changes = DocumentDiff::compare(
         ['title' => 'Old'],
