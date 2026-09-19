@@ -42,6 +42,8 @@ final class CurrentConfig
         // Cache the row id, not the Eloquent model. Laravel 13 sets
         // cache.serializable_classes to false, so a cached model comes back as
         // __PHP_Incomplete_Class and GET /api/rms/{kind} 500s after the first hit.
+        // Redis may still hold a serialized model from an older deploy; treat the hit as mixed.
+        /** @var mixed $id */
         $id = Cache::rememberForever(
             $kind->cacheKey(),
             function () use ($kind, $modelClass): int {

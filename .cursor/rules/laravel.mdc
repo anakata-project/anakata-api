@@ -89,6 +89,8 @@ app/
 - `App\Services\Config\ConfigPublisher` is the only writer. Drafts are never stored; the editor holds the draft and publish sends the whole document.
 - Published versions are immutable: `save()` on an existing row, `update()` and `delete()` throw. A change is a new version.
 - Each kind is a typed `ConfigDocument` (validation `rules()`, soft `warnings()`, `labels()` for the change list) and a `ConfigVersion` table.
+- Any change to a document's shape (new, renamed or removed field) ships with a migration that publishes a new version through `ConfigPublisher` as System, with `approval_reference` `Sprint N: <field> added (default <value>, source <doc>)`. The `initial()` values and the seed-data assertions change in the same commit.
+- Published JSON must pass the document's `rules()`. `fromArray()` is lenient (a missing key becomes 0 / false / ""). Deploys run `php artisan anakata:config-verify`; a missing or invalid field fails naming the kind, version and path.
 
 ## Events
 - Laravel events + queued listeners are only for side effects (emails, Stripe, engine availability push, CRM tasks raised by booking changes). Dispatch after commit (`ShouldDispatchAfterCommit`).

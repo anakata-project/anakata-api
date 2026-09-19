@@ -1170,7 +1170,6 @@ Rates, business rules and engine settings are versioned documents. Each kind pub
 Compiled from each task’s “Open questions” and still-open “Notes for later” that are unanswered questions. Tasks 01, 02, 04, 05, 06, 07, 08 and 09 recorded **none** under Open questions.
 
 - **03** The seeded `fees.footnote` still says the PNG fee “is paid at SCY airport”. Since 12 Sep 2026 the guest chooses whether Anakata collects it (B6 / FIN-004). Seed text kept — copy to review with the client.
-- **01 (note)** `CurrentConfig` caches forever. A deploy that changes a document class must clear `config:{kind}:current`, **or** the cache key should include a document schema version. Unanswered: which of those two.
 
 ### Still open outside this sprint
 - **Go-live date** — not decided.
@@ -1452,6 +1451,65 @@ EOF
 git add docs/sprints/sprint-02/REPORT.md
 git commit -m "$(cat <<'EOF'
 Record sprint 2 task 09 and the Sprint 2 summary.
+EOF
+)"
+```
+
+## Sprint 2 · review fixes
+
+### What was built
+Document schema evolution. `ConfigDocument::fromArray()` stays lenient (a missing key becomes 0 / false / ""). A later field added to a document class would otherwise be read as that default from an older published row.
+
+**`anakata:config-verify`.** `ConfigVerifier` loads the latest stored JSON of every registered kind (direct query, not `CurrentConfig` / `asDocument()`) and validates it against `rules()`. A missing version or invalid field fails naming the kind, version and path. The artisan command is `anakata:config-verify` (same prefix as `anakata:create-admin`) so it does not collide with Laravel's `config:*` namespace. Deploys run it after migrate.
+
+**Schema-evolution rule** added to `.cursor/rules/laravel.mdc`: a shape change (new, renamed or removed field) ships with a migration that publishes a new version through `ConfigPublisher` as System, with `approval_reference` `Sprint N: <field> added (default <value>, source <doc>)`. `initial()` and the seed-data assertions change in the same commit.
+
+**Stale-document cache question closed.** Task 07 already changed `CurrentConfig` to cache only the row id (int), then `find()` the model. A deploy that changes the PHP document class always re-reads stored JSON from MySQL; Redis cannot hold a stale serialized document. Schema drift is a stored-JSON vs `rules()` problem, caught by `anakata:config-verify` and the migration convention. The **01 (note)** open question was removed from the Sprint 2 summary.
+
+### Files touched
+- `app/Services/Config/ConfigVerifier.php`
+- `app/Services/Config/CurrentConfig.php`
+- `app/Support/Config/ConfigVerifyFailure.php`
+- `app/Support/Config/ConfigVerifyReport.php`
+- `app/Console/Commands/VerifyConfigCommand.php`
+- `tests/Feature/Config/ConfigVerifyCommandTest.php`
+- `.cursor/rules/laravel.mdc`
+- `docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- Command signature is `anakata:config-verify`, not `config:verify`. Laravel owns `config:*`.
+- `ConfigPublisher::publish()` still requires a `User $actor`. The first real shape-change migration will need `?User $actor` (null = System).
+- Larastan flagged `is_int()` on `CurrentConfig`'s cached id (the closure is typed `int`). Annotated the cache hit as `mixed` so a leftover serialized model from an older deploy is still forgotten and rebuilt.
+
+### Open questions
+None.
+
+### Notes for later
+`ConfigPublisher::publish()` needs a nullable actor (null = System, `created_by` / `updated_by` null, History actor System) before a schema-evolution migration can follow the new laravel.mdc rule.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 261 tests (1549 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Services/Config/ConfigVerifier.php \
+  app/Services/Config/CurrentConfig.php \
+  app/Support/Config/ConfigVerifyFailure.php \
+  app/Support/Config/ConfigVerifyReport.php \
+  app/Console/Commands/VerifyConfigCommand.php \
+  tests/Feature/Config/ConfigVerifyCommandTest.php \
+  .cursor/rules/laravel.mdc \
+  docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Fail loudly when a published config document is missing a field.
+
+fromArray still fills defaults; anakata:config-verify checks stored
+JSON against rules() so a later schema change cannot silently read 0.
 EOF
 )"
 ```
