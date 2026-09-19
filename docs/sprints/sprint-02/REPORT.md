@@ -917,3 +917,112 @@ EOF
 )"
 ```
 
+## Task 08 · Engine Settings page
+
+### What was built
+`/rms/booking-engine/settings` is a real page (replaces the `[group]/[item]` placeholder). It loads `useConfigEditor('engine-settings')`, provides the draft (`ENGINE_SETTINGS_DRAFT_KEY`) so the seven panels can mutate it, and leaves via `useUnsavedGuard`.
+
+**E6 locking.** `canEditPath(path, copyPaths, can)` is true for `engine_settings.manage`, or for a copy path (exact or prefix, e.g. `copy.confirmation_steps`) when the user has `engine_copy.manage`. Locked controls are `disabled` and use the prototype read-only look (`.rin:disabled` and `.field input/textarea:disabled`).
+
+**Publish bar.** `canPublish` is `engine_settings.manage || engine_copy.manage` so Mateo and Carolina can discard. `approvalRequired` is `validation.rule_fields_changed`. A copy-only editor whose draft includes a rule field gets `blockedReason` (“Includes rule changes — only users who can edit engine rules can publish them”): Save is disabled, the line shows in the warnbox, the state line stays as the unsaved count (not VIEW ONLY), and Discard stays enabled. Lucía (`canPublish` false, no `blockedReason`) sees `VIEW ONLY — {ROLE}` from `useAuth().user.role.name` (uppercased). Confirm note is `config.confirmNeutral`. Money formats: `fees.tct_pp` and `fees.png`. A `labels` map of PHP paths → prototype field wording is passed so the warnbox resolves before `changes` exist.
+
+**Panels** (prototype `buildESet` order, each `AnkPanel` + pill):
+1. Guests & capacity (`ADMIN`) — max cabin / yacht, child from / to, under-age message (60), adult-required checkbox, New reservation note.
+2. Sales calendar & search (`ADMIN`) — first bookable month as read-only `roval` “Set by Departures (Sprint 3)”; month from/to, default adults, horizon.
+3. Language & currency — static `table.list` from `locale` (EN DEFAULT·LIVE, ES NOT PLANNED, Currency USD). No inputs.
+4. Booking notes & messages (`ADMIN · MANAGER`) — five copy textareas.
+5. Confirmation page (`ADMIN · MANAGER`) — three separate textareas (`copy.confirmation_steps[0..2]`).
+6. Galápagos fees (`ADMIN`) — TCT; six PNG amounts in `cols2`; show-in-price-panel checkbox; footnote (copy).
+7. Private charter (`ADMIN · MANAGER`) — headline (60), intro, itinerary label (30) + SLA hours (rule), group contexts one per line, thank-you, rates/capacity note.
+
+**Group contexts** stay in local textarea state. On input, `linesToList` (split `\n`, trim, drop empties) writes the list to `draft.charter.group_contexts`. The textarea is never rewritten from `join('\n')` while typing. Re-sync only when the draft object identity changes (load, discard, reload, successful publish).
+
+**Numbers** use `ConfigNumberInput` with `variant="field"` (same `parseRinValue` empty-is-null). Default `variant="rin"` is unchanged for Rates.
+
+**Counters:** `· n / max` (`.cnt`). Copy 320; headline 60; itinerary label 30; under-age 60. `maxlength` on the control.
+
+**CSS / i18n:** `.setgrid` (stacks at 1100px), `.prevbox` / `.prevl`, `.field` (+ disabled), `.cols2`, `.chkline`, `.roval`, `.cnt` in `config.css`. New class names added to the eslint ignore list. `engineSettings.*` in `en.json`.
+
+**Folder name:** panels live in `app/components/engine/` (not `engine-settings/`). Nuxt 4 `pathPrefix` would otherwise auto-import them as `EngineSettingsEngineGuestsPanel`, so the page’s `<EngineGuestsPanel>` would not resolve.
+
+### Files touched
+- `anakata-panel/app/pages/rms/booking-engine/settings.vue`
+- `anakata-panel/app/components/engine/EngineGuestsPanel.vue`
+- `anakata-panel/app/components/engine/EngineCalendarPanel.vue`
+- `anakata-panel/app/components/engine/EngineLocalePanel.vue`
+- `anakata-panel/app/components/engine/EngineCopyPanel.vue`
+- `anakata-panel/app/components/engine/EngineConfirmationPanel.vue`
+- `anakata-panel/app/components/engine/EngineFeesPanel.vue`
+- `anakata-panel/app/components/engine/EngineCharterPanel.vue`
+- `anakata-panel/app/components/engine/EngineField.vue`
+- `anakata-panel/app/components/engine/EnginePreviewBox.vue`
+- `anakata-panel/app/components/engine/engineSettingsHelpers.ts`
+- `anakata-panel/app/components/config/ConfigNumberInput.vue`
+- `anakata-panel/app/components/config/ConfigPublishBar.vue`
+- `anakata-panel/app/utils/canEditPath.ts`
+- `anakata-panel/app/utils/linesToList.ts`
+- `anakata-panel/app/assets/css/config.css`
+- `anakata-panel/i18n/locales/en.json`
+- `anakata-panel/eslint.config.mjs`
+- `anakata-panel/tests/unit/canEditPath.test.ts`
+- `anakata-panel/tests/unit/linesToList.test.ts`
+- `anakata-api/docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- **Fee table (B6 / task 03):** six PNG amounts (`foreign_over_12`, `foreign_12_and_under`, `can_adult`, `can_minor`, `national_or_resident`, `exempt_under_age`) after TCT. The prototype only shows two PNG fields. Intended.
+- **Fee footnote wording:** “Informational only — never added to the invoice total or charged, unless the guest asks Anakata to collect them.” Prototype sentence kept; the clause after the comma is the 12 Sep 2026 / B6 addition.
+- **Engine previews:** each `.prevbox` keeps its prototype label (`Engine preview · booking bar`, `departure dates picker`, `trip details sidebar`, `"We have received your booking"`, `price panel (2 adults)`, `"Charter, at a glance"`). Body is “Preview arrives with the booking engine sprint”. Real engine components are out of scope.
+- **First bookable month:** read-only `roval` “Set by Departures (Sprint 3)”.
+- **`canPublish` vs the task file:** the task said copy-only + rule change should make `canPublish` false. That would also disable Discard. The bar uses `canPublish` for “may edit this kind” and a separate `blockedReason` so Mateo can still discard a draft that picked up a rule field.
+- **VIEW ONLY line:** role name from `useAuth()`, not a hard-coded “SALES EXEC”.
+- **Panels under `app/components/engine/`** so Nuxt auto-import names match the tags.
+
+### Open questions
+None.
+
+### Notes for later
+- Sprint 3: first bookable month from Departures instead of the placeholder `roval`.
+- Booking-engine sprint: replace preview placeholders with the real engine components (once, not twice).
+- Business Rules page: reuse `ConfigNumberInput` / `canEditPath` / the publish bar `blockedReason` pattern if that screen also splits rule vs copy.
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (84), `pnpm build` — pass.
+- Fresh clone onto `/tmp/anakata-fresh-s2t08` with sibling `extends: ['../anakata-ui']`. New files are present (not gitignored). `pnpm typecheck` and `pnpm build` pass.
+- Browser (dark and light, against `v-eset`). Role switch is login as carolina@ / mateo@ / lucia@ `anakata.test`:
+  - **Mateo:** copy headline publish with empty approval → V2 (`● PUBLISHED — V2 · 19 Sep 2026, 09:58 · Mateo R.`). Guest / calendar / fee / SLA inputs disabled; copy enabled; approval optional.
+  - **Mateo + rule change** (`guests.max_per_cabin` → 4): warnbox “Includes rule changes — only users who can edit engine rules can publish them”, Save disabled, Discard still enabled, unsaved count stays. Forced `POST /versions` → **403** (“This change includes rule fields (Max guests per cabin). Only users who can edit engine rules can publish it.”).
+  - **Carolina:** max cabin 3 → 4 requires approval; group-contexts textarea accepted Enter + `Wedding party  ` (newline and trailing spaces stayed in the textarea; draft list became `…, Wedding party` after the line was non-empty). Publish `S2-T08-ENGINE` → V3 (`● PUBLISHED — V3 · 19 Sep 2026, 10:02 · Carolina M.`). After publish the textarea re-synced without the trailing spaces.
+  - **Lucía:** every field disabled, no approval input, bar reads `VIEW ONLY — SALES EXEC` from her role name.
+  - Light theme: `html.light`, body `rgb(250, 249, 240)`. Dark default: `html.dark`, body `rgb(20, 27, 23)`.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/pages/rms/booking-engine/settings.vue \
+  app/components/engine \
+  app/components/config/ConfigNumberInput.vue \
+  app/components/config/ConfigPublishBar.vue \
+  app/utils/canEditPath.ts app/utils/linesToList.ts \
+  app/assets/css/config.css i18n/locales/en.json eslint.config.mjs \
+  tests/unit/canEditPath.test.ts tests/unit/linesToList.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS Engine Settings config page.
+
+Admin edits rules and copy; Manager edits copy only. A rule
+change in a copy-only draft blocks Save and keeps Discard.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 2 task 08: Engine Settings page.
+EOF
+)"
+```
+
