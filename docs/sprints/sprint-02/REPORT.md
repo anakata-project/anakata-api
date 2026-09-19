@@ -276,3 +276,157 @@ EOF
 )"
 ```
 
+## Task 03 · Engine settings
+
+### What was built
+The engine settings document is the second production configuration kind. Guest rules, sales-calendar defaults, the full FIN-004 PNG fee table, locale pins, engine copy and charter page copy publish as one immutable version. Managers may publish copy-only changes; rule fields need `engine_settings.manage` and an approval reference (E6).
+
+`EngineSettingsDocument` (plus `GuestsSettings`, `CalendarSettings`, `LocaleSettings`, `FeesSettings`, `PngFees`, `CopySettings`, `CharterSettings`) uses the task JSON shape. `locale` is pinned to `en` / `["en"]` / `USD`. PNG categories the prototype lacks (`can_adult` 100, `can_minor` 30, `national_or_resident` 30, `exempt_under_age` 2) come from doc 02 / FIN-004. The seeded fee footnote is unchanged.
+
+**Rule / copy paths (E6)**
+
+Copy (`copyPaths()`; any `copy.*` leaf also counts as copy):
+
+- `fees.footnote`
+- `copy.book_now_pay_later`, `copy.traveling_with_children`, `copy.solo_and_triple`, `copy.pay_today`, `copy.details_note`, `copy.confirmation_steps`
+- `charter.headline`, `charter.intro`, `charter.itinerary_label`, `charter.group_contexts`, `charter.thank_you`
+
+Rule (everything else):
+
+- `guests.max_per_cabin`, `guests.max_per_yacht`, `guests.child_min_age`, `guests.child_max_age`, `guests.adult_required_with_children`, `guests.under_age_message`
+- `calendar.default_search_from`, `calendar.default_search_to`, `calendar.default_adults`, `calendar.horizon_months`
+- `locale.default`, `locale.live`, `locale.currency`
+- `fees.tct_pp`, `fees.png.*`, `fees.show_in_price_panel`
+- `charter.response_sla_hours`
+
+Prototype difference: `ES_COPY` omits `chCtx` / `group_contexts` (it is also absent from `ES_RULES`). The charter page is Admin+Manager and the task names it a copy path — we follow the task.
+
+`requiresApprovalReference($changes)` is true when any changed path is not a copy path.
+
+**Validation carried over from `esIssues()`**
+
+Errors:
+
+- `max_per_cabin` 1–4, `max_per_yacht` 1–36
+- `max_per_yacht` ≤ 9 × `max_per_cabin` (esIssues)
+- child ages 0–17 and min ≤ max
+- `default_adults` 1–16, ≤ `max_per_yacht` (esIssues), and ≤ `max_per_cabin` × 9 (task)
+- `horizon_months` 6–36
+- search months `YYYY-MM` with from ≤ to
+- fee amounts integers ≥ 0; `exempt_under_age` 0–12
+- `response_sla_hours` 1–72
+- copy non-empty; max 320; headline 60; itinerary label 30; under-age message 60
+- `confirmation_steps` exactly 3 items
+- `group_contexts` 1–8 non-empty unique items (esIssues only required ≥ 1)
+- locale pins reject `"es"`
+
+Warnings implemented:
+
+- `max_per_yacht` ≠ 16 (OPS-002)
+- under-age message digits ≠ `child_min_age`
+- “Traveling with children” age range ≠ `{min}–{max}`
+- charter intro / thank-you “within N hours” ≠ SLA
+- copy that quotes rates (child %, single +, triple −, deposit %, charter USD) vs `CurrentConfig::rates()` — skipped if rates are unpublished
+- extractors never throw: no number or range in the text means no warning
+
+Deferred:
+
+- `TODO(Sprint 3)` default search starts before the first bookable month (needs departures)
+- `TODO(task 04)` confirmation step 1 hours ≠ business-rules response SLA
+
+**Authorisation** uses a raw `DocumentDiff` (current `toArray()` vs the submitted array as-is). `authorizePublish` never calls `fromArray()` / `changesAgainst()` on the request body. Any path that is not a known copy path — including a missing `guests` group — is a rule path. The publisher still validates and diffs the typed document after that.
+
+**Permission `engine_copy.manage`:** label “Edit engine copy”, group `commercial`, not a flag. Manager default yes; Sales Exec no. `RolesSeeder` does not overwrite existing roles. `GrantEngineCopyManage` (data migration `2026_09_19_200011`) grants it to an existing `manager` role, writes `role.updated` with actor System and reason `Sprint 2: new permission engine_copy.manage`, and is idempotent. Fresh migrate: no manager row yet → no-op; seeder then creates Manager with the new default. `down()` removes the permission.
+
+`engine_settings_versions` is immutable (model + MySQL triggers). Morph alias `engine_settings_version`. View = `panel.rms`. `GET /api/rms/engine-settings` adds `copy_paths`. `POST /validate` adds `rule_fields_changed`.
+
+### Files touched
+- `app/Support/Config/Documents/EngineSettingsDocument.php`
+- `app/Support/Config/Documents/EngineSettingsConstraint.php`
+- `app/Support/Config/Documents/GuestsSettings.php`
+- `app/Support/Config/Documents/CalendarSettings.php`
+- `app/Support/Config/Documents/LocaleSettings.php`
+- `app/Support/Config/Documents/FeesSettings.php`
+- `app/Support/Config/Documents/PngFees.php`
+- `app/Support/Config/Documents/CopySettings.php`
+- `app/Support/Config/Documents/CharterSettings.php`
+- `app/Support/Roles/GrantEngineCopyManage.php`
+- `app/Enums/Permission.php`
+- `app/Enums/SystemRole.php`
+- `app/Models/EngineSettingsVersion.php`
+- `app/Policies/ConfigPolicy.php`
+- `app/Policies/EngineSettingsVersionPolicy.php`
+- `app/Providers/AppServiceProvider.php`
+- `app/Services/Config/CurrentConfig.php`
+- `app/Http/Controllers/Rms/EngineSettingsController.php`
+- `app/Http/Resources/Rms/EngineSettingsCurrentResource.php`
+- `app/Http/Resources/Rms/EngineSettingsValidationResource.php`
+- `database/migrations/2026_09_19_200010_create_engine_settings_versions_table.php`
+- `database/migrations/2026_09_19_200011_grant_engine_copy_manage_to_manager.php`
+- `routes/api/rms.php`
+- `tests/Pest.php`
+- `tests/Unit/Enums/SystemRoleTest.php`
+- `tests/Feature/Database/DatabaseSetupTest.php`
+- `tests/Feature/Config/EngineSettingsDocumentTest.php`
+- `tests/Feature/Config/EngineSettingsSeederTest.php`
+- `tests/Feature/Config/EngineSettingsEndpointsTest.php`
+- `tests/Feature/Config/GrantEngineCopyManageTest.php`
+- `docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- Cross-field document checks live in `EngineSettingsConstraint` (validator-aware) because Laravel closures do not receive the validator.
+- The permission grant is a small `GrantEngineCopyManage` helper called from the data migration so History stays inside a transaction and the grant is testable / idempotent.
+- `ConfigPolicy::publish()` return type widened to `bool|Response` so the engine-settings policy can return a named 403.
+
+### Open questions
+- The seeded `fees.footnote` still says the PNG fee “is paid at SCY airport”. Since 12 Sep 2026 the guest chooses whether Anakata collects it (B6 / FIN-004). Keep the seed text for now — copy to review with the client.
+
+### Notes for later
+- Task 04 registry will read this document (OPS-002, OPS-004, FIN-004, language).
+- Wire the confirmation-step-1 SLA warning once business rules exist.
+- First-bookable-month warning once departures exist.
+- Engine push listener on `ConfigPublished`.
+- Append-only triggers on the business-rules version table (engine settings now has them).
+- `08-dev-decisions.md` still ends at D6; E1–E8 live only in the sprint README.
+- `CurrentConfig` forever-cache caveat from task 01 still applies.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Config/Documents \
+  app/Support/Roles/GrantEngineCopyManage.php \
+  app/Enums/Permission.php \
+  app/Enums/SystemRole.php \
+  app/Models/EngineSettingsVersion.php \
+  app/Policies/ConfigPolicy.php \
+  app/Policies/EngineSettingsVersionPolicy.php \
+  app/Providers/AppServiceProvider.php \
+  app/Services/Config/CurrentConfig.php \
+  app/Http/Controllers/Rms/EngineSettingsController.php \
+  app/Http/Resources/Rms/EngineSettingsCurrentResource.php \
+  app/Http/Resources/Rms/EngineSettingsValidationResource.php \
+  database/migrations/2026_09_19_200010_create_engine_settings_versions_table.php \
+  database/migrations/2026_09_19_200011_grant_engine_copy_manage_to_manager.php \
+  routes/api/rms.php \
+  tests/Pest.php \
+  tests/Unit/Enums/SystemRoleTest.php \
+  tests/Feature/Database/DatabaseSetupTest.php \
+  tests/Feature/Config/EngineSettingsDocumentTest.php \
+  tests/Feature/Config/EngineSettingsSeederTest.php \
+  tests/Feature/Config/EngineSettingsEndpointsTest.php \
+  tests/Feature/Config/GrantEngineCopyManageTest.php \
+  docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the engine settings document, copy permission and RMS API.
+
+Guest rules, fees and engine copy publish as a versioned document;
+Managers may publish copy-only changes without an approval reference.
+EOF
+)"
+```
+

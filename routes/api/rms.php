@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
 use App\Http\Controllers\Rms\RoleController;
@@ -32,4 +33,11 @@ Route::post('rates/price-check', [RatesController::class, 'priceCheck']);
 Route::post('rates/versions', [RatesController::class, 'store']);
 Route::get('rates/versions', [RatesController::class, 'index']);
 Route::get('rates/versions/{version}', [RatesController::class, 'show'])
+    ->whereNumber('version');
+
+Route::get('engine-settings', [EngineSettingsController::class, 'current']);
+Route::post('engine-settings/validate', [EngineSettingsController::class, 'validateDocument']);
+Route::post('engine-settings/versions', [EngineSettingsController::class, 'store']);
+Route::get('engine-settings/versions', [EngineSettingsController::class, 'index']);
+Route::get('engine-settings/versions/{version}', [EngineSettingsController::class, 'show'])
     ->whereNumber('version');

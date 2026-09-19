@@ -1,0 +1,171 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Support\Config\Documents\EngineSettingsDocument;
+use Database\Seeders\ConfigSeeder;
+use Illuminate\Support\Facades\Validator;
+
+test('rules reject cabin, yacht, ages, search months, locale and copy shape', function (): void {
+    $invalid = engineSettingsDocument([
+        'guests' => [
+            'max_per_cabin' => 5,
+            'max_per_yacht' => 0,
+            'child_min_age' => 18,
+            'child_max_age' => 18,
+            'under_age_message' => '',
+        ],
+        'calendar' => [
+            'default_search_from' => '2028-13',
+            'default_search_to' => 'not-a-month',
+            'default_adults' => 0,
+            'horizon_months' => 5,
+        ],
+        'locale' => [
+            'default' => 'es',
+            'live' => ['es'],
+            'currency' => 'EUR',
+        ],
+        'copy' => [
+            'book_now_pay_later' => '',
+        ],
+        'charter' => [
+            'headline' => '',
+            'itinerary_label' => str_repeat('x', 31),
+            'response_sla_hours' => 0,
+            'group_contexts' => [],
+        ],
+    ]);
+    $invalid['copy']['confirmation_steps'] = ['one', 'two'];
+    $invalid['charter']['group_contexts'] = [];
+
+    $errors = Validator::make($invalid, EngineSettingsDocument::rules())->errors();
+
+    expect($errors->has('guests.max_per_cabin'))->toBeTrue();
+    expect($errors->has('guests.max_per_yacht'))->toBeTrue();
+    expect($errors->has('guests.child_min_age'))->toBeTrue();
+    expect($errors->has('guests.child_max_age'))->toBeTrue();
+    expect($errors->has('guests.under_age_message'))->toBeTrue();
+    expect($errors->has('calendar.default_search_from'))->toBeTrue();
+    expect($errors->has('calendar.default_search_to'))->toBeTrue();
+    expect($errors->has('calendar.default_adults'))->toBeTrue();
+    expect($errors->has('calendar.horizon_months'))->toBeTrue();
+    expect($errors->has('locale.default'))->toBeTrue();
+    expect($errors->has('locale.live.0'))->toBeTrue();
+    expect($errors->has('locale.currency'))->toBeTrue();
+    expect($errors->has('copy.book_now_pay_later'))->toBeTrue();
+    expect($errors->has('copy.confirmation_steps'))->toBeTrue();
+    expect($errors->has('charter.headline'))->toBeTrue();
+    expect($errors->has('charter.itinerary_label'))->toBeTrue();
+    expect($errors->has('charter.response_sla_hours'))->toBeTrue();
+    expect($errors->has('charter.group_contexts'))->toBeTrue();
+});
+
+test('the locale pins reject es', function (): void {
+    $document = engineSettingsDocument();
+    $document['locale']['default'] = 'es';
+    $document['locale']['live'] = ['es'];
+
+    $errors = Validator::make($document, EngineSettingsDocument::rules())->errors();
+
+    expect($errors->has('locale.default'))->toBeTrue();
+    expect($errors->has('locale.live.0'))->toBeTrue();
+});
+
+test('rules reject yacht over nine cabins, reversed child ages and search range', function (): void {
+    $document = engineSettingsDocument([
+        'guests' => [
+            'max_per_cabin' => 1,
+            'max_per_yacht' => 16,
+            'child_min_age' => 12,
+            'child_max_age' => 6,
+        ],
+        'calendar' => [
+            'default_search_from' => '2028-06',
+            'default_search_to' => '2028-01',
+            'default_adults' => 10,
+        ],
+    ]);
+
+    $errors = Validator::make($document, EngineSettingsDocument::rules())->errors();
+
+    expect($errors->has('guests.max_per_yacht'))->toBeTrue();
+    expect($errors->has('guests.child_max_age'))->toBeTrue();
+    expect($errors->has('calendar.default_search_to'))->toBeTrue();
+    expect($errors->has('calendar.default_adults'))->toBeTrue();
+});
+
+test('rules reject duplicate group contexts', function (): void {
+    $document = engineSettingsDocument();
+    $document['charter']['group_contexts'] = ['Family', 'Family'];
+
+    $errors = Validator::make($document, EngineSettingsDocument::rules())->errors();
+
+    expect($errors->has('charter.group_contexts.1'))->toBeTrue();
+});
+
+test('copyPaths classifies footnote and group contexts as copy', function (): void {
+    expect(EngineSettingsDocument::isCopyPath('fees.footnote'))->toBeTrue();
+    expect(EngineSettingsDocument::isCopyPath('charter.group_contexts'))->toBeTrue();
+    expect(EngineSettingsDocument::isCopyPath('copy.book_now_pay_later'))->toBeTrue();
+    expect(EngineSettingsDocument::isCopyPath('copy.unknown_block'))->toBeTrue();
+    expect(EngineSettingsDocument::isCopyPath('guests.max_per_cabin'))->toBeFalse();
+    expect(EngineSettingsDocument::isCopyPath('charter.response_sla_hours'))->toBeFalse();
+    expect(EngineSettingsDocument::isCopyPath('guests'))->toBeFalse();
+});
+
+test('warnings flag yacht capacity, under-age message and copy versus sla', function (): void {
+    $this->seed(ConfigSeeder::class);
+
+    $draft = engineSettingsDocument([
+        'guests' => [
+            'max_per_yacht' => 14,
+            'under_age_message' => 'Under 5 not accommodated',
+        ],
+        'copy' => [
+            'traveling_with_children' => 'A 15% discount applies to children aged 7–16.',
+        ],
+        'charter' => [
+            'response_sla_hours' => 12,
+        ],
+    ]);
+
+    $messages = array_map(
+        fn ($warning): string => $warning->message,
+        EngineSettingsDocument::fromArray($draft)->warnings(null),
+    );
+
+    expect($messages)->toContain('Charter capacity will show 14 guests (follows max per yacht).');
+    expect($messages)->toContain('Under-age message says 5 but children are accepted from age 6.');
+    expect($messages)->toContain('"Traveling with children" mentions different ages than the guest rules (6–17).');
+    expect($messages)->toContain('Charter intro says "within 24 hours" but the SLA is 12 h.');
+    expect($messages)->toContain('Charter thank-you says "within 24 hours" but the SLA is 12 h.');
+});
+
+test('copy with no numbers produces no copy-versus-rates or copy-versus-sla warnings', function (): void {
+    $this->seed(ConfigSeeder::class);
+
+    $draft = engineSettingsDocument([
+        'guests' => [
+            'under_age_message' => 'Too young to sail',
+        ],
+        'copy' => [
+            'traveling_with_children' => 'Children are welcome when traveling with an adult.',
+            'solo_and_triple' => 'Solo and triple occupancy are priced on the next step.',
+            'pay_today' => 'Nothing is charged until you decide.',
+            'confirmation_steps' => [
+                'A member of our team confirms your cabins.',
+                'You receive your booking confirmation and deposit link.',
+                'After the deposit we gather guest details.',
+            ],
+        ],
+        'charter' => [
+            'intro' => 'One yacht, yours for the week, shaped around your group.',
+            'thank_you' => 'Thank you — your charter enquiry has been received. Our team will contact you.',
+        ],
+    ]);
+
+    $warnings = EngineSettingsDocument::fromArray($draft)->warnings(null);
+
+    expect($warnings)->toBe([]);
+});

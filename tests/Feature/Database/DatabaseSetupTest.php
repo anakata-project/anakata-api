@@ -22,4 +22,5 @@ test('core tables exist after migration', function (): void {
         'test_config_versions missing — tests/database/migrations must be registered for the whole suite.',
     );
     expect(Schema::hasTable('rate_versions'))->toBeTrue('rate_versions table missing after migration.');
+    expect(Schema::hasTable('engine_settings_versions'))->toBeTrue('engine_settings_versions table missing after migration.');
 });

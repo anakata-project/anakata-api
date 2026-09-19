@@ -7,6 +7,7 @@ namespace App\Services\Config;
 use App\Enums\ConfigKind;
 use App\Models\ConfigVersion;
 use App\Support\Config\ConfigDocument;
+use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
@@ -62,9 +63,15 @@ final class CurrentConfig
         return $this->document(ConfigKind::BusinessRules);
     }
 
-    public function engineSettings(): ConfigDocument
+    public function engineSettings(): EngineSettingsDocument
     {
-        return $this->document(ConfigKind::EngineSettings);
+        $document = $this->document(ConfigKind::EngineSettings);
+
+        if (! $document instanceof EngineSettingsDocument) {
+            throw new RuntimeException('Published engine settings are not an EngineSettingsDocument.');
+        }
+
+        return $document;
     }
 
     public function forget(ConfigKind $kind): void

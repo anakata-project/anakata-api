@@ -8,11 +8,13 @@ use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Events\ConfigPublished;
 use App\Listeners\ClearCurrentConfigCache;
+use App\Models\EngineSettingsVersion;
 use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Config\ConfigRegistry;
 use App\Services\Config\CurrentConfig;
+use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Iso;
 use DateTimeInterface;
@@ -83,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'role' => Role::class,
             'rate_version' => RateVersion::class,
+            'engine_settings_version' => EngineSettingsVersion::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(
@@ -90,6 +93,13 @@ class AppServiceProvider extends ServiceProvider
             RateVersion::class,
             RatesDocument::class,
             RatesDocument::initial(),
+        );
+
+        $this->app->make(ConfigRegistry::class)->register(
+            ConfigKind::EngineSettings,
+            EngineSettingsVersion::class,
+            EngineSettingsDocument::class,
+            EngineSettingsDocument::initial(),
         );
 
         foreach (Permission::cases() as $permission) {

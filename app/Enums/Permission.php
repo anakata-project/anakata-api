@@ -36,6 +36,7 @@ enum Permission: string
     case RulesView = 'rules.view';
     case RulesManage = 'rules.manage';
     case EngineSettingsManage = 'engine_settings.manage';
+    case EngineCopyManage = 'engine_copy.manage';
     case OffersManage = 'offers.manage';
     case OffersApprove = 'offers.approve';
     case ExtrasManage = 'extras.manage';
@@ -74,6 +75,7 @@ enum Permission: string
             self::RulesView => 'View business rules',
             self::RulesManage => 'View and adjust business rules',
             self::EngineSettingsManage => 'Manage engine settings',
+            self::EngineCopyManage => 'Edit engine copy',
             self::OffersManage => 'Manage offers',
             self::OffersApprove => 'Approve offers',
             self::ExtrasManage => 'Manage extras catalog',
@@ -110,6 +112,7 @@ enum Permission: string
             self::RulesView,
             self::RulesManage,
             self::EngineSettingsManage,
+            self::EngineCopyManage,
             self::OffersManage,
             self::OffersApprove,
             self::ExtrasManage,

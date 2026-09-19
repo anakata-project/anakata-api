@@ -8,6 +8,7 @@ use App\Enums\SystemRole;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Config\ConfigRegistry;
+use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\SensitiveFields;
 use Illuminate\Testing\TestResponse;
@@ -127,6 +128,18 @@ function ratesDocument(array $overrides = []): array
 {
     /** @var array<string, mixed> $document */
     $document = array_replace_recursive(RatesDocument::initial(), $overrides);
+
+    return $document;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function engineSettingsDocument(array $overrides = []): array
+{
+    /** @var array<string, mixed> $document */
+    $document = array_replace_recursive(EngineSettingsDocument::initial(), $overrides);
 
     return $document;
 }

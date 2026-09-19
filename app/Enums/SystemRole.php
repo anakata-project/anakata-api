@@ -41,6 +41,7 @@ enum SystemRole: string
                 Permission::ItinerariesManage,
                 Permission::BlocksManage,
                 Permission::OffersManage,
+                Permission::EngineCopyManage,
                 Permission::PipelineMoveStage,
             ]),
             self::SalesExec => collect([

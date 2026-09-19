@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Enums\Permission;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 abstract class ConfigPolicy extends Policy
 {
@@ -18,7 +19,7 @@ abstract class ConfigPolicy extends Policy
         return $actor->hasPermission($this->viewPermission());
     }
 
-    public function publish(User $actor): bool
+    public function publish(User $actor): bool|Response
     {
         return $actor->hasPermission($this->publishPermission());
     }
