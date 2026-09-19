@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\SensitiveFields;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
+use Tests\TruncatingTestCase;
 
 /*
 | Feature tests boot the Laravel application and refresh the database.
@@ -16,6 +17,7 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)->in('Feature');
+pest()->extend(TruncatingTestCase::class)->in('Concurrency');
 
 function assertNoSensitiveFields(TestResponse $response): void
 {

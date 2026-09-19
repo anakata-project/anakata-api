@@ -79,6 +79,11 @@ app/
 - Sensitive values (and `password` / `remember_token`) are redacted automatically by `History`. The key stays; the value becomes `[redacted]`.
 - History is never written from controllers. Controllers call Actions; Actions call `History`.
 
+## References
+- The business reference column is `reference`, a unique string (`ANK-2026-0005`, `DEP-012`…).
+- `App\Services\References\ReferenceService` is the only generator. Nothing derives a reference from `id`.
+- Draw inside the creating Action's transaction so a rollback also rolls the counter back.
+
 ## Events
 - Laravel events + queued listeners are only for side effects (emails, Stripe, engine availability push, CRM tasks raised by booking changes). Dispatch after commit (`ShouldDispatchAfterCommit`).
 - No outbox, no `EventEnvelope`, no internal sync bus. CRM data derived from bookings is computed from the booking tables directly.

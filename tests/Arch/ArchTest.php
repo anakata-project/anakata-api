@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\ChangeHistory;
 use App\Models\Concerns\HasAuditColumns;
+use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Models\ReferenceSequence;
 use App\Support\History\History;
 
 arch('crm controllers do not use money or booking write paths')
@@ -23,6 +25,17 @@ arch('models use HasAuditColumns')
     ->ignoring([
         ChangeHistory::class,
         HasAuditColumns::class,
+        SerializesDatesAsUtc::class,
+        // Infrastructure counter: no audit columns and no history.
+        ReferenceSequence::class,
+    ]);
+
+arch('models serialize dates as UTC')
+    ->expect('App\Models')
+    ->toUseTrait(SerializesDatesAsUtc::class)
+    ->ignoring([
+        HasAuditColumns::class,
+        SerializesDatesAsUtc::class,
     ]);
 
 arch('controllers do not write history')

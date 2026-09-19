@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Support\HealthChecker;
+use App\Support\Iso;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
@@ -23,7 +24,7 @@ final class HealthController extends Controller
         return response()->json([
             'status' => $failed ? 'degraded' : 'ok',
             'app' => 'anakata-api',
-            'time' => now()->utc()->toIso8601String(),
+            'time' => Iso::utc(now()),
             'checks' => $checks,
         ], $failed ? 503 : 200);
     }

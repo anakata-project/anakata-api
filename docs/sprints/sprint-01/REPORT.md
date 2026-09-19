@@ -475,3 +475,109 @@ EOF
 )"
 ```
 
+## Task 05 · Reference sequence service and business time zone
+
+### What was built
+`ReferenceService` issues every business reference from `reference_sequences` (`scope` unique, `last_value`). One upsert per draw takes an exclusive lock immediately:
+
+```
+INSERT … VALUES (?, 1, …) ON DUPLICATE KEY UPDATE last_value = last_value + 1
+```
+
+then `SELECT last_value` in the same transaction. `ensureAtLeast` uses `GREATEST` and never lowers a counter. Draws throw outside a transaction (same `$baseTransactionLevel` pattern as History). A caller rollback rolls the counter back, so rollbacks cannot create gaps.
+
+Year for `ANK-{YYYY}-…` comes from `BusinessTime` / `Pacific/Galapagos` (already in `config('anakata.business_timezone')`). `config('app.timezone')` stays `UTC`.
+
+One datetime format everywhere: `Y-m-d\TH:i:s.v\Z` via `Iso::utc()`. `Date::serializeUsing` covers `json_encode` of Carbon; `SerializesDatesAsUtc` covers every model `toArray()`; `ChangeHistoryResource`, `UserResource`, and `/api/health` use the same helper.
+
+Before this change, Eloquent/`json_encode(now())` already emitted UTC with `Z` and **microseconds** (`toISOString()`). The two resources already used milliseconds. `/health` used `toIso8601String()` (`+00:00`). All three now match milliseconds + `Z`.
+
+No consumer yet. First use is Sprint 3/4.
+
+### Files touched
+- `app/Enums/ReferenceType.php`, `app/Enums/PaymentRefKind.php`
+- `app/Services/References/ReferenceService.php`
+- `app/Models/ReferenceSequence.php`
+- `app/Models/Concerns/SerializesDatesAsUtc.php`
+- `app/Models/User.php`, `app/Models/Role.php`, `app/Models/ChangeHistory.php`
+- `app/Support/Iso.php`, `app/Support/BusinessTime.php`
+- `app/Providers/AppServiceProvider.php`
+- `app/Http/Resources/Rms/ChangeHistoryResource.php`, `app/Http/Resources/Rms/UserResource.php`
+- `app/Http/Controllers/HealthController.php`
+- `database/migrations/2026_09_19_200007_create_reference_sequences_table.php`
+- `.cursor/rules/laravel.mdc`
+- `tests/TestCase.php`, `tests/TruncatingTestCase.php`, `tests/Pest.php`, `phpunit.xml`
+- `tests/Arch/ArchTest.php`
+- `tests/Unit/Support/IsoTest.php`
+- `tests/Feature/Support/BusinessTimeTest.php`, `tests/Feature/Support/UtcSerialisationTest.php`
+- `tests/Feature/References/ReferenceServiceTest.php`
+- `tests/Concurrency/ReferenceServiceConcurrencyTest.php`
+- `tests/Feature/Health/HealthEndpointTest.php`
+- `docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- Pest cannot rebind the Feature `TestCase` (RefreshDatabase) on a file in `tests/Feature`. Concurrency tests live in `tests/Concurrency/` on `TruncatingTestCase` (`DatabaseTruncation`, no wrapping transaction) and are included in the Feature phpunit suite.
+- Upsert SQL quotes every identifier. Unquoted `scope` in the INSERT column list is a syntax error on MySQL 8.4 via PDO. `GREATEST` qualifies `reference_sequences.last_value` vs `new.last_value` (ambiguous otherwise).
+- `/api/health` `time` also uses `Iso::utc()` so it is not a third format.
+
+### Open questions
+- **X/O:** doc 02 names payment kinds Deposit · Balance · Extras · Refund · Other, but only documents suffixes `D`/`B`/`R`. `PaymentRefKind::Extras = X` and `Other = O` are our assumption.
+- **Request → booking:** whether a request keeps `ANK-R-YYYY-NNNN` or gets a new `ANK-YYYY-NNNN` when it becomes a booking is decided in the bookings sprint.
+
+### Notes for later
+- Seeders should call `ensureAtLeast` after importing `seed-data.json`. Observed maxima there: bookings `ANK-2026-0019` (plus agency blocked ref `ANK-2026-0021`), requests `ANK-R-2026-0042`, departures `DEP-016`, groups `GRP-007`, offers `OF-002`, agencies `AG-003`.
+- Business-hours calculation (hold deadlines) belongs on `BusinessTime`.
+- First consumer of `ReferenceService` is Sprint 3 or 4 (creating Actions draw inside their transaction).
+
+### Concurrency test outcome
+Both tests passed. Connection B (`innodb_lock_wait_timeout = 1`) gets MySQL **1205** (lock wait timeout), not **1213** (deadlock), on:
+
+1. an existing scope (`booking:2026`, after a committed seed draw)
+2. a first draw of a new year (`booking:2031`)
+
+After A commits, B's next draw is A's number + 1. Default connection is switched around each draw (`mysql` / `mysql_lock`) and restored in `finally`. No fork, no retry, no sleep.
+
+### Git commands for the user
+
+Do **not** run these in the agent. From the workspace:
+
+```bash
+# anakata-api (branch dev)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+docker compose exec app sh -c "php artisan migrate"
+git add \
+  app/Enums/ReferenceType.php \
+  app/Enums/PaymentRefKind.php \
+  app/Services/References \
+  app/Models/ReferenceSequence.php \
+  app/Models/Concerns/SerializesDatesAsUtc.php \
+  app/Models/User.php \
+  app/Models/Role.php \
+  app/Models/ChangeHistory.php \
+  app/Support/Iso.php \
+  app/Support/BusinessTime.php \
+  app/Providers/AppServiceProvider.php \
+  app/Http/Resources/Rms/ChangeHistoryResource.php \
+  app/Http/Resources/Rms/UserResource.php \
+  app/Http/Controllers/HealthController.php \
+  database/migrations/2026_09_19_200007_create_reference_sequences_table.php \
+  .cursor/rules/laravel.mdc \
+  tests/TestCase.php \
+  tests/TruncatingTestCase.php \
+  tests/Pest.php \
+  phpunit.xml \
+  tests/Arch/ArchTest.php \
+  tests/Unit/Support/IsoTest.php \
+  tests/Feature/Support/BusinessTimeTest.php \
+  tests/Feature/Support/UtcSerialisationTest.php \
+  tests/Feature/References \
+  tests/Concurrency \
+  tests/Feature/Health/HealthEndpointTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the reference sequence service and a single UTC millisecond datetime format.
+
+EOF
+)"
+```
+

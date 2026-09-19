@@ -6,7 +6,7 @@ use App\Support\HealthChecker;
 use RuntimeException;
 
 test('health returns 200 when every check is ok', function (): void {
-    $this->getJson('/api/health')
+    $response = $this->getJson('/api/health')
         ->assertOk()
         ->assertJsonPath('status', 'ok')
         ->assertJsonPath('app', 'anakata-api')
@@ -14,6 +14,8 @@ test('health returns 200 when every check is ok', function (): void {
         ->assertJsonPath('checks.redis', 'ok')
         ->assertJsonPath('checks.queue', 'ok')
         ->assertJsonStructure(['time']);
+
+    expect($response->json('time'))->toMatch('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/');
 });
 
 test('health returns 503 when the redis check fails', function (): void {

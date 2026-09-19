@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\Permission;
 use App\Enums\UserStatus;
 use App\Models\Concerns\HasAuditColumns;
+use App\Models\Concerns\SerializesDatesAsUtc;
 use App\Notifications\ResetPasswordNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -43,7 +44,7 @@ use Illuminate\Support\Str;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasAuditColumns, HasFactory, Notifiable;
+    use HasAuditColumns, HasFactory, Notifiable, SerializesDatesAsUtc;
 
     /**
      * @return array<string, string>

@@ -6,6 +6,7 @@ namespace App\Http\Resources\Rms;
 
 use App\Models\ChangeHistory;
 use App\Models\User;
+use App\Support\Iso;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -48,7 +49,7 @@ class ChangeHistoryResource extends JsonResource
             'after' => $this->after,
             'reason' => $this->reason,
             'source' => $this->context['source'] ?? 'system',
-            'at' => $this->created_at->clone()->utc()->format('Y-m-d\TH:i:s.v\Z'),
+            'at' => Iso::utc($this->created_at),
         ];
     }
 }

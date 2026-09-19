@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\SerializesDatesAsUtc;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -26,6 +27,8 @@ use LogicException;
  */
 class ChangeHistory extends Model
 {
+    use SerializesDatesAsUtc;
+
     public const UPDATED_AT = null;
 
     protected $table = 'change_history';

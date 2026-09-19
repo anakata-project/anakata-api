@@ -6,9 +6,9 @@ namespace App\Http\Resources\Rms;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Iso;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
@@ -51,13 +51,8 @@ class UserResource extends JsonResource
                 'slug' => $role->slug,
             ],
             'flags' => $role->flagValues(),
-            'last_login_at' => self::utc($this->last_login_at),
-            'invited_at' => self::utc($this->invited_at),
+            'last_login_at' => Iso::utc($this->last_login_at),
+            'invited_at' => Iso::utc($this->invited_at),
         ];
-    }
-
-    private static function utc(?Carbon $value): ?string
-    {
-        return $value?->clone()->utc()->format('Y-m-d\TH:i:s.v\Z');
     }
 }

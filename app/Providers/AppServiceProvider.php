@@ -7,12 +7,15 @@ namespace App\Providers;
 use App\Enums\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Iso;
+use DateTimeInterface;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -75,5 +78,7 @@ class AppServiceProvider extends ServiceProvider
         foreach (Permission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user): bool => $user->hasPermission($permission));
         }
+
+        Date::serializeUsing(fn (DateTimeInterface $date): string => Iso::utc($date));
     }
 }
