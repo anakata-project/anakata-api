@@ -676,3 +676,140 @@ EOF
 )"
 ```
 
+## Task 06 · Shared config editor pieces
+
+### What was built
+Shared RMS configuration editing layer in **anakata-panel**. No Rates / Engine Settings / Business Rules field layouts (tasks 07–09).
+
+The panel holds a **local draft only**. `POST /validate` is the dirty source of truth when the draft is valid. An invalid document returns `changes: []`, so dirtiness then falls back to a canonical deep-equal against the published document.
+
+**`useConfigEditor(kind)`** (`kind`: `'rates' | 'engine-settings' | 'business-rules'`). Kind-specific overloads type `current` / `validation` (`RatesVersion`, `EngineSettingsVersion` + `EngineSettingsValidation`, `BusinessRulesVersion`).
+
+| Surface | Role |
+|---|---|
+| `current` | Loaded version envelope (`version`, `document`, publisher, dates, approval) |
+| `draft` | Deep reactive copy. Cloned with `cloneDocument(toRaw(value))` (JSON round-trip). Never `structuredClone` a Vue proxy — that throws `DataCloneError`. |
+| `validation` | `{ errors, warnings, changes }` (+ `rule_fields_changed` for engine) |
+| `validating` | Timer pending or request in flight. Dirty treats this as in-flight; Save waits so the confirm list is current. |
+| `dirty` | If in-flight or errors: `!documentsEqual(draft, current.document)`. Else `validation.changes.length > 0`. |
+| `hasErrors` | Errors object/array has any keys (`[]` from validate is empty) |
+| `conflict` / `publishMessage` | 409 body / 422 top-level message |
+| `discard()` | `invalidate()` queue, empty validation, reset draft from `current.document`, clear conflict |
+| `publish(approvalReference)` | `POST /versions` with `base_version`. **201** → invalidate + empty validation, apply body, `GET /{kind}` (for `copy_paths` / `registry`), `reloadHistory()`, toast `Version {n} published`. **409** → keep draft, set `conflict`. **422** → merge `document.*` errors into `validation.errors`, store top-level `message`. |
+| `reload()` | Same invalidate as discard, then `GET /{kind}` |
+| `errorsFor(path)` / `warningsFor(path)` | Exact path; also accept `document.{path}` |
+| History | `versions`, `hasMore`, `historyLoading`, `loadOlder()`, `reloadHistory()` |
+
+`discard()`, a successful publish, `reload()`, and unmount all `invalidate()` the 400 ms queue so a late `/validate` cannot mark the page dirty again.
+
+**`ConfigPublishBar`** — prototype `.esbar` + existing `.warnbox`. State line: `readOnlyText` when `!canPublish`; dirty + errors → `● UNSAVED CHANGES` (`--warn`, no count); dirty + valid → `● N UNSAVED CHANGE(S)`; clean → `● PUBLISHED — V{n} · {date} · {name}` (`--ok`). Discard stays enabled for an invalid dirty draft. Save is disabled when clean, when there are errors, or while validating. 409 shows the warnbox plus “Load the latest version”. Confirm modal lists `label: from → to` (`formatConfigValue`). Buttons are themed `UButton`, not a new `.btn` port.
+
+**`ConfigHistoryPanel`** — `AnkPanel` + `table.list`, one row per change (shared When / Who / Approval). Version 1 with `changes: []` is one “Initial values” row. Columns: **When · Who · Item · Change · Approval / reason** (overrides the engine table’s 4 columns).
+
+**`useUnsavedGuard(dirty, message)`** — `beforeunload` while dirty; `onBeforeRouteLeave` → `window.confirm(message)`. Role matrix now calls `useUnsavedGuard(dirty, () => t('admin.leaveUnsaved'))`. Config pages (07–09) pass `t('config.leaveUnsaved')`.
+
+Config types are re-exported from `app/types/api.ts` so panel files do not import the layer path.
+
+### Composable API
+```
+useConfigEditor('rates' | 'engine-settings' | 'business-rules')
+  current, draft, validation, validating, dirty, hasErrors, loading,
+  conflict, publishMessage,
+  versions, hasMore, historyLoading,
+  discard(), publish(approvalReference), reload(),
+  reloadHistory(), loadOlder(),
+  errorsFor(path), warningsFor(path)
+```
+
+### Prototype differences (deliberate)
+1. **Version line, not engine sync.** Clean state is `● PUBLISHED — V{n} · {date} · {name}` (`useDates().format(published_at, 'dateTime')`; name or `System`). The prototype’s `ENGINE UP TO DATE` is not used — there is no engine sync yet.
+2. **Sticky bar.** `.esbar` is `position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--forest-900)`. Prototype CSS is sticky `top: 0` but the bar still scrolls away inside the prototype’s view container. This bar stays reachable on long pages.
+
+### CSS classes
+Ported from `prototype/rms_index.html` (lines 231–262) into `app/assets/css/config.css`, registered in `nuxt.config.ts`, and added to the `better-tailwindcss/no-unknown-classes` ignore list:
+
+`.esbar`, `.esbar .acts`, `.rreason`, `.rreason.bad`, `.rcell`, `.rin` (plus `:focus` / `:disabled`), `.mini`, `.yoy`, `.rhelp`, `.bands`, `.rtab`, `.rflag`, `tr.rdiff`.
+
+Added for the shared pieces (not in the prototype block): `.esbar-state--ok`, `.esbar-state--warn`, `.esbar-state--ro`, `.esbar-warn`, `.nw`, `.config-change-to`, `.config-change-from`, `.config-change-list`, `.config-confirm-note`, `.config-history-scroll`.
+
+### Files touched
+- `anakata-panel/app/composables/useConfigEditor.ts`
+- `anakata-panel/app/composables/useUnsavedGuard.ts`
+- `anakata-panel/app/utils/formatConfigValue.ts`
+- `anakata-panel/app/utils/validationQueue.ts`
+- `anakata-panel/app/utils/publishOutcome.ts`
+- `anakata-panel/app/utils/documentsEqual.ts`
+- `anakata-panel/app/utils/isConfigDirty.ts`
+- `anakata-panel/app/utils/configHistory.ts`
+- `anakata-panel/app/components/config/ConfigPublishBar.vue`
+- `anakata-panel/app/components/config/ConfigHistoryPanel.vue`
+- `anakata-panel/app/assets/css/config.css`
+- `anakata-panel/app/types/api.ts`
+- `anakata-panel/app/components/admin/RoleMatrixPanel.vue`
+- `anakata-panel/i18n/locales/en.json`
+- `anakata-panel/nuxt.config.ts`
+- `anakata-panel/eslint.config.mjs`
+- `anakata-panel/tests/unit/formatConfigValue.test.ts`
+- `anakata-panel/tests/unit/validationQueue.test.ts`
+- `anakata-panel/tests/unit/publishOutcome.test.ts`
+- `anakata-panel/tests/unit/documentsEqual.test.ts`
+- `anakata-panel/tests/unit/isConfigDirty.test.ts`
+- `anakata-panel/tests/unit/configHistory.test.ts`
+- `anakata-panel/app/pages/accept-invitation.vue` (pre-existing `vue/html-indent` so lint passes)
+- `anakata-panel/app/pages/reset-password.vue` (same)
+- `anakata-api/docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- Dirty rule follows the plan correction, not the task file’s “`changes.length` only”: invalid drafts with `changes: []` stay dirty so Discard and the leave guard stay active.
+- Clone is a JSON round-trip after `toRaw`, not `structuredClone` on a reactive proxy.
+- Successful publish applies the 201 body then `GET /{kind}` so engine `copy_paths` and rules `registry` / `counts` are present (the version-detail resource does not include them).
+- Extra `configHistory.ts` flattens versions → one row per change (including the version-1 “Initial values” row). Vue stays out of the unit.
+- `useUnsavedGuard` takes a message getter so the role matrix keeps `admin.leaveUnsaved`.
+- Buttons use themed `UButton` (layer already maps coral / mono / square).
+- Two auth pages had a pre-existing indent lint; fixed so `pnpm lint` is green.
+
+### Open questions
+None.
+
+### Notes for later
+- Visual check of the publish bar and history table is **task 07** (this task does not mount a config page).
+- Restore an `ENGINE UP TO DATE` (or sync) state line when engine availability push exists.
+- Tasks 07–09: wire `useConfigEditor` + `ConfigPublishBar` + `ConfigHistoryPanel` + `useUnsavedGuard(..., t('config.leaveUnsaved'))` and pass each page’s `formats` map / `confirmNote` / `emptyText`.
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (66), `pnpm build` — pass.
+- Fresh clone onto `/tmp/anakata-fresh-s2t06/{anakata-ui,anakata-panel}` with sibling `extends: ['../anakata-ui']`. Confirmed `app/assets/css/config.css` and the new composables are present (not gitignored). `pnpm typecheck` and `pnpm build` pass.
+- Browser: `/rms/admin/permissions` after the `useUnsavedGuard` extract. Toggle a cell → Save/Cancel appear → Calendar click stays on the page and `window.confirm` is `You have unsaved permission changes. Leave this page?`. Cancel restores a clean matrix. Publish bar / history visuals are task 07.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/composables/useConfigEditor.ts app/composables/useUnsavedGuard.ts \
+  app/utils/formatConfigValue.ts app/utils/validationQueue.ts app/utils/publishOutcome.ts \
+  app/utils/documentsEqual.ts app/utils/isConfigDirty.ts app/utils/configHistory.ts \
+  app/components/config app/assets/css/config.css app/types/api.ts \
+  app/components/admin/RoleMatrixPanel.vue i18n/locales/en.json \
+  nuxt.config.ts eslint.config.mjs tests/unit \
+  app/pages/accept-invitation.vue app/pages/reset-password.vue
+git commit -m "$(cat <<'EOF'
+Add the shared RMS config editor, publish bar and history.
+
+Rates, engine settings and business rules will edit a local draft
+and publish through one composable; the role matrix reuses the
+unsaved-leave guard.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 2 task 06: panel config editor pieces.
+EOF
+)"
+```
+
