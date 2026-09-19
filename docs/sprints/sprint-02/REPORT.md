@@ -813,3 +813,107 @@ EOF
 )"
 ```
 
+## Task 07 · anakata-panel · Rates & Promotions page
+
+### What was built
+`/rms/commercial/rates` is the first real `useConfigEditor` page. Admin / Director (`rates.manage`) edit; everyone else is read-only (`VIEW ONLY — ADMIN / DIRECTOR EDITS RATES`, inputs disabled, no helper row, no year buttons, no approval field). Price check and history stay visible.
+
+Shared empty-is-null number input lives with the other config pieces: `app/components/config/ConfigNumberInput.vue` + `app/utils/parseRinValue.ts` (empty / whitespace / non-finite → `null`). Rates uses it for every `.rin`; Engine Settings and Business Rules will reuse it.
+
+Base rates: three categories, one column per draft year, derived deposit · balance (`10% · 90% at T−120` / charter `20% · 80% at T−120`), `.yoy` vs the previous year, editor-only annual-increase (default 5, 0–50) and round-to helper. `↻ +n%` refills a year from the previous one; last year has `✕` when there is more than one year (`TODO(Sprint 3)` to block years that have departures). 2027 → 2028 at +5% nearest USD is 13,965 / 26,250 / 209,475.
+
+Child row ages come from `GET /api/rms/engine-settings` (`child_min_age` / `child_max_age`). Seeded values are **6–17** (OPS-004), not 6–12 (PNG cutoff). Link goes to `/rms/booking-engine/settings`.
+
+Price check: sailing-year select (default first draft year), `POST /api/rms/rates/price-check` with a cloned plain `document`. Skipped while the draft has errors; last good table is dimmed with “Fix the errors above to update the price check”. Differences: increase `--warn`, decrease `--ok`, “no change” `--iv38`. `NoRate` is `—` / “no rate”.
+
+Extras and Promotions are placeholder `.note` lines plus the Offers link, so the page layout matches the prototype.
+
+`ConfigPublishBar` hides the approval input when `!canPublish` and accepts optional `labels` so warnbox paths resolve before `changes` exist.
+
+Draft panels `provide`/`inject` `RATES_DRAFT_KEY` so Vue does not see `vue/no-mutating-props` on a draft prop.
+
+### Notice wording
+Prototype claim that rates push to the public site in “< 30 seconds” is dropped (that arrives with the engine API). The notice is now: single source the engine reads — Admin / Director only — each change published with an approval reference and logged. Promotions stay a v1.2 extension pending CEO sign-off.
+
+### Elements without a prototype source
+- `ConfigNumberInput` / `parseRinValue` (shared; not in the HTML prototype).
+- Extras / Promotions bodies are the task’s one-line notes, not the prototype’s future editors.
+- Year-remove `TODO(Sprint 3)` comment.
+
+### Files touched
+- `anakata-panel/app/pages/rms/commercial/rates.vue`
+- `anakata-panel/app/components/rates/RatesBasePanel.vue`
+- `anakata-panel/app/components/rates/RatesTermsPanel.vue`
+- `anakata-panel/app/components/rates/RatesRulesPanel.vue`
+- `anakata-panel/app/components/rates/RatesPriceCheck.vue`
+- `anakata-panel/app/components/rates/rateHelpers.ts`
+- `anakata-panel/app/components/rates/isNoRate.ts`
+- `anakata-panel/app/components/config/ConfigNumberInput.vue`
+- `anakata-panel/app/components/config/ConfigPublishBar.vue`
+- `anakata-panel/app/utils/parseRinValue.ts`
+- `anakata-panel/app/types/api.ts`
+- `anakata-panel/app/assets/css/config.css`
+- `anakata-panel/i18n/locales/en.json`
+- `anakata-panel/eslint.config.mjs`
+- `anakata-panel/tests/unit/parseRinValue.test.ts`
+- `anakata-panel/tests/unit/rateHelpers.test.ts`
+- `anakata-api/app/Services/Config/CurrentConfig.php`
+- `anakata-api/docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- Seeded 2029 is already +5% from 2028 (14,663 / 27,563 / 219,949). Bare “fill 2029 at +5%” is a no-op. Browser check edited 2029 first (10,000), then fill restored 14,663; a later 16,000 publish is what produced the 2029 price-check differences.
+- Clearing the helper-row increase resets to 5 (editor-only state, not a stored `.rin`).
+- Price-check POST body is `cloneDocument(toRaw(draft))`, same as validate, so a reactive proxy is not sent.
+- **API (needed to load the page):** Laravel 13 `cache.serializable_classes` is `false`. Task 01’s `rememberForever` of an Eloquent `ConfigVersion` came back as `__PHP_Incomplete_Class` on the second request, so `GET /api/rms/rates` and `POST /price-check` 500’d. `CurrentConfig` now caches the row **id** (int) and loads the model from the database. Stale model entries are forgotten and rebuilt.
+
+### Open questions
+None.
+
+### Notes for later
+- Engine Settings and Business Rules: use `ConfigNumberInput` for every `.rin`.
+- Sprint 3: block removing a year that has departures (API will also refuse).
+- Restore the “< 30 seconds push” sentence when the engine availability push exists.
+- Local Redis cache lives on DB 1 (`REDIS_CACHE_DB`). `FLUSHDB` on DB 0 does not clear `config:{kind}:current`. Do not `FLUSHALL` — that drops Sanctum sessions.
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (78), `pnpm build` — pass.
+- Fresh clone onto `/tmp/anakata-fresh-s2t07` with sibling `extends: ['../anakata-ui']`. New files are present (not gitignored). `pnpm typecheck` and `pnpm build` pass.
+- Browser (dark and light, against `v-rates`):
+  - Carolina: notice without the 30-second claim; V1 System then publish to V2 (`Suite 2029` 14,663 → 16,000, ref `S2-T07-RATES`) and V3 (festive 750 → 800). History is one row per changed price. Child ages **6–17**. Empty festive `.rin` → required (null, not `""`). `child_discounts_per_cabin = 5` → warnbox + Save disabled + dimmed price check. Add 2030 → 3 unsaved; remove → 0. Price check 2029 after the 16,000 edit: Suite · 2 adults 29,326 → 32,000 (+2,674).
+  - Lucía: `VIEW ONLY — ADMIN / DIRECTOR EDITS RATES`, 22 disabled inputs, no helper / fill / ✕ / approval; price check still “no change”; history visible.
+  - Two Carolina tabs: publish festive in tab 1 (V3); tab 2 publish → conflict “Someone published a newer version (v3)…” with **Load the latest version**.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/pages/rms/commercial/rates.vue \
+  app/components/rates app/components/config/ConfigNumberInput.vue \
+  app/components/config/ConfigPublishBar.vue \
+  app/utils/parseRinValue.ts app/types/api.ts \
+  app/assets/css/config.css i18n/locales/en.json eslint.config.mjs \
+  tests/unit/parseRinValue.test.ts tests/unit/rateHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS Rates & Promotions config page.
+
+Admin and Director edit the published rates draft; other roles
+see it read-only. Number inputs share empty-is-null with later
+engine-settings and business-rules screens.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Services/Config/CurrentConfig.php docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 2 task 07 and cache config version ids.
+
+Laravel 13 will not unserialize Eloquent models from Redis, so
+CurrentConfig stores the row id instead of the model.
+EOF
+)"
+```
+

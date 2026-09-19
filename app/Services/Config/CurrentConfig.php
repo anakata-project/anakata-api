@@ -37,21 +37,39 @@ final class CurrentConfig
             return $this->memo[$kind->value];
         }
 
-        $version = Cache::rememberForever(
+        $modelClass = $kind->modelClass();
+
+        // Cache the row id, not the Eloquent model. Laravel 13 sets
+        // cache.serializable_classes to false, so a cached model comes back as
+        // __PHP_Incomplete_Class and GET /api/rms/{kind} 500s after the first hit.
+        $id = Cache::rememberForever(
             $kind->cacheKey(),
-            function () use ($kind): ConfigVersion {
-                $modelClass = $kind->modelClass();
+            function () use ($kind, $modelClass): int {
                 $row = $modelClass::query()->orderByDesc('version')->first();
 
                 if (! $row instanceof ConfigVersion) {
                     throw new RuntimeException('No published '.$kind->label().' — run the seeders');
                 }
 
-                return $row;
+                return (int) $row->id;
             },
         );
 
-        return $this->memo[$kind->value] = $version;
+        if (! is_int($id)) {
+            Cache::forget($kind->cacheKey());
+
+            return $this->version($kind);
+        }
+
+        $row = $modelClass::query()->find($id);
+
+        if (! $row instanceof ConfigVersion) {
+            Cache::forget($kind->cacheKey());
+
+            return $this->version($kind);
+        }
+
+        return $this->memo[$kind->value] = $row;
     }
 
     public function document(ConfigKind $kind): ConfigDocument
