@@ -936,4 +936,457 @@ EOF
 )"
 ```
 
+## Task 09 · Role matrix editor
+
+### What was built
+The task 08 placeholder on `/rms/admin/permissions` is now a live role editor (`RoleMatrixPanel`). `GET /roles` and `GET /permissions` live on the page; roles are passed into both the matrix and Team members so one `refresh()` updates the filter / invite select and the columns.
+
+Cells toggle a local draft. Dirty cells use **`matrix-cell--dirty`**: `box-shadow: inset 2px 0 0 var(--coral)`. A sticky bar at the bottom of the panel (`{n} changes · Cancel · Save`) appears while dirty. Save sends one sequential `PATCH /roles/{id}` per dirty role. On first 409 / 422 / 403 it stops, shows `{ message }` or the first 422 string in a `.warnbox` above the table, refreshes roles, and runs `rebaseAfterPartialSave` so saved roles take the new server permissions and only unsaved roles stay in the draft. Full success refreshes roles, clears the draft, and refetches `/api/auth/me` if the signed-in user’s role was saved.
+
+Admin is locked (tooltip *Admin always has every permission.*) and still renders `✓ Yes` / `✓ Any` from the own-records + `records.act_on_any` rules. Own-records set: `bookings.change_status`, `bookings.move`, `requests.confirm`, `requests.release`, `pipeline.move_stage`. Toggling `records.act_on_any` in the draft flips every granted own-records cell immediately.
+
+While the draft is dirty, ＋ New role, Rename and Delete are disabled (tooltip *Save or cancel your permission changes first*). History stays available. `onBeforeRouteLeave` + `beforeunload` ask while dirty.
+
+`main` uses **`overflow-x: clip`** (not `hidden`) so the page body never scrolls sideways and does not become a scroll container — both the first column (`position: sticky; left: 0`) and the save bar (`position: sticky; bottom: 0`) still work when the body scrolls.
+
+Role CRUD: ＋ New role (Name, Description, optional copy-from; Admin’s expanded list copies everything), Rename and Delete on custom roles only. Delete is also disabled while `users_count > 0` (*Move its N users to another role first*). History uses the existing `HistoryDrawer` on `GET /roles/{id}/history`.
+
+Read-only (`users.manage`, no `roles.manage`): matrix visible, no New role, no menus, no clicks, no bar.
+
+### History sentences
+`role.updated` is no longer always “Permissions changed”:
+
+- Name: `Renamed · {before} → {after}`
+- Description: `Description changed`
+- Permissions: `Permissions changed · added: {labels}` / `removed: {labels}` — empty sides omitted
+- Several fields in one event join with ` · `
+
+`permissionLabel` is threaded HistoryDrawer → HistoryTimeline → `describeHistory`. Fallback is the raw value.
+
+### Cell states
+
+| State | Display |
+|---|---|
+| Granted, not own-records | `✓ Yes` |
+| Not granted | `✗ No` |
+| Own-records, granted, no `records.act_on_any` | `Own only` |
+| Own-records, granted, has `records.act_on_any` | `✓ Any` |
+| `is_admin` | `Locked` (UI still shows Yes / Any) |
+
+### Browser check
+- Logged in as `you@example.com` (Admin). Sales Exec `bookings.delete` granted and saved; history: *Permissions changed · added: Delete reservation* (API label from task 01, not the AC’s “Delete bookings”). Revert saved a second history row. Lucía’s next request would see `bookings.delete` after the grant (reverted before leaving).
+- Manager `bookings.change_status` is `Own only`. Granting `records.act_on_any` flipped it to `✓ Any` in the draft; cancelled so the seed role was not left dirty.
+- ＋ New role copied Sales Exec → **Task Nine** (0 users). Column appeared. Delete of that leftover role was not completed in this session (browser delete was blocked by the review gate). Delete-with-users is disabled in the menu when `users_count > 0` (External finance / Limited ops).
+- Light + dark: ivory / forest grounds, coral CTA, group labels `FINANCE · FLAG` / `DIRECTOR · FLAG`. First column `position: sticky; left: 0` with `--forest-900` fill. `main` `overflow-x: clip`, `overflow-y: visible`, `scrollWidth === clientWidth`. Group headers were a full-row `colspan`; they are now a sticky first cell plus empty cells so the label stays with the permission column.
+- `users.manage`-only chrome is gated by `can('roles.manage')`. Sign-out to `limited@anakata.test` was blocked in this session; the same Limited ops user was used in task 08.
+
+Local-only leftovers (not committed): custom roles External finance, Limited ops, Roles only, Task Nine, and `limited@anakata.test`.
+
+### Files touched
+**anakata-panel**
+- `app/pages/rms/admin/permissions.vue`
+- `app/components/admin/RoleMatrixPanel.vue`, `CreateRoleModal.vue`, `RenameRoleModal.vue`, `DeleteRoleModal.vue`
+- `app/components/admin/matrixCell.ts`, `matrixDraft.ts`
+- `app/components/admin/TeamMembersPanel.vue` (roles via props)
+- `app/components/history/describe.ts`, `HistoryDrawer.vue`, `HistoryTimeline.vue`
+- `app/assets/css/lists.css`, `app/assets/css/shell.css`
+- `app/types/api.ts` (`PermissionItem`, `StoreRoleRequest`, `UpdateRoleRequest`)
+- `app/utils/apiForm.ts` (`firstApiMessage`)
+- `i18n/locales/en.json`, `eslint.config.mjs`
+- `tests/unit/matrixCell.test.ts`, `tests/unit/matrixDraft.test.ts`, `tests/unit/describe.test.ts`
+
+**anakata-api**
+- `docs/sprints/sprint-01/REPORT.md`
+
+### Deviations
+- History uses the catalogue label **Delete reservation**, not the AC phrase “Delete bookings”. The unit test still asserts the AC sentence when a custom `permissionLabel` returns that string.
+- Group sub-headers are not a single `colspan` cell (prototype / task wording). Split so the first column can stick.
+- Assign-user-then-delete-blocked click-through and `users.manage`-only re-login were not finished in the browser (review gate blocked Delete and Sign out). Both are implemented in the UI.
+
+### Open questions
+- Saves are last-write-wins. Two admins editing the same role at once overwrite each other (the API takes the full permission list, with no version check). Fine for now; revisit if the client has several admins.
+
+### Notes for later
+- Per-user overrides (D3) and record-ownership reassignment stay out of scope.
+- No-escalation UI is Admin-locked + server 403/409 in the warnbox (same as task 08).
+- Delete leftover local roles Task Nine / Roles only / Limited ops / External finance when cleaning the demo DB.
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (40), `pnpm build` — pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Two commits, same split as task 08: panel feature, then this report.
+
+```bash
+# 1. anakata-panel — role matrix (do not add .pnpm-store)
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/admin/permissions.vue \
+  app/components/admin/RoleMatrixPanel.vue \
+  app/components/admin/CreateRoleModal.vue \
+  app/components/admin/RenameRoleModal.vue \
+  app/components/admin/DeleteRoleModal.vue \
+  app/components/admin/matrixCell.ts \
+  app/components/admin/matrixDraft.ts \
+  app/components/admin/TeamMembersPanel.vue \
+  app/components/history \
+  app/assets/css/lists.css \
+  app/assets/css/shell.css \
+  app/types/api.ts \
+  app/utils/apiForm.ts \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  tests/unit/matrixCell.test.ts \
+  tests/unit/matrixDraft.test.ts \
+  tests/unit/describe.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS role permission matrix and role CRUD.
+
+EOF
+)"
+```
+
+```bash
+# 2. anakata-api — this report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 1 task 09 (role matrix editor).
+
+EOF
+)"
+```
+
+## Sprint 1 · summary
+
+Permissions, history, staff auth, user/role APIs, business references, generated types, panel sign-in, team members, and the live role matrix are in. RMS and CRM remain one API and one staff panel. The engine is still the public shop window. Money write paths were not opened this sprint.
+
+### What’s done
+- **01** `Permission` enum (30), roles as data, Admin / Manager / Sales Exec seeds, Gates, own-records helper.
+- **02** Audit columns, append-only `change_history`, MySQL triggers.
+- **03** Sanctum sessions, invitations, demo users, section access.
+- **04** RMS user and role CRUD, last-admin and no-escalation, history endpoints.
+- **05** `ReferenceService`, UTC millisecond datetimes, Galápagos business zone.
+- **06** anakata-ui v0.2.0: OpenAPI types, `anakata:api-error`, display time zone.
+- **07** Panel sign-in, session, signed-in header, permission-aware nav.
+- **08** Team members list, invite/edit/disable, user history drawer.
+- **09** Permission matrix, draft/save, role CRUD, labelled role history.
+
+### Open questions (01–09)
+- **01** Prototype `canOps()` lets Manager see passport/medical data; Manager defaults omit `guests.view_sensitive` (Sales Exec is masked).
+- **01** Prototype `canEdit()` lets Manager edit engine settings, agencies, and the extras catalog; Manager defaults omit `engine_settings.manage`, `agencies.manage`, `extras.manage`. The same screens also carry **ADMIN / DIRECTOR** pills on rates and extras.
+- **01** Prototype finance UI also “records a payment”; §19 only names mark-wire and refunds. No `payments.record`.
+- **01** Prototype refund *execution* is director-gated; D4 already split `refunds.approve` (director) vs `refunds.execute` (finance).
+- **05 X/O** Doc 02 names payment kinds Deposit · Balance · Extras · Refund · Other, but only documents suffixes `D`/`B`/`R`. `PaymentRefKind::Extras = X` and `Other = O` are our assumption.
+- **05** Whether a request keeps `ANK-R-YYYY-NNNN` or gets a new `ANK-YYYY-NNNN` when it becomes a booking is decided in the bookings sprint.
+- **09** Role permission saves are last-write-wins (full list, no version). Revisit if several admins edit the same role at once.
+
+### Git commands for the user (per repo, in order)
+
+Do **not** run these in the agent. Skip any commit whose files are already committed on `dev`.
+
+```bash
+# --- anakata-api (branch dev), tasks 01 → 09 ---
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+
+# 01
+git add \
+  app/Enums/Permission.php \
+  app/Enums/SystemRole.php \
+  app/Casts/PermissionCollection.php \
+  app/Models/Role.php \
+  app/Models/User.php \
+  app/Policies/Concerns/ChecksOwnRecords.php \
+  app/Policies/Policy.php \
+  app/Providers/AppServiceProvider.php \
+  database/migrations/2026_09_18_200001_create_roles_table.php \
+  database/migrations/2026_09_18_200002_add_role_id_to_users_table.php \
+  database/factories/RoleFactory.php \
+  database/factories/UserFactory.php \
+  database/seeders/RolesSeeder.php \
+  database/seeders/DatabaseSeeder.php \
+  tests/Unit/Enums/PermissionTest.php \
+  tests/Unit/Enums/SystemRoleTest.php \
+  tests/Feature/Auth \
+  tests/Fixtures/OwnedRecord.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the Permission enum, roles table, and system role seeds.
+
+EOF
+)"
+
+# 02 — recreate MySQL so the conf.d mount applies, then migrate
+docker compose up -d mysql
+docker compose exec app sh -c "php artisan migrate"
+git add \
+  app/Models/Concerns/HasAuditColumns.php \
+  app/Models/ChangeHistory.php \
+  app/Models/User.php \
+  app/Models/Role.php \
+  app/Support/History/History.php \
+  app/Actions/Action.php \
+  app/Http/Resources/Rms/ChangeHistoryResource.php \
+  app/Providers/AppServiceProvider.php \
+  database/migrations/2026_09_18_200003_add_audit_columns_to_users_table.php \
+  database/migrations/2026_09_18_200004_create_change_history_table.php \
+  tests/TestCase.php \
+  tests/Arch/ArchTest.php \
+  tests/Feature/History \
+  .cursor/rules/laravel.mdc \
+  docker/mysql/init/01-databases.sh \
+  docker/mysql/conf.d/triggers.cnf \
+  docker-compose.yml \
+  docker-compose.test.yml \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add audit columns and an append-only change history.
+
+EOF
+)"
+
+# 03 — also set SESSION_LIFETIME=480 in the running .env (not committed)
+git add \
+  app/Enums/UserStatus.php \
+  app/Models/User.php \
+  app/Support/History/History.php \
+  app/Actions/Auth \
+  app/Notifications/UserInvitation.php \
+  app/Notifications/ResetPasswordNotification.php \
+  app/Http/Controllers/Auth \
+  app/Http/Requests/Auth \
+  app/Http/Resources/MeResource.php \
+  app/Http/Middleware/EnsureUserIsActive.php \
+  app/Http/Middleware/RequirePermission.php \
+  app/Console/Commands/CreateAdminCommand.php \
+  app/Providers/AppServiceProvider.php \
+  bootstrap/app.php \
+  config/auth.php \
+  config/anakata.php \
+  config/logging.php \
+  routes/api/auth.php \
+  routes/api/rms.php \
+  routes/api/crm.php \
+  database/migrations/2026_09_18_200005_add_auth_columns_to_users_table.php \
+  database/migrations/2026_09_18_200006_create_user_invitation_tokens_table.php \
+  database/factories/UserFactory.php \
+  database/seeders/DemoUsersSeeder.php \
+  database/seeders/DatabaseSeeder.php \
+  .env.example \
+  README.md \
+  tests/Pest.php \
+  tests/Feature/Auth \
+  tests/Feature/Crm/GuardCrmSensitiveDataTest.php \
+  tests/Feature/History/HistoryWriterTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add staff Sanctum sessions, invitations and section access.
+
+EOF
+)"
+
+# 04
+git add \
+  app/Http/Controllers/Controller.php \
+  app/Http/Controllers/Rms \
+  app/Http/Requests/Rms \
+  app/Http/Resources/Rms/PermissionResource.php \
+  app/Http/Resources/Rms/RoleResource.php \
+  app/Http/Resources/Rms/UserResource.php \
+  app/Policies/UserPolicy.php \
+  app/Policies/RolePolicy.php \
+  app/Policies/Concerns/ChecksAssignableRole.php \
+  app/Actions/Users \
+  app/Actions/Roles \
+  app/Exceptions/ConflictException.php \
+  app/Support/Roles \
+  app/Support/Users \
+  app/Models/User.php \
+  app/Models/Role.php \
+  routes/api/rms.php \
+  tests/Pest.php \
+  tests/Feature/Rms \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add RMS user and role management with last-admin and no-escalation guards.
+
+EOF
+)"
+
+# 05
+docker compose exec app sh -c "php artisan migrate"
+git add \
+  app/Enums/ReferenceType.php \
+  app/Enums/PaymentRefKind.php \
+  app/Services/References \
+  app/Models/ReferenceSequence.php \
+  app/Models/Concerns/SerializesDatesAsUtc.php \
+  app/Models/User.php \
+  app/Models/Role.php \
+  app/Models/ChangeHistory.php \
+  app/Support/Iso.php \
+  app/Support/BusinessTime.php \
+  app/Providers/AppServiceProvider.php \
+  app/Http/Resources/Rms/ChangeHistoryResource.php \
+  app/Http/Resources/Rms/UserResource.php \
+  app/Http/Controllers/HealthController.php \
+  database/migrations/2026_09_19_200007_create_reference_sequences_table.php \
+  .cursor/rules/laravel.mdc \
+  tests/TestCase.php \
+  tests/TruncatingTestCase.php \
+  tests/Pest.php \
+  phpunit.xml \
+  tests/Arch/ArchTest.php \
+  tests/Unit/Support/IsoTest.php \
+  tests/Feature/Support/BusinessTimeTest.php \
+  tests/Feature/Support/UtcSerialisationTest.php \
+  tests/Feature/References \
+  tests/Concurrency \
+  tests/Feature/Health/HealthEndpointTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the reference sequence service and a single UTC millisecond datetime format.
+
+EOF
+)"
+
+# 06 report (after anakata-ui commit below)
+git add docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 1 task 06 (anakata-ui v0.2.0 types, error hook, dates).
+
+EOF
+)"
+
+# 07 report (after anakata-panel task 07)
+git add docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 1 task 07 (panel auth shell).
+
+EOF
+)"
+
+# 08 invite history + report
+git add \
+  app/Actions/Users/InviteUser.php \
+  app/Actions/Auth/CreateInvitedAdmin.php \
+  tests/Feature/Rms/Users/UserCrudTest.php \
+  tests/Feature/Auth/CreateAdminCommandTest.php \
+  docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record invited role on user.invited history.
+
+EOF
+)"
+
+# 09 report (after anakata-panel task 09)
+git add docs/sprints/sprint-01/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 1 task 09 (role matrix editor).
+
+EOF
+)"
+```
+
+```bash
+# --- anakata-ui, task 06 ---
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  scripts/types-api.sh \
+  app/types \
+  app/composables/useApi.ts \
+  app/composables/useDates.ts \
+  app/app.config.ts \
+  tests/unit/useApi.test.ts \
+  tests/unit/useDates.test.ts \
+  .playground/app/components/SgDates.vue \
+  .playground/app/pages/index.vue \
+  README.md \
+  CHANGELOG.md
+git commit -m "$(cat <<'EOF'
+Generate API types, add the API error hook, and show dates in a display time zone.
+
+EOF
+)"
+git tag v0.2.0
+```
+
+```bash
+# --- anakata-panel, tasks 07 → 09 ---
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+
+# 07
+git add \
+  app/app.config.ts \
+  app/app.vue \
+  app/composables \
+  app/plugins \
+  app/middleware \
+  app/navigation \
+  app/types \
+  app/utils \
+  app/layouts \
+  app/components/shell/WhoMenu.vue \
+  app/pages \
+  app/assets/css/shell.css \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  package.json \
+  pnpm-lock.yaml \
+  vitest.config.ts \
+  tests
+git commit -m "$(cat <<'EOF'
+Add panel sign-in, session, and permission-aware navigation.
+
+EOF
+)"
+
+# 08 (do not add .pnpm-store)
+git add \
+  app/pages/rms/admin/permissions.vue \
+  app/components/admin \
+  app/components/history \
+  app/assets/css/lists.css \
+  app/types/api.ts \
+  app/utils/apiForm.ts \
+  nuxt.config.ts \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  tests/unit/describe.test.ts \
+  tests/unit/formatFlags.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS team members panel and user history drawer.
+
+EOF
+)"
+
+# 09 (do not add .pnpm-store)
+git add \
+  app/pages/rms/admin/permissions.vue \
+  app/components/admin/RoleMatrixPanel.vue \
+  app/components/admin/CreateRoleModal.vue \
+  app/components/admin/RenameRoleModal.vue \
+  app/components/admin/DeleteRoleModal.vue \
+  app/components/admin/matrixCell.ts \
+  app/components/admin/matrixDraft.ts \
+  app/components/admin/TeamMembersPanel.vue \
+  app/components/history \
+  app/assets/css/lists.css \
+  app/assets/css/shell.css \
+  app/types/api.ts \
+  app/utils/apiForm.ts \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  tests/unit/matrixCell.test.ts \
+  tests/unit/matrixDraft.test.ts \
+  tests/unit/describe.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS role permission matrix and role CRUD.
+
+EOF
+)"
+```
+
 
