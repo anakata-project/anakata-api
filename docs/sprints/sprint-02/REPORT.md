@@ -565,3 +565,114 @@ EOF
 )"
 ```
 
+## Task 05 · Regenerate API types, release v0.3.0
+
+### What was built
+`pnpm types:api` against the running API regenerated `app/types/api.d.ts`. The generated `Permission` union now includes `"engine_copy.manage"`. New paths: `/rms/rates` (+ `/validate`, `/price-check`, `/versions`), `/rms/engine-settings`, `/rms/business-rules`. Layer bumped to `0.3.0` (tag not applied here).
+
+Scramble emits `document` as `{ [key: string]: unknown }`, `changes` as `string` or `unknown[]`, `scenarios` as `string`, and registry row fields as `string`. Hand-written shapes in `app/types/config.ts` sit in front of those.
+
+**Generated schema names and aliases** (`app/types/index.ts`):
+
+| Alias | Source |
+|---|---|
+| `RatesDocument` | hand-written (`config.ts`) |
+| `EngineSettingsDocument` | hand-written |
+| `BusinessRulesDocument` | hand-written |
+| `ConfigVersion<TDocument>` | hand-written helper |
+| `RatesVersion` | `ConfigVersion<RatesDocument>` |
+| `EngineSettingsVersion` | current + `copy_paths` (`EngineSettingsCurrentResource`) |
+| `BusinessRulesVersion` | current + `registry` / `counts` (`BusinessRulesCurrentResource`) |
+| `ConfigVersionDetail<TDocument>` | current + `changes` (`ConfigVersionDetailResource`) |
+| `ConfigVersionSummary` | hand-written (`ConfigVersionSummaryResource.changes` is `string`) |
+| `ConfigChange` | hand-written |
+| `ConfigWarning` | hand-written |
+| `ConfigValidation` | hand-written (`ConfigValidationResource`) |
+| `EngineSettingsValidation` | `ConfigValidation` + `rule_fields_changed` |
+| `PriceCheckRow` / `Quote` / `NoRate` | hand-written (`PriceCheckResource.scenarios` is `string`) |
+| `RuleRegistryRow` / `RuleRegistryCounts` | hand-written |
+| `Permission` | `components['schemas']['Permission']` (now includes `engine_copy.manage`) |
+
+Sprint 1 aliases (`Me`, `Role`, `PermissionItem`, `UserListItem`, `ChangeHistoryEntry`, `Paginated<T>`) are unchanged.
+
+### Hand-written types (`app/types/config.ts`)
+Each has a comment naming the PHP class.
+
+Documents and nested groups: `RatesDocument`, `RateYear`, `RateTerms`, `RateRules`, `EngineSettingsDocument`, `GuestsSettings`, `CalendarSettings`, `LocaleSettings`, `PngFees`, `FeesSettings`, `CopySettings`, `CharterSettings`, `BusinessRulesDocument`, `CommissionRules`, `PaymentsRules`, `DiscountsRules`, `HoldsRules`, `SlaRules`, `ManifestsRules`, `AlertsRules`, `RetentionRules`, `CancellationBand`.
+
+Shared envelopes: `ConfigChange`, `ConfigWarning`, `ConfigValidation`, `EngineSettingsValidation`, `ConfigPublisher`, `ConfigVersion`, `ConfigVersionDetail`, `ConfigVersionSummary`, `RatesVersion`, `EngineSettingsVersion`, `BusinessRulesVersion`.
+
+Pricing: `QuoteLine`, `Quote`, `NoRate`, `PriceCheckRow`.
+
+Registry: `RuleGroup`, `RuleStatus`, `RuleWhere`, `RuleRegistryRow`, `RuleRegistryCounts`.
+
+### Files touched
+- `anakata-ui/app/types/api.d.ts`
+- `anakata-ui/app/types/config.ts`
+- `anakata-ui/app/types/index.ts`
+- `anakata-ui/package.json` (`0.3.0`)
+- `anakata-ui/CHANGELOG.md`
+- `anakata-ui/README.md`
+- `anakata-api/docs/sprints/sprint-02/REPORT.md`
+
+### Deviations
+- `ConfigValidation` includes `changes`. The task listed `{ errors, warnings }`; `ValidationReport` and panel task 06 both need the change list.
+- Extra aliases the panel uses: `EngineSettingsValidation`, `NoRate`, `ConfigWarning`, `ConfigVersionDetail`, kind-specific `*Version` types, `Permission` on `index.ts`.
+- `published_by.id` is `number` (PHP resource). Scramble emitted `string`.
+- `RuleRegistryRow` is typed (`paths: Array<string>`, `differs: boolean`, `source_value: unknown`). Scramble flattened every registry field to `string`.
+
+### Open questions
+None.
+
+### Notes for later
+The hand-written document types in `config.ts` can drift from the PHP classes without anything failing. Scramble reads PHPDoc array shapes (`@return array{...}`) on resource `toArray()` methods and the documents' `toArray()`. A later API task should add those shapes so the documents are generated and `config.ts` can shrink to nothing.
+
+Hand-written types that would disappear:
+
+- Documents: `RatesDocument`, `RateYear`, `RateTerms`, `RateRules`, `EngineSettingsDocument`, `GuestsSettings`, `CalendarSettings`, `LocaleSettings`, `PngFees`, `FeesSettings`, `CopySettings`, `CharterSettings`, `BusinessRulesDocument`, `CommissionRules`, `PaymentsRules`, `DiscountsRules`, `HoldsRules`, `SlaRules`, `ManifestsRules`, `AlertsRules`, `RetentionRules`, `CancellationBand`
+- Envelopes: `ConfigChange`, `ConfigWarning`, `ConfigValidation`, `EngineSettingsValidation`, `ConfigPublisher`, `ConfigVersion`, `ConfigVersionDetail`, `ConfigVersionSummary`, `RatesVersion`, `EngineSettingsVersion`, `BusinessRulesVersion`
+- Pricing: `QuoteLine`, `Quote`, `NoRate`, `PriceCheckRow`
+- Registry: `RuleGroup`, `RuleStatus`, `RuleWhere`, `RuleRegistryRow`, `RuleRegistryCounts`
+
+`index.ts` would then alias the generated schema names directly.
+
+### Quality
+- anakata-ui: `pnpm lint`, `pnpm typecheck`, `pnpm test` (34), `pnpm build` — pass.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout so `extends: ['../anakata-ui']` resolves). Overlayed the working tree onto the ui clone. Confirmed the clone has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: `pnpm typecheck` pass
+  - panel / engine: `pnpm build` pass
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/config.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for versioned config documents.
+
+The panel can type rates, engine settings, business rules,
+price check and the rules registry against the Sprint 2 API.
+EOF
+)"
+git tag v0.3.0
+```
+
+```bash
+# anakata-api (branch dev) — report only
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-02/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 2 task 05: regenerated UI API types.
+EOF
+)"
+```
+
