@@ -29,7 +29,7 @@ final class ConfigPublisher extends Action
         array $document,
         int $baseVersion,
         ?string $approvalReference,
-        User $actor,
+        ?User $actor,
     ): ConfigVersion {
         try {
             return $this->transaction(function () use ($kind, $document, $baseVersion, $approvalReference, $actor): ConfigVersion {
@@ -54,7 +54,7 @@ final class ConfigPublisher extends Action
         array $document,
         int $baseVersion,
         ?string $approvalReference,
-        User $actor,
+        ?User $actor,
     ): ConfigVersion {
         $modelClass = $kind->modelClass();
         $documentClass = $kind->documentClass();
@@ -121,8 +121,8 @@ final class ConfigPublisher extends Action
             ),
             'approval_reference' => $approval === '' ? null : $approval,
             'published_at' => now(),
-            'created_by' => $actor->id,
-            'updated_by' => $actor->id,
+            'created_by' => $actor?->id,
+            'updated_by' => $actor?->id,
         ]);
 
         $row->save();
@@ -136,6 +136,7 @@ final class ConfigPublisher extends Action
             ],
             reason: $approval === '' ? null : $approval,
             actor: $actor,
+            system: $actor === null,
         );
 
         ConfigPublished::dispatch($kind, $row);

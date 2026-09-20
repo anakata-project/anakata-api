@@ -258,3 +258,26 @@ test('CurrentConfig is cached and cleared after a publish', function (): void {
     expect($current->version(ConfigKind::Rates)->version)->toBe(2);
     expect($current->document(ConfigKind::Rates)->toArray()['title'])->toBe('Updated terms');
 });
+
+test('a System publish has a null created_by and a System history row', function (): void {
+    $version = app(ConfigPublisher::class)->publish(
+        ConfigKind::Rates,
+        testConfigDocument(),
+        0,
+        'SPRINT-SYSTEM',
+        null,
+    );
+
+    expect($version->created_by)->toBeNull();
+    expect($version->updated_by)->toBeNull();
+
+    $entry = ChangeHistory::query()
+        ->where('event', 'rates.published')
+        ->where('subject_id', $version->id)
+        ->first();
+
+    expect($entry)->not->toBeNull();
+    expect($entry?->actor_id)->toBeNull();
+    expect($entry?->actor_label)->toBe('System');
+    expect($entry?->reason)->toBe('SPRINT-SYSTEM');
+});

@@ -29,6 +29,11 @@ test('the seeded business rules document matches seed-data.json plus the new fie
     expect($document['holds']['web_extension_minutes'])->toBe($policies['webExtMin']);
     expect($document['holds']['near_term_business_hours'])->toBe($policies['holdNearH']);
     expect($document['holds']['long_lead_business_days'])->toBe($policies['holdLongD']);
+    expect($document['holds']['business_days'])->toBe([1, 2, 3, 4, 5]);
+    expect($document['holds']['business_day_start'])->toBe('09:00');
+    expect($document['holds']['business_day_end'])->toBe('18:00');
+    expect($document['holds']['holidays'])->toBe([]);
+    expect($document['holds']['near_term_max_days'])->toBe(120);
     expect($document['sla']['response_hours'])->toBe($policies['reqSla']);
     expect($document['sla']['refund_business_days'])->toBe($policies['refundSla']);
     expect($document['sla']['agency_approval_business_days'])->toBe(2);

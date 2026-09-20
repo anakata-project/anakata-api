@@ -250,6 +250,11 @@ final class Registry
             'web-checkout-hold' => data_get($document, 'holds.web_minutes').' / '.data_get($document, 'holds.web_extension_minutes').' min',
             'hold-near-term' => data_get($document, 'holds.near_term_business_hours').' business hours',
             'hold-long-lead' => data_get($document, 'holds.long_lead_business_days').' business days',
+            'hold-business-days' => self::weekdayList(data_get($document, 'holds.business_days') ?? []),
+            'hold-business-day-start' => (string) data_get($document, 'holds.business_day_start'),
+            'hold-business-day-end' => (string) data_get($document, 'holds.business_day_end'),
+            'hold-holidays' => self::holidayList(data_get($document, 'holds.holidays') ?? []),
+            'hold-near-term-max-days' => data_get($document, 'holds.near_term_max_days').' days',
             'response-sla' => data_get($document, 'sla.response_hours').' hours',
             'refund-sla' => data_get($document, 'sla.refund_business_days').' business days',
             'agency-approval-sla' => data_get($document, 'sla.agency_approval_business_days').' business days',
@@ -260,6 +265,29 @@ final class Registry
             'cancellation-bands' => self::bandDisplay(data_get($document, 'cancellation.bands') ?? []),
             default => $definition->sourceDisplay,
         };
+    }
+
+    /**
+     * @param  list<int|string>  $days
+     */
+    private static function weekdayList(array $days): string
+    {
+        $names = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
+        $labels = [];
+
+        foreach ($days as $day) {
+            $labels[] = $names[(int) $day] ?? (string) $day;
+        }
+
+        return implode(', ', $labels);
+    }
+
+    /**
+     * @param  list<string>  $holidays
+     */
+    private static function holidayList(array $holidays): string
+    {
+        return $holidays === [] ? 'none' : implode(', ', $holidays);
     }
 
     /**
@@ -728,6 +756,61 @@ final class Registry
                 BusinessRulesDocument::sourceDisplay('holds.long_lead_business_days'),
                 data_get($initial, 'holds.long_lead_business_days'),
                 'Booking Requests, Holds, charter quotes (OPS-010)',
+            ),
+            self::here(
+                'hold-business-days',
+                $g,
+                'TEC-004',
+                'Business days',
+                RuleStatus::PendingClient,
+                ['holds.business_days'],
+                BusinessRulesDocument::sourceDisplay('holds.business_days'),
+                data_get($initial, 'holds.business_days'),
+                'Booking Requests, Holds',
+            ),
+            self::here(
+                'hold-business-day-start',
+                $g,
+                'TEC-004',
+                'Business day start',
+                RuleStatus::PendingClient,
+                ['holds.business_day_start'],
+                BusinessRulesDocument::sourceDisplay('holds.business_day_start'),
+                data_get($initial, 'holds.business_day_start'),
+                'Booking Requests, Holds',
+            ),
+            self::here(
+                'hold-business-day-end',
+                $g,
+                'TEC-004',
+                'Business day end',
+                RuleStatus::PendingClient,
+                ['holds.business_day_end'],
+                BusinessRulesDocument::sourceDisplay('holds.business_day_end'),
+                data_get($initial, 'holds.business_day_end'),
+                'Booking Requests, Holds',
+            ),
+            self::here(
+                'hold-holidays',
+                $g,
+                'TEC-004',
+                'Holidays',
+                RuleStatus::PendingClient,
+                ['holds.holidays'],
+                BusinessRulesDocument::sourceDisplay('holds.holidays'),
+                data_get($initial, 'holds.holidays'),
+                'Booking Requests, Holds',
+            ),
+            self::here(
+                'hold-near-term-max-days',
+                $g,
+                'TEC-004',
+                'Near-term window',
+                RuleStatus::PendingClient,
+                ['holds.near_term_max_days'],
+                BusinessRulesDocument::sourceDisplay('holds.near_term_max_days'),
+                data_get($initial, 'holds.near_term_max_days'),
+                'Booking Requests, Holds',
             ),
             self::here(
                 'response-sla',

@@ -53,6 +53,11 @@ final class BusinessRulesDocument extends ConfigDocument
                 'web_extension_minutes' => 10,
                 'near_term_business_hours' => 48,
                 'long_lead_business_days' => 5,
+                'business_days' => [1, 2, 3, 4, 5],
+                'business_day_start' => '09:00',
+                'business_day_end' => '18:00',
+                'holidays' => [],
+                'near_term_max_days' => 120,
             ],
             'sla' => [
                 'response_hours' => 24,
@@ -141,6 +146,11 @@ final class BusinessRulesDocument extends ConfigDocument
                 (int) ($holds['web_extension_minutes'] ?? 0),
                 (int) ($holds['near_term_business_hours'] ?? 0),
                 (int) ($holds['long_lead_business_days'] ?? 0),
+                self::intList($holds['business_days'] ?? []),
+                is_string($holds['business_day_start'] ?? null) ? $holds['business_day_start'] : '',
+                is_string($holds['business_day_end'] ?? null) ? $holds['business_day_end'] : '',
+                self::dateList($holds['holidays'] ?? []),
+                (int) ($holds['near_term_max_days'] ?? 0),
             ),
             new SlaRules(
                 (int) ($sla['response_hours'] ?? 0),
@@ -169,7 +179,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     modification_fee_usd: int,
      *     payments: array{extras_due_hours: int, wire_window_hours: int, balance_reminder_days: list<int>},
      *     discounts: array{online_deposit_discount_pct: int, max_total_discount_pct: int|null},
-     *     holds: array{web_minutes: int, web_extension_minutes: int, near_term_business_hours: int, long_lead_business_days: int},
+     *     holds: array{web_minutes: int, web_extension_minutes: int, near_term_business_hours: int, long_lead_business_days: int, business_days: list<int>, business_day_start: string, business_day_end: string, holidays: list<string>, near_term_max_days: int},
      *     sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
      *     manifests: array{dpng_fit_days: int, dpng_charter_days: int},
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
@@ -222,6 +232,13 @@ final class BusinessRulesDocument extends ConfigDocument
             'holds.web_extension_minutes' => ['required', 'integer', 'min:0', 'max:60'],
             'holds.near_term_business_hours' => ['required', 'integer', 'min:4', 'max:120'],
             'holds.long_lead_business_days' => ['required', 'integer', 'min:1', 'max:15'],
+            'holds.business_days' => ['required', 'array', 'min:1', 'distinct'],
+            'holds.business_days.*' => ['required', 'integer', 'min:1', 'max:7'],
+            'holds.business_day_start' => ['required', 'date_format:H:i'],
+            'holds.business_day_end' => ['required', 'date_format:H:i', new BusinessRulesConstraint('day_end_after_start')],
+            'holds.holidays' => ['present', 'array', 'distinct'],
+            'holds.holidays.*' => ['date_format:Y-m-d'],
+            'holds.near_term_max_days' => ['required', 'integer', 'min:1', 'max:365'],
             'sla' => ['required', 'array'],
             'sla.response_hours' => ['required', 'integer', 'min:1', 'max:72'],
             'sla.refund_business_days' => ['required', 'integer', 'min:1', 'max:60'],
@@ -261,6 +278,11 @@ final class BusinessRulesDocument extends ConfigDocument
             'holds.web_extension_minutes' => 'R-B2 · Web checkout hold (+ one silent extension)',
             'holds.near_term_business_hours' => 'TEC-004 · Request / agency hold — near-term',
             'holds.long_lead_business_days' => 'TEC-004 · Request / agency hold — long-lead',
+            'holds.business_days' => 'TEC-004 · Business days',
+            'holds.business_day_start' => 'TEC-004 · Business day start',
+            'holds.business_day_end' => 'TEC-004 · Business day end',
+            'holds.holidays' => 'TEC-004 · Holidays',
+            'holds.near_term_max_days' => 'TEC-004 · Near-term window',
             'sla.response_hours' => 'OPS-009 · Quote / first-response SLA (FIT, groups, charter)',
             'sla.refund_business_days' => 'RMS · Refund execution SLA',
             'sla.agency_approval_business_days' => '§5.5 · Agency approval SLA',
@@ -360,6 +382,11 @@ final class BusinessRulesDocument extends ConfigDocument
             'holds.web_minutes', 'holds.web_extension_minutes' => '20 / 10 min (confirmed 12 Sep 2026)',
             'holds.near_term_business_hours' => '48 business hours',
             'holds.long_lead_business_days' => '5 business days',
+            'holds.business_days',
+            'holds.business_day_start',
+            'holds.business_day_end',
+            'holds.holidays',
+            'holds.near_term_max_days' => 'Not defined in v5 — default',
             'sla.response_hours' => '24 hours',
             'sla.refund_business_days' => '15 business days (confirmed 12 Sep 2026)',
             'sla.agency_approval_business_days' => '2 business days',
@@ -370,5 +397,51 @@ final class BusinessRulesDocument extends ConfigDocument
             'cancellation.bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100%',
             default => $path,
         };
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function intList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $days = [];
+
+        foreach ($value as $item) {
+            if (is_numeric($item)) {
+                $days[] = (int) $item;
+            }
+        }
+
+        $days = array_values(array_unique($days));
+        sort($days);
+
+        return $days;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function dateList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $dates = [];
+
+        foreach ($value as $item) {
+            if (is_string($item) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $item) === 1) {
+                $dates[] = $item;
+            }
+        }
+
+        $dates = array_values(array_unique($dates));
+        sort($dates);
+
+        return $dates;
     }
 }

@@ -30,6 +30,7 @@ final class BusinessRulesConstraint implements ValidationRule, ValidatorAwareRul
             'default_lte_cap' => $this->defaultLteCap($value, $data, $fail),
             'reminders_decreasing' => $this->remindersDecreasing($value, $fail),
             'bands' => $this->bands($value, $fail),
+            'day_end_after_start' => $this->dayEndAfterStart($value, $data, $attribute, $fail),
             default => null,
         };
     }
@@ -94,6 +95,27 @@ final class BusinessRulesConstraint implements ValidationRule, ValidatorAwareRul
 
         if (! in_array(0, $mins, true)) {
             $fail('The last cancellation band must start at 0 days.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function dayEndAfterStart(mixed $value, array $data, string $attribute, Closure $fail): void
+    {
+        if (! is_string($value)) {
+            return;
+        }
+
+        $startPath = preg_replace('/business_day_end$/', 'business_day_start', $attribute);
+        $start = is_string($startPath) ? data_get($data, $startPath) : null;
+
+        if (! is_string($start) || $start === '' || $value === '') {
+            return;
+        }
+
+        if ($value <= $start) {
+            $fail('Business day end must be after the start.');
         }
     }
 }

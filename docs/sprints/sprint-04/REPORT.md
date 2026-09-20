@@ -171,3 +171,119 @@ emits the shapes the panel already reads.
 EOF
 )"
 ```
+
+## Task 02 · Business hours for holds
+
+### What was built
+G5 business-hours values are now data on the business-rules document. Fresh installs get them in **v1** via `initial()`. Databases that already had a published document get **v2** from a DML-only shape-change migration, published by System through `ConfigPublisher`. `App\Support\BusinessHours` turns a request time into a hold expiry.
+
+`approval_reference` is `varchar(255)` / HTTP `max:255`; history `reason` is `text`. `ConfigPublisher` has no extra max. The Sprint 4 string is ~120 characters (including `–` and `≤`) and fits; it is stored as both `approval_reference` and the history reason:
+
+`Sprint 4: holds business hours added (defaults Mon–Fri 09:00–18:00, near-term ≤ 120 days, source TEC-004 pending client)`
+
+### Definitions (from the `BusinessHours` docblock)
+
+A business window is [start, end) on a business day that isn't a holiday, in Galápagos time.
+
+addBusinessHours(CarbonInterface $from, int $hours): CarbonImmutable: count only time inside business windows. A start outside a window begins at the next window's opening.
+
+endOfNthBusinessDay(CarbonInterface $from, int $n): CarbonImmutable: the closing time of the n-th business day after the day of $from. The day of $from never counts, even if it's a business day.
+
+holdExpiry(CarbonInterface $requestedAt, CalendarDate $departureDate, BusinessRulesDocument $rules): { expires_at, rule: NEAR_TERM|LONG_LEAD }:
+- near-term when the departure is ≤ near_term_max_days days after the request's Galápagos date → addBusinessHours(requestedAt, holds.near_term_business_hours) (48)
+- otherwise → endOfNthBusinessDay(requestedAt, holds.long_lead_business_days) (5)
+
+All results are returned in UTC.
+
+The constructor rejects empty `business_days`, a start/end that is not valid `H:i`, or `start >= end`. Both walkers stop after 366 days and throw. `fromArray()` stays lenient; the calculator does not trust it.
+
+The 120-day rule compares **whole days between two Y-m-d values** (request converted to Galápagos first). It never compares the departure date's midnight instant to a GALT instant.
+
+### Worked examples
+
+GALT = `Pacific/Galapagos` (UTC−6). Window Mon–Fri [09:00, 18:00).
+
+| Case | Result (UTC) |
+|---|---|
+| Tue 2026-09-22 10:00 GALT + 48 business hours (Tue 8h + Wed–Fri 27h + Mon 9h + Tue 4h) | 2026-09-29 19:00 (Tue 13:00 GALT) |
+| Fri 2026-09-25 17:00 GALT + 48h (weekend carry) | 2026-10-05 17:00 (Mon 11:00 GALT) |
+| Sat 2026-09-26 12:00 GALT + 1h (snaps to Mon 09:00) | 2026-09-28 16:00 (Mon 10:00 GALT) |
+| Wed 2026-09-23 holiday; Tue 10:00 GALT + 48h | 2026-09-30 19:00 (Wed 13:00 GALT) |
+| Long-lead from Wed 2026-09-23 (Thu, Fri, Mon, Tue, Wed) | 2026-10-01 00:00 (Wed 18:00 GALT) |
+| Wed 2026-09-23 23:30 GALT (Thu 05:30 UTC) long-lead — Galápagos day is still Wednesday | 2026-10-01 00:00 |
+| Saturday request, `endOfNthBusinessDay(1)` — Monday is day 1 | 2026-09-29 00:00 (Mon 18:00 GALT) |
+| Mon 09:00 GALT + 9h | 2026-09-22 00:00 (Mon 18:00 GALT, same day) |
+| Mon 18:00 GALT + 1h (snaps to next opening) | 2026-09-22 16:00 (Tue 10:00 GALT) |
+| Request Galápagos date 2026-09-22, departure 2027-01-20 (120 calendar days) | `NEAR_TERM` |
+| Same request, departure 2027-01-21 (121 days) | `LONG_LEAD` |
+| Request 2026-09-22 23:30 GALT (05:30 next day UTC), same 120 / 121 departures | still that Galápagos date |
+
+### Registry count
+
+**50** (was 45). `here` 25, `other_pages` 15, `locked` 10, `differs_or_flagged` 11. Five new PENDING CLIENT rows in Holds & service levels: business days, start, end, holidays, near-term window. Source display: `Not defined in v5 — default`.
+
+### Files touched
+- `app/Services/Config/ConfigPublisher.php` (`?User $actor`, `system: true` when null)
+- `app/Support/Config/Documents/HoldsRules.php`, `BusinessRulesDocument.php`, `BusinessRulesConstraint.php`
+- `app/Support/BusinessRules/Registry.php`
+- `app/Support/BusinessHours.php`, `app/Support/HoldExpiry.php` (new)
+- `app/Http/Resources/Rms/BusinessRulesCurrentResource.php`, `ConfigVersionDetailResource.php`
+- `database/migrations/2026_09_20_200019_add_holds_business_hours_to_business_rules.php` (new; DML only)
+- `tests/Unit/Support/BusinessHoursTest.php` (new)
+- `tests/Feature/Config/AddHoldsBusinessHoursMigrationTest.php` (new)
+- `tests/Feature/Config/ConfigPublisherTest.php`, `BusinessRulesDocumentTest.php`, `BusinessRulesEndpointsTest.php`, `BusinessRulesSeederTest.php`
+- `docs/sprints/sprint-04/REPORT.md`
+
+### Deviations
+- `holds.holidays` is validated as `present` (not `required`). Laravel's `required` treats `[]` as empty, so the default empty list would fail `anakata:config-verify` and the seeder.
+- `holdExpiry` takes `CarbonImmutable $departureDate` (Y-m-d, same as the `CalendarDate` cast's `get()`). `CalendarDate` is a cast, not a type.
+- Result is `HoldExpiry` (`expiresAt`, `rule` `NEAR_TERM`/`LONG_LEAD`), not an invented booking enum.
+
+### Open questions
+The three client questions from the sprint README are still open (G5 / PENDING CLIENT):
+1. Which days and hours are business hours?
+2. Which public holidays?
+3. From how many days before departure is a request near-term (default 120)?
+
+Shape migrations publish through `ConfigPublisher`, which validates against current `rules()`. A DB that is behind this and a later shape migration will fail here, because the merged document lacks the later required path. This affects only stale dev/e2e DBs today (`migrate:fresh --seed` fixes it). The policy is to be decided before go-live: fold shape migrations into `initial()` while no production exists, or keep replay-in-order only.
+
+### Notes for later
+- Task 05 wires `holdExpiry` into request create.
+- Task 06 OpenAPI types pick up the new `holds.*` fields from the resource PHPDoc.
+- Task 11: add the five paths to `tests/e2e/fixtures/reference-values.md`.
+
+### Quality
+anakata-api: `composer check` inside Docker — 401 tests (2750 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Services/Config/ConfigPublisher.php \
+  app/Support/Config/Documents/HoldsRules.php \
+  app/Support/Config/Documents/BusinessRulesDocument.php \
+  app/Support/Config/Documents/BusinessRulesConstraint.php \
+  app/Support/BusinessRules/Registry.php \
+  app/Support/BusinessHours.php \
+  app/Support/HoldExpiry.php \
+  app/Http/Resources/Rms/BusinessRulesCurrentResource.php \
+  app/Http/Resources/Rms/ConfigVersionDetailResource.php \
+  database/migrations/2026_09_20_200019_add_holds_business_hours_to_business_rules.php \
+  tests/Unit/Support/BusinessHoursTest.php \
+  tests/Feature/Config/AddHoldsBusinessHoursMigrationTest.php \
+  tests/Feature/Config/ConfigPublisherTest.php \
+  tests/Feature/Config/BusinessRulesDocumentTest.php \
+  tests/Feature/Config/BusinessRulesEndpointsTest.php \
+  tests/Feature/Config/BusinessRulesSeederTest.php \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add business hours to the rules document and hold calculator.
+
+TEC-004 windows are now data (G5); expiry is counted in Galápagos
+business time instead of wall-clock hours.
+EOF
+)"
+```

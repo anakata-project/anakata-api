@@ -99,6 +99,54 @@ test('rules reject duplicate band days and a missing zero band', function (): vo
     expect($errors->first('cancellation.bands'))->toBe('The last cancellation band must start at 0 days.');
 });
 
+test('rules reject empty business days, a day end that is not after start, and a bad holiday', function (): void {
+    $document = businessRulesDocument([
+        'holds' => [
+            'business_day_start' => '18:00',
+            'business_day_end' => '09:00',
+            'holidays' => ['not-a-date'],
+            'near_term_max_days' => 0,
+        ],
+    ]);
+    $document['holds']['business_days'] = [];
+
+    $errors = Validator::make($document, BusinessRulesDocument::rules())->errors();
+
+    expect($errors->has('holds.business_days'))->toBeTrue();
+    expect($errors->has('holds.business_day_end'))->toBeTrue();
+    expect($errors->has('holds.holidays.0'))->toBeTrue();
+    expect($errors->has('holds.near_term_max_days'))->toBeTrue();
+});
+
+test('fromArray sorts holidays and business days and fills missing hold fields', function (): void {
+    $document = BusinessRulesDocument::fromArray(businessRulesDocument([
+        'holds' => [
+            'business_days' => [5, 1, 1, 3],
+            'holidays' => ['2026-12-25', '2026-01-01'],
+        ],
+    ]));
+
+    expect($document->holds->businessDays)->toBe([1, 3, 5]);
+    expect($document->holds->holidays)->toBe(['2026-01-01', '2026-12-25']);
+
+    $missing = BusinessRulesDocument::initial();
+    unset(
+        $missing['holds']['business_days'],
+        $missing['holds']['business_day_start'],
+        $missing['holds']['business_day_end'],
+        $missing['holds']['holidays'],
+        $missing['holds']['near_term_max_days'],
+    );
+
+    $lenient = BusinessRulesDocument::fromArray($missing);
+
+    expect($lenient->holds->businessDays)->toBe([]);
+    expect($lenient->holds->businessDayStart)->toBe('');
+    expect($lenient->holds->businessDayEnd)->toBe('');
+    expect($lenient->holds->holidays)->toBe([]);
+    expect($lenient->holds->nearTermMaxDays)->toBe(0);
+});
+
 test('fromArray sorts bands descending', function (): void {
     $document = BusinessRulesDocument::fromArray(businessRulesDocument([
         'cancellation' => [
