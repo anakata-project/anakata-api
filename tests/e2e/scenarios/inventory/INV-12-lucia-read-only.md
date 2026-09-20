@@ -18,7 +18,7 @@ Sales Exec can read inventory and must not see write controls. The API also refu
 - [ ] E1 · Itineraries: no `＋ New itinerary`. Drawer notice `Sales Exec role: view only. Itinerary content is managed by Admin / Manager.` Fieldset disabled. Close only (no Save / Hide / Delete; History hidden).
 - [ ] E2 · Departures: no `Generate season…`, no `＋ New departure`. Every `.tsel` status select is `disabled`. Drawer notice `Sales Exec role: view only. Departures are managed by Admin / Manager.` Cancel only.
 - [ ] E3 · Blocks: no `＋ New block`, no Release buttons. Drawer notice `Sales Exec role: view only. Internal blocks are managed by Admin / Manager.` Notes as text, no edit form. History is visible (`panel.rms`).
-- [ ] E4 · Calendar Year 2027 shows the eight columns and the FAM cells. Yacht Layout for `14 Nov 2027` shows both decks and `Blocked · Fam trip` on ANAMARA Suite 07–08. No write controls on either page.
+- [ ] E4 · Calendar Year 2027 shows the eight columns and the FAM cells. Yacht Layout for `14 Nov 2027` shows both decks and `Blocked · Fam trip` on ANAMARA Suite 07–08. No itinerary / departure / block write controls on either page. Free cells may open New reservation because Lucía has `bookings.create`.
 
 ## Notes
 Lucía rights: `fixtures/accounts.md`.

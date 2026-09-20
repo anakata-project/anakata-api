@@ -1509,3 +1509,124 @@ see remaining time without the requests permission.
 EOF
 )"
 ```
+
+## Task 10 · Booking states in the Calendar and Yacht Layout
+
+### What was built
+Sprint 3 Calendar and Yacht Layout now render every booking / request / hold state from `claim.holder.detail`, open BookingPanel or New Reservation from a cell, and refetch occupancy once after those mutations.
+
+`mapCabinCell` is the single presentation function (calendar class + deck text). Both pages call `canActOnBooking(ownerId, currentUserId, hasActOnAny)` — they do not inline the lock rule.
+
+### State table as built
+
+| Claim | Calendar | Deck |
+|---|---|---|
+| HOLD, `hold_type` REQUEST | `c-req` / `REQ` | `s-hold` / "Requested · {party}" |
+| BOOKING, type CHARTER | `c-charter` / `CHARTER` | `s-conf` / "Charter · {party}" |
+| BOOKING, PENDING_PAYMENT | `c-dep` / `PEND` | `s-dep` / "Pending payment · {party}" |
+| BOOKING, CONFIRMED | `c-conf` / last 4 | `s-conf` / "Confirmed · {party} · {segment}" |
+| BOOKING, FULLY_PAID or ON_BOARD | `c-full` / last 4 | `s-conf` / "Fully paid · {party} · {segment}" |
+| BOOKING, COMPLETED | `c-conf` / last 4 | "Completed · {party}" (no segment) |
+| HOLD WEB / AGENCY (no booking detail) | `c-hold` / `HOLD` or `AGCY` | `s-hold` / "On hold · …" |
+| BLOCKED | `c-block` / FAM MAINT NEG COURT | `s-block` / never 🔒 |
+| Expired request hold (`hold_expired` or Availability `FREE`) | `c-av` / `·` | Available. Cabin is sellable (G9). Request stays REQUESTED. |
+
+Segment is on Fully paid / Confirmed (and ON_BOARD as Fully paid), matching the prototype `cabHtml` sold branch. Charter / request / pending / completed do not append segment.
+
+### Lock · `canActOnBooking`
+`holder.detail` has no `can_act`. The helper matches `App\Policies\Concerns\ChecksOwnRecords::ownsOrMayActOnAny`: `records.act_on_any` **or** `owner_id === currentUserId`. Unit-tested. Blocks never take `lock`. Deck prefixes "🔒 " when locked.
+
+**Follow-up:** overlay `can_act` on the calendar resource so the panel can stop recomputing this.
+
+### Clicks
+- Booking / live request → `GET /bookings/{id}` → BookingPanel (no `window.confirm`).
+- Free cell + `bookings.create` → New Reservation with `{departureId, cabinCode}`. Tooltip is the prototype prompt (`freeCellPrompt`).
+- Block → Sprint 3 `?open=` link.
+- No sailing → no action.
+
+### Refresh
+`useCalendarGrid` owns the `GET /api/rms/calendar` fetch. `CalendarOccupancyHost` takes that `refresh` and calls it **once** after create / update / delete (create then opens `response.bookings[0]`). No second calendar fetch after create.
+
+### `cellAt` and JSON keys
+Calendar JSON reindexes `rows[].cells` to `"0".."n"` (yacht date order). Looking up `cells[String(departure.id)]` first collides when departure id is `1` (`cells["1"]` is the second sailing). `cellAt` prefers a complete 0..n list when every index key exists; otherwise departure-id keys. Unit-tested against the id-1 collision.
+
+### Browser
+**Year 2027** (eight ANAMARA Sundays, both themes): 0003 Suite 01 7 Nov; 0005 Suite 02 7 Nov `c-full`; 0007 Suite 03 14 Nov; PEND 0014 Suite 05 14 Nov; REQ 0041 Suite 04 21 Nov and 0042 Suite 05 28 Nov; CHARTER all nine ANAMARA cabins 19 Dec; FAM Suite 07–08 14 Nov (no lock). 0009 Owner 21 Nov.
+
+**CFO:** every booking/request locked (no `records.act_on_any`, not the owner). Click 0003 → panel Harrison & Whitfield, 7 Nov, Suite 01.
+
+**Lucía:** hers (0003, 0007, 0011, 0018, 0014, 0041) unlocked; Mateo’s (0005, 0016, 0017, 0019, 0009, 0042) and Carolina’s charter locked. Free Suite 04 7 Nov → modal prefilled `7 Nov 2027 · ANAMARA` / Suite 04 → create **ANK-2026-0020** PENDING_PAYMENT. One calendar fetch; cell became `PEND` without a reload; panel opened.
+
+**Yacht Layout** 19 Dec 2027: ANAMARA every cabin `🔒 Charter · 0 AD` (API `party_label`; seed charter `adults: 0`, not prototype “16 PAX”). ANATIVA available.
+
+**`inventory:expire-hold ANK-R-2026-0041`:** Suite 04 21 Nov became `c-av` (Availability drops the claim). Request is still open (badge still 2).
+
+### Quality
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (174), `build`
+
+### Files touched
+**anakata-panel**
+- `app/components/calendar/calendarHelpers.ts` (`canActOnBooking`, `mapCabinCell` states, `cellAt` list-index)
+- `app/composables/useCalendarGrid.ts` (new)
+- `app/components/calendar/CalendarOccupancyHost.vue` (new)
+- `app/components/calendar/CalendarCell.vue`
+- `app/pages/rms/reservations/calendar.vue`, `yacht-layout.vue`
+- `app/assets/css/inventory.css` (`button.cell`, `.cab.is-click`)
+- `tests/unit/calendarHelpers.test.ts`
+
+**anakata-api**
+- `tests/e2e/scenarios/inventory/INV-12-lucia-read-only.md` (E4: Lucía may open New reservation from a free cell)
+- `docs/sprints/sprint-04/REPORT.md`
+
+### Deviations
+- Prototype “WIRE” / “Pending wire” → **PEND** / **Pending payment** (payment method is Sprint 5).
+- Charter deck text is **Charter · 0 AD**, not “16 PAX” — `party_label` is computed from `adults` / `children` and the seed charter is `adults: 0`.
+- No `window.confirm` on a free cell; the prompt is the tooltip / title and the modal opens directly.
+- Lock is a local `canActOnBooking` helper, not an API `can_act` field.
+
+### Open questions
+None.
+
+### Notes for later
+- Overlay `can_act` on the calendar resource (`holder.detail` or the cell) so the panel can drop the local lock copy.
+- Emit calendar `cells` with non-numeric keys (or stringified departure ids that JSON will not reindex to 0..n).
+- Sprint 5: restore WIRE for wire pending payments.
+- Task 11: E2E `BKG-*` — calendar Year 2027 states, Lucía 🔒, free-cell create + one refresh, expire-hold as free, Yacht Layout charter. Local DB now has ANK-2026-0020 and an expired 0041 hold; `reset.sh` before the P1 run.
+- Charter `party_label` / 16 PAX if Anakata wants a pax count that is not `adults`+`children`.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# 1. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/components/calendar/calendarHelpers.ts \
+  app/composables/useCalendarGrid.ts \
+  app/components/calendar/CalendarOccupancyHost.vue \
+  app/components/calendar/CalendarCell.vue \
+  app/pages/rms/reservations/calendar.vue \
+  app/pages/rms/reservations/yacht-layout.vue \
+  app/assets/css/inventory.css \
+  tests/unit/calendarHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Show booking states on Calendar and Yacht Layout.
+
+Own-records lock uses canActOnBooking (ChecksOwnRecords).
+Clicks open the booking panel or a prefilled new reservation.
+EOF
+)"
+
+# 2. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  tests/e2e/scenarios/inventory/INV-12-lucia-read-only.md \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record Task 10 calendar occupancy and INV-12 free-cell note.
+
+Lucía may open New reservation from a free calendar cell.
+EOF
+)"
+```
