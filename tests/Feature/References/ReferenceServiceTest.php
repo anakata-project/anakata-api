@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\PaymentRefKind;
+use App\Enums\PaymentKind;
 use App\Enums\ReferenceType;
 use App\Services\References\ReferenceService;
 use Carbon\CarbonImmutable;
@@ -64,10 +64,10 @@ test('a booking at 2026-12-31 23:30 Galapagos is a 2026 booking', function (): v
 test('payment suffixes increment per booking and kind', function (): void {
     $service = app(ReferenceService::class);
 
-    $firstDeposit = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0005', PaymentRefKind::Deposit));
-    $secondDeposit = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0005', PaymentRefKind::Deposit));
-    $balance = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0005', PaymentRefKind::Balance));
-    $otherBooking = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0007', PaymentRefKind::Deposit));
+    $firstDeposit = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0005', PaymentKind::Deposit));
+    $secondDeposit = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0005', PaymentKind::Deposit));
+    $balance = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0005', PaymentKind::Balance));
+    $otherBooking = DB::transaction(fn (): string => $service->nextPayment('ANK-2026-0007', PaymentKind::Deposit));
 
     expect($firstDeposit)->toBe('ANK-2026-0005-D01');
     expect($secondDeposit)->toBe('ANK-2026-0005-D02');

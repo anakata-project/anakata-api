@@ -16,3 +16,6 @@ An admin must not disable or demote themselves from the UI.
 - [ ] E1 · Own-row actions are `Edit` and `History` only — no `Disable`.
 - [ ] E2 · Edit modal: `Role` is disabled. Hint reads `You can't change your own role`.
 - [ ] E3 · `Name` is still editable.
+
+## Notes
+Status pills are i18n sentence case (`Active`) and CSS-uppercase on screen (`ACTIVE`). Match case-insensitively.

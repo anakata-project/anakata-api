@@ -19,3 +19,4 @@ Adding a year is three price leaves. Removing it must return to a clean publishe
 
 ## Notes
 Seeded 2029 is already +5% from 2028, so `↻ +5%` on 2029 is a no-op. Do not use that as the dirty check.
+The published / unsaved state line lives in the **top** `ConfigPublishBar` (`.esbar-state`), not in the panel body.

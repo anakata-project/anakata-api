@@ -17,3 +17,6 @@ The own-records rule is a cell display, not a separate permission. Granting `Act
 - [ ] E1 · Before the grant, Manager **Change reservation status** shows `Own only`.
 - [ ] E2 · After granting **Act on any record** in the draft, that cell (and the other own-records cells: Move reservation, Confirm requests, Release requests, Move lead stage) show `✓ Any`.
 - [ ] E3 · `Cancel` restores `Own only` and the sticky bar disappears.
+
+## Notes
+E1 is the text **`Own only`**, not the `✗ No` glyph. After the draft grant, those own-records cells are **`✓ Any`**. Do not look for `✗ No` on Change reservation status — that cell is already granted.

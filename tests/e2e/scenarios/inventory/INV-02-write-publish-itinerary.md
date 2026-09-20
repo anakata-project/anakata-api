@@ -18,7 +18,8 @@ A new itinerary must start as a draft with the documented defaults, refuse publi
 - [ ] E1 · New drawer title `New itinerary`. Status DRAFT. **Days** `8`, **Nights** `7`, embark and disembark `San Cristóbal (SCY)`, **Card tagline** `8 days · 7 nights`. Card chips include `16 guests`. Day plan is empty. Photo file input is disabled with hint `Save once to add a photo`.
 - [ ] E2 · After `Save as draft`, the drawer is an existing SOUTH itinerary (code locked). Toolbar `3 published · 4 total`. Card pill `DRAFT`.
 - [ ] E3 · First `Save & publish` stays in the drawer and shows `Cannot publish — missing: card description, day-by-day plan.`
-- [ ] E4 · Second publish succeeds. Card pill `PUBLISHED`. Completeness `54% COMPLETE · MISSING: HERO PHOTO, HIGHLIGHTS, LONG DESCRIPTION, URL SLUG, SEO TITLE, SEO DESCRIPTION`. Toolbar `4 published · 4 total`.
+- [ ] E4 · Second publish succeeds. Card pill `PUBLISHED`. Completeness on the SOUTH card `.itin-complete` is the full line `54% COMPLETE · MISSING: HERO PHOTO, HIGHLIGHTS, LONG DESCRIPTION, URL SLUG, SEO TITLE, SEO DESCRIPTION`. Toolbar `4 published · 4 total`.
 
 ## Notes
 Defaults: `App\Support\Itineraries\Defaults`. Completeness: 7 of 13 checks after name + card description + one day + default days/nights/includes/excludes/FAQs. Do not require 100%.
+Read the **entire** `.itin-complete` text (9px mono). A cropped screenshot that only shows `HERO PHOTO` / `SEO TITLE` / `SEO DESCRIPTION` is not a shorter missing list — those six fields must all be present.

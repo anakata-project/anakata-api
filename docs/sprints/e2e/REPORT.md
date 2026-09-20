@@ -222,3 +222,67 @@ AUTH-03 sends unknown then known emails on one page.
 EOF
 )"
 ```
+
+## Follow-up · 2026-09-20 sprints 1–4 full run
+
+Source: [`tests/e2e/runs/2026-09-20-1826-sprints-1-4-full.md`](../../tests/e2e/runs/2026-09-20-1826-sprints-1-4-full.md). 45 passed · 15 failed (harness locators) · 1 not run.
+
+### What was built
+
+- **Labels.** RMS fields that Playwright `getByLabel` could not see now have `label[for]` + control `id` (or `aria-label` on the rates child-discount cells). Shared wrapper: [`EngineField.vue`](../../../../anakata-panel/app/components/engine/EngineField.vue) exposes the id to the slot. Also wired itinerary, departure, new reservation, and reason forms.
+- **ROLE-03 tooltip.** Delete’s blocked reason (`Move its {n} users to another role first`) is on the **Delete** menu item. The `···` tooltip is only the dirty-draft warning.
+- **`GET /api/auth/me` 500.** Unauthenticated requests without `Accept: application/json` called `route('login')` and 500’d. `redirectGuestsTo` now returns null for `api/*`, so those requests are 401 `{ "message": "Unauthenticated." }`.
+- **INV-02.** Product completeness after SOUTH publish is still 54% with the six documented gaps. Scenario E4 now says to read the full `.itin-complete` line.
+- Scenario locator notes (CSS-uppercase pills, `ConfigPublishBar` at the top, festive checkbox, `label.chkline` ticks) and INDEX BKG unverified line retired.
+
+### Files touched
+
+- `anakata-api`: `bootstrap/app.php`, `tests/Feature/Auth/LogoutAndMeTest.php`, `tests/Feature/Inventory/ItineraryEndpointsTest.php`, `tests/e2e/README.md`, `tests/e2e/scenarios/INDEX.md`, AUTH-04/06, USR-01/02/03, ROLE-02/03, RATE-02/04, ENG-03/04, BR-05, INV-02/03/06/08/11, `docs/sprints/e2e/REPORT.md`
+- `anakata-panel`: `EngineField` + engine panels, `ConfigNumberInput`, `RatesRulesPanel`, `ItineraryEditor`, `DepartureEditor`, `NewReservationModal`, `ReasonModal`, `RoleMatrixPanel`, `roleMenu.ts`, tests, `vitest.config.ts`, `package.json` (`happy-dom`, `@vue/test-utils`)
+
+### Deviations
+
+None from the follow-up plan. INV-02 kept the product (54% / six missing); the shorter list in the cloud report was a truncated card read.
+
+### Open questions
+
+None.
+
+### Browser check (dark theme)
+
+Clicked the visible label (or used the accessible name for the rates aria-labelled cells). The matching control took focus on: itinerary **Code**, engine **Max guests per cabin** and **Group context options (one per line)**, rates **Child discounts per cabin**, new reservation **Guest / client name**, release **Reason (required)**. Cookie-less `GET /api/auth/me` is 401 `{ "message": "Unauthenticated." }`.
+
+### Notes for later
+
+None.
+
+### Git commands for the user to run
+
+```bash
+# anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add bootstrap/app.php \
+  tests/Feature/Auth/LogoutAndMeTest.php \
+  tests/Feature/Inventory/ItineraryEndpointsTest.php \
+  tests/e2e/README.md tests/e2e/scenarios \
+  docs/sprints/e2e/REPORT.md
+git status
+git commit -m "$(cat <<'EOF'
+Fix unauthenticated /api/auth/me 500 and tighten e2e locators.
+
+Guest API requests no longer redirect to a missing login route.
+EOF
+)"
+
+# anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/components tests/components tests/unit/roleMenu.test.ts \
+  vitest.config.ts package.json pnpm-lock.yaml
+git status
+git commit -m "$(cat <<'EOF'
+Associate RMS labels and put the role-delete tooltip on Delete.
+
+Playwright getByLabel can find Code, max guests, embark date, and reason.
+EOF
+)"
+```

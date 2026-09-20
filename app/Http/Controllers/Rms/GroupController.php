@@ -27,7 +27,11 @@ final class GroupController extends Controller
 
         $groups = Group::query()
             ->visibleTo($actor)
-            ->with(['coordinator', 'departure.yacht', 'bookings.cabin'])
+            ->with([
+                'coordinator',
+                'departure.yacht',
+                'bookings' => fn ($bookings) => $bookings->withLedgerAggregates()->with('cabin'),
+            ])
             ->when(
                 $request->filled('from'),
                 fn (Builder $query) => $query->whereHas(

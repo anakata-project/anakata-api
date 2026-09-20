@@ -18,3 +18,6 @@ A role with users must not be deletable. After the last user is moved, delete mu
 - [ ] E1 · Toast `Role created`. A `Copy Exec` column appears.
 - [ ] E2 · While the user is assigned, `Delete` is disabled. Tooltip is `Move its 1 users to another role first` (or `Move its {n} users…`).
 - [ ] E3 · After moving the user, Delete works. Toast `Role deleted`. The column is gone.
+
+## Notes
+Hover **Delete** inside the open `···` menu (not only the `···` button). The blocked-delete tooltip is on that item: `Move its 1 users to another role first`. The `···` tooltip is only the dirty-draft warning.

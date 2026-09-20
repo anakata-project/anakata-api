@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\References;
 
-use App\Enums\PaymentRefKind;
+use App\Enums\PaymentKind;
 use App\Enums\ReferenceType;
 use App\Support\BusinessTime;
 use Carbon\CarbonInterface;
@@ -29,13 +29,13 @@ final class ReferenceService
         return $type->format($this->increment($type->scope($year)), $year);
     }
 
-    public function nextPayment(string $bookingRef, PaymentRefKind $kind): string
+    public function nextPayment(string $bookingRef, PaymentKind $kind): string
     {
         $this->guardTransaction();
 
-        $value = $this->increment('payment:'.$bookingRef.':'.$kind->value);
+        $value = $this->increment('payment:'.$bookingRef.':'.$kind->letter());
 
-        return $bookingRef.'-'.$kind->value.str_pad((string) $value, 2, '0', STR_PAD_LEFT);
+        return $bookingRef.'-'.$kind->letter().str_pad((string) $value, 2, '0', STR_PAD_LEFT);
     }
 
     public function ensureAtLeast(ReferenceType $type, int $value, ?int $year = null): void

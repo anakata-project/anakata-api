@@ -35,6 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->redirectGuestsTo(function (Request $request): ?string {
+            if ($request->is('api/*')) {
+                return null;
+            }
+
+            return '/login';
+        });
         $middleware->alias([
             'crm.sensitive' => GuardCrmSensitiveData::class,
             'active' => EnsureUserIsActive::class,

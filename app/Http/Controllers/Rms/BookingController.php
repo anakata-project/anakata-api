@@ -64,6 +64,7 @@ final class BookingController extends Controller
         $bookings = Booking::query()
             ->select('bookings.*')
             ->join('departures', 'departures.id', '=', 'bookings.departure_id')
+            ->withLedgerAggregates()
             ->with([
                 'departure.yacht',
                 'departure.itinerary',
@@ -162,17 +163,20 @@ final class BookingController extends Controller
     {
         $this->authorize('view', $booking);
 
-        $booking->load([
-            'departure.yacht',
-            'departure.itinerary',
-            'cabin',
-            'contact',
-            'group.coordinator',
-            'owner',
-            'ratesVersion',
-            'bookingRequest',
-            'activeClaims',
-        ]);
+        $booking = Booking::query()
+            ->withLedgerAggregates()
+            ->with([
+                'departure.yacht',
+                'departure.itinerary',
+                'cabin',
+                'contact',
+                'group.coordinator',
+                'owner',
+                'ratesVersion',
+                'bookingRequest',
+                'activeClaims',
+            ])
+            ->findOrFail($booking->getKey());
 
         return new BookingResource($booking);
     }

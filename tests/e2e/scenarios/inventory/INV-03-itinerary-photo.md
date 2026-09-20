@@ -19,3 +19,4 @@ Hero upload is locked until the itinerary exists. After the first save, the card
 
 ## Notes
 Alt prefill is `{name} — Galápagos` in `ItineraryEditor.vue`.
+**Code**, **Name (public)** and **Hero photo** are labelled (`getByLabel(/^code$/i)` works).

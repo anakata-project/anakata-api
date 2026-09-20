@@ -7,12 +7,15 @@ use App\Enums\BookingType;
 use App\Enums\ChannelOfOrigin;
 use App\Enums\ClaimKind;
 use App\Enums\MainChannel;
+use App\Enums\PaymentKind;
 use App\Enums\ReferenceType;
 use App\Models\Booking;
 use App\Models\CabinClaim;
 use App\Models\Group;
+use App\Models\Payment;
 use App\Services\References\ReferenceService;
 use App\Support\Bookings\ChannelSeedMap;
+use App\Support\Payments\Ledger;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\DemoBookingsSeeder;
 use Database\Seeders\DemoInventorySeeder;
@@ -73,6 +76,31 @@ test('demo bookings seed is idempotent and skips requests', function (): void {
 
     $nextGroup = DB::transaction(fn (): string => app(ReferenceService::class)->next(ReferenceType::Group));
     expect($nextGroup)->toBe('GRP-008');
+
+    expect(Payment::query()->count())->toBe(12);
+
+    $paid = Booking::query()->where('reference', 'ANK-2026-0005')->firstOrFail();
+    expect(Ledger::paid($paid))->toBe($paid->total);
+    expect($paid->balance())->toBe(0);
+
+    $confirmed = Booking::query()->where('reference', 'ANK-2026-0003')->firstOrFail();
+    expect(Ledger::paid($confirmed))->toBe($confirmed->depositAmount());
+    expect($confirmed->balance())->toBe($confirmed->total - $confirmed->depositAmount());
+
+    $wire = Booking::query()->where('reference', 'ANK-2026-0014')->firstOrFail();
+    expect(Ledger::paid($wire))->toBe(0);
+    expect(Ledger::pledged($wire))->toBe($wire->depositAmount());
+    expect($wire->balance())->toBe($wire->total);
+
+    $overdue = Booking::query()->where('reference', 'ANK-2026-0018')->firstOrFail();
+    expect(Ledger::paid($overdue))->toBe($overdue->depositAmount());
+    expect($overdue->balanceDueDate()->toDateString())->toBe('2027-08-14');
+
+    $nextDeposit = DB::transaction(fn (): string => app(ReferenceService::class)->nextPayment(
+        'ANK-2026-0003',
+        PaymentKind::Deposit,
+    ));
+    expect($nextDeposit)->toBe('ANK-2026-0003-D02');
 });
 
 test('the seeder records calculator totals even when they match the seed', function (): void {

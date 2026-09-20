@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Policies\BookingPolicy;
 use App\Support\Bookings\RequestSummary;
 use App\Support\Bookings\Transitions;
+use App\Support\Payments\Ledger;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -36,7 +37,10 @@ class BookingResource extends JsonResource
      *     party_label: string,
      *     back_to_back: bool,
      *     total: int,
+     *     paid: int,
+     *     pledged: int,
      *     balance: int,
+     *     payments_count: int,
      *     deposit_pct: int,
      *     deposit_amount: int,
      *     balance_days: int,
@@ -88,7 +92,10 @@ class BookingResource extends JsonResource
             'party_label' => $this->partyLabel(),
             'back_to_back' => $this->back_to_back,
             'total' => $this->total,
+            'paid' => Ledger::paid($this->resource),
+            'pledged' => Ledger::pledged($this->resource),
             'balance' => $this->balance(),
+            'payments_count' => (int) ($this->resource->payments_count ?? $this->resource->payments()->count()),
             'deposit_pct' => $this->deposit_pct,
             'deposit_amount' => $this->depositAmount(),
             'balance_days' => $this->balance_days,

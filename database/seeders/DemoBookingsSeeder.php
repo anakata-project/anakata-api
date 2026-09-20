@@ -9,6 +9,9 @@ use App\Enums\BookingStatus;
 use App\Enums\BookingType;
 use App\Enums\ClaimKind;
 use App\Enums\ConfigKind;
+use App\Enums\PaymentKind;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Enums\PreferredChannel;
 use App\Enums\ReferenceType;
 use App\Models\Booking;
@@ -27,6 +30,7 @@ use App\Services\References\ReferenceService;
 use App\Support\Bookings\ChannelSeedMap;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
+use App\Support\Payments\InsertLedgerRow;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use JsonException;
@@ -61,7 +65,7 @@ final class DemoBookingsSeeder extends Seeder
             $departureIds[] = $this->departureFor((int) $row['dep'], $departures)->id;
         }
 
-        DB::transaction(function () use ($bookings, $departures, $groupRow, $departureIds): void {
+        DB::transaction(function () use ($bookings, $departures, $groupRow, $departureIds, $seed): void {
             DepartureLocks::lockMany($departureIds);
 
             $group = is_array($groupRow) ? $this->seedGroup($groupRow, $departures) : null;
@@ -69,6 +73,8 @@ final class DemoBookingsSeeder extends Seeder
             foreach ($bookings as $row) {
                 $this->seedBooking($row, $departures, $group);
             }
+
+            $this->seedPayments($seed['payments'] ?? []);
 
             app(ReferenceService::class)->ensureAtLeast(ReferenceType::Group, 7);
             app(ReferenceService::class)->ensureAtLeast(ReferenceType::Booking, 19, 2026);
@@ -347,14 +353,107 @@ final class DemoBookingsSeeder extends Seeder
     }
 
     /**
-     * @return array{departures: list<array<string, mixed>>, groups: list<array<string, mixed>>, bookings: list<array<string, mixed>>}
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function seedPayments(array $rows): void
+    {
+        $grouped = [];
+
+        foreach ($rows as $row) {
+            $reference = (string) ($row['bk'] ?? '');
+
+            if ($reference === '') {
+                continue;
+            }
+
+            $grouped[$reference][] = $row;
+        }
+
+        foreach ($grouped as $reference => $payments) {
+            $booking = Booking::query()->where('reference', $reference)->lockForUpdate()->first();
+
+            if (! $booking instanceof Booking) {
+                throw new RuntimeException('No seeded booking '.$reference.' for a payment.');
+            }
+
+            foreach ($payments as $row) {
+                $this->seedPayment($booking, $row);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function seedPayment(Booking $booking, array $row): void
+    {
+        $kind = $this->paymentKind((string) ($row['kind'] ?? ''));
+
+        if ($booking->payments()->where('kind', $kind)->exists()) {
+            return;
+        }
+
+        $amount = match ($kind) {
+            PaymentKind::Deposit => $booking->depositAmount(),
+            PaymentKind::Balance => $booking->total - $booking->depositAmount(),
+            default => throw new RuntimeException('Seed payments only support deposit and balance.'),
+        };
+
+        $gateway = (string) ($row['gw'] ?? '');
+
+        app(InsertLedgerRow::class)->handle($booking, [
+            'kind' => $kind,
+            'method' => $this->paymentMethod((string) ($row['method'] ?? '')),
+            'amount' => $amount,
+            'status' => $this->paymentStatus((string) ($row['status'] ?? '')),
+            'paid_at' => is_string($row['date'] ?? null) && $row['date'] !== ''
+                ? $row['date']
+                : null,
+            'gateway_id' => $gateway === '' ? null : $gateway,
+        ]);
+    }
+
+    private function paymentKind(string $kind): PaymentKind
+    {
+        return match ($kind) {
+            'Deposit' => PaymentKind::Deposit,
+            'Balance' => PaymentKind::Balance,
+            'Extras' => PaymentKind::Extras,
+            'Refund' => PaymentKind::Refund,
+            'Other' => PaymentKind::Other,
+            default => throw new RuntimeException('Unknown seed payment kind '.$kind),
+        };
+    }
+
+    private function paymentMethod(string $method): PaymentMethod
+    {
+        return match ($method) {
+            'Card (Stripe)' => PaymentMethod::CardStripe,
+            'Stripe payment link' => PaymentMethod::StripeLink,
+            'Wire transfer' => PaymentMethod::Wire,
+            default => throw new RuntimeException('Unknown seed payment method '.$method),
+        };
+    }
+
+    private function paymentStatus(string $status): PaymentStatus
+    {
+        return match ($status) {
+            'Settled' => PaymentStatus::Settled,
+            'Awaiting wire' => PaymentStatus::AwaitingWire,
+            'Refunded' => PaymentStatus::Refunded,
+            default => throw new RuntimeException('Unknown seed payment status '.$status),
+        };
+    }
+
+    /**
+     * @return array{departures: list<array<string, mixed>>, groups: list<array<string, mixed>>, bookings: list<array<string, mixed>>, payments: list<array<string, mixed>>}
      */
     private function seedFile(): array
     {
         $path = base_path('docs/requirements/examples/seed-data.json');
 
         try {
-            /** @var array{departures: list<array<string, mixed>>, groups: list<array<string, mixed>>, bookings: list<array<string, mixed>>} $seed */
+            /** @var array{departures: list<array<string, mixed>>, groups: list<array<string, mixed>>, bookings: list<array<string, mixed>>, payments: list<array<string, mixed>>} $seed */
             $seed = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new RuntimeException('seed-data.json is not valid JSON.', 0, $exception);

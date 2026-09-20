@@ -9,8 +9,10 @@ use App\Enums\BookingStatus;
 use App\Enums\BookingType;
 use App\Enums\ChannelOfOrigin;
 use App\Enums\MainChannel;
+use App\Enums\PaymentStatus;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Support\Payments\Ledger;
 use App\Support\Rounding;
 use Carbon\CarbonImmutable;
 use Database\Factories\BookingFactory;
@@ -19,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -60,7 +63,11 @@ use Illuminate\Support\Collection;
  * @property-read RateVersion $ratesVersion
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
+ * @property-read Collection<int, Payment> $payments
  * @property-read BookingRequest|null $bookingRequest
+ * @property-read int|null $payments_paid_sum
+ * @property-read int|null $payments_pledged_sum
+ * @property-read int $payments_count
  */
 #[Fillable([
     'reference',
@@ -166,6 +173,14 @@ class Booking extends Model
     }
 
     /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
      * @return MorphMany<CabinClaim, $this>
      */
     public function claims(): MorphMany
@@ -214,12 +229,9 @@ class Booking extends Model
         return $this->main_channel->segment();
     }
 
-    /**
-     * Until Sprint 5 (G6) the balance equals the contracted total.
-     */
     public function balance(): int
     {
-        return $this->total;
+        return $this->total - Ledger::paid($this);
     }
 
     public function balanceDueDate(): CarbonImmutable
@@ -266,6 +278,23 @@ class Booking extends Model
     public function historyLabel(): string
     {
         return $this->displayReference() ?? 'booking';
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    public function scopeWithLedgerAggregates(Builder $query): void
+    {
+        $query
+            ->withSum(
+                ['payments as payments_paid_sum' => fn ($payments) => $payments->countingAsPaid()],
+                'amount',
+            )
+            ->withSum(
+                ['payments as payments_pledged_sum' => fn ($payments) => $payments->where('status', PaymentStatus::AwaitingWire)],
+                'amount',
+            )
+            ->withCount('payments');
     }
 
     /**

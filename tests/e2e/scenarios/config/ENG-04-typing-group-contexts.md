@@ -19,3 +19,4 @@ The textarea must not rewrite itself from the parsed list while the user types (
 
 ## Notes
 Trailing spaces stay visible while typing and are trimmed on publish/reload.
+`Group context options (one per line)` is a labelled textarea (`getByLabel`).

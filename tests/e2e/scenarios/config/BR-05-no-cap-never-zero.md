@@ -16,3 +16,6 @@ Unticking **No cap** without typing must not write `0` (0% would mean no discoun
 - [ ] E1 · Seeded state: `No cap` is ticked; the number input is disabled.
 - [ ] E2 · After untick + blur with no number, the draft is unchanged: no unsaved-changes state (`● PUBLISHED — V1 · …`).
 - [ ] E3 · After typing `25`, state is `● 1 UNSAVED CHANGE`.
+
+## Notes
+The published / unsaved state line lives in the **top** `ConfigPublishBar` (`.esbar-state`), not in the panel body. After typing `25`, wait for that bar to read `● 1 UNSAVED CHANGE`.

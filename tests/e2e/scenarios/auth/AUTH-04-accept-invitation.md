@@ -25,3 +25,6 @@ Invitation is the only way onto the staff panel (D2). History and status must up
 
 ## Cross-checks
 - `bin/db-check.sh 'App\Models\ChangeHistory::query()->where("event", "user.activated")->latest("id")->value("event")'` → `"user.activated"`
+
+## Notes
+Status pills are i18n sentence case (`Invited`, `Active`) and CSS-uppercase on screen (`INVITED`, `ACTIVE`). Match case-insensitively.

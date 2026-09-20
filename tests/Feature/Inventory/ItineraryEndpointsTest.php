@@ -241,3 +241,50 @@ test('completeness lists missing fields in prototype order', function (): void {
     expect($this->actingAs($mateo)->getJson("/api/rms/itineraries/{$itinerary->id}")->json('completeness.pct'))
         ->toBe((int) round((13 - 12) / 13 * 100));
 });
+
+test('INV-02 publish path is 54 percent with the six non-blocking gaps', function (): void {
+    $mateo = managerUser();
+
+    $created = $this->actingAs($mateo)
+        ->postJson('/api/rms/itineraries', [
+            'code' => 'SOUTH',
+            'name' => 'Southern Isles',
+            'hero_alt' => '',
+            'card_description' => '',
+            'long_description' => '',
+            'meta_title' => '',
+            'meta_description' => '',
+            'slug' => '',
+            'fallback_gradient' => Gradients::DEFAULT_KEY,
+            'highlights' => [],
+            'day_plan' => [],
+        ])
+        ->assertCreated()
+        ->json();
+
+    $published = $this->actingAs($mateo)
+        ->patchJson("/api/rms/itineraries/{$created['id']}", [
+            'name' => 'Southern Isles',
+            'card_description' => 'Southern isles — a test itinerary.',
+            'long_description' => '',
+            'highlights' => [],
+            'day_plan' => [['Day 1', 'Day 1 at sea.']],
+            'slug' => null,
+            'meta_title' => '',
+            'meta_description' => '',
+            'status' => 'PUBLISHED',
+        ])
+        ->assertOk();
+
+    $published
+        ->assertJsonPath('status', 'PUBLISHED')
+        ->assertJsonPath('completeness.pct', 54)
+        ->assertJsonPath('completeness.missing', [
+            'hero photo',
+            'highlights',
+            'long description',
+            'URL slug',
+            'SEO title',
+            'SEO description',
+        ]);
+});

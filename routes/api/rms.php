@@ -12,6 +12,7 @@ use App\Http\Controllers\Rms\GroupController;
 use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
+use App\Http\Controllers\Rms\PaymentController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
 use App\Http\Controllers\Rms\RequestController;
@@ -83,6 +84,8 @@ Route::patch('departures/{departure}', [DepartureController::class, 'update'])->
 Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])->whereNumber('departure');
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
 
+Route::get('payments', [PaymentController::class, 'index']);
+
 Route::get('bookings', [BookingController::class, 'index']);
 Route::get('bookings/audit', [BookingController::class, 'audit']);
 Route::get('bookings/owners', [BookingController::class, 'owners']);
@@ -96,6 +99,7 @@ Route::patch('bookings/{booking}', [BookingController::class, 'update'])->whereN
 Route::delete('bookings/{booking}', [BookingController::class, 'destroy'])->whereNumber('booking');
 Route::get('bookings/{booking}', [BookingController::class, 'show'])->whereNumber('booking');
 Route::get('bookings/{booking}/history', [BookingController::class, 'history'])->whereNumber('booking');
+Route::get('bookings/{booking}/payments', [PaymentController::class, 'forBooking'])->whereNumber('booking');
 
 Route::get('groups', [GroupController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);

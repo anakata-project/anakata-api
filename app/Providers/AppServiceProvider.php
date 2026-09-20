@@ -19,6 +19,7 @@ use App\Models\EngineSettingsVersion;
 use App\Models\Group;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
+use App\Models\Payment;
 use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
@@ -107,6 +108,7 @@ class AppServiceProvider extends ServiceProvider
             'booking' => Booking::class,
             'booking_request' => BookingRequest::class,
             'waitlist_entry' => WaitlistEntry::class,
+            'payment' => Payment::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(

@@ -22,3 +22,4 @@ An internal block is the first real claim holder. Calendar and layout must show 
 
 ## Notes
 Mateo has `blocks.manage` (`fixtures/accounts.md`). Demo block stays ANAMARA / BLK-001.
+Yacht / departure / cabin ticks are `label.chkline` wrapping the checkbox. Tick ANATIVA, both listed departures, and Suite 01–03 **before** Create. INV-10 release of BLK-001 is a later scenario; this one must finish Create + Release of BLK-002.

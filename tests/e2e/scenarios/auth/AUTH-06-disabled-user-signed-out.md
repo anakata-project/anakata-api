@@ -22,3 +22,4 @@ A disabled account must not keep working until they refresh. The next API call m
 
 ## Notes
 Public `GET /api/health` does not kick a disabled session.
+Status pills are i18n sentence case (`Disabled`) and CSS-uppercase on screen (`DISABLED`). Match case-insensitively.

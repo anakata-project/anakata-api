@@ -66,6 +66,8 @@ tests/e2e/bin/status.sh
 - **Expected values come from the scenario or `fixtures/reference-values.md`**, never from what the screen currently shows.
 - **Time:** timestamps are shown in Galápagos time (UTC−6). Compare with that, not the machine's time zone.
 - **Don't wait blindly.** Wait for a visible condition (the text, the toast, the row), at most 15 s, then fail the step.
+- **Labels.** RMS fields use `label[for]` + control `id` (or `aria-label` on unlabeled table cells). Prefer `getByLabel` on Code, Max guests per cabin, Embark date, Child discounts per cabin, group-context, reason, and the new-reservation fields. Status pills are CSS-uppercase (`INVITED`); match case-insensitively.
+- **`/api/auth/me`.** Call `http://localhost:8000/api/auth/me` (JSON, 401 when signed out). Do not open `/api/auth/me` as a panel URL — that is HTML from Nuxt, not the API.
 - **Reports:**
   - write them to `runs/YYYY-MM-DD-HHMM-<slug>.md`
   - reports are not committed to `dev`; if the agent works on a branch, it may commit only its report there

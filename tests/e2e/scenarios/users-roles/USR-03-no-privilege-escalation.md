@@ -23,3 +23,4 @@
 
 ## Notes
 Sprint 1 task AC said 409 for last-admin; the shipped API returns 403 because a non-Admin cannot mutate an Admin. Screen wins.
+Status pills are i18n sentence case (`Active`) and CSS-uppercase on screen (`ACTIVE`). Match case-insensitively.

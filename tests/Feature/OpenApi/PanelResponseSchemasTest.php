@@ -65,6 +65,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'BookingRequestResource',
         'HoldResource',
         'WaitlistEntryResource',
+        'PaymentResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }
@@ -130,7 +131,26 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     expect($conflictRef)->toContain('CabinUnavailableException');
 
     $booking = openApiSchema($spec, 'BookingResource');
-    expect($booking['properties'])->toHaveKeys(['allowed_transitions', 'request']);
+    expect($booking['properties'])->toHaveKeys(['allowed_transitions', 'request', 'paid', 'pledged', 'payments_count']);
+
+    $payment = openApiSchema($spec, 'PaymentResource');
+    expect($payment['properties'])->toHaveKeys([
+        'reference',
+        'date',
+        'kind',
+        'method',
+        'amount',
+        'status',
+        'gateway_id',
+        'recorded_by',
+        'can_mark_wire',
+        'booking',
+    ]);
+
+    $ledger = $spec['paths']['/rms/payments']['get']
+        ?? $spec['paths']['/api/rms/payments']['get']
+        ?? null;
+    expect($ledger)->toBeArray();
     $bookingDeparture = $booking['properties']['departure']['properties'] ?? [];
     expect($bookingDeparture)->toHaveKeys(['itinerary_name', 'return_date', 'embark', 'festive']);
 
@@ -238,6 +258,9 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'BookingSegment',
         'MainChannel',
         'ChannelOfOrigin',
+        'PaymentKind',
+        'PaymentMethod',
+        'PaymentStatus',
     ] as $enum) {
         $schema = $spec['components']['schemas'][$enum] ?? null;
         expect($schema)->toBeArray("schema {$enum} is missing");

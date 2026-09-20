@@ -16,3 +16,6 @@ Invalid drafts must not be publishable. Restoring the valid value must clear the
 - [ ] E1 · At `5`, `Save & publish` is disabled. Warnbox names `Child discounts per cabin` and says it must not be greater than 3 (`✕ Child discounts per cabin: …`).
 - [ ] E2 · State line is `● UNSAVED CHANGES` (no count — errors). `Discard` is enabled.
 - [ ] E3 · After returning to `2`, there are no unsaved changes: state is `● PUBLISHED — V1 · … · System` and the warnbox is gone.
+
+## Notes
+The child-discount cells have `aria-label`s: `Child discount %`, `Child discounts per adult`, `Child discounts per cabin`. Use `getByLabel` on **Child discounts per cabin**. The state line is the top `ConfigPublishBar`.

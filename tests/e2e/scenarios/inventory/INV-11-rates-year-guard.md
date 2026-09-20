@@ -19,3 +19,4 @@ Publishing rates must refuse dropping a year that still has departures, and warn
 
 ## Notes
 The task file said “remove 2027”. The screen can only ✕ the last year, and cannot remove the last remaining year, so this scenario uses a 2029 departure + ✕ 2029. Same API guard (`DepartureConfigChecks`). Sentences: `fixtures/reference-values.md`. Mateo cannot run this (`rates.manage`).
+**Embark date (Sunday)** is a labelled date input (`getByLabel`).

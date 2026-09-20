@@ -26,3 +26,4 @@ Generate season must create the ALT pair for each Sunday and skip existing (yach
 
 ## Notes
 ALT table: Sprint 3 REPORT task 02 (festive window off). `DEP-042` = DEP-016 + 26. This scenario starts from `reset`, so the number holds even if earlier scenarios created departures.
+Leaving the festive checkbox ticked is a **step miss**, not a product bug: the first generate then creates 13 (not 26) and the latest reference is not `DEP-042`. Uncheck it before Generate.

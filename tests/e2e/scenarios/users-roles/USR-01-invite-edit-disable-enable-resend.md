@@ -24,3 +24,6 @@ Each team action must update the row, the status pill, and write a history sente
 - [ ] E4 · After disable: toast `User disabled`; pill `Disabled`.
 - [ ] E5 · After enable: toast `User enabled`; pill `Active` (or `Invited` if they never accepted — here they never accepted, so the pill returns to `Invited`).
 - [ ] E6 · History includes (newest-first) `Enabled`, `Disabled` with `Reason: E2E USR-01`, `Name changed · Row Walker → Row Walker Jr`, `Invitation resent`, `Invited as Sales Exec`. Zone label `Galápagos time · UTC−6`.
+
+## Notes
+Status pills are i18n sentence case (`Invited`, `Disabled`, `Active`) and CSS-uppercase on screen (`INVITED`). Match case-insensitively.

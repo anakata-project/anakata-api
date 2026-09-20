@@ -7,6 +7,22 @@ use App\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
+test('unauthenticated me is 401 json even without an accept header', function (): void {
+    $this->get('/api/auth/me')
+        ->assertUnauthorized()
+        ->assertHeader('content-type', 'application/json')
+        ->assertExactJson(['message' => 'Unauthenticated.']);
+});
+
+test('unauthenticated me from the panel origin is 401 json', function (): void {
+    $this->withHeaders([
+        'Origin' => 'http://localhost:3001',
+        'Referer' => 'http://localhost:3001/login',
+    ])->get('/api/auth/me')
+        ->assertUnauthorized()
+        ->assertExactJson(['message' => 'Unauthenticated.']);
+});
+
 test('me returns the signed-in user', function (): void {
     $user = User::factory()->withRole(SystemRole::Admin)->create([
         'name' => 'Carolina M.',

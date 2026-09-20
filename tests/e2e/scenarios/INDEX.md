@@ -2,7 +2,7 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
-Sprint 4 `BKG-*` and the rewritten BR-01 / BR-02 / INV-01 / INV-10 still have unverified screen values (63 greppable markers under `tests/e2e/`). Run the Task 11 verification pass before the full P1 set.
+Sprint 4 `BKG-01`…`BKG-12` were read on the 2026-09-20 full run. BR-01 / BR-02 / INV-01 still have a few unverified markers from the Task 11 rewrite.
 
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|

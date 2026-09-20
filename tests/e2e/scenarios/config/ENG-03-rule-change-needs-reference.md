@@ -17,3 +17,6 @@ E3: changing a rule field requires an approval reference.
 - [ ] E1 · After the rule edit, the approval placeholder is `Approval ref / reason (required)`.
 - [ ] E2 · Publish with an empty reference is blocked (button disabled and/or a validation message on the reference).
 - [ ] E3 · With `E2E-ENG-03`, publish succeeds (`Version 2 published`). History records the max-guests change with that reference.
+
+## Notes
+`Max guests per cabin` is a labelled number input (`getByLabel`).
