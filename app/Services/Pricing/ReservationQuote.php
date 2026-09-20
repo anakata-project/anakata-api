@@ -19,6 +19,7 @@ final readonly class ReservationQuote
         public bool $backToBack,
         public array $parties,
         public array $warnings,
+        public QuoteTerms $terms,
     ) {}
 
     /**

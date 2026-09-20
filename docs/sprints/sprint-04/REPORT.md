@@ -1159,3 +1159,174 @@ reason modal replaces prompt; move pages all future departures.
 EOF
 )"
 ```
+
+## Task 08 · New Reservation modal
+
+### What was built
+The prototype `#newmodal` on `/rms/reservations/bookings`, wired to Task 03 `POST /bookings/quote` and `POST /bookings`. Header and toolbar **＋ New reservation** are live (`bookings.create`). Off the bookings route the header goes to `/rms/reservations/bookings?new=1` (optional `departure_id` / `cabin` for task 10). After 201: toast, close, `refreshAll()`, open `BookingPanel` on `bookings[0]`.
+
+No panel GET to `/rates`, `/engine-settings`, or `/business-rules`. Channels, preferred, children ages and `max_per_cabin` come from `GET /bookings/form-options`. Frozen-at-sale deposit / balance days / CHARTER notice numbers come from `quote.terms` plus the party totals.
+
+### API prelude
+`GET /api/rms/bookings/form-options` (`bookings.create`, registered next to `bookings/audit` and `bookings/owners`). `BookingFormOptionsResource` (`$wrap = null`): `main` (`trade` = `MainChannel::isTrade()`), `origin` grouped by `ChannelOfOrigin::group()`, `preferred` (enum case names), `guests` from `CurrentConfig::engineSettings()->guests`.
+
+`ReservationQuote.terms`: `balance_days` (cabin or charter); `charter` is non-null only when `type === CHARTER` (`deposit_pct`, `deposit_business_days`, `balance_days`, `dpng_manifest_days`). Present even when a party is `NoRate` so the charter notice can render. PHPDoc so Scramble keeps `terms` as an object. `QuoteReservationRequest` still 422s a CABIN row without `cabin_code` (“Pick a cabin.”) — unchanged.
+
+Pest: `BookingFormOptionsTest` (Sales Exec 200, no `bookings.create` 403, origin groups, B2B `trade: true` / D2C and Partners `false`, seed guests 6 / 17 / 3). `QuoteReservationTest` terms: cabin 120 + `charter` null; festive charter 20 / 5 / 120 / 30. Both resources in `PanelResponseSchemasTest`.
+
+### Types · anakata-ui v0.5.2
+PHPDoc + `pnpm types:api`. Alias `BookingFormOptions` only — no hand-written `BookingChannels`. `BookingQuote` leftover overlay adds `terms` (Scramble still types quote `cabins` / totals loosely). Panel README pin: `` `extends: ['../anakata-ui']` (`v0.5.2`) ``.
+
+### Pure helpers
+`newReservationHelpers.ts` + `tests/unit/newReservationHelpers.test.ts`:
+- Quote payload: CHARTER one party, no `cabin_code`. CABIN `null` until every row has `cabin_code` (price box **Pick a cabin**; no POST).
+- Group row: `!charter && (cabinCount >= 2 || existingGroupId != null)`. Name field hidden when an existing group is chosen.
+- Festive suffix exactly ` · FESTIVE (+supplement, discounts blocked)`.
+- Toasts: `Reservation {ref} created.` · `{n} cabins created under {GRP} ({ANK-…}). The coordinator receives all communications.`
+- Back-to-back hidden for CHARTER or festive, and **forced `false` whenever hidden**.
+- Trade from API `trade`, never a panel regex.
+
+### Modal
+Square/hairline `UModal`, title **New reservation — manual entry**, 640 px. `createValidationQueue` 400 ms. Create disabled while the queue is pending, the quote is missing/has errors, or the create POST is in flight. 409 → `.warnbox` + reload cabins + requote. 422 → `applyApiFormError`. Unsaved: overlay / Cancel / Escape → `confirmUnsaved`.
+
+`watch(open, …, { immediate: true })` so `?new=1` (modal mounts already open) still loads form-options and departures. Parent also sets `newOpen = false` on `created` so the modal actually dismisses after 201.
+
+### Contact pick (G1) — notice; fields stay editable
+`ResolveContact` fills empty fields only. After a suggestion is chosen, if the email still matches: `.notice` “Existing contact — the name and phone on file are kept.” Name and phone stay editable (empty-on-file phone can still be sent). Clearing or changing the email dismisses the notice. **Not** read-only.
+
+### Omissions and additions vs the prototype
+Omitted (Sprint 5): agency / commission / payment method / `ON_HOLD_AGENCY`. Trade shows the Sprint 5 notice.
+Added (create API requires them): email, phone, preferred channel.
+
+### Browser
+As **Carolina** (light then dark):
+- One cabin, Suite 03, 2 adults, 7 Nov 2027 ANAMARA → **USD 26,600** / deposit **USD 2,660** / T−120 → ANK-2026-0020 Elena Voss, panel opens, owner Carolina.
+- Three cabins (21 Nov 2027 ANATIVA S3–S5) → GRP-008 Mira family, three PENDING_PAYMENT rows, lead-guest label + OPS-008 notice.
+- Festive CHARTER **19 Dec 2027 ANAMARA** → **USD 211,500** / **USD 42,300**; notice “Deposit 20% within 5 business days … balance 80% at 120 days; DPNG manifest 30 days”. Cabins and back-to-back hidden. Calendar `SOLD` not checked (task 10).
+- Two-tab race (modal quoted S1 on 28 Nov 2027 ANATIVA; parallel POST took it) → `.warnbox` “Suite 01 on 28 Nov 2027 · ANATIVA is sold.”; cabin then **Not available**.
+- 4 adults → capacity error, Create disabled.
+- Create + Cancel disabled while the POST is in flight.
+- Harrison contact suggestion → notice; name/phone remain editable; changing the email dismisses the notice.
+- Header ＋ New reservation on the bookings route opens the modal; from Calendar it navigates to `?new=1`.
+
+As **Lucía** (Sales Exec): ANK-2026-0025 Lucia Guest created; she is owner. Dark theme on the list + modal.
+
+### Quality
+- anakata-api: `docker compose exec app sh -c "composer check"` — 504 passed, Pint, Larastan OK
+- anakata-ui: `pnpm types:api`, `pnpm lint`, `typecheck`, `test` (35), `build`
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (157), `build`
+
+### Files touched
+**anakata-api**
+- `app/Http/Controllers/Rms/BookingController.php` (`formOptions`)
+- `app/Http/Resources/Rms/BookingFormOptionsResource.php` (new)
+- `app/Support/Bookings/BookingFormOptions.php` (new)
+- `app/Enums/PreferredChannel.php` (`label()`)
+- `app/Services/Pricing/QuoteTerms.php` (new)
+- `app/Services/Pricing/ReservationQuote.php`, `ReservationQuoter.php`
+- `app/Http/Resources/Rms/ReservationQuoteResource.php`
+- `routes/api/rms.php`
+- `tests/Feature/Bookings/BookingFormOptionsTest.php` (new)
+- `tests/Feature/Bookings/QuoteReservationTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `docs/sprints/sprint-04/REPORT.md`
+
+**anakata-ui (v0.5.2)**
+- `app/types/api.d.ts`, `bookings.ts`, `index.ts`
+- `package.json`, `CHANGELOG.md`, `README.md`
+
+**anakata-panel**
+- `app/components/bookings/NewReservationModal.vue` (new)
+- `app/components/bookings/newReservationHelpers.ts` (new)
+- `app/composables/useNewReservation.ts` (new)
+- `tests/unit/newReservationHelpers.test.ts` (new)
+- `app/pages/rms/reservations/bookings.vue`, `app/layouts/default.vue`
+- `app/assets/css/bookings.css`, `app/types/api.ts`, `i18n/locales/en.json`
+- `eslint.config.mjs`, `README.md`
+
+### Deviations
+- Contact fields stay editable with a notice (G1 fill-empty-only), not read-only.
+- CABIN quote is gated in the panel until every `cabin_code` is set (**Pick a cabin**). The API still 422s if a CABIN quote is sent without one.
+- Calendar occupancy / `SOLD` cells deferred to task 10 — only the `?new=` / prefill hook.
+- Immediate `watch(open)` and parent `newOpen = false` on `created` (mount-already-open + UModal staying visible after 201).
+
+### Open questions
+None.
+
+### Notes for later
+- Task 09: request queue.
+- Task 10: calendar / Yacht Layout occupancy and `SOLD`; prefill from a cell.
+- Task 11: E2E `BKG-*`.
+- Sprint 5: agency, commission, payment method, `ON_HOLD_AGENCY`.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Commit Task 07 first if those files are still uncommitted, then:
+
+```bash
+# 1. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/BookingController.php \
+  app/Http/Resources/Rms/BookingFormOptionsResource.php \
+  app/Support/Bookings/BookingFormOptions.php \
+  app/Enums/PreferredChannel.php \
+  app/Services/Pricing/QuoteTerms.php \
+  app/Services/Pricing/ReservationQuote.php \
+  app/Services/Pricing/ReservationQuoter.php \
+  app/Http/Resources/Rms/ReservationQuoteResource.php \
+  routes/api/rms.php \
+  tests/Feature/Bookings/BookingFormOptionsTest.php \
+  tests/Feature/Bookings/QuoteReservationTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Expose booking form-options and quote.terms for the panel.
+
+Staff with only bookings.create can load channels and the
+frozen-at-sale terms without config-page permissions.
+EOF
+)"
+
+# 2. anakata-ui — commit, then tag, then push
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  app/types/api.d.ts \
+  app/types/bookings.ts \
+  app/types/index.ts \
+  package.json \
+  CHANGELOG.md \
+  README.md
+git commit -m "$(cat <<'EOF'
+Regenerate types for form-options and quote.terms.
+
+v0.5.2 aliases BookingFormOptions; the quote leftover keeps
+terms so the panel never reads rates or business-rules.
+EOF
+)"
+git tag v0.5.2
+git push origin HEAD
+git push origin v0.5.2
+
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/components/bookings/NewReservationModal.vue \
+  app/components/bookings/newReservationHelpers.ts \
+  app/composables/useNewReservation.ts \
+  tests/unit/newReservationHelpers.test.ts \
+  app/pages/rms/reservations/bookings.vue \
+  app/layouts/default.vue \
+  app/assets/css/bookings.css \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  eslint.config.mjs
+git commit -m "$(cat <<'EOF'
+Add the New reservation modal on live quote and create.
+
+Form-options and quote.terms are the only sources; Create
+stays disabled while the POST is in flight.
+EOF
+)"
+```

@@ -33,7 +33,11 @@ class ReservationQuoteResource extends JsonResource
      *     }>,
      *     total: int|null,
      *     deposit: int|null,
-     *     warnings: list<string>
+     *     warnings: list<string>,
+     *     terms: array{
+     *         balance_days: int,
+     *         charter: array{deposit_pct: int, deposit_business_days: int, balance_days: int, dpng_manifest_days: int}|null
+     *     }
      * }
      */
     public function toArray(Request $request): array
@@ -61,6 +65,7 @@ class ReservationQuoteResource extends JsonResource
             'total' => $quote->total(),
             'deposit' => $quote->deposit(),
             'warnings' => $quote->warnings,
+            'terms' => $quote->terms->toArray(),
         ];
     }
 }

@@ -57,6 +57,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'BookingResource',
         'ReservationQuoteResource',
         'ReservationCreatedResource',
+        'BookingFormOptionsResource',
         'GroupResource',
         'ContactResource',
         'MovePreviewResource',
@@ -155,6 +156,16 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     } else {
         expect($transitionItems)->toBeArray();
     }
+
+    $quote = openApiSchema($spec, 'ReservationQuoteResource');
+    expect($quote['properties'])->toHaveKey('terms');
+    $terms = openApiProperties($quote['properties']['terms'] ?? []);
+    expect($terms)->toHaveKeys(['balance_days', 'charter']);
+
+    $formOptions = $spec['paths']['/rms/bookings/form-options']['get']
+        ?? $spec['paths']['/api/rms/bookings/form-options']['get']
+        ?? null;
+    expect($formOptions)->toBeArray();
 
     $created = openApiSchema($spec, 'ReservationCreatedResource');
     expect($created['properties'])->toHaveKey('bookings');

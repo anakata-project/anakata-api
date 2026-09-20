@@ -65,7 +65,14 @@ final class ReservationQuoter
             }
         }
 
-        return new ReservationQuote($departure, $type, $backToBack, $parties, $warnings);
+        return new ReservationQuote(
+            $departure,
+            $type,
+            $backToBack,
+            $parties,
+            $warnings,
+            QuoteTerms::fromConfig($this->config, $type),
+        );
     }
 
     /**

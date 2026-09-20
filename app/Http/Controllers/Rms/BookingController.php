@@ -25,6 +25,7 @@ use App\Http\Requests\Rms\StoreReservationRequest;
 use App\Http\Requests\Rms\TransitionBookingRequest;
 use App\Http\Requests\Rms\UpdateBookingRequest;
 use App\Http\Resources\Rms\BookingAuditResource;
+use App\Http\Resources\Rms\BookingFormOptionsResource;
 use App\Http\Resources\Rms\BookingOwnerResource;
 use App\Http\Resources\Rms\BookingResource;
 use App\Http\Resources\Rms\ChangeHistoryResource;
@@ -34,7 +35,9 @@ use App\Http\Resources\Rms\ReservationQuoteResource;
 use App\Models\Booking;
 use App\Models\ChangeHistory;
 use App\Models\User;
+use App\Services\Config\CurrentConfig;
 use App\Services\Pricing\ReservationQuoter;
+use App\Support\Bookings\BookingFormOptions;
 use App\Support\BusinessTime;
 use Carbon\CarbonImmutable;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
@@ -117,6 +120,13 @@ final class BookingController extends Controller
             ->paginate($perPage);
 
         return BookingResource::collection($bookings);
+    }
+
+    public function formOptions(CurrentConfig $config): BookingFormOptionsResource
+    {
+        $this->authorize('create', Booking::class);
+
+        return new BookingFormOptionsResource(BookingFormOptions::fromConfig($config));
     }
 
     public function quote(QuoteReservationRequest $request, ReservationQuoter $quoter): ReservationQuoteResource

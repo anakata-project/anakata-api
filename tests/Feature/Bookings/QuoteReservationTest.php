@@ -88,6 +88,30 @@ test('charter is unavailable when any cabin is taken', function (): void {
         ->assertJsonPath('total', 199500);
 });
 
+test('quote terms come from the published rates and business rules', function (): void {
+    $cabin = ReservationFixtures::anamaraDeparture();
+    $charter = ReservationFixtures::anamaraDeparture('2027-12-19', true);
+
+    $this->actingAs(salesExecUser())
+        ->postJson('/api/rms/bookings/quote', ReservationFixtures::quotePayload($cabin, [
+            ['cabin_code' => 'S1', 'adults' => 2, 'children' => 0],
+        ]))
+        ->assertOk()
+        ->assertJsonPath('terms.balance_days', 120)
+        ->assertJsonPath('terms.charter', null);
+
+    $this->actingAs(salesExecUser())
+        ->postJson('/api/rms/bookings/quote', ReservationFixtures::quotePayload($charter, [
+            ['adults' => 8, 'children' => 0],
+        ], 'CHARTER'))
+        ->assertOk()
+        ->assertJsonPath('terms.balance_days', 120)
+        ->assertJsonPath('terms.charter.deposit_pct', 20)
+        ->assertJsonPath('terms.charter.deposit_business_days', 5)
+        ->assertJsonPath('terms.charter.balance_days', 120)
+        ->assertJsonPath('terms.charter.dpng_manifest_days', 30);
+});
+
 test('quote requires bookings.create', function (): void {
     $role = Role::factory()->create([
         'permissions' => [Permission::PanelRms],
