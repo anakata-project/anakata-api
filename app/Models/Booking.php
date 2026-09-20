@@ -78,6 +78,7 @@ use Illuminate\Support\Collection;
  * @property-read Collection<int, Payment> $payments
  * @property-read Collection<int, PaymentLink> $paymentLinks
  * @property-read BookingRequest|null $bookingRequest
+ * @property-read RefundRequest|null $refundRequest
  * @property-read int|null $payments_paid_sum
  * @property-read int|null $payments_pledged_sum
  * @property-read int $payments_count
@@ -211,6 +212,14 @@ class Booking extends Model
     public function bookingRequest(): HasOne
     {
         return $this->hasOne(BookingRequest::class);
+    }
+
+    /**
+     * @return HasOne<RefundRequest, $this>
+     */
+    public function refundRequest(): HasOne
+    {
+        return $this->hasOne(RefundRequest::class);
     }
 
     /**

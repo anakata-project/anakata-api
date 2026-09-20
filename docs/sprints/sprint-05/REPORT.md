@@ -506,7 +506,6 @@ Idempotent. `ensureAtLeast` Agency 3, Booking 21.
 None for this task.
 
 ### Notes for later
-- Task 05: penalty and refund request on CANCELLED from `ON_HOLD_AGENCY` (existing `TODO(task 05)` in `TransitionBooking`).
 - Task 07: Deleted & released now includes released sold bookings; render `what` as returned (`Reservation released — cabin returned to inventory`). Payments tab is unchanged by this task.
 - Task 09: B2B & Agent Portal screens consume the agency index / show / decide endpoints and the net-only preview.
 - Task 10: New Reservation agency + commission fields; `form-options.agencies` is APPROVED only.
@@ -567,6 +566,91 @@ git add tests/Unit/Support/Bookings/TransitionsTest.php
 git add tests/Unit/Support/BusinessHoursTest.php
 git commit -m "$(cat <<'EOF'
 Add agencies, frozen commissions, and the FIN-005 ON_HOLD_AGENCY cap.
+
+EOF
+)"
+```
+
+## Task 05 · Cancellation penalties, refund requests, approval and execution
+
+### Calculator — two bases
+`App\Support\Payments\CancellationPenalty` reads `cancellation.bands` (never 5/50/100 in call sites). `bandFor` sorts descending by `min_days` and takes the first band at or below the day count. `label` is the prototype’s `bandLabel`: `≥120 days`, `90–119 days`, `0–89 days`, built from the neighbouring band.
+
+- **Penalty is on the booking total:** `Rounding::halfUp(total × penalty_pct / 100)` — same half-up as `CabinPricer`.
+- **Refund due is on what was paid:** `refund_due = max(0, paid − penalty)`.
+
+Days before departure are Galápagos calendar dates via `BusinessTime::calendarDaysBetween` (the old private `BusinessHours` helper, now public). Never a UTC instant difference.
+
+### Frozen request
+`refund_requests` stores `cancelled_at`, `days_before_departure`, `band_min_days`, `penalty_pct`, `penalty_amount`, `paid_at_cancellation`, `refund_due`, `status` (`PENDING · APPROVED · REJECTED · EXECUTED`), `due_by` (`BusinessHours::endOfNthBusinessDay` + `sla.refund_business_days`), decision fields, `executed_payment_id`. Unique pending row per booking (`pending_booking_id` generated column). Morph alias `refund_request`. A later publish of `cancellation.bands` does not change stored amounts (G4 / H9).
+
+### Where the Sprint 4 TODO went
+`TransitionBooking::applyClaims()` after `release()`, only for `CANCELLED` and `CANCELLED_POSTPAID` (not `RELEASED`). `CreateRefundRequest` writes `refund.requested` when `Ledger::paid > 0`, or `refund.not_due` when nothing was paid. The `TODO(task 05)` in `DecideOverdue` is gone — OPS-007 CANCEL already goes through `TransitionBooking`. Agency commission stays derived: `Accrual::status()` is `CANCELLED` from the booking status; no second write.
+
+### Approve / execute
+- `GET /api/rms/refunds?status&from&to` — `refunds.approve` **or** `refunds.execute`.
+- `POST /api/rms/refunds/{refund}/decide` `{ decision: APPROVED|REJECTED, reason }` — `refunds.approve`, reason required both ways. Authorises only.
+- `POST /api/rms/refunds/{refund}/execute` `{ method, reference?, amount? }` — `refunds.execute`, only `APPROVED`.
+
+**Amount rule:** `amount` omitted defaults to `refund_due`; if present it must equal `refund_due`, otherwise 422. One request, one refund. A second execute is 422.
+
+Execute uses H10 (`BookingMutationLock` then `InsertLedgerRow`): `kind = REFUND`, **negative** amount, auto `…-R01`, `status = REFUNDED` (not `SETTLED` — task 01’s paid rule). `ApplyPaymentEffects` is not run. History: `Refund executed — USD 1,330 (5 % penalty band)`, reason `Director approval`.
+
+`BookingResource.refund` is `{ status, penalty_amount, refund_due, band_label, due_by } | null` when the relation is loaded (show / transition).
+
+### Stripe
+Record-only this sprint (README default until the client answers). Finance refunds in Stripe; execute `reference` is stored as `payments.gateway_id` (`re_…`). No `refunds.create`.
+
+A `CARD_STRIPE` REFUND row with `gateway_id = re_…` lands in the generated `stripe_gateway_id` unique index. It cannot collide with the settlement `pi_…` (different strings). `ProcessStripeEvent::matchRefund` finds the row by `kind = REFUND` + `re_…`. Settlement matching stays PaymentIntent against positive rows only. Covered by settle → execute → `charge.refunded` (same row, settlement untouched).
+
+### Deviations
+- **Ledger status `REFUNDED`, not `SETTLED`.** Task 05 line 35 said `SETTLED`. Task 01 REPORT, `PaymentStatus::Refunded`, `Ledger::paid`, and the Stripe refund webhook already treat a refund as `REFUNDED` with a negative amount.
+
+### Open questions
+- **Split refunds.** Finance sometimes splits a `refund_due` across more than one ledger row. This sprint is one request / one full `refund_due`. Ask finance whether later executions should be allowed until the sum reaches `refund_due`.
+- **Stripe auto-refund.** Still the README client question. Until answered, record only.
+
+### What LEG-001 still blocks
+Customer-facing cancellation wording. Internal labels and history only. No client notification (the old TODO’s “notifies the client”).
+
+### Notes for later
+- Task 07 / 09: Payments tab and Refund Approvals consume `BookingResource.refund` and `GET /api/rms/refunds`.
+- Task 11: `PAY-09` / `PAY-10`; revisit `BKG-06` only if the cancel screen grows a refund line.
+- Demo seed of the prototype’s two refund rows (`ANK-2026-0007` / `0011`) — those bookings are still CONFIRMED in seed.
+
+### Git (do not run; no tag)
+
+```
+git add app/Actions/Bookings/DecideOverdue.php
+git add app/Actions/Bookings/TransitionBooking.php
+git add app/Actions/Refunds
+git add app/Enums/RefundRequestStatus.php
+git add app/Http/Controllers/Rms/BookingController.php
+git add app/Http/Controllers/Rms/RefundController.php
+git add app/Http/Requests/Rms/DecideRefundRequest.php
+git add app/Http/Requests/Rms/ExecuteRefundRequest.php
+git add app/Http/Requests/Rms/IndexRefundsRequest.php
+git add app/Http/Resources/Rms/BookingResource.php
+git add app/Http/Resources/Rms/RefundRequestResource.php
+git add app/Models/Booking.php
+git add app/Models/RefundRequest.php
+git add app/Policies/RefundRequestPolicy.php
+git add app/Providers/AppServiceProvider.php
+git add app/Support/BusinessHours.php
+git add app/Support/BusinessTime.php
+git add app/Support/Config/Documents/BusinessRulesDocument.php
+git add app/Support/Payments/CancellationPenalty.php
+git add app/Support/Refunds
+git add database/factories/RefundRequestFactory.php
+git add database/migrations/2026_09_20_200032_create_refund_requests_table.php
+git add docs/sprints/sprint-05/REPORT.md
+git add routes/api/rms.php
+git add tests/Feature/Refunds
+git add tests/Pest.php
+git add tests/Unit/Support/BusinessTimeCalendarDaysTest.php
+git add tests/Unit/Support/Payments/CancellationPenaltyTest.php
+git commit -m "$(cat <<'EOF'
+Queue frozen cancellation refunds and execute them as negative ledger rows.
 
 EOF
 )"

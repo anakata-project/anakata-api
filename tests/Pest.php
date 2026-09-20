@@ -173,6 +173,47 @@ function businessRulesDocument(array $overrides = []): array
 /**
  * @param  array<string, mixed>  $overrides
  */
+function refundCabin(array $overrides = []): Booking
+{
+    $departure = $overrides['departure'] ?? ReservationFixtures::anamaraDeparture();
+    unset($overrides['departure']);
+    $actor = $overrides['actor'] ?? adminUser();
+    unset($overrides['actor']);
+    $cabin = $overrides['cabin_code'] ?? 'S1';
+    unset($overrides['cabin_code']);
+    $paid = $overrides['paid'] ?? null;
+    unset($overrides['paid']);
+
+    $id = test()->actingAs($actor)
+        ->postJson('/api/rms/bookings', ReservationFixtures::createPayload($departure, [
+            'cabins' => [['cabin_code' => $cabin, 'adults' => 2, 'children' => 0]],
+        ]))
+        ->assertCreated()
+        ->json('bookings.0.id');
+
+    $booking = Booking::query()->findOrFail($id);
+
+    if ($overrides !== []) {
+        $booking->update($overrides);
+        $booking->refresh();
+    }
+
+    if (is_int($paid) && $paid > 0) {
+        Payment::factory()->create([
+            'booking_id' => $booking->id,
+            'kind' => PaymentKind::Deposit,
+            'amount' => $paid,
+            'status' => PaymentStatus::Settled,
+            'reference' => $booking->displayReference().'-D01',
+        ]);
+    }
+
+    return $booking->fresh() ?? $booking;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
 function pendingCabin(array $overrides = []): Booking
 {
     $departure = $overrides['departure'] ?? ReservationFixtures::anamaraDeparture();

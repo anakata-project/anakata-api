@@ -8,6 +8,7 @@ use App\Enums\ConfigKind;
 use App\Services\Config\CurrentConfig;
 use App\Support\Config\ConfigDocument;
 use App\Support\Config\Warning;
+use App\Support\Payments\CancellationPenalty;
 
 final class BusinessRulesDocument extends ConfigDocument
 {
@@ -303,13 +304,9 @@ final class BusinessRulesDocument extends ConfigDocument
 
     public function penaltyFor(int $daysBeforeDeparture): CancellationBand
     {
-        foreach ($this->bands as $band) {
-            if ($daysBeforeDeparture >= $band->minDays) {
-                return $band;
-            }
-        }
+        $band = CancellationPenalty::bandFor($daysBeforeDeparture, $this->bands);
 
-        return $this->bands[array_key_last($this->bands)];
+        return new CancellationBand($band['min_days'], $band['penalty_pct']);
     }
 
     /**

@@ -129,7 +129,7 @@ final class BusinessHours
     ): HoldExpiry {
         $requestYmd = $this->inZone($requestedAt)->format('Y-m-d');
         $departureYmd = $departureDate->format('Y-m-d');
-        $daysAfter = self::calendarDaysBetween($requestYmd, $departureYmd);
+        $daysAfter = BusinessTime::calendarDaysBetween($requestYmd, $departureYmd);
 
         if ($daysAfter <= $this->nearTermMaxDays) {
             return new HoldExpiry(
@@ -246,17 +246,5 @@ final class BusinessHours
     private static function isHi(string $value): bool
     {
         return preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $value) === 1;
-    }
-
-    private static function calendarDaysBetween(string $fromYmd, string $toYmd): int
-    {
-        $from = CarbonImmutable::createFromFormat('!Y-m-d', $fromYmd);
-        $to = CarbonImmutable::createFromFormat('!Y-m-d', $toYmd);
-
-        if (! $from instanceof CarbonImmutable || ! $to instanceof CarbonImmutable) {
-            throw new InvalidArgumentException('Calendar dates must be Y-m-d.');
-        }
-
-        return (int) round(($to->getTimestamp() - $from->getTimestamp()) / 86400);
     }
 }

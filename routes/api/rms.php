@@ -19,6 +19,7 @@ use App\Http\Controllers\Rms\PaymentLinkController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
 use App\Http\Controllers\Rms\ReconciliationController;
+use App\Http\Controllers\Rms\RefundController;
 use App\Http\Controllers\Rms\RequestController;
 use App\Http\Controllers\Rms\RoleController;
 use App\Http\Controllers\Rms\UserController;
@@ -120,6 +121,10 @@ Route::patch('agencies/{agency}', [AgencyController::class, 'update'])->whereNum
 Route::post('agencies/{agency}/decide', [AgencyController::class, 'decide'])->whereNumber('agency');
 
 Route::get('commissions', [CommissionController::class, 'index']);
+
+Route::get('refunds', [RefundController::class, 'index']);
+Route::post('refunds/{refund}/decide', [RefundController::class, 'decide'])->whereNumber('refund');
+Route::post('refunds/{refund}/execute', [RefundController::class, 'execute'])->whereNumber('refund');
 
 Route::get('groups', [GroupController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);

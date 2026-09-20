@@ -23,6 +23,7 @@ use App\Models\Itinerary;
 use App\Models\Payment;
 use App\Models\PaymentLink;
 use App\Models\RateVersion;
+use App\Models\RefundRequest;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WaitlistEntry;
@@ -128,6 +129,7 @@ class AppServiceProvider extends ServiceProvider
             'waitlist_entry' => WaitlistEntry::class,
             'payment' => Payment::class,
             'payment_link' => PaymentLink::class,
+            'refund_request' => RefundRequest::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(

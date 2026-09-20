@@ -188,6 +188,7 @@ final class BookingController extends Controller
                 'bookingRequest',
                 'activeClaims',
                 'paymentLinks',
+                'refundRequest',
             ])
             ->findOrFail($booking->getKey());
 

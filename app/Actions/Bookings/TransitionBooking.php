@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Bookings;
 
 use App\Actions\Action;
+use App\Actions\Refunds\CreateRefundRequest;
 use App\Enums\BookingStatus;
 use App\Enums\ClaimKind;
 use App\Enums\ReferenceType;
@@ -29,6 +30,7 @@ final class TransitionBooking extends Action
     public function __construct(
         private ClaimService $claims,
         private ReferenceService $references,
+        private CreateRefundRequest $refunds,
     ) {}
 
     /**
@@ -58,7 +60,7 @@ final class TransitionBooking extends Action
             $reason = $this->reason($data);
             $from = $booking->status;
 
-            $this->applyClaims($booking, $from, $to);
+            $this->applyClaims($booking, $from, $to, $actor, $system);
 
             if ($to === BookingStatus::Confirmed && $booking->reference === null) {
                 $booking->reference = $this->references->next(ReferenceType::Booking);
@@ -87,6 +89,7 @@ final class TransitionBooking extends Action
                 'group.coordinator',
                 'owner',
                 'ratesVersion',
+                'refundRequest',
             ]);
         });
     }
@@ -139,8 +142,13 @@ final class TransitionBooking extends Action
         return $what;
     }
 
-    private function applyClaims(Booking $booking, BookingStatus $from, BookingStatus $to): void
-    {
+    private function applyClaims(
+        Booking $booking,
+        BookingStatus $from,
+        BookingStatus $to,
+        ?User $actor,
+        bool $system,
+    ): void {
         if ($from === BookingStatus::Requested
             && in_array($to, [BookingStatus::PendingPayment, BookingStatus::Confirmed], true)
         ) {
@@ -158,7 +166,10 @@ final class TransitionBooking extends Action
                 $booking,
                 $to === BookingStatus::Released ? ReleaseReason::Released : ReleaseReason::Cancelled,
             );
-            // TODO(task 05): penalty, refund request, and client notification (G6).
+
+            if (in_array($to, [BookingStatus::Cancelled, BookingStatus::CancelledPostpaid], true)) {
+                $this->refunds->handle($booking, $actor, $system);
+            }
 
             return;
         }

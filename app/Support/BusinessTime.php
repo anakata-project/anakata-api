@@ -41,6 +41,21 @@ final class BusinessTime
         return $parsed;
     }
 
+    /**
+     * Whole Galápagos calendar days from $fromYmd to $toYmd. Never a UTC instant difference.
+     */
+    public static function calendarDaysBetween(string $fromYmd, string $toYmd): int
+    {
+        $from = CarbonImmutable::createFromFormat('!Y-m-d', $fromYmd);
+        $to = CarbonImmutable::createFromFormat('!Y-m-d', $toYmd);
+
+        if (! $from instanceof CarbonImmutable || ! $to instanceof CarbonImmutable) {
+            throw new InvalidArgumentException('Calendar dates must be Y-m-d.');
+        }
+
+        return (int) round(($to->getTimestamp() - $from->getTimestamp()) / 86400);
+    }
+
     public static function dayStartUtc(string $date): CarbonImmutable
     {
         return self::calendarDay($date)->startOfDay()->utc();

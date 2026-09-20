@@ -43,15 +43,11 @@ final class DecideOverdue extends Action
                 return $this->extend($booking, $data, $actor, $reason);
             }
 
-            $booking = $this->transitions->handle($booking, [
+            return $this->transitions->handle($booking, [
                 'to' => BookingStatus::Cancelled,
                 'reason' => $reason,
                 'what' => 'OPS-007 decision — cancelled per policy · OVERDUE → CANCELLED',
             ], $actor);
-
-            // TODO(task 05): create the refund request this cancellation should queue.
-
-            return $booking;
         });
     }
 

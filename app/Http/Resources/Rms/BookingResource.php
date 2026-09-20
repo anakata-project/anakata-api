@@ -6,11 +6,14 @@ namespace App\Http\Resources\Rms;
 
 use App\Models\Booking;
 use App\Models\Group;
+use App\Models\RefundRequest;
 use App\Models\User;
 use App\Policies\BookingPolicy;
+use App\Services\Config\CurrentConfig;
 use App\Support\Bookings\RequestSummary;
 use App\Support\Bookings\Transitions;
 use App\Support\Iso;
+use App\Support\Payments\CancellationPenalty;
 use App\Support\Payments\Ledger;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -68,7 +71,8 @@ class BookingResource extends JsonResource
      *     commission_approved_at: string|null,
      *     commission_reason: string|null,
      *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string, remaining_business_minutes: int}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null,
-     *     payment_links: list<array{id: int, kind: string, amount: int, stripe_id: string, url: string, status: string, mode: string, created_at: string}>
+     *     payment_links: list<array{id: int, kind: string, amount: int, stripe_id: string, url: string, status: string, mode: string, created_at: string}>,
+     *     refund: array{status: string, penalty_amount: int, refund_due: int, band_label: string, due_by: string}|null
      * }
      */
     public function toArray(Request $request): array
@@ -171,6 +175,32 @@ class BookingResource extends JsonResource
             'payment_links' => $this->relationLoaded('paymentLinks')
                 ? PaymentLinkResource::collection($this->paymentLinks)->resolve()
                 : [],
+            'refund' => $this->relationLoaded('refundRequest') ? $this->refundPayload() : null,
+        ];
+    }
+
+    /**
+     * @return array{status: string, penalty_amount: int, refund_due: int, band_label: string, due_by: string}|null
+     */
+    private function refundPayload(): ?array
+    {
+        $refund = $this->refundRequest;
+
+        if (! $refund instanceof RefundRequest) {
+            return null;
+        }
+
+        $bands = app(CurrentConfig::class)->businessRules()->bands;
+
+        return [
+            'status' => $refund->status->value,
+            'penalty_amount' => $refund->penalty_amount,
+            'refund_due' => $refund->refund_due,
+            'band_label' => CancellationPenalty::label([
+                'min_days' => $refund->band_min_days,
+                'penalty_pct' => $refund->penalty_pct,
+            ], $bands),
+            'due_by' => Iso::utc($refund->due_by),
         ];
     }
 
