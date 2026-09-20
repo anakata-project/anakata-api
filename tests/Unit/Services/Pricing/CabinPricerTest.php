@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Services\Pricing\CabinCategory;
+use App\Enums\CabinCategory;
 use App\Services\Pricing\CabinPricer;
 use App\Services\Pricing\NoRate;
 use App\Services\Pricing\Quote;

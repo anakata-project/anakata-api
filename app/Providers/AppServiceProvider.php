@@ -10,6 +10,7 @@ use App\Events\ConfigPublished;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Models\BusinessRuleVersion;
 use App\Models\EngineSettingsVersion;
+use App\Models\Itinerary;
 use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
@@ -89,6 +90,7 @@ class AppServiceProvider extends ServiceProvider
             'rate_version' => RateVersion::class,
             'business_rule_version' => BusinessRuleVersion::class,
             'engine_settings_version' => EngineSettingsVersion::class,
+            'itinerary' => Itinerary::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(

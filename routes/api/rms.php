@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\EngineSettingsController;
+use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
 use App\Http\Controllers\Rms\RoleController;
 use App\Http\Controllers\Rms\UserController;
+use App\Http\Controllers\Rms\YachtController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => response()->json(['ok' => true]));
@@ -49,3 +51,14 @@ Route::post('business-rules/versions', [BusinessRulesController::class, 'store']
 Route::get('business-rules/versions', [BusinessRulesController::class, 'index']);
 Route::get('business-rules/versions/{version}', [BusinessRulesController::class, 'show'])
     ->whereNumber('version');
+
+Route::get('yachts', [YachtController::class, 'index']);
+
+Route::get('itineraries', [ItineraryController::class, 'index']);
+Route::get('itineraries/defaults', [ItineraryController::class, 'defaults']);
+Route::post('itineraries', [ItineraryController::class, 'store']);
+Route::get('itineraries/{itinerary}', [ItineraryController::class, 'show']);
+Route::patch('itineraries/{itinerary}', [ItineraryController::class, 'update']);
+Route::post('itineraries/{itinerary}/image', [ItineraryController::class, 'image']);
+Route::delete('itineraries/{itinerary}', [ItineraryController::class, 'destroy']);
+Route::get('itineraries/{itinerary}/history', [ItineraryController::class, 'history']);

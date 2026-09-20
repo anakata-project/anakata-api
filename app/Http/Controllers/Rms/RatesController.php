@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Rms;
 
+use App\Enums\CabinCategory;
 use App\Enums\ConfigKind;
 use App\Http\Requests\Rms\PriceCheckRequest;
 use App\Http\Resources\Rms\PriceCheckResource;
 use App\Services\Config\ConfigValidator;
 use App\Services\Config\CurrentConfig;
-use App\Services\Pricing\CabinCategory;
 use App\Services\Pricing\CabinPricer;
 use App\Services\Pricing\NoRate;
 use App\Services\Pricing\Quote;

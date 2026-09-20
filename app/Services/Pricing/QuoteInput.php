@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Pricing;
 
+use App\Enums\CabinCategory;
+
 final readonly class QuoteInput
 {
     public function __construct(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Pricing;
 
+use App\Enums\CabinCategory;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Money;
 use App\Support\Rounding;

@@ -18,9 +18,11 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesSeeder::class);
         $this->call(ConfigSeeder::class);
+        $this->call(InventorySeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DemoUsersSeeder::class);
+            $this->call(DemoInventorySeeder::class);
         }
     }
 }

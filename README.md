@@ -42,6 +42,7 @@ docker compose exec app sh -c "composer install"
 docker compose exec app sh -c "php artisan key:generate"
 docker compose exec app sh -c "php artisan key:generate --env=testing"
 docker compose exec app sh -c "php artisan migrate"
+docker compose exec app sh -c "php artisan storage:link"
 ```
 
 4. Confirm the API is up:

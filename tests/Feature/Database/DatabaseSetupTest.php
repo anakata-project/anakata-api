@@ -24,4 +24,10 @@ test('core tables exist after migration', function (): void {
     expect(Schema::hasTable('rate_versions'))->toBeTrue('rate_versions table missing after migration.');
     expect(Schema::hasTable('engine_settings_versions'))->toBeTrue('engine_settings_versions table missing after migration.');
     expect(Schema::hasTable('business_rule_versions'))->toBeTrue('business_rule_versions table missing after migration.');
+    expect(Schema::hasTable('yachts'))->toBeTrue('yachts table missing after migration.');
+    expect(Schema::hasTable('cabins'))->toBeTrue('cabins table missing after migration.');
+    expect(Schema::hasTable('itineraries'))->toBeTrue('itineraries table missing after migration.');
+    expect(Schema::hasTable('calendar_date_hosts'))->toBeTrue(
+        'calendar_date_hosts missing — tests/database/migrations must be registered for the whole suite.',
+    );
 });

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Pricing;
+namespace App\Enums;
 
 enum CabinCategory: string
 {

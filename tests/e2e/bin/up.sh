@@ -33,6 +33,9 @@ fi
 
 fix_app_writable_dirs
 
+say "php artisan storage:link --force"
+in_app "php artisan storage:link --force"
+
 wait_api_health "${E2E_WAIT_SECS}"
 wait_horizon 60
 
