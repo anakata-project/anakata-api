@@ -607,3 +607,154 @@ settings now refuse or warn using the departure calendar.
 EOF
 )"
 ```
+
+## Task 05 · Regenerate API types, release v0.4.0
+
+### What was built
+`pnpm types:api` against the running API regenerated `app/types/api.d.ts`. New paths: `/rms/yachts`, `/rms/itineraries` (+ `/defaults`, `/{itinerary}`, `/image`, `/history`), `/rms/departures` (+ `/generate-season`, `/{departure}/layout`, `/history`), `/rms/calendar`, `/rms/blocks` (+ `/release`, `/history`). Layer bumped to `0.4.0` (tag not applied here).
+
+Scramble inferred real fields on `YachtResource`, `ItineraryResource`, `DepartureResource`, `InternalBlockResource` and `ItineraryDefaultsResource` despite several `array<string, mixed>` PHPDocs. Nested gaps remain: `YachtResource.cabins` is `unknown[]`, list `meta.kpis` is `string`, calendar `departures` / `cells` are `string`, create/update departure is `{ warnings } & { [key: string]: unknown }`, and the 409 body is not in the spec. Hand-written shapes in `app/types/inventory.ts` sit in front of those.
+
+Calendar dates (`date`, `return_date`, generate-season `from` / `to` / `skipped[].date`, calendar query, block-claim `departure.date`) are typed `string` (`YYYY-MM-DD`). No shared helper converts them to `Date`.
+
+**Generated schema names and aliases** (`app/types/index.ts`):
+
+| Alias | Source |
+|---|---|
+| `Yacht` | `YachtResource` + typed `cabins` (`Cabin`) |
+| `Cabin` | hand-written (`YachtResource.cabins` is `unknown[]`) |
+| `CabinCategory` | hand-written (`SUITE` / `OWNER`) |
+| `Itinerary` / `ItineraryListItem` | `ItineraryResource` (same schema for list and show); `status` / `hero_image_url` / pairs / completeness narrowed |
+| `ItineraryCompleteness` | hand-written (`Completeness`) |
+| `ItineraryStatus` | `components['schemas']['ItineraryStatus']` |
+| `ItineraryDefaults` | hand-written (`Defaults::payload()`; generated schema freezes seed literals and types `day_plan` as `string[]`) |
+| `ItineraryPair` | hand-written (`[string, string]` for `facts` / `day_plan` / `faqs`) |
+| `Departure` / `DepartureLayout` | `DepartureResource` narrowed (`status`, `availability.cabins`, `locks`) |
+| `DepartureListItem` | same, `locks` and `availability.cabins` optional |
+| `DepartureStatus` | `components['schemas']['DepartureStatus']` |
+| `DepartureLocks` | hand-written |
+| `DepartureKpis` | hand-written (`meta.kpis` is `string`) |
+| `DepartureMutationResponse` | `Departure` + `warnings: Array<string>` |
+| `Availability` / `AvailabilityCounts` | hand-written |
+| `CabinState` | hand-written (`FREE` / `HELD` / `SOLD` / `BLOCKED`) |
+| `CabinAvailability` | hand-written |
+| `ClaimSummary` / `ClaimHolder` / `ClaimKind` / `HoldType` | hand-written |
+| `EngineLabel` / `EngineLabelCode` / `EngineLabelTone` | hand-written |
+| `CalendarGrid` / `CalendarDeparture` / `CalendarRow` / `CalendarCell` | hand-written (calendar JSON is flattened) |
+| `InternalBlock` | `InternalBlockResource` + `reason: BlockReason` + `claims: Array<BlockClaim>` |
+| `BlockReason` | `components['schemas']['BlockReason']` |
+| `BlockClaim` | hand-written |
+| `GenerateSeasonResult` | hand-written (inline on the operation; no named schema) |
+| `CabinUnavailableError` / `CabinUnavailableItem` | hand-written (exception `render()`, not in the spec) |
+
+Sprint 1–2 aliases are unchanged.
+
+### Hand-written types (`app/types/inventory.ts`)
+Each has a comment naming the PHP class.
+
+Enums: `CabinCategory`, `CabinState`, `ItineraryStatus` (alias), `DepartureStatus` (alias), `BlockReason` (alias), `ClaimKind`, `HoldType`, `EngineLabelCode`, `EngineLabelTone`.
+
+Yachts / itineraries: `Cabin`, `Yacht`, `ItineraryPair`, `ItineraryCompleteness`, `Itinerary`, `ItineraryListItem`, `ItineraryDefaults`.
+
+Availability: `EngineLabel`, `ClaimHolder`, `ClaimSummary`, `CabinAvailability`, `AvailabilityCounts`, `Availability`, `DepartureLocks`, `DepartureKpis`.
+
+Departures: `Departure`, `DepartureListItem`, `DepartureLayout`, `DepartureMutationResponse`, `GenerateSeasonResult`.
+
+Calendar: `CalendarDeparture`, `CalendarCell`, `CalendarRow`, `CalendarGrid`.
+
+Blocks: `BlockClaim`, `InternalBlock`, `CabinUnavailableItem`, `CabinUnavailableError`.
+
+### Files touched
+- `anakata-ui/app/types/api.d.ts`
+- `anakata-ui/app/types/inventory.ts`
+- `anakata-ui/app/types/index.ts`
+- `anakata-ui/package.json` (`0.4.0`)
+- `anakata-ui/CHANGELOG.md`
+- `anakata-ui/README.md`
+- `anakata-api/docs/sprints/sprint-03/REPORT.md`
+
+### Deviations
+- `DepartureResource`, `InternalBlockResource` and `ItineraryDefaultsResource` are not `{ [key: string]: unknown }`. Aliases overlay the generated schemas; only the untyped or unusable bits are hand-written.
+- Extra aliases the panel uses: `ItineraryDefaults`, `DepartureMutationResponse`, `CabinUnavailableError`, plus supporting types (`ItineraryPair`, `ClaimHolder`, `AvailabilityCounts`, calendar/block rows).
+- Generated `ItineraryResource.hero_image_url` is `null` only; the overlay is `string | null`.
+- `ItineraryDefaults` is hand-written even though a schema exists: the generated type freezes seed-data literals and types `day_plan` as `string[]`.
+
+### Open questions
+None.
+
+### Notes for later
+These `inventory.ts` types exist only because the PHP side returns `array<string, mixed>`, a raw `JsonResponse`, or an exception `render()` with no resource schema. **Sprint 4 task 01** adds PHPDoc `@return array{…}` shapes on those methods so Scramble generates them and these hand-written types can be deleted. `index.ts` then aliases the generated schema names directly.
+
+Do **not** delete types that exist for another reason (`ItineraryPair` — tuple PHPDoc; enum unions that Scramble still emits as `string`; overlays that only narrow a generated resource).
+
+**CalendarController** (raw `JsonResponse`; Scramble emits `departures` / `cells` as `string`):
+
+- `CalendarGrid`
+- `CalendarDeparture`
+- `CalendarRow`
+- `CalendarCell`
+
+**DepartureController::generate** (raw `JsonResponse`; no named schema):
+
+- `GenerateSeasonResult`
+
+**DepartureController::store / update** (`response()->json` spread; `{ warnings } & { [key: string]: unknown }`):
+
+- `DepartureMutationResponse`
+
+**DepartureController::index** (`meta.kpis` is `string`):
+
+- `DepartureKpis`
+
+**ItineraryDefaultsResource** / `Defaults::payload()` (`array<string, mixed>`; generated schema is unusable):
+
+- `ItineraryDefaults`
+
+**CabinUnavailableException** (`render()`, no resource):
+
+- `CabinUnavailableError`
+- `CabinUnavailableItem`
+
+Scramble already inferred fields on `DepartureResource` and `InternalBlockResource`, so `Departure`, `InternalBlock`, `Availability`, `ClaimSummary` and friends are overlays, not mixed-resource stand-ins.
+
+### Quality
+- anakata-ui: `pnpm lint`, `pnpm typecheck`, `pnpm test` (34), `pnpm build` — pass.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout so `extends: ['../anakata-ui']` resolves). Overlayed the working tree onto the ui clone. Confirmed the clone has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: `pnpm typecheck` pass
+  - panel / engine: `pnpm build` pass
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/inventory.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for yachts, itineraries and departures.
+
+The panel can type inventory, calendar, blocks and generate-season
+against the Sprint 3 API. Calendar dates stay YYYY-MM-DD strings.
+EOF
+)"
+git tag v0.4.0
+git push origin HEAD
+git push origin v0.4.0
+```
+
+```bash
+# anakata-api (branch dev) — report only
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 3 task 05: regenerated UI API types.
+EOF
+)"
+```
