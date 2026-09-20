@@ -168,3 +168,132 @@ Calendar dates serialise as Y-m-d and never pass through Iso::utc().
 EOF
 )"
 ```
+
+## Task 02 · Departures and generate season
+
+### What was built
+A departure is one yacht sailing one Sunday. RMS users create them one at a time or generate a season. Availability is not stored (task 03). Date/yacht locks and the claims delete guard are also task 03.
+
+**Table `departures`:** `reference` (`DEP-NNN` from `ReferenceService`), `date` (`CalendarDate`), `yacht_id` / `itinerary_id` (`restrictOnDelete`), `status` (`ON_SALE` / `CLOSED` / `HIDDEN` / `CHARTER`), `urgency_threshold` (default 3), `waitlist_enabled` (default true), `public_note` (max 40), `festive`, unique `(yacht_id, date)`. Morph alias `departure`. `return_date` is `date + 7` days (OPS-001), never stored.
+
+**Endpoints** under `/api/rms/departures`. View / history: `panel.rms`. Writes: `departures.manage`. Lucía reads; Mateo writes.
+
+**Actions:** `CreateDeparture` (draws the reference in its transaction), `UpdateDeparture` (content → `departure.updated`; status → `departure.status_changed` separately), `DeleteDeparture` (no claims guard yet), `GenerateSeason`.
+
+**Unique `(yacht_id, date)`:** FormRequest returns 422 on `date`. Create / Update / GenerateSeason also catch MySQL 1062 on `departures_yacht_id_date_unique`, then read the winning row after rollback and return the same 422 (`YachtDateConflict`). If the winner is gone, the parenthetical reference is omitted.
+
+### ALT table used in the test
+`runSeason` `(w + yi) % 2`, `yacht_ids` = ANAMARA then ANATIVA, festive window off, from `2028-01-02`:
+
+- w0 `2028-01-02` — ANAMARA WEST / ANATIVA NORTH
+- w1 `2028-01-09` — ANAMARA NORTH / ANATIVA WEST
+- w2 `2028-01-16` — ANAMARA WEST / ANATIVA NORTH
+- w3 `2028-01-23` — ANAMARA NORTH / ANATIVA WEST
+- w4 `2028-01-30` — ANAMARA WEST / ANATIVA NORTH
+- w5 `2028-02-06` — ANAMARA NORTH / ANATIVA WEST
+
+Acceptance range `2028-01-02`–`2028-03-26` = 13 Sundays × 2 = 26, opposite routes each week. Festive window on → the two `2028-01-02` rows use `FEST`.
+
+### Warning texts
+Do not block; returned as a top-level `warnings` array on create/update.
+
+- Twin not festive, this one is: `ANATIVA's departure on 19 Dec 2027 is not festive.`
+- Twin is festive, this one is not: `ANATIVA's departure on 19 Dec 2027 is festive.`
+- Festive departure + non-festive itinerary: `This departure is festive but itinerary WEST is not.`
+- Non-festive departure + festive itinerary: `This departure is not festive but itinerary FEST is festive.`
+
+Date copy matches prototype `fmtD` (`j M Y`, e.g. `7 Nov 2027`) via `App\Support\Dates\Format::calendar()`.
+
+Sunday 422: `Anakata sails Sunday → Sunday. {date} is not a Sunday.`
+Duplicate 422: `{YACHT} already has a departure on {date} ({DEP-NNN}).`
+
+### `runSeason` behaviour that was unclear
+- `yi` is the index in the **request’s** `yacht_ids`, not a fixed ANAMARA=0.
+- The festive window is month/day only: 15–31 Dec or 1–2 Jan, any year — not a continuous season spanning a year boundary as a single interval.
+- Festive overrides the pattern **after** ALT/WEST/NORTH is chosen (`if (isF) k = 'FEST'`).
+- Existing `(yacht, date)` pairs are skipped, not errors. A concurrent insert that wins between the skip-check and the write 422s the whole generate and rolls it back.
+- Generated rows use prototype defaults: threshold 3, waitlist on, empty note.
+- First Sunday is on or after `from` (if `from` is already Sunday, it is used). Carbon has no `nextOrSame`; we branch on `dayOfWeek`.
+
+### Demo seed
+`DemoInventorySeeder` (local/testing) now also upserts the 16 seed-data departures by `(yacht_id, date)`, keeping `DEP-001`…`DEP-016`, then `ensureAtLeast(Departure, 16)`. Next create is `DEP-017`. `di` is ignored; the calendar date is `date`.
+
+### Itinerary delete guard
+`DELETE /api/rms/itineraries/{id}` is 409 `Used by 1 departure` / `Used by 3 departures`. Task 01 TODO removed.
+
+### Files touched
+- `app/Enums/DepartureStatus.php`, `SeasonPattern.php`
+- `app/Models/Departure.php`; `Yacht.php` / `Itinerary.php` (relations); `Itinerary::departuresCount()` now real (`withCount` on the itinerary index)
+- `app/Actions/Departures/CreateDeparture.php`, `UpdateDeparture.php`, `DeleteDeparture.php`, `GenerateSeason.php`
+- `app/Actions/Itineraries/DeleteItinerary.php`
+- `app/Support/Dates/Format.php`
+- `app/Support/Departures/YachtDateConflict.php`, `Warnings.php`, `SeedMapper.php`
+- `app/Support/History/History.php` (optional `$extraContext`; generate season sets `action: generate season`)
+- `app/Policies/DeparturePolicy.php`
+- `app/Http/Controllers/Rms/DepartureController.php`, `ItineraryController.php`
+- `app/Http/Requests/Rms/StoreDepartureRequest.php`, `UpdateDepartureRequest.php`, `IndexDeparturesRequest.php`, `GenerateSeasonRequest.php`, `Concerns/ValidatesDepartureDate.php`
+- `app/Http/Resources/Rms/DepartureResource.php` (task 03 seam: no `availability` / `engine_label` / `locks`)
+- `app/Providers/AppServiceProvider.php` (morph alias)
+- `database/migrations/2026_09_20_200016_create_departures_table.php`
+- `database/factories/DepartureFactory.php`
+- `database/seeders/DemoInventorySeeder.php`
+- `routes/api/rms.php`
+- `tests/Feature/Inventory/DepartureEndpointsTest.php`, `GenerateSeasonTest.php`, `DepartureHistoryTest.php`, `DemoInventorySeederTest.php`, `ItineraryDeleteGuardTest.php`
+- `tests/Feature/Database/DatabaseSetupTest.php`
+
+### Deviations
+- Create/update JSON is assembled with `response()->json([…resource, 'warnings' => …])` so `warnings` sits next to the fields. Laravel `additional()` on a `$wrap = null` resource still nested the departure under `data`.
+- Itinerary delete copy is pluralised (`1 departure` / `3 departures`); the task file said `{n} departures` even for n=1 (plan correction).
+
+### Open questions
+None.
+
+### Notes for later
+- Task 03 extends `DepartureResource` with availability, engine_label and locks, and adds the date/yacht lock plus the claims delete guard.
+- ALT alternation restarts at each generated range (`w` counts from that range’s first Sunday), so a season generated in two parts can give a yacht the same route two weeks running at the join. That is the prototype’s behaviour; the departures can be edited afterwards.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 320 tests (2222 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/DepartureStatus.php \
+  app/Enums/SeasonPattern.php \
+  app/Models/Departure.php \
+  app/Models/Yacht.php \
+  app/Models/Itinerary.php \
+  app/Actions/Departures \
+  app/Actions/Itineraries/DeleteItinerary.php \
+  app/Support/Dates \
+  app/Support/Departures \
+  app/Support/History/History.php \
+  app/Policies/DeparturePolicy.php \
+  app/Http/Controllers/Rms/DepartureController.php \
+  app/Http/Controllers/Rms/ItineraryController.php \
+  app/Http/Requests/Rms/StoreDepartureRequest.php \
+  app/Http/Requests/Rms/UpdateDepartureRequest.php \
+  app/Http/Requests/Rms/IndexDeparturesRequest.php \
+  app/Http/Requests/Rms/GenerateSeasonRequest.php \
+  app/Http/Requests/Rms/Concerns/ValidatesDepartureDate.php \
+  app/Http/Resources/Rms/DepartureResource.php \
+  app/Providers/AppServiceProvider.php \
+  database/migrations/2026_09_20_200016_create_departures_table.php \
+  database/factories/DepartureFactory.php \
+  database/seeders/DemoInventorySeeder.php \
+  routes/api/rms.php \
+  tests/Feature/Inventory \
+  tests/Feature/Database/DatabaseSetupTest.php \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add RMS departures and generate-season.
+
+Sunday sailings, one per yacht per date, with festive warnings
+and the prototype ALT pattern. Demo seed keeps DEP-001–016.
+EOF
+)"
+```

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Itineraries;
 
 use App\Actions\Action;
+use App\Exceptions\ConflictException;
 use App\Models\Itinerary;
 use App\Support\History\History;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,13 @@ final class DeleteItinerary extends Action
 {
     public function handle(Itinerary $itinerary): void
     {
-        // TODO(Sprint 3 task 02): refuse (409) while any departure uses this itinerary.
+        $usedBy = $itinerary->departures()->count();
+
+        if ($usedBy > 0) {
+            $noun = $usedBy === 1 ? 'departure' : 'departures';
+
+            throw new ConflictException("Used by {$usedBy} {$noun}");
+        }
 
         $imagePath = $itinerary->hero_image_path;
 

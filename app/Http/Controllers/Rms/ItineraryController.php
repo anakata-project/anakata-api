@@ -28,6 +28,7 @@ final class ItineraryController extends Controller
         $this->authorize('viewAny', Itinerary::class);
 
         $itineraries = Itinerary::query()
+            ->withCount('departures')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();

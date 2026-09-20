@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Rms\BusinessRulesController;
+use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\PermissionController;
@@ -62,3 +63,11 @@ Route::patch('itineraries/{itinerary}', [ItineraryController::class, 'update']);
 Route::post('itineraries/{itinerary}/image', [ItineraryController::class, 'image']);
 Route::delete('itineraries/{itinerary}', [ItineraryController::class, 'destroy']);
 Route::get('itineraries/{itinerary}/history', [ItineraryController::class, 'history']);
+
+Route::get('departures', [DepartureController::class, 'index']);
+Route::post('departures', [DepartureController::class, 'store']);
+Route::post('departures/generate-season', [DepartureController::class, 'generate']);
+Route::get('departures/{departure}', [DepartureController::class, 'show'])->whereNumber('departure');
+Route::patch('departures/{departure}', [DepartureController::class, 'update'])->whereNumber('departure');
+Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])->whereNumber('departure');
+Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');

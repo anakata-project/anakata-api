@@ -37,6 +37,7 @@ final class History
     /**
      * @param  array<string, mixed>|null  $before
      * @param  array<string, mixed>|null  $after
+     * @param  array<string, mixed>  $extraContext
      */
     public static function record(
         Model $subject,
@@ -45,6 +46,7 @@ final class History
         ?array $after = null,
         ?string $reason = null,
         ?User $actor = null,
+        array $extraContext = [],
     ): ChangeHistory {
         self::guardTransaction();
 
@@ -65,6 +67,7 @@ final class History
                 'source' => self::source(),
                 'ip' => request()->ip(),
                 'request_id' => request()->header('X-Request-Id') ?: (string) Str::uuid(),
+                ...$extraContext,
             ],
         ]);
 

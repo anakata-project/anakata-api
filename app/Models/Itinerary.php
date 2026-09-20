@@ -12,6 +12,7 @@ use Database\Factories\ItineraryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 use LogicException;
@@ -48,6 +49,7 @@ use LogicException;
  * @property int|null $updated_by
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property-read int|null $departures_count
  */
 #[Fillable([
     'code',
@@ -120,6 +122,14 @@ class Itinerary extends Model
         return $this->morphMany(ChangeHistory::class, 'subject');
     }
 
+    /**
+     * @return HasMany<Departure, $this>
+     */
+    public function departures(): HasMany
+    {
+        return $this->hasMany(Departure::class);
+    }
+
     public function completeness(): Completeness
     {
         return Completeness::for($this);
@@ -127,6 +137,10 @@ class Itinerary extends Model
 
     public function departuresCount(): int
     {
-        return 0;
+        if (array_key_exists('departures_count', $this->getAttributes())) {
+            return (int) $this->getAttribute('departures_count');
+        }
+
+        return $this->departures()->count();
     }
 }

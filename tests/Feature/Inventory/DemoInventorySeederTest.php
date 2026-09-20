@@ -2,12 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Enums\DepartureStatus;
 use App\Enums\ItineraryStatus;
+use App\Enums\ReferenceType;
+use App\Models\Departure;
 use App\Models\Itinerary;
+use App\Models\Yacht;
+use App\Services\References\ReferenceService;
+use App\Support\Departures\SeedMapper as DepartureSeedMapper;
 use App\Support\Itineraries\Gradients;
 use App\Support\Itineraries\SeedMapper;
 use Database\Seeders\DemoInventorySeeder;
 use Database\Seeders\InventorySeeder;
+use Database\Seeders\RolesSeeder;
+use Illuminate\Support\Facades\DB;
 
 test('the seeded itineraries match seed-data.json via the key map', function (): void {
     $this->seed(InventorySeeder::class);
@@ -59,4 +67,69 @@ test('the seeded itineraries match seed-data.json via the key map', function ():
     }
 
     expect(Itinerary::query()->where('status', ItineraryStatus::Published)->count())->toBe(3);
+});
+
+test('the seeded departures match seed-data.json via the key map and stay at 16', function (): void {
+    $this->seed(InventorySeeder::class);
+    $this->seed(DemoInventorySeeder::class);
+    $this->seed(DemoInventorySeeder::class);
+
+    $path = base_path('docs/requirements/examples/seed-data.json');
+    /** @var array{departures: list<array<string, mixed>>} $seed */
+    $seed = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+
+    expect(Departure::query()->count())->toBe(16);
+    expect(Departure::query()->min('date'))->toBe('2027-11-07');
+    expect(Departure::query()->max('date'))->toBe('2027-12-26');
+
+    foreach ($seed['departures'] as $row) {
+        $mapped = DepartureSeedMapper::fromPrototype($row);
+        $yacht = Yacht::query()->where('code', $mapped['yacht_code'])->firstOrFail();
+        $itinerary = Itinerary::query()->where('code', $mapped['itinerary_code'])->firstOrFail();
+        $departure = Departure::query()
+            ->where('yacht_id', $yacht->id)
+            ->whereDate('date', $mapped['date'])
+            ->firstOrFail();
+
+        expect($mapped['reference'])->toBe($row['id']);
+        expect($mapped['yacht_code'])->toBe($row['yacht']);
+        expect($mapped['itinerary_code'])->toBe($row['itin']);
+        expect($mapped['urgency_threshold'])->toBe($row['thr']);
+        expect($mapped['waitlist_enabled'])->toBe($row['wait']);
+        expect($mapped['date'])->toBe($row['date']);
+        expect($mapped['festive'])->toBe($row['festive']);
+        expect($row)->toHaveKey('di');
+
+        expect($departure->reference)->toBe($mapped['reference']);
+        expect($departure->itinerary_id)->toBe($itinerary->id);
+        expect($departure->status)->toBe($mapped['status']);
+        expect($departure->urgency_threshold)->toBe($mapped['urgency_threshold']);
+        expect($departure->waitlist_enabled)->toBe($mapped['waitlist_enabled']);
+        expect($departure->public_note)->toBe($mapped['public_note']);
+        expect($departure->festive)->toBe($mapped['festive']);
+        expect($departure->date->toDateString())->toBe($mapped['date']);
+    }
+
+    $next = DB::transaction(fn (): string => app(ReferenceService::class)->next(ReferenceType::Departure));
+    expect($next)->toBe('DEP-017');
+});
+
+test('the next departure created after the demo seed is DEP-017', function (): void {
+    $this->seed(RolesSeeder::class);
+    $this->seed(InventorySeeder::class);
+    $this->seed(DemoInventorySeeder::class);
+
+    $west = Itinerary::query()->where('code', 'WEST')->firstOrFail();
+    $yacht = Yacht::query()->where('code', 'ANAMARA')->firstOrFail();
+    $mateo = managerUser();
+
+    $this->actingAs($mateo)
+        ->postJson('/api/rms/departures', [
+            'date' => '2028-04-02',
+            'yacht_id' => $yacht->id,
+            'itinerary_id' => $west->id,
+            'status' => DepartureStatus::OnSale->value,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('reference', 'DEP-017');
 });
