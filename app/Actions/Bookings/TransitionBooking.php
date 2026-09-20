@@ -11,6 +11,7 @@ use App\Enums\ReferenceType;
 use App\Enums\ReleaseReason;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Booking;
+use App\Models\BookingRequest;
 use App\Models\Cabin;
 use App\Models\CabinClaim;
 use App\Models\User;
@@ -112,6 +113,16 @@ final class TransitionBooking extends Action
 
         $what = 'Status '.Transitions::statusLabel($from).' → '.Transitions::statusLabel($to);
 
+        if ($from === BookingStatus::Requested && $to === BookingStatus::PendingPayment) {
+            $booking->loadMissing('bookingRequest');
+            $request = $booking->bookingRequest;
+            $channel = $request instanceof BookingRequest
+                ? $request->preferred_channel->value
+                : 'EMAIL';
+            $what .= ' · deposit link to be sent via '.$channel;
+            // TODO(Sprint 5): send the deposit link
+        }
+
         if ($to === BookingStatus::FullyPaid && $booking->balance() > 0) {
             $what .= ' (marked manually — '.Money::format($booking->balance()).' not in the payments record)';
         }
@@ -146,13 +157,16 @@ final class TransitionBooking extends Action
 
     private function confirmRequest(Booking $booking): void
     {
+        $needed = $this->cabinsFor($booking)->count();
         $activeHold = $booking->claims
             ->first(fn (CabinClaim $claim): bool => $claim->released_at === null && $claim->kind === ClaimKind::Hold);
 
         if ($activeHold instanceof CabinClaim) {
-            $this->claims->convert($booking, $booking, ClaimKind::Booking);
+            $converted = $this->claims->convert($booking, $booking, ClaimKind::Booking);
 
-            return;
+            if ($converted >= $needed) {
+                return;
+            }
         }
 
         try {

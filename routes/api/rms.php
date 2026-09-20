@@ -9,12 +9,15 @@ use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\GroupController;
+use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
+use App\Http\Controllers\Rms\RequestController;
 use App\Http\Controllers\Rms\RoleController;
 use App\Http\Controllers\Rms\UserController;
+use App\Http\Controllers\Rms\WaitlistController;
 use App\Http\Controllers\Rms\YachtController;
 use Illuminate\Support\Facades\Route;
 
@@ -94,6 +97,17 @@ Route::get('bookings/{booking}/history', [BookingController::class, 'history'])-
 
 Route::get('groups', [GroupController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);
+
+Route::get('requests', [RequestController::class, 'index']);
+Route::post('requests/{booking}/confirm', [RequestController::class, 'confirm'])->whereNumber('booking');
+Route::post('requests/{booking}/release', [RequestController::class, 'release'])->whereNumber('booking');
+
+Route::get('holds', [HoldController::class, 'index']);
+
+Route::get('waitlist', [WaitlistController::class, 'index']);
+Route::post('waitlist', [WaitlistController::class, 'store']);
+Route::post('waitlist/{entry}/notify', [WaitlistController::class, 'notify'])->whereNumber('entry');
+Route::post('waitlist/{entry}/remove', [WaitlistController::class, 'remove'])->whereNumber('entry');
 
 Route::get('blocks', [InternalBlockController::class, 'index']);
 Route::post('blocks', [InternalBlockController::class, 'store']);

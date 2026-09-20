@@ -8,6 +8,7 @@ use App\Enums\ClaimKind;
 use App\Enums\HoldType;
 use App\Enums\ReleaseReason;
 use App\Events\AvailabilityChanged;
+use App\Events\HoldExpired;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Cabin;
 use App\Models\CabinClaim;
@@ -16,6 +17,7 @@ use App\Support\BusinessTime;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -27,6 +29,13 @@ use RuntimeException;
 final class ClaimService
 {
     public static int $baseTransactionLevel = 0;
+
+    /**
+     * Test seam only. Always null in production.
+     *
+     * @var (Closure(): void)|null
+     */
+    public static ?Closure $beforeConvert = null;
 
     /**
      * @param  Collection<int, Cabin>  $cabins
@@ -79,12 +88,13 @@ final class ClaimService
         return $released;
     }
 
-    /**
-     * @return Collection<int, CabinClaim>
-     */
-    public function convert(Model $fromHolder, Model $toHolder, ClaimKind $kind): Collection
+    public function convert(Model $fromHolder, Model $toHolder, ClaimKind $kind): int
     {
         $this->guardTransaction();
+
+        if (self::$beforeConvert instanceof Closure) {
+            (self::$beforeConvert)();
+        }
 
         $active = CabinClaim::query()
             ->where('holder_type', $fromHolder->getMorphClass())
@@ -94,7 +104,7 @@ final class ClaimService
             ->get();
 
         if ($active->isEmpty()) {
-            return new Collection;
+            return 0;
         }
 
         DepartureLocks::lockMany(array_map(
@@ -110,7 +120,7 @@ final class ClaimService
             ->get();
 
         if ($active->isEmpty()) {
-            return new Collection;
+            return 0;
         }
 
         $this->releaseByIds($active->pluck('id')->all(), ReleaseReason::Converted);
@@ -138,7 +148,7 @@ final class ClaimService
             array_map(intval(...), $active->pluck('departure_id')->unique()->values()->all()),
         );
 
-        return $created->values();
+        return $created->count();
     }
 
     public function releaseExpired(): int
@@ -230,8 +240,9 @@ final class ClaimService
             $claim = CabinClaim::query()->with('holder')->find($id);
             $holder = $claim?->holder;
 
-            if ($holder instanceof Model) {
+            if ($claim instanceof CabinClaim && $holder instanceof Model) {
                 History::record($holder, 'hold.expired', system: true);
+                HoldExpired::dispatch($holder, $claim);
             }
 
             $released++;

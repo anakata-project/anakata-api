@@ -556,7 +556,7 @@ None.
 - Task 09 panel: `/rms/operations/blocks`, 409 modal, “To change cabins or dates, release this block and create a new one.”
 - Task 10 E2E: `INV-*` including calendar BLOCKED cells and rates-without-2027.
 - First bookable month ignores the day (month only), matching prototype `ymd.slice(0,7)`.
-- Demo inventory is fixed in Nov–Dec 2027 and `ClaimService` refuses past departures, so after **14 Nov 2027** the demo block (and the e2e reset) will fail to seed. Before then, make demo dates relative to “today” or skip past-dated demo claims.
+- Demo inventory is fixed in Nov–Dec 2027 and `ClaimService` refuses past departures, so after **14 Nov 2027** the demo block (and the e2e reset) will fail to seed. Before then, make demo dates relative to “today” or skip past-dated demo claims. Sprint 4 request timestamps are relative to now and request references are pinned to 2026; together with the fixed 2027 departures the request demo stays valid until **Nov 2027**.
 
 ### Quality
 - anakata-api: `composer check` inside Docker — 370 tests (2569 assertions), Pint, Larastan OK.

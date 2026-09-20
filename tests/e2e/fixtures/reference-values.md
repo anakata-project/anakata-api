@@ -103,6 +103,8 @@ FIN-001 source display on the registry: `USD 13,300 · 25,000 · 199,500`.
 
 Demo itineraries, departures and the fam-trip block are seeded only when `APP_ENV` is `local` or `testing` (`DemoInventorySeeder`, F6). Yachts and cabins are seeded in every environment (`InventorySeeder`). Amounts below are from the documents and seeders — **not** from a running app. After leftover local data, run `tests/e2e/bin/reset.sh` before reading the screen.
 
+Request holds use timestamps relative to now (SLA stays live) and references pinned to 2026 (`ANK-R-2026-0041` / `0042`). Combined with the fixed 2027 departures, that demo is valid until **Nov 2027**.
+
 ### Yachts and cabins
 
 Source: `database/seeders/InventorySeeder.php` (F4).

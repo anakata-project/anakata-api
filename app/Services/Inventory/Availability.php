@@ -45,7 +45,7 @@ final class Availability
             ->with(['cabin', 'holder' => function (Relation $morph): void {
                 if ($morph instanceof MorphTo) {
                     $morph->morphWith([
-                        Booking::class => ['owner'],
+                        Booking::class => ['owner', 'bookingRequest'],
                     ]);
                 }
             }])
@@ -235,7 +235,7 @@ final class Availability
         }
 
         if ($holder instanceof Booking) {
-            $holder->loadMissing('owner');
+            $holder->loadMissing(['owner', 'bookingRequest']);
 
             return [
                 'status' => $holder->status->value,

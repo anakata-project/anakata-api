@@ -78,4 +78,21 @@ final class ReservationFixtures
 
         return array_merge($payload, $overrides);
     }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    public static function requestPayload(Departure $departure, array $overrides = []): array
+    {
+        $payload = self::createPayload($departure, $overrides);
+
+        unset($payload['group']);
+
+        return array_merge([
+            'preferred_channel' => 'EMAIL',
+            'travel_advisor' => false,
+            'notes' => null,
+        ], $payload);
+    }
 }

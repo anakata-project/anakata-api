@@ -606,7 +606,7 @@ With `FIN-006` (`modification_fee_usd`) **> 0**, each move re-quotes `price_line
 - **Sprint 5 / payments:** a move that raises the price of a `FULLY_PAID` booking leaves an amount owed; payments must handle it. `Booking::balance()` is still `total` until then.
 - **Sprint 5 / G6:** penalty, refund request, and client notification after cancel/release — the TODO is in `TransitionBooking::applyClaims` immediately after `release`.
 - **Sprint 5 / G7:** `OVERDUE`, `ON_HOLD_AGENCY`, `WAITLISTED` stay on the enum with empty targets.
-- **Task 05:** once `holdExpiry` is wired, moving an expired request may take a fresh hold. Until then, a `REQUESTED` with no active claim is 422. Do not call `Booking::holdExpired()` yet (still `false`).
+- **Task 05 (done):** `holdExpired()` reads `booking_requests.hold_expired_at`. Moving an expired request still 422s (“confirm or release it first”).
 - Task 06: regenerate types; `MovePreviewResource`, `BookingAuditResource`, and `allowed_transitions` (`to` + `reason_required`) — overlay the item shape if Scramble still emits `[]`.
 
 ### Quality
@@ -655,6 +655,115 @@ Add booking status transitions, date/cabin moves, delete and audit.
 
 Mutations lock departure then booking and reject a stale departure
 with 409; moves re-quote at current rates after the locks.
+EOF
+)"
+```
+
+## Task 05 · Requests and their holds, the waitlist
+
+### What was built
+A request is a booking in `REQUESTED` with a `booking_requests` row (preferred channel, advisor flag, notes, SLA, hold rule). `CreateBookingRequest` (no RMS create endpoint) re-quotes, draws `ANK-R-YYYY-NNNN`, claims a `HOLD` (`HoldType::Request`) with `BusinessHours::holdExpiry`, and writes `booking.requested`.
+
+An expired HOLD frees the cabin and never cancels the request (G9). `ClaimService::releaseExpiredByIds` dispatches `HoldExpired` **in the same transaction**. `MarkRequestHoldExpired` sets `hold_expired_at` and writes `request.hold_expired` as System. Status stays `REQUESTED`. `TODO(Sprint 7): notify the owner`.
+
+**A4 exception:** this event is synchronous and in-transaction (not queued, not `ShouldDispatchAfterCommit`) so the request row cannot disagree with the claim. Documented in `laravel.mdc` next to History.
+
+**Expiry vs confirm race:** `releaseExpired` takes no departure lock. `convert()` now returns the number of claims converted. If that is fewer than the booking must hold (1 cabin, or 9 for a charter), `TransitionBooking` falls through to `claim(..., BOOKING)` — 409 if the cabin was taken. Never a claimless `PENDING_PAYMENT`. Test seam: `ClaimService::$beforeConvert` (always null in production; reset in Pest `afterEach`).
+
+Confirm / release are `POST /api/rms/requests/{booking}/confirm|release` through `TransitionBooking`, with `requests.confirm` / `requests.release` and own-records. Confirm history: `Status REQUESTED → PENDING PAYMENT · deposit link to be sent via WHATSAPP` + `TODO(Sprint 5): send the deposit link`.
+
+Waitlist is its own table (G7). Position is **computed on read** (FIFO by `created_at` then `id` among active rows of that departure + category). No stored column. Add lock order is **departure → contact** (`DepartureLocks::lock`, then `waitlist_enabled`, then `ResolveContact`, then insert) so it cannot 1213 against `CreateReservation`. Notify is “Mark notified” — no email (deviation from the prototype’s “Notify now”).
+
+### Demo
+`DemoRequestsSeeder` (local/testing): skip if that `request_reference` exists; otherwise `ensureAtLeast(Request, 40, 2026)` then 0041 then 0042. References **pinned to 2026** via `$referenceAt`. Each request’s `Carbon::setTestNow` is `try/finally` and restored after that request. 0041 submitted 5 h ago (SLA ~19 h left); 0042 submitted 50 h ago (breached ~26 h). Hold expiries from `BusinessHours`. Waitlist: Anna Whitfield (Suite) and K. Osei (Owner) on festive ANAMARA 19 Dec 2027.
+
+Valid until **Nov 2027** (near-term cutoff + `ClaimService` refusing past departures). Noted on the seeder, Sprint 3 report, and `tests/e2e/fixtures/reference-values.md`.
+
+### Deviations
+- Confirm wording says “to be sent” (payments are Sprint 5), not the prototype’s “sent”.
+- Waitlist button is “Mark notified”; no email.
+- Request references are pinned to 2026 rather than rolling on 1 Jan 2027.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 06: regenerate types for `BookingRequestResource`, `HoldResource`, `WaitlistEntryResource`, `meta.rules`.
+- Task 09: hold remaining formatter (`remaining_business_minutes` / `business_day_minutes`); SLA from signed minutes; expire via `inventory:expire-hold ANK-R-2026-0041`.
+- Task 11: `BKG-*` request / hold / waitlist scenarios.
+- Engine sprint: public create-request endpoint calling `CreateBookingRequest`.
+
+### Quality
+anakata-api: `composer check` inside Docker — 497 tests (3311 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/HoldRule.php \
+  app/Models/BookingRequest.php \
+  app/Models/WaitlistEntry.php \
+  app/Models/Booking.php \
+  app/Providers/AppServiceProvider.php \
+  app/Events/HoldExpired.php \
+  app/Listeners/MarkRequestHoldExpired.php \
+  app/Services/Inventory/ClaimService.php \
+  app/Services/Inventory/Availability.php \
+  app/Support/BusinessHours.php \
+  app/Support/Bookings/RequestParty.php \
+  app/Support/Bookings/RequestQueueRules.php \
+  app/Support/Bookings/HoldRuleText.php \
+  app/Actions/Bookings/CreateBookingRequest.php \
+  app/Actions/Bookings/TransitionBooking.php \
+  app/Actions/Waitlist/AddWaitlistEntry.php \
+  app/Actions/Waitlist/NotifyWaitlistEntry.php \
+  app/Actions/Waitlist/RemoveWaitlistEntry.php \
+  app/Http/Controllers/Rms/RequestController.php \
+  app/Http/Controllers/Rms/HoldController.php \
+  app/Http/Controllers/Rms/WaitlistController.php \
+  app/Http/Requests/Rms/IndexRequestsRequest.php \
+  app/Http/Requests/Rms/ReleaseRequestRequest.php \
+  app/Http/Requests/Rms/IndexWaitlistRequest.php \
+  app/Http/Requests/Rms/StoreWaitlistEntryRequest.php \
+  app/Http/Requests/Rms/NotifyWaitlistEntryRequest.php \
+  app/Http/Requests/Rms/RemoveWaitlistEntryRequest.php \
+  app/Http/Resources/Rms/BookingRequestResource.php \
+  app/Http/Resources/Rms/HoldResource.php \
+  app/Http/Resources/Rms/WaitlistEntryResource.php \
+  app/Policies/BookingPolicy.php \
+  app/Policies/WaitlistEntryPolicy.php \
+  app/Console/Commands/ExpireHoldCommand.php \
+  database/migrations/2026_09_20_200023_create_booking_requests_table.php \
+  database/migrations/2026_09_20_200024_create_waitlist_entries_table.php \
+  database/factories/BookingRequestFactory.php \
+  database/factories/WaitlistEntryFactory.php \
+  database/seeders/DemoRequestsSeeder.php \
+  database/seeders/DatabaseSeeder.php \
+  routes/api/rms.php \
+  .cursor/rules/laravel.mdc \
+  tests/Pest.php \
+  tests/Unit/Support/BusinessHoursTest.php \
+  tests/Feature/Bookings/CreateBookingRequestTest.php \
+  tests/Feature/Bookings/RequestHoldExpiryTest.php \
+  tests/Feature/Bookings/RequestQueueTest.php \
+  tests/Feature/Bookings/WaitlistTest.php \
+  tests/Feature/Bookings/ExpireHoldCommandTest.php \
+  tests/Feature/Bookings/DemoRequestsSeederTest.php \
+  tests/Feature/Bookings/RequestCalendarQueryCountTest.php \
+  tests/Feature/Inventory/CabinClaimsTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Support/Bookings/ReservationFixtures.php \
+  tests/e2e/fixtures/reference-values.md \
+  docs/sprints/sprint-03/REPORT.md \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add booking requests, expiring holds, and the waitlist.
+
+Expired holds free the cabin without cancelling the request;
+confirm falls through to a fresh claim if convert races expiry.
 EOF
 )"
 ```

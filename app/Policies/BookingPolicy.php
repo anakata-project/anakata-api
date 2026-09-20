@@ -64,6 +64,28 @@ final class BookingPolicy extends Policy
         return $actor->hasPermission(Permission::BookingsDelete);
     }
 
+    public function confirm(User $actor, Booking $booking): Response
+    {
+        if (! $actor->hasPermission(Permission::RequestsConfirm)) {
+            return Response::deny();
+        }
+
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
+    public function release(User $actor, Booking $booking): Response
+    {
+        if (! $actor->hasPermission(Permission::RequestsRelease)) {
+            return Response::deny();
+        }
+
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
     public function update(User $actor, Booking $booking): Response
     {
         $notes = request()->exists('internal_notes');

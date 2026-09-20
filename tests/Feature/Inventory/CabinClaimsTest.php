@@ -221,7 +221,7 @@ test('convert moves claims between holders atomically', function (): void {
 
     $converted = inClaimTransaction(fn () => app(ClaimService::class)->convert($from, $to, ClaimKind::Booking));
 
-    expect($converted)->toHaveCount(2);
+    expect($converted)->toBe(2);
     expect(CabinClaim::query()->where('holder_id', $from->id)->whereNull('released_at')->count())->toBe(0);
     expect(CabinClaim::query()->where('holder_id', $from->id)->value('release_reason'))->toBe(ReleaseReason::Converted);
     expect(CabinClaim::query()->where('holder_id', $to->id)->whereNull('released_at')->pluck('kind')->unique()->all())

@@ -8,6 +8,7 @@ use App\Enums\SystemRole;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Config\ConfigRegistry;
+use App\Services\Inventory\ClaimService;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
@@ -25,6 +26,10 @@ use Tests\TruncatingTestCase;
 
 pest()->extend(TestCase::class)->in('Feature');
 pest()->extend(TruncatingTestCase::class)->in('Concurrency');
+
+afterEach(function (): void {
+    ClaimService::$beforeConvert = null;
+});
 
 function assertNoSensitiveFields(TestResponse $response): void
 {

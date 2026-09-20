@@ -1,0 +1,127 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Actions\Bookings\CreateBookingRequest;
+use App\Enums\BookingStatus;
+use App\Enums\ClaimKind;
+use App\Models\ChangeHistory;
+use Database\Seeders\ConfigSeeder;
+use Database\Seeders\InventorySeeder;
+use Database\Seeders\RolesSeeder;
+use Tests\Support\Bookings\ReservationFixtures;
+
+beforeEach(function (): void {
+    $this->seed(RolesSeeder::class);
+    $this->seed(InventorySeeder::class);
+    $this->seed(ConfigSeeder::class);
+});
+
+test('the queue lists requests with meta.rules and SLA order', function (): void {
+    $departure = ReservationFixtures::anamaraDeparture();
+    $actor = managerUser();
+
+    $first = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload($departure, [
+            'cabins' => [['cabin_code' => 'S1', 'adults' => 2, 'children' => 0]],
+        ]),
+        $actor,
+    );
+    $this->travel(2)->hours();
+    $second = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload($departure, [
+            'cabins' => [['cabin_code' => 'S2', 'adults' => 2, 'children' => 1]],
+            'preferred_channel' => 'WHATSAPP',
+            'travel_advisor' => true,
+        ]),
+        $actor,
+    );
+
+    $this->actingAs($actor)
+        ->getJson('/api/rms/requests')
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $first->id)
+        ->assertJsonPath('data.1.id', $second->id)
+        ->assertJsonPath('data.1.party', '2 adults + 1 child · 1 cabin')
+        ->assertJsonPath('data.1.travel_advisor', true)
+        ->assertJsonPath('data.1.contact.preferred_channel', 'WHATSAPP')
+        ->assertJsonPath('data.0.hold.expired', false)
+        ->assertJsonPath('data.0.sla.breached', false)
+        ->assertJsonPath('meta.rules.near_term_business_hours', 48)
+        ->assertJsonPath('meta.rules.long_lead_business_days', 5)
+        ->assertJsonPath('meta.rules.near_term_max_days', 120)
+        ->assertJsonPath('meta.rules.response_hours', 24)
+        ->assertJsonPath('meta.rules.business_day_minutes', 540)
+        ->assertJsonPath('meta.rules.cabin_deposit_pct', 10);
+});
+
+test('confirm converts the hold and release requires a reason', function (): void {
+    $booking = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture(), [
+            'preferred_channel' => 'WHATSAPP',
+        ]),
+        managerUser(),
+    );
+
+    $this->actingAs($booking->owner)
+        ->postJson('/api/rms/requests/'.$booking->id.'/confirm')
+        ->assertOk()
+        ->assertJsonPath('status', BookingStatus::PendingPayment->value);
+
+    expect($booking->fresh()->claims()->whereNull('released_at')->where('kind', ClaimKind::Booking)->count())->toBe(1);
+    expect(ChangeHistory::query()->where('event', 'booking.status_changed')->latest('id')->value('after')['what'] ?? '')
+        ->toBe('Status REQUESTED → PENDING PAYMENT · deposit link to be sent via WHATSAPP');
+
+    $other = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture(), [
+            'cabins' => [['cabin_code' => 'S2', 'adults' => 2, 'children' => 0]],
+        ]),
+        managerUser(),
+    );
+
+    $this->actingAs($other->owner)
+        ->postJson('/api/rms/requests/'.$other->id.'/release', [])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['reason']);
+
+    $this->actingAs($other->owner)
+        ->postJson('/api/rms/requests/'.$other->id.'/release', ['reason' => 'Client withdrew'])
+        ->assertOk()
+        ->assertJsonPath('status', BookingStatus::Released->value);
+
+    expect(ChangeHistory::query()->where('event', 'booking.released')->where('subject_id', $other->id)->count())->toBe(1);
+    expect(ChangeHistory::query()->where('event', 'booking.released')->value('after')['client'] ?? '')->toBe($other->contact->name);
+});
+
+test('own-records blocks lucia from acting on mateo\'s request', function (): void {
+    $mateo = managerUser(['name' => 'Mateo R.']);
+    $lucia = salesExecUser(['name' => 'Lucia B.']);
+    $booking = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture()),
+        $mateo,
+    );
+
+    $this->actingAs($lucia)
+        ->postJson('/api/rms/requests/'.$booking->id.'/confirm')
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Blocked: own-records rule.');
+
+    $this->actingAs($lucia)
+        ->postJson('/api/rms/requests/'.$booking->id.'/release', ['reason' => 'No'])
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Blocked: own-records rule.');
+});
+
+test('the holds list shows TEC-004 rule text from the document', function (): void {
+    $booking = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture()),
+        managerUser(),
+    );
+
+    $this->actingAs($booking->owner)
+        ->getJson('/api/rms/holds')
+        ->assertOk()
+        ->assertJsonPath('data.0.type', 'REQUEST')
+        ->assertJsonPath('data.0.reference', $booking->request_reference)
+        ->assertJsonPath('data.0.rule', 'TEC-004 · 5 business days (long-lead)');
+});

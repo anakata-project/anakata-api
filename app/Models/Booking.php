@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
@@ -58,6 +59,7 @@ use Illuminate\Support\Collection;
  * @property-read User $owner
  * @property-read RateVersion $ratesVersion
  * @property-read Collection<int, CabinClaim> $claims
+ * @property-read BookingRequest|null $bookingRequest
  */
 #[Fillable([
     'reference',
@@ -155,6 +157,14 @@ class Booking extends Model
     }
 
     /**
+     * @return HasOne<BookingRequest, $this>
+     */
+    public function bookingRequest(): HasOne
+    {
+        return $this->hasOne(BookingRequest::class);
+    }
+
+    /**
      * @return MorphMany<CabinClaim, $this>
      */
     public function claims(): MorphMany
@@ -217,7 +227,18 @@ class Booking extends Model
 
     public function holdExpired(): bool
     {
-        return false;
+        if ($this->status !== BookingStatus::Requested) {
+            return false;
+        }
+
+        $this->loadMissing('bookingRequest');
+
+        return $this->bookingRequest?->hold_expired_at !== null;
+    }
+
+    public function occupiesInventory(): bool
+    {
+        return $this->status->holdsInventory() && ! $this->holdExpired();
     }
 
     public function cabinLabel(): string

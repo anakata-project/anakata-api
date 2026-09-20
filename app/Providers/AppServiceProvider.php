@@ -7,8 +7,11 @@ namespace App\Providers;
 use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Events\ConfigPublished;
+use App\Events\HoldExpired;
 use App\Listeners\ClearCurrentConfigCache;
+use App\Listeners\MarkRequestHoldExpired;
 use App\Models\Booking;
+use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
 use App\Models\Contact;
 use App\Models\Departure;
@@ -19,6 +22,7 @@ use App\Models\Itinerary;
 use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\WaitlistEntry;
 use App\Services\Config\ConfigRegistry;
 use App\Services\Config\CurrentConfig;
 use App\Support\Config\Documents\BusinessRulesDocument;
@@ -101,6 +105,8 @@ class AppServiceProvider extends ServiceProvider
             'contact' => Contact::class,
             'group' => Group::class,
             'booking' => Booking::class,
+            'booking_request' => BookingRequest::class,
+            'waitlist_entry' => WaitlistEntry::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(
@@ -131,6 +137,7 @@ class AppServiceProvider extends ServiceProvider
         Date::serializeUsing(fn (DateTimeInterface $date): string => Iso::utc($date));
 
         Event::listen(ConfigPublished::class, ClearCurrentConfigCache::class);
+        Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
 
         if ($this->app->runningUnitTests()) {
             $this->loadMigrationsFrom(base_path('tests/database/migrations'));

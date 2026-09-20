@@ -82,6 +82,7 @@ app/
 - A reason is required where a document says so (cancellations, manual FULLY_PAID, OPS-007 decisions, deletion, release). Validate it in the FormRequest; do not invent it in the Action.
 - Sensitive values (and `password` / `remember_token`) are redacted automatically by `History`. The key stays; the value becomes `[redacted]`.
 - History is never written from controllers. Controllers call Actions; Actions call `History`.
+- **Exception to A4 (request holds):** when `ClaimService` releases an expired HOLD, it dispatches `HoldExpired` **synchronously in the same transaction** (not queued, not `ShouldDispatchAfterCommit`). A listener marks `booking_requests.hold_expired_at` and writes `request.hold_expired` as System. The request stay in REQUESTED — the cabin is freed, the request is never auto-cancelled (G9). The hold state on the request row must never disagree with the claim.
 
 ## References
 - The business reference column is `reference`, a unique string (`ANK-2026-0005`, `DEP-012`, `BLK-001`…).
@@ -97,7 +98,7 @@ app/
 - Published JSON must pass the document's `rules()`. `fromArray()` is lenient (a missing key becomes 0 / false / ""). Deploys run `php artisan anakata:config-verify`; a missing or invalid field fails naming the kind, version and path.
 
 ## Events
-- Laravel events + queued listeners are only for side effects (emails, Stripe, engine availability push, CRM tasks raised by booking changes). Dispatch after commit (`ShouldDispatchAfterCommit`).
+- Laravel events + queued listeners are only for side effects (emails, Stripe, engine availability push, CRM tasks raised by booking changes). Dispatch after commit (`ShouldDispatchAfterCommit`). Exception: `HoldExpired` is in-transaction (see History).
 - No outbox, no `EventEnvelope`, no internal sync bus. CRM data derived from bookings is computed from the booking tables directly.
 
 ## API documentation

@@ -144,6 +144,34 @@ final class BusinessHours
         );
     }
 
+    public function remainingBusinessMinutes(CarbonInterface $from, CarbonInterface $until): int
+    {
+        $start = $this->inZone($from);
+        $end = $this->inZone($until);
+
+        if ($end->lte($start)) {
+            return 0;
+        }
+
+        $cursor = $start;
+        $origin = $cursor->startOfDay();
+        $total = 0;
+
+        while ($cursor->lt($end)) {
+            [$open, $close] = $this->nextWindow($cursor, $origin);
+
+            if ($open->gte($end)) {
+                break;
+            }
+
+            $windowEnd = $close->lt($end) ? $close : $end;
+            $total += (int) $open->diffInMinutes($windowEnd);
+            $cursor = $close;
+        }
+
+        return $total;
+    }
+
     /**
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      */

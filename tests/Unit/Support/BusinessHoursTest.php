@@ -155,6 +155,20 @@ test('the constructor rejects empty days, invalid times and a start that is not 
     expect(fn () => businessHoursCalculator(['start' => '09:00', 'end' => '09:00']))->toThrow(InvalidArgumentException::class);
 });
 
+test('remaining business minutes from Tuesday 10:00 to next Tuesday 13:00 is 48 hours', function (): void {
+    $from = galtDateTime('2026-09-22 10:00:00');
+    $until = galtDateTime('2026-09-29 13:00:00');
+
+    expect(businessHoursCalculator()->remainingBusinessMinutes($from, $until))->toBe(48 * 60);
+});
+
+test('remaining business minutes is zero when the instant is past', function (): void {
+    $from = galtDateTime('2026-09-29 13:00:00');
+    $until = galtDateTime('2026-09-22 10:00:00');
+
+    expect(businessHoursCalculator()->remainingBusinessMinutes($from, $until))->toBe(0);
+});
+
 test('day-walking methods stop after 366 days', function (): void {
     $blocked = [];
     $day = CarbonImmutable::parse('2026-09-21', 'Pacific/Galapagos');
