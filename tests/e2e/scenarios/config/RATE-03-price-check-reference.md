@@ -9,7 +9,7 @@ The eight doc-02 totals are the pricing contract. If Published is wrong, every q
 
 ## Steps
 1. Sign in as `carolina@anakata.test` / `password`. Open `http://localhost:3001/rms/commercial/rates`.
-2. In **Price check — published vs your draft**, set **Sailing year** to `2027`.
+2. Scroll past Base rates, Terms and Rules (the price-check block is below the fold) to the panel titled **Price check — published vs your draft**. Set **Sailing year** to `2027`.
 3. Read the **Published** column for every scenario. Compare to `fixtures/reference-values.md` — not to what you expect from memory.
 
 ## Expected

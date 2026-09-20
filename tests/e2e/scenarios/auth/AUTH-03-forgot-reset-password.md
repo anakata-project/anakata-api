@@ -27,3 +27,4 @@ Forgot-password must not enumerate emails, and the new password (D1a: 8+ charact
 
 ## Notes
 Minimum 8 characters is D1a (`Password::min(8)`). Sprint 1 REPORT still says 12 — the screen and API are 8.
+The confirmation notice stays above the form after the first send. Do **not** reload between steps 2 and 3 — enter the second address on the same page.

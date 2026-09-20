@@ -12,5 +12,5 @@
 2. Sign out. Sign in as Lucía. Same URL.
 
 ## Expected
-- [ ] E1 · Mateo: no **Business Rules** nav item. Direct URL → `/rms/reservations/calendar` + toast `You don't have permission to do that.`
+- [ ] E1 · Mateo: no **Business Rules** nav item. Direct URL → `/rms/reservations/calendar` + toast `You don't have permission to do that.` Capture the toast immediately after the bounce — it auto-dismisses. If it is already gone, the URL bounce alone is enough (same path as AUTH-08).
 - [ ] E2 · Lucía: same.

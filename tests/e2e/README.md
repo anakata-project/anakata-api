@@ -44,6 +44,7 @@ Helpers:
 ```bash
 tests/e2e/bin/mail-latest.sh carolina@anakata.test
 tests/e2e/bin/db-check.sh 'App\Models\ChangeHistory::latest("id")->first()'
+tests/e2e/bin/db-check.sh 'App\Models\User::query()->where("email","lucia@anakata.test")->first()->hasPermission(\App\Enums\Permission::BookingsDelete)'
 tests/e2e/bin/status.sh
 ```
 

@@ -9,10 +9,10 @@
 E2: no stored drafts. The second publish must 409 and not overwrite.
 
 ## Steps
-1. Context A: sign in as Carolina. Open `/rms/commercial/rates`. Change Suite **2028** to `14100`. Do **not** publish yet.
-2. Context B: sign in as Carolina (separate private context). Open `/rms/commercial/rates`. Change festive supplement / guest (`Festive supplement`) from `750` to `800`. Approval `E2E-RATE-06-B`. `Save & publish`.
-3. Context A: approval `E2E-RATE-06-A`. `Save & publish`.
-4. Context A: click `Load the latest version` (confirm `Discard your unsaved edits and load the latest published version?` if asked).
+1. Context A: sign in as Carolina. Open `/rms/commercial/rates`. Publish controls are the bar at the **top** of the page (state line + `Approval ref / reason (required)` + Discard + `Save & publish`). Change Suite **2028** to `14100`. Do **not** publish yet.
+2. Context B: sign in as Carolina (separate private context). Open `/rms/commercial/rates`. Change festive supplement / guest (`Festive supplement`) from `750` to `800`. In the top bar, approval `E2E-RATE-06-B`. `Save & publish`. Confirm `Publish these changes?`
+3. Context A: in the top bar, approval `E2E-RATE-06-A`. `Save & publish`.
+4. Context A: the conflict text and the button `Load the latest version` appear in the warnbox **under** that top bar — not a toast. Click `Load the latest version` (confirm `Discard your unsaved edits and load the latest published version?` if asked).
 
 ## Expected
 - [ ] E1 · Context B publish succeeds (`Version 2 published`).

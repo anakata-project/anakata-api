@@ -13,8 +13,8 @@ All under `tests/e2e/bin/`, bash, `set -euo pipefail`, `COMPOSE_PROJECT_NAME` de
 | Script | Role |
 |---|---|
 | `install.sh` | Idempotent siblings + pnpm + `compose pull --policy missing` |
-| `up.sh` | Memory check, networks, copy `.env` if missing, staged compose, composer, `key:generate` if empty, Horizon wait, `reset.sh`, frontend preview |
-| `reset.sh` | `migrate:fresh --seed`, four demo users, Redis flush, Mailpit empty, `anakata:config-verify`. Refuses unless project is `anakata-e2e` or `E2E_ALLOW_RESET=1` |
+| `up.sh` | Memory check, networks, copy `.env` if missing, staged compose, composer, `key:generate` if empty, `fix_app_writable_dirs`, Horizon wait, `reset.sh`, frontend preview |
+| `reset.sh` | `migrate:fresh --seed`, four demo users, Redis flush, Mailpit empty, `anakata:config-verify`, `fix_app_writable_dirs`. Refuses unless project is `anakata-e2e` or `E2E_ALLOW_RESET=1` |
 | `status.sh` | One line per service; `ALL UP` only if everything answers |
 | `down.sh` | Stop preview PIDs + compose down. `--wipe` uses the same destructive guard |
 | `mail-latest.sh` | Newest Mailpit message to an address: subject + `http(s)` links (30 s) |
@@ -22,7 +22,7 @@ All under `tests/e2e/bin/`, bash, `set -euo pipefail`, `COMPOSE_PROJECT_NAME` de
 
 **Isolation.** Compose project `anakata-e2e` → volume `anakata-e2e_mysql-data`. Working checkout stays `anakata-api_mysql-data`. `container_name` values still collide, so the working stack must be down while e2e is up.
 
-**Startup order.** `up -d --wait mysql redis mailpit` → `up -d app` → `composer install` → `key:generate` if `APP_KEY` empty → wait for `/api/health` and `horizon:status` → `reset.sh`. Do not `--wait` the app first (health is 500 until vendor + key).
+**Startup order.** `up -d --wait mysql redis mailpit` → `up -d app` → `composer install` → `key:generate` if `APP_KEY` empty → `fix_app_writable_dirs` (`chown application:application` on `storage` and `bootstrap/cache`) → wait for `/api/health` and `horizon:status` → `reset.sh`. Do not `--wait` the app first (health is 500 until vendor + key).
 
 **Memory.** `E2E_MIN_MEM_GB` (default 6): warn and continue. Fail only below 3 GiB.
 
@@ -155,6 +155,70 @@ cd /home/mohammad/Code/iconic/anakata/anakata-engine
 git add .cursor/rules/anakata-core.mdc
 git commit -m "$(cat <<'EOF'
 Point sprint work at the shared e2e scenario catalogue.
+EOF
+)"
+```
+
+## Follow-up · 2026-09-19 cloud run findings
+
+Source: [`tests/e2e/runs/2026-09-19-1823-cloud-browser.md`](../../tests/e2e/runs/2026-09-19-1823-cloud-browser.md). 16 passed · 6 failed (harness / incomplete, not product verdicts) · 16 not run.
+
+### What was built
+
+- `fix_app_writable_dirs` in [`tests/e2e/bin/_lib.sh`](../../tests/e2e/bin/_lib.sh). `up.sh` calls it after composer / `key:generate` and before `/api/health` + Horizon; `reset.sh` calls it at the end. Bind-mounted `storage/` and `bootstrap/cache` were `root:root`, so Horizon could not compile mail views and compose `GET /` was 500 while `/api/health` stayed ok.
+- Forgot-password form stays visible under the confirmation notice so AUTH-03 can send the unknown and known emails on one page ([`anakata-panel/app/pages/forgot-password.vue`](../../../../anakata-panel/app/pages/forgot-password.vue)).
+- Scenarios ROLE-01, RATE-03, RATE-05, RATE-06, ENG-02, BR-02, BR-06 and AUTH-03 notes tightened (locators, scroll, History `···` menu, publish bar at top, `disabled` attribute, toast dismiss). ROLE-01 Cross-check and README helpers now include the Lucía `hasPermission(BookingsDelete)` `db-check`.
+
+The six FAILs were not product bugs. The screens already matched the expected copy; the agent could not finish locators, scroll, or `/api/auth/me` opened as a panel URL (HTML).
+
+### Files touched
+
+- `anakata-api`: `tests/e2e/bin/_lib.sh`, `up.sh`, `reset.sh`, `tests/e2e/README.md`, the scenarios above, `docs/sprints/e2e/REPORT.md`
+- `anakata-panel`: `app/pages/forgot-password.vue`
+
+### Deviations
+
+None from the follow-up plan.
+
+### Open questions
+
+None.
+
+### Notes for later
+
+None.
+
+### Git commands for the user to run
+
+```bash
+# anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add tests/e2e/bin/_lib.sh tests/e2e/bin/up.sh tests/e2e/bin/reset.sh \
+  tests/e2e/README.md \
+  tests/e2e/scenarios/auth/AUTH-03-forgot-reset-password.md \
+  tests/e2e/scenarios/users-roles/ROLE-01-grant-use-revert.md \
+  tests/e2e/scenarios/config/RATE-03-price-check-reference.md \
+  tests/e2e/scenarios/config/RATE-05-publish-and-history.md \
+  tests/e2e/scenarios/config/RATE-06-two-editors.md \
+  tests/e2e/scenarios/config/ENG-02-manager-rules-locked.md \
+  tests/e2e/scenarios/config/BR-02-differ-reset-publish.md \
+  tests/e2e/scenarios/config/BR-06-who-can-see-business-rules.md \
+  docs/sprints/e2e/REPORT.md
+git status
+git commit -m "$(cat <<'EOF'
+Fix e2e storage perms and tighten cloud-run scenarios.
+
+up.sh chowns storage so Horizon can send mail; AUTH-03 can submit twice.
+EOF
+)"
+
+# anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/pages/forgot-password.vue
+git commit -m "$(cat <<'EOF'
+Keep the forgot-password form after the confirmation notice.
+
+AUTH-03 sends unknown then known emails on one page.
 EOF
 )"
 ```

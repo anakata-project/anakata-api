@@ -8,11 +8,11 @@
 A publish must write one history row per changed price, keep the approval reference, and append `rates.published` to change_history.
 
 ## Steps
-1. As Carolina, open `/rms/commercial/rates`.
+1. As Carolina, open `/rms/commercial/rates`. Publish controls are the bar at the **top** of the page (state line + `Approval ref / reason (required)` + Discard + `Save & publish`). `Save & publish` stays disabled until the draft is dirty.
 2. Change **Suite — per person, double occ.** for year **2028** from `13965` to `14000`.
-3. Fill **Approval ref / reason (required)** with `E2E-RATE-05`.
-4. Click `Save & publish`. Confirm `Publish these changes?`
-5. Read **Rate publish history**.
+3. In that top bar, fill **Approval ref / reason (required)** with `E2E-RATE-05`.
+4. Click `Save & publish`. Confirm the modal titled `Publish these changes?`
+5. Scroll to **Rate publish history** (below the fold).
 
 ## Expected
 - [ ] E1 · Confirm list includes `Suite 2028: USD 13,965 → USD 14,000` (or the same numbers without grouping — match the screen).

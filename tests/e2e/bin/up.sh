@@ -31,6 +31,8 @@ else
   say "APP_KEY already set — skipping key:generate"
 fi
 
+fix_app_writable_dirs
+
 wait_api_health "${E2E_WAIT_SECS}"
 wait_horizon 60
 

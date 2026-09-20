@@ -43,6 +43,14 @@ in_app() {
   compose exec -T app sh -c "$1"
 }
 
+# composer / artisan run as root via in_app; php-fpm and Horizon run as application.
+# Without this, bind-mounted storage/ and bootstrap/cache stay root:root, GET / is 500,
+# and reset-password mail cannot compile Blade views.
+fix_app_writable_dirs() {
+  say "chown storage and bootstrap/cache to application"
+  in_app "chown -R application:application /app/storage /app/bootstrap/cache && chmod -R ug+rwX /app/storage /app/bootstrap/cache"
+}
+
 ensure_log_dir() {
   mkdir -p "${E2E_LOG_DIR}"
 }

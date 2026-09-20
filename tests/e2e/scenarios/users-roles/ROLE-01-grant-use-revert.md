@@ -12,15 +12,19 @@ Permission changes apply on the next request, not on the cookie. History must na
 1. Context B: sign in as `lucia@anakata.test` / `password`. Stay signed in on Calendar.
 2. Context A: sign in as `carolina@anakata.test` / `password`. Open `/rms/admin/permissions`.
 3. In the **Sales Exec** column, find the row **Delete reservation** (`bookings.delete`). Toggle it from `✗ No` to granted (`✓ Yes`). Click `Save` on the sticky bar.
-4. Open **History** on the Sales Exec role.
-5. Context B (Lucía): trigger a new request (navigate to `/rms/reservations/bookings` and back, or reload). Lucía now has the permission on the next request — there is no Delete button on Calendar yet, so treat “has it” as: the API `/api/auth/me` permissions list includes `bookings.delete` (open the network panel) **or** any UI that appears once she has it.
-6. Context A: toggle **Delete reservation** back to `✗ No`. `Save`. Open History again.
+4. Open **History** via the `···` button (`Role actions`) on the **Sales Exec** column header — not a row action.
+5. Context B (Lucía): trigger a new request (navigate to `/rms/reservations/bookings` and back, or reload). Do **not** open `/api/auth/me` as a panel page (that returns HTML). Either inspect the DevTools Network request to `http://localhost:8000/api/auth/me` after that navigation, or run the Cross-check below.
+6. Context A: toggle **Delete reservation** back to `✗ No`. `Save`. Open History again (same `···` menu).
 
 ## Expected
 - [ ] E1 · After the grant, toast `Roles updated`.
 - [ ] E2 · Sales Exec history newest sentence is `Permissions changed · added: Delete reservation`.
-- [ ] E3 · Lucía’s next authenticated request includes `bookings.delete` (network `/api/auth/me` or equivalent).
+- [ ] E3 · Lucía’s next authenticated request includes `bookings.delete` (network `http://localhost:8000/api/auth/me` or the Cross-check).
 - [ ] E4 · After revert, history has a second permissions entry `Permissions changed · removed: Delete reservation` (two permission-change rows total).
+
+## Cross-checks
+- After the grant: `tests/e2e/bin/db-check.sh 'App\Models\User::query()->where("email","lucia@anakata.test")->first()->hasPermission(\App\Enums\Permission::BookingsDelete)'` → `true`
+- After the revert: the same expression → `false`
 
 ## Notes
 The Sprint 1 AC said “Delete bookings”. The catalogue and screen use **Delete reservation**.

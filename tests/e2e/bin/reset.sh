@@ -29,4 +29,6 @@ curl -sS -X DELETE http://localhost:8025/api/v1/messages >/dev/null \
 say "anakata:config-verify"
 in_app "php artisan anakata:config-verify"
 
+fix_app_writable_dirs
+
 say "reset.sh done"
