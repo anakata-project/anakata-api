@@ -2,6 +2,8 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
+Sprint 4 `BKG-*` and the rewritten BR-01 / BR-02 / INV-01 / INV-10 still have unverified screen values (63 greppable markers under `tests/e2e/`). Run the Task 11 verification pass before the full P1 set.
+
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|
 | SMK-01 | Stack is up | smoke | P1 | — | [smoke/SMK-01-stack-is-up.md](smoke/SMK-01-stack-is-up.md) |
@@ -53,3 +55,15 @@ Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 | INV-10 | Departure locks with a block | sprint-3, inventory | P2 | Carolina | [inventory/INV-10-departure-locks.md](inventory/INV-10-departure-locks.md) |
 | INV-11 | Rates year guard | sprint-3, inventory | P2 | Carolina | [inventory/INV-11-rates-year-guard.md](inventory/INV-11-rates-year-guard.md) |
 | INV-12 | Read-only inventory for Lucía | sprint-3, inventory | P2 | Lucía | [inventory/INV-12-lucia-read-only.md](inventory/INV-12-lucia-read-only.md) |
+| BKG-01 | Seeded bookings and segments | sprint-4, bookings | P1 | Carolina | [bookings/BKG-01-seeded-bookings-segments.md](bookings/BKG-01-seeded-bookings-segments.md) |
+| BKG-02 | Create a one-cabin reservation | sprint-4, bookings | P1 | Carolina | [bookings/BKG-02-create-one-cabin.md](bookings/BKG-02-create-one-cabin.md) |
+| BKG-03 | Create a three-cabin group | sprint-4, bookings | P1 | Carolina | [bookings/BKG-03-create-three-cabin-group.md](bookings/BKG-03-create-three-cabin-group.md) |
+| BKG-04 | Festive charter | sprint-4, bookings | P2 | Carolina | [bookings/BKG-04-festive-charter.md](bookings/BKG-04-festive-charter.md) |
+| BKG-05 | No double booking | sprint-4, bookings | P1 | Carolina ×2 | [bookings/BKG-05-no-double-booking.md](bookings/BKG-05-no-double-booking.md) |
+| BKG-06 | Legal transitions and cancellation | sprint-4, bookings | P1 | Carolina | [bookings/BKG-06-transitions-cancel.md](bookings/BKG-06-transitions-cancel.md) |
+| BKG-07 | Date change reprices | sprint-4, bookings | P2 | Carolina | [bookings/BKG-07-date-change-reprice.md](bookings/BKG-07-date-change-reprice.md) |
+| BKG-08 | Delete is admin-only and audited | sprint-4, bookings | P2 | Mateo, Carolina | [bookings/BKG-08-delete-admin-audit.md](bookings/BKG-08-delete-admin-audit.md) |
+| BKG-09 | Request queue | sprint-4, bookings | P1 | Carolina | [bookings/BKG-09-request-queue.md](bookings/BKG-09-request-queue.md) |
+| BKG-10 | Expired request hold | sprint-4, bookings | P2 | Carolina | [bookings/BKG-10-expired-request-hold.md](bookings/BKG-10-expired-request-hold.md) |
+| BKG-11 | Waitlist | sprint-4, bookings | P2 | Carolina | [bookings/BKG-11-waitlist.md](bookings/BKG-11-waitlist.md) |
+| BKG-12 | Own-records | sprint-4, bookings | P2 | Lucía | [bookings/BKG-12-own-records.md](bookings/BKG-12-own-records.md) |

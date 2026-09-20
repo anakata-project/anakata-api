@@ -1630,3 +1630,183 @@ Lucía may open New reservation from a free calendar cell.
 EOF
 )"
 ```
+
+## Task 11 · E2E scenarios for Sprint 4; P1 run
+
+### What was built
+Twelve `BKG-*` browser scenarios under `tests/e2e/scenarios/bookings/`, tags `sprint-4`, `bookings`. Fixtures name the seeded bookings, requests, waitlist and next references. INV-10, BR-01, BR-02 and INV-01 were rewritten for the Sprint 4 seed. `INDEX.md` lists the twelve; P1 grows by BKG-01, 02, 03, 05, 06 and 09.
+
+**No local e2e run.** Every value not read off a screen in this task and not taken from a passing Pest assertion is marked with the greppable string `⚠ UNVERIFIED`. Count: **63** (`rg '⚠ UNVERIFIED' tests/e2e --glob '*.md'`). The verification report must state how many were cleared and how many remain.
+
+BKG-02, 03, 04 and 05 each allocate ANATIVA 2027 cabins. Step 1 is `reset.sh` plus an Available (`·`) check on the target cabin(s), so a missed reset fails there instead of as a later false conflict.
+
+### The scenarios
+
+| ID | Priority | User | File |
+|---|---|---|---|
+| BKG-01 | P1 | Carolina | `bookings/BKG-01-seeded-bookings-segments.md` |
+| BKG-02 | P1 | Carolina | `bookings/BKG-02-create-one-cabin.md` |
+| BKG-03 | P1 | Carolina | `bookings/BKG-03-create-three-cabin-group.md` |
+| BKG-04 | P2 | Carolina | `bookings/BKG-04-festive-charter.md` |
+| BKG-05 | P1 | Carolina ×2 | `bookings/BKG-05-no-double-booking.md` |
+| BKG-06 | P1 | Carolina | `bookings/BKG-06-transitions-cancel.md` |
+| BKG-07 | P2 | Carolina | `bookings/BKG-07-date-change-reprice.md` |
+| BKG-08 | P2 | Mateo, Carolina | `bookings/BKG-08-delete-admin-audit.md` |
+| BKG-09 | P1 | Carolina | `bookings/BKG-09-request-queue.md` |
+| BKG-10 | P2 | Carolina | `bookings/BKG-10-expired-request-hold.md` |
+| BKG-11 | P2 | Carolina | `bookings/BKG-11-waitlist.md` |
+| BKG-12 | P2 | Lucía | `bookings/BKG-12-own-records.md` |
+
+INV-10 **keeps DEP-003**. Date/yacht are locked by the two seeded bookings; Delete names `2 blocked, 2 sold`, then `2 sold` after releasing BLK-001. The history-only Delete sentence is unreachable on that row.
+
+BKG-07 ends by moving GRP-007 member ANK-2026-0016 and expecting `This booking belongs to GRP-007 — moving a group to another departure isn't supported yet.`
+
+### Old-scenario changes
+
+| File | Change |
+|---|---|
+| INV-10 | DEP-003 now locked; Delete counts include sold bookings |
+| BR-01 | Registry 50 / 25 / 15 / 11; seven PENDING CLIENT |
+| BR-02 | Differ KPI 12 then 11; publish still 12% → 15% |
+| INV-01 | ANAMARA 14 Nov `0007` / `PEND`; 19 Dec `CHARTER`; layout `Charter · 0 AD` |
+
+INV-07 ANATIVA bookable 63, INV-08/09 “9 free”, INV-06 `DEP-042` left as written (ANATIVA still empty; generate season is 2028). Desk-check only.
+
+### Wording differences / ⚠ UNVERIFIED list
+
+63 markers. Fixtures **9**, scenarios **54**.
+
+Named values the user called out:
+
+- Departures KPI recount **121** bookable / **full 0** — `Availability::kpis` arithmetic
+- Hold remaining **45 business hours** — task 09 browser
+- Bookings list **13** rows — index has no status filter; task 07 said 11
+- Registry KPIs and chips **50 / 25 / 15 / 10 / 11** — task 02 / Pest JSON, not a reset screen
+
+Other markers are i18n / REPORT browser strings (toasts, chip labels, `PEND`, lock copy, Delete wrap, History `Moved · …`).
+
+Calculator totals match the seed (`DemoBookingsSeeder::$priceDifferences` empty). Conflict `… is sold.` and the group-move 409 are Pest-backed and unmarked.
+
+### Verification pass
+
+Not run in this task. After merge, a cloud agent:
+
+1. `tests/e2e/bin/up.sh` — wait for `ALL UP`. If it fails, write **ENV** and **stop**. Do not guess values. **Sprint 3’s cloud P1 never ran**, so the cloud path itself is unproven.
+2. `reset.sh` before **each** of: BKG-01, BKG-02, BKG-03, BKG-05, BKG-06, BKG-09, INV-10, BR-01, BR-02.
+3. Report at `tests/e2e/runs/YYYY-MM-DD-HHMM-<slug>.md` that separates:
+   - **(i) Scenario wording/value fixes** — update the file; drop `⚠ UNVERIFIED` when the screen agrees. State cleared vs remaining of the **63**.
+   - **(ii) Real application bugs** — `BUG` with screenshot, console, request, step. **Only (ii) goes back to code.**
+
+The full P1 set (Sprints 1–4) runs **only after** this pass has cleared the markers.
+
+### Cloud run (full P1 — later)
+
+Placeholder — not started here.
+
+- **Prompt:** `Run all P1 e2e scenarios on dev and write the report`
+- **P1 set (Sprints 1–4), after verification:** SMK-01, SMK-02, AUTH-01, AUTH-03, AUTH-04, AUTH-08, ROLE-01, RATE-03, RATE-05, RATE-06, ENG-01, ENG-02, BR-01, BR-02, INV-01, INV-02, INV-05, INV-06, INV-08, INV-09, BKG-01, BKG-02, BKG-03, BKG-05, BKG-06, BKG-09
+- **Run report path:** `tests/e2e/runs/YYYY-MM-DD-HHMM-<slug>.md`
+- **Summary:** _not run yet_
+
+### Files touched
+
+- `tests/e2e/fixtures/reference-values.md`
+- `tests/e2e/scenarios/INDEX.md`
+- `tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md`
+- `tests/e2e/scenarios/config/BR-02-differ-reset-publish.md`
+- `tests/e2e/scenarios/inventory/INV-01-seeded-calendar.md`
+- `tests/e2e/scenarios/inventory/INV-10-departure-locks.md`
+- `tests/e2e/scenarios/bookings/BKG-01-seeded-bookings-segments.md`
+- `tests/e2e/scenarios/bookings/BKG-02-create-one-cabin.md`
+- `tests/e2e/scenarios/bookings/BKG-03-create-three-cabin-group.md`
+- `tests/e2e/scenarios/bookings/BKG-04-festive-charter.md`
+- `tests/e2e/scenarios/bookings/BKG-05-no-double-booking.md`
+- `tests/e2e/scenarios/bookings/BKG-06-transitions-cancel.md`
+- `tests/e2e/scenarios/bookings/BKG-07-date-change-reprice.md`
+- `tests/e2e/scenarios/bookings/BKG-08-delete-admin-audit.md`
+- `tests/e2e/scenarios/bookings/BKG-09-request-queue.md`
+- `tests/e2e/scenarios/bookings/BKG-10-expired-request-hold.md`
+- `tests/e2e/scenarios/bookings/BKG-11-waitlist.md`
+- `tests/e2e/scenarios/bookings/BKG-12-own-records.md`
+- `docs/sprints/sprint-04/REPORT.md`
+
+### Deviations
+- No local BKG-02 / BKG-05 / INV-10 browser pass (task file asked for one; the approved plan replaced it with UNVERIFIED markers + a cloud verification pass).
+- INV-10 kept DEP-003 rather than inventing a block-only departure.
+
+### Open questions
+The 63 `⚠ UNVERIFIED` markers. Sprint 3 cloud P1 never ran — `up.sh` on a cloud machine is unproven.
+
+### Notes for later
+- Full P1 only after the verification pass clears markers.
+- VIS-01 still does not include Calendar / Bookings / Requests / Holds (Sprint 3 leftover).
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  tests/e2e/fixtures/reference-values.md \
+  tests/e2e/scenarios/INDEX.md \
+  tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md \
+  tests/e2e/scenarios/config/BR-02-differ-reset-publish.md \
+  tests/e2e/scenarios/inventory/INV-01-seeded-calendar.md \
+  tests/e2e/scenarios/inventory/INV-10-departure-locks.md \
+  tests/e2e/scenarios/bookings \
+  docs/sprints/sprint-04/REPORT.md
+git status
+git commit -m "$(cat <<'EOF'
+Add Sprint 4 booking e2e scenarios with unverified markers.
+
+Twelve BKG scripts and the seed-affected INV/BR files; screen
+values not read in this task are marked for a cloud pass.
+EOF
+)"
+```
+
+---
+
+## Sprint 4 · summary
+
+### What’s done
+The RMS takes reservations. API: departure-row lock, business-hours holds (G5, rules v2 shape change), contacts / groups / create, transitions / move / delete / audit, requests (holds expire without cancelling), waitlist. `anakata-ui` shipped booking types (`v0.5.0` then `v0.5.1`–`v0.5.3`). Panel: Bookings (Overview + History), New reservation, Booking Requests, Holds & Waitlist, calendar / layout occupancy. Browser scenarios `BKG-01`–`BKG-12` are written with **63** `⚠ UNVERIFIED` markers. The cloud verification pass and the full P1 run are still to attach.
+
+### Open questions from tasks 01–11
+
+Compiled from each task’s REPORT (Open questions **and** leftover Notes that are still open). Do not read a heading that said “None” as closed.
+
+| Task | Still open |
+|---|---|
+| 01 | Open-questions heading was empty. Leftover note: optional replace of on-disk G10 wording. |
+| 02 | TEC-004: which days and hours; which public holidays; from how many days before departure is a request near-term (defaults Mon–Fri 09:00–18:00 GALT, holidays `[]`, 120 days). **Shape migrations** publish through `ConfigPublisher` against the current `rules()`: a DB behind this and a later shape migration fails because the merged document lacks the later required path. Policy before go-live: fold shape migrations into `initial()` while no production exists, or keep replay-in-order only. |
+| 03 | Open-questions heading was empty. **`GET /api/rms/contacts?q=` is not own-records scoped** (`ContactController` returns any matching name/email, top 10). Still undecided whether a Sales Exec should see another owner’s clients. |
+| 04 | If `modification_fee_usd` > 0, a later move drops the earlier FIN-006 line and writes a new quote + a new fee — should a charged fee stick? A move that **raises the price of a FULLY_PAID booking** leaves an amount owed; `Booking::balance()` is still `total` until Sprint 5. Group move to another departure is unsupported (now an expected 409 in BKG-07). |
+| 05 | Open-questions heading was empty. Demo request refs are pinned to 2026; combined with fixed 2027 departures the demo is valid until Nov 2027. |
+| 06 | Open-questions heading was empty. Scramble still mistypes several booking shapes (`allowed_transitions` items, `can_act`, quote cabins); the layer keeps overlays. |
+| 07 | Open-questions heading was empty. Paid stays `USD 0` until Sprint 5. |
+| 08 | Open-questions heading was empty. Agency / commission / `ON_HOLD_AGENCY` wait for Sprint 5. |
+| 09 | Open-questions heading was empty. Confirm copy says the deposit link is sent in Sprint 5. |
+| 10 | Open-questions heading was empty. **Overlay `can_act` on the calendar claim shape** (`holder.detail` or the cell) so the panel can drop the local `canActOnBooking` copy. Charter `party_label` is `0 AD` on the seed (adults 0), not “16 PAX”. |
+| 11 | **63** `⚠ UNVERIFIED` markers. Sprint 3’s cloud P1 never ran; if `up.sh` fails on the cloud machine, say so rather than guessing values. |
+
+### Still open outside the sprint
+- Go-live date
+- Production domains
+- LEG-001 (cancellation policy customer-facing text)
+- LEG-002 (LOPDP / GDPR architecture)
+- B2 pricing items (PENDING CLIENT: engine SPEC §10 / online-deposit advantage and max total discount)
+- The two TEC-004 client questions (business hours; the near-term boundary)
+- Group-move note: moving a group to another departure is not supported (BKG-07 expects the 409)
+
+### Git commands per repo, in order
+
+Do **not** run these here. Each task already listed its exact `git add` set. Run them in this order if they are not already on `dev`:
+
+1. **anakata-api** — tasks 01, 02, 03, 04, 05, then 07–10 API preludes, **11 (this commit, above)**.
+2. **anakata-ui** — task 06 (`v0.5.0` + `git tag v0.5.0` + push tag), task 07 (`v0.5.1` + tag + push), task 08 (`v0.5.2` + tag + push), task 09 (`v0.5.3` + tag + push).
+3. **anakata-panel** — tasks 07 (list + panel), 08 (New reservation), 09 (requests + holds), 10 (calendar occupancy).
+
+Full command blocks live under each Task section above. `anakata-engine` has no Sprint 4 commits.
+

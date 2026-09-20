@@ -5,17 +5,18 @@
 - **Start:** reset
 
 ## Why
-Blocks do not lock date or yacht, but any claim row — including a released one — keeps Delete off so the FK cannot 500.
+DEP-003 still has the demo block, and Sprint 4 also seeds two bookings on it. Date and yacht lock when cabins are sold; Delete names the active-claim counts. The history-only Delete sentence is unreachable here.
 
 ## Steps
 1. Sign in as Carolina. Open `http://localhost:3001/rms/booking-engine/departures`. Open DEP-003 (`14 Nov 2027` · ANAMARA).
-2. Read **Embark date**, **Yacht**, and Delete.
+2. Read **Embark date**, **Yacht**, the lock notice, and Delete.
 3. Open `/rms/operations/blocks`. Release `BLK-001` (confirm `Release BLK-001`).
 4. Return to Departures and open DEP-003 again.
 
 ## Expected
-- [ ] E1 · Before release: date and yacht are enabled (no lock notice). Delete is disabled and reads `Delete (2 blocked)`.
-- [ ] E2 · After release: date and yacht stay enabled. Delete is still disabled and reads `Delete (This departure has inventory history (released blocks or holds). Close or hide it instead.)`.
+- [ ] E1 · Before release: date and yacht are disabled. Lock notice `Date and yacht are locked — 2 cabin(s) sold or held on this departure. Move guests with "Move to another departure" on each booking first.` ⚠ UNVERIFIED — `departures.lockNotice` + `dateAndYachtLockCount` (sold 2).
+- [ ] E2 · Before release: Delete is disabled and reads `Delete (2 blocked, 2 sold)`. ⚠ UNVERIFIED — `DepartureLocks::activeDeleteMessage` wrapped as `Delete ({reason})`.
+- [ ] E3 · After release: date and yacht stay locked (the two bookings remain). Delete is still disabled and reads `Delete (2 sold)`. ⚠ UNVERIFIED — same composers; history-only sentence is not reached.
 
 ## Notes
-Task 10’s “Delete is enabled after release” is wrong on the screen. Task 03 keeps `locks.delete` true for every claim row, released included (`DepartureLocks::HISTORY_DELETE`). Write the screen, not the task file.
+Keep DEP-003 (do not invent a block-only departure). Bookings lock date/yacht; the Sprint 3 “block does not lock date/yacht / history keeps Delete off” story no longer applies on this row.

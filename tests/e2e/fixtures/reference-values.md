@@ -52,6 +52,11 @@ Source: `BusinessRulesDocument::initial()`.
 | holds.web_extension_minutes | 10 |
 | holds.near_term_business_hours | 48 |
 | holds.long_lead_business_days | 5 |
+| holds.business_days | Mon–Fri (`[1, 2, 3, 4, 5]`) |
+| holds.business_day_start | 09:00 |
+| holds.business_day_end | 18:00 |
+| holds.holidays | `[]` |
+| holds.near_term_max_days | 120 |
 | sla.response_hours | 24 |
 | sla.refund_business_days | 15 |
 | sla.agency_approval_business_days | 2 |
@@ -80,11 +85,12 @@ Source: `EngineSettingsDocument::initial()` → `fees` (FIN-004).
 
 ## Registry facts (fresh seed)
 
-Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php`.
+Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON). On-screen KPI and chip numbers are ⚠ UNVERIFIED — task 02 report / Pest counts, not a reset screen.
 
-- **45** rows total.
-- After a fresh seed exactly **6** flagged: 5 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note).
-- Breakdown: `here` 20 · `other_pages` 15 · `locked` 10.
+- **50** rows total. ⚠ UNVERIFIED
+- After a fresh seed exactly **11** flagged: 10 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
+- Breakdown: `here` 25 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
+- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 50 / 25 / 15 / 10 / 11. ⚠ UNVERIFIED
 
 Flagged rows:
 
@@ -95,9 +101,14 @@ Flagged rows:
 | medical retention | PENDING LEGAL | pending |
 | online-deposit advantage | PENDING CLIENT | pending |
 | max total discount | PENDING CLIENT | pending |
+| hold-business-days | PENDING CLIENT | TEC-004 default |
+| hold-business-day-start | PENDING CLIENT | TEC-004 default |
+| hold-business-day-end | PENDING CLIENT | TEC-004 default |
+| hold-holidays | PENDING CLIENT | TEC-004 default |
+| hold-near-term-max-days | PENDING CLIENT | TEC-004 default |
 | OPS-006 sales open / first cruise | CONFIRMED | non-empty note |
 
-FIN-001 source display on the registry: `USD 13,300 · 25,000 · 199,500`.
+FIN-001 source display on the registry: `USD 13,300 · 25,000 · 199,500`. Five new hold rows source display: `Not defined in v5 — default` (task 02).
 
 ## Seeded inventory (local / testing)
 
@@ -156,7 +167,9 @@ Duplicate 422: `{YACHT} already has a departure on {date} ({DEP-NNN}).`
 
 Engine labels (`App\Support\Inventory\EngineLabel`): `CLOSED — ENQUIRE`, `NOT SHOWN`, `ONLY N CABINS LEFT` (or `ONLY 1 CABIN LEFT`).
 
-Fresh-seed Departures KPIs (all dates): 16 on sale of 16 · 142 bookable (15 × 9 + DEP-003’s 7) · 0 only-N · 0 full.
+Fresh-seed Departures KPIs (all dates), Sprint 3 (no bookings): 16 on sale of 16 · 142 bookable (15 × 9 + DEP-003’s 7) · 0 only-N · 0 full.
+
+After the Sprint 4 demo bookings + requests: 144 cabins − 2 block − 19 booking claims − 2 holds = **121** bookable; charter DEP-013 is `CHARTERED — NOT SHOWN` and excluded from live KPIs so **full** is **0**. ⚠ UNVERIFIED — `Availability::kpis` arithmetic, not a reset screen.
 
 ### Demo block
 
@@ -187,3 +200,50 @@ Source: `App\Services\Config\DepartureConfigChecks`.
 |---|---|
 | Publish drops a year that still has departures | `Can't remove {year} — {n} departure(s) sail that year.` |
 | Departures exist in a year not in the draft | `Departures in {year} have no rates.` |
+
+## Seeded bookings (local / testing)
+
+Source: `docs/requirements/examples/seed-data.json` → `bookings` / `groups`, mapped by `DemoBookingsSeeder` and `DemoRequestsSeeder`. Stored totals are `CabinPricer` (`DemoBookingsSeederTest`: `$priceDifferences` is empty). Seed `OVERDUE` is stored as `CONFIRMED` (G6). Owners matched by first name to demo users.
+
+Conflict when a cabin already has a booking claim: `{cabin} on {j M Y} · {YACHT} is sold.` (`ConflictMessage`, Pest).
+
+| Reference | Departure | Cabin | Status | Total | Owner | Segment | Client |
+|---|---|---|---|---|---|---|---|
+| ANK-2026-0003 | 7 Nov 2027 ANAMARA (DEP-001) | Suite 01 | CONFIRMED | 26,600 | Lucía | D2C | Harrison & Whitfield |
+| ANK-2026-0005 | 7 Nov 2027 ANAMARA | Suite 02 | FULLY_PAID | 37,905 | Mateo | D2C | The Brandt Family |
+| ANK-2026-0007 | 14 Nov 2027 ANAMARA (DEP-003) | Suite 03 | CONFIRMED | 23,275 | Lucía | B2B | M. Castellanos |
+| ANK-2026-0009 | 21 Nov 2027 ANAMARA | Owner's Suite | CONFIRMED | 50,000 | Mateo | D2C | Söderberg Party |
+| ANK-2026-0011 | 5 Dec 2027 ANAMARA | Suite 01 | CONFIRMED | 26,600 | Lucía | D2C | J. & P. Okafor |
+| ANK-2026-0012 | 19 Dec 2027 ANAMARA festive (DEP-013) | Full yacht | CONFIRMED | 211,500 | Carolina | CHARTER | Vandermeer Charter |
+| ANK-2026-0014 | 14 Nov 2027 ANAMARA | Suite 05 | PENDING_PAYMENT | 26,600 | Lucía | D2C | R. Ellison |
+| ANK-2026-0016 | 28 Nov 2027 ANAMARA (DEP-007) | Suite 01 | CONFIRMED | 26,600 | Mateo | D2C | L. Alvear · GRP-007 |
+| ANK-2026-0017 | 28 Nov 2027 ANAMARA | Suite 06 | CONFIRMED | 26,600 | Mateo | D2C | S. & T. Ruiz · GRP-007 |
+| ANK-2026-0019 | 28 Nov 2027 ANAMARA | Suite 07 | CONFIRMED | 26,600 | Mateo | D2C | D. & A. Pereyra · GRP-007 |
+| ANK-2026-0018 | 12 Dec 2027 ANAMARA | Suite 02 | CONFIRMED (seed OVERDUE) | 26,600 | Lucía | D2C | A. Fontaine |
+
+GRP-007: `Alvear family & friends`, coordinator Lorena Alvear, 28 Nov 2027 ANAMARA. Next draws after a fresh seed (`ensureAtLeast` + Pest): `ANK-2026-0020`, `GRP-008`, `ANK-R-2026-0043`.
+
+### Requests
+
+| Reference | Departure | Cabin | Owner | Submitted | Client |
+|---|---|---|---|---|---|
+| ANK-R-2026-0041 | 21 Nov 2027 ANAMARA (DEP-005) | Suite 04 | Lucía | 5 h ago | E. Harmon |
+| ANK-R-2026-0042 | 28 Nov 2027 ANAMARA (DEP-007) | Suite 05 | Mateo | 50 h ago | L. Moreau |
+
+SLA on screen after reset: 0041 **19h**, 0042 **SLA BREACH — 26h**. ⚠ UNVERIFIED — task 09 browser at one clock time; seeder is relative to `now()`.
+Hold remaining on both rows: **45 business hours**. ⚠ UNVERIFIED — task 09 browser note (5 long-lead days × 540 min displayed as hours because &lt; 72 h).
+
+### Waitlist
+
+Both on 19 Dec 2027 ANAMARA festive (DEP-013). Position is FIFO per departure + category (not stored).
+
+| Contact | Category | Email |
+|---|---|---|
+| Anna Whitfield | Suite | whitfield.anna@anakata.test |
+| K. Osei | Owner | k.osei@anakata.test |
+
+### Bookings list count
+
+Default list range is All dates (`from`/`to` null). Index has no default status filter, so REQUESTED rows should appear: **13** (11 + 0041 + 0042). Date-range line `13 bookings · all dates`. ⚠ UNVERIFIED — query shape; task 07 browser said 11.
+
+Group-move 409: `This booking belongs to GRP-007 — moving a group to another departure isn't supported yet.` (`MoveBooking`, Pest).
