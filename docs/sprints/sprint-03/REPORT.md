@@ -1275,3 +1275,142 @@ Record Sprint 3 task 09 Internal Blocks page.
 EOF
 )"
 ```
+
+## Task 10 · E2E scenarios for Sprint 3; P1 run
+
+### What was built
+Twelve browser scenarios under `tests/e2e/scenarios/inventory/` (`INV-01`–`INV-12`) in the existing harness template. `INDEX.md` lists them with tags `sprint-3`, `inventory`. Fixtures now name the seeded inventory and who can write it.
+
+**Working rule (screen facts):** before writing or checking on-screen copy, run `tests/e2e/bin/reset.sh` so the panel shows the seed. Re-check any other value previously read from the local database the same way. **Amounts** come from `tests/e2e/fixtures/reference-values.md` (and the seeders it cites), never from leftover local data (the festive 800 on a dirty DB is not the seed).
+
+P1 added this sprint: INV-01, INV-02, INV-05, INV-06, INV-08, INV-09.
+
+Local INV-01 / INV-08 were **not** run here — those browser passes are for a Cursor cloud agent after merge.
+
+### The scenarios
+
+| ID | Priority | User | File |
+|---|---|---|---|
+| INV-01 | P1 | Carolina | `inventory/INV-01-seeded-calendar.md` |
+| INV-02 | P1 | Carolina | `inventory/INV-02-write-publish-itinerary.md` |
+| INV-03 | P2 | Carolina | `inventory/INV-03-itinerary-photo.md` |
+| INV-04 | P2 | Carolina | `inventory/INV-04-itinerary-delete-guard.md` |
+| INV-05 | P1 | Carolina | `inventory/INV-05-departure-date-rules.md` |
+| INV-06 | P1 | Carolina | `inventory/INV-06-generate-season.md` |
+| INV-07 | P2 | Carolina | `inventory/INV-07-status-engine-label.md` |
+| INV-08 | P1 | Mateo | `inventory/INV-08-block-see-release.md` |
+| INV-09 | P1 | Mateo | `inventory/INV-09-block-conflict.md` |
+| INV-10 | P2 | Carolina | `inventory/INV-10-departure-locks.md` |
+| INV-11 | P2 | Carolina | `inventory/INV-11-rates-year-guard.md` |
+| INV-12 | P2 | Lucía | `inventory/INV-12-lucia-read-only.md` |
+
+### Wording differences found against the screen / seed
+
+| Task file | Scenario / seed |
+|---|---|
+| Festive pill from a dirty local DB (`USD 800`) | After `reset.sh`: `FESTIVE +USD 750 PP` (`rates.festive_supplement_pp` = 750) |
+| Calendar “just open it” | Default range is today → +6 months; seed Sundays need **Year 2027** |
+| Prototype static block on ANATIVA | Seed / calendar: **ANAMARA** Suite 07–08, 14 Nov 2027, `BLK-001` |
+| INV-06 festive window left at default | Default is **on**; 2 Jan is in-window so both yachts would be FEST. Scenario unchecks it so ALT opposite routes hold |
+| INV-10 “Delete enabled after releasing BLK-001” | Delete stays locked: `Delete (This departure has inventory history (released blocks or holds). Close or hide it instead.)` (task 03: any claim row, including released) |
+| INV-11 “remove 2027” | Rates ✕ only the last year; 2027 is not clickable. Scenario creates a 2029 Sunday then ✕ 2029 → `Can't remove 2029 — 1 departure sails that year.` |
+| INV-06 `DEP-042` | Computed as DEP-016 + 26. Not confirmed on a live generate in this task; the cloud run should. |
+
+Sprint README already lists `INV-01` … `INV-12`. Ids did not change.
+
+### Cloud run
+
+Placeholder — the user (or the next cloud agent) fills this after merge.
+
+- **Prompt:** `Run all P1 e2e scenarios on dev and write the report`
+- **P1 set (Sprints 1–3):** SMK-01, SMK-02, AUTH-01, AUTH-03, AUTH-04, AUTH-08, ROLE-01, RATE-03, RATE-05, RATE-06, ENG-01, ENG-02, BR-01, BR-02, INV-01, INV-02, INV-05, INV-06, INV-08, INV-09
+- **Run report path:** `tests/e2e/runs/YYYY-MM-DD-HHMM-<slug>.md`
+- **Summary:** _not run yet_
+
+### Files touched
+
+- `tests/e2e/fixtures/reference-values.md`
+- `tests/e2e/fixtures/accounts.md`
+- `tests/e2e/fixtures/itinerary-hero.jpg`
+- `tests/e2e/scenarios/INDEX.md`
+- `tests/e2e/scenarios/inventory/INV-01-seeded-calendar.md`
+- `tests/e2e/scenarios/inventory/INV-02-write-publish-itinerary.md`
+- `tests/e2e/scenarios/inventory/INV-03-itinerary-photo.md`
+- `tests/e2e/scenarios/inventory/INV-04-itinerary-delete-guard.md`
+- `tests/e2e/scenarios/inventory/INV-05-departure-date-rules.md`
+- `tests/e2e/scenarios/inventory/INV-06-generate-season.md`
+- `tests/e2e/scenarios/inventory/INV-07-status-engine-label.md`
+- `tests/e2e/scenarios/inventory/INV-08-block-see-release.md`
+- `tests/e2e/scenarios/inventory/INV-09-block-conflict.md`
+- `tests/e2e/scenarios/inventory/INV-10-departure-locks.md`
+- `tests/e2e/scenarios/inventory/INV-11-rates-year-guard.md`
+- `tests/e2e/scenarios/inventory/INV-12-lucia-read-only.md`
+- `docs/sprints/sprint-03/REPORT.md`
+
+### Deviations
+- Local INV-01 / INV-08 browser pass skipped (cloud-agent work).
+- INV-06 `DEP-042` left as the documented 016 + 26 count until a generate confirms it.
+- INV-10 and INV-11 follow the screen, not the task-file wording (table above).
+
+### Open questions
+None new. Task 03’s two hold questions stay open for Sprint 4 (see sprint summary).
+
+### Notes for later
+- Update VIS-01 to include Calendar, Yacht Layout, Itineraries, Departures and Internal Blocks.
+- After 14 Nov 2027 the demo block seed will fail (`ClaimService` refuses past departures) — make demo dates relative to today or skip past-dated claims (task 04).
+- Confirm `DEP-042` on the first INV-06 cloud pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  tests/e2e/fixtures/reference-values.md \
+  tests/e2e/fixtures/accounts.md \
+  tests/e2e/fixtures/itinerary-hero.jpg \
+  tests/e2e/scenarios/INDEX.md \
+  tests/e2e/scenarios/inventory \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add Sprint 3 inventory e2e scenarios.
+
+Twelve INV browser scripts cover calendar, itineraries, departures
+and blocks. Amounts come from the seed fixtures, not a dirty DB.
+EOF
+)"
+```
+
+---
+
+## Sprint 3 · summary
+
+### What’s done
+The RMS now knows what can be sold. Two yachts × nine cabins are seeded everywhere. Itineraries, departures (including generate season), cabin claims, computed availability, calendar / layout endpoints and internal blocks live in the API. `anakata-ui` shipped inventory types (`v0.4.0`, then `v0.4.1` / `v0.4.2` for gradient keys and claim `holder.detail`). The panel has Itineraries, Departures, Calendar, Yacht Layout and Internal Blocks. Browser scenarios `INV-01`–`INV-12` are written; the cloud P1 run is still to attach.
+
+### Open questions from tasks 01–10
+
+| Task | Question |
+|---|---|
+| 03 | What “business hours” means for TEC-004 holds (days, hours, Galápagos public holidays?). |
+| 03 | Where “near-term” ends and “long-lead” begins (48 business hours vs 5 business days). |
+| 01, 02, 04–10 | None. |
+
+### Still open outside the sprint
+- Go-live date
+- Production domains
+- LEG-001 (cancellation policy customer-facing text)
+- LEG-002 (LOPDP / GDPR architecture)
+- B2 pricing items (PENDING CLIENT: engine SPEC §10 / online-deposit advantage and max total discount)
+- The two Sprint 4 hold questions from task 03 (business hours; near-term vs long-lead)
+
+### Git commands per repo, in order
+
+Do **not** run these here. Each task already listed its exact `git add` set. Run them in this order if they are not already on `dev`:
+
+1. **anakata-api** — tasks 01, 02, 03, 04 (code), 05/07/09 (report-only commits), 06 (gradient keys + empty-string restore), 08 (`holder.detail`), **10 (this commit, above)**.
+2. **anakata-ui** — task 05 (`v0.4.0` + `git tag v0.4.0` + push tag), task 06 (`v0.4.1` + tag + push), task 08 (`v0.4.2` + tag + push).
+3. **anakata-panel** — tasks 06 (itineraries), 07 (departures), 08 (calendar + layout), 09 (blocks).
+
+Full command blocks live under each Task section above. `anakata-engine` has no Sprint 3 commits.

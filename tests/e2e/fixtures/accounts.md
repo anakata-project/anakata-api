@@ -24,12 +24,14 @@ After sign-in the header who-menu shows `{NAME} — {ROLE}` **uppercased** (em d
 - **No** sidebar items for **Business Rules** or **Permissions**. Direct URLs redirect to Calendar with toast `You don't have permission to do that.`
 - Engine Settings: **copy** panels editable (`Booking notes & messages`, `Confirmation page — what happens next`, charter copy). **Rules** locked: guests, calendar, fee amounts, charter **Response SLA (hours)**.
 - Rates: read-only (no `rates.manage`).
+- Inventory write: **Itineraries**, **Departures** and **Internal Blocks** (`itineraries.manage`, `departures.manage`, `blocks.manage`).
 
 ### Lucía (Sales Exec)
 - RMS and CRM. Section switch visible. **＋ New Reservation** visible.
 - **No** Business Rules or Permissions in the sidebar. Direct URLs → Calendar + the same forbidden toast.
 - Rates: **VIEW ONLY — ADMIN / DIRECTOR EDITS RATES**. Inputs disabled, no helper row, no approval field.
 - Engine Settings: **VIEW ONLY — SALES EXEC**. Everything disabled.
+- Inventory read: Itineraries, Departures and Internal Blocks show no write controls (no `＋ New itinerary` / `Generate season…` / `＋ New departure` / `＋ New block`; status selects disabled). Calendar and Yacht Layout are readable.
 
 ### CFO (external)
 - **RMS only.** No section switch. No **＋ New Reservation**.
