@@ -52,7 +52,10 @@ test('sales exec can read booking form options', function (): void {
         ->assertJsonPath('preferred.0.label', 'Email')
         ->assertJsonPath('guests.child_min_age', 6)
         ->assertJsonPath('guests.child_max_age', 17)
-        ->assertJsonPath('guests.max_per_cabin', 3);
+        ->assertJsonPath('guests.max_per_cabin', 3)
+        ->assertJsonPath('commission.cap_pct', 12)
+        ->assertJsonPath('commission.default_pct', 10)
+        ->assertJsonPath('agencies', []);
 });
 
 test('form options require bookings.create', function (): void {

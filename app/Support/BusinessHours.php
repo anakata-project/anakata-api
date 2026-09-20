@@ -144,6 +144,27 @@ final class BusinessHours
         );
     }
 
+    /**
+     * Open Galápagos days strictly after the day of $from, up to and including
+     * the day of $to. The day of $from never counts (same as endOfNthBusinessDay).
+     */
+    public function businessDaysElapsed(CarbonInterface $from, CarbonInterface $to): int
+    {
+        $day = $this->inZone($from)->startOfDay();
+        $end = $this->inZone($to)->startOfDay();
+        $counted = 0;
+
+        while ($day->lt($end)) {
+            $day = $day->addDay();
+
+            if ($this->isOpenDay($day)) {
+                $counted++;
+            }
+        }
+
+        return $counted;
+    }
+
     public function remainingBusinessMinutes(CarbonInterface $from, CarbonInterface $until): int
     {
         $start = $this->inZone($from);

@@ -8,6 +8,8 @@ use App\Actions\Bookings\TransitionBooking;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Services\Config\CurrentConfig;
+use App\Support\History\History;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -18,7 +20,10 @@ use RuntimeException;
  */
 final class ApplyPaymentEffects
 {
-    public function __construct(private readonly TransitionBooking $transitions) {}
+    public function __construct(
+        private readonly TransitionBooking $transitions,
+        private readonly CurrentConfig $config,
+    ) {}
 
     public function handle(Booking $booking, Payment $payment): Booking
     {
@@ -27,18 +32,26 @@ final class ApplyPaymentEffects
         $reason = $payment->kind->label().' settled · '.$payment->reference;
         $paid = Ledger::paidFresh($booking);
 
-        if ($paid >= $booking->depositAmount() && $booking->status === BookingStatus::PendingPayment) {
-            $booking = $this->transitions->handle($booking, [
-                'to' => BookingStatus::Confirmed,
-                'reason' => $reason,
-            ], null, system: true);
+        if ($paid >= $booking->depositAmount()) {
+            if ($booking->status === BookingStatus::PendingPayment) {
+                $booking = $this->transitions->handle($booking, [
+                    'to' => BookingStatus::Confirmed,
+                    'reason' => $reason,
+                ], null, system: true);
+            } elseif ($booking->status === BookingStatus::OnHoldAgency) {
+                if ($booking->commission_approved) {
+                    $booking = $this->transitions->handle($booking, [
+                        'to' => BookingStatus::Confirmed,
+                        'reason' => $reason,
+                    ], null, system: true);
+                } else {
+                    $this->writeBlockedIfNewEpisode($booking);
+                }
+            }
         }
 
-        // TransitionBooking::acquire() writes status on a fresh instance.
-        // Re-read before the balance check or a covering payment stays PENDING_PAYMENT.
         $paid = Ledger::paidFresh($booking);
 
-        // TODO(task 04): also treat ON_HOLD_AGENCY after the commission-cap override.
         if ($booking->total - $paid <= 0 && $booking->status === BookingStatus::Confirmed) {
             $booking = $this->transitions->handle($booking, [
                 'to' => BookingStatus::FullyPaid,
@@ -47,6 +60,29 @@ final class ApplyPaymentEffects
         }
 
         return $booking;
+    }
+
+    private function writeBlockedIfNewEpisode(Booking $booking): void
+    {
+        $decision = $booking->latestCommissionCapDecision();
+
+        $blocked = $booking->history()->where('event', 'booking.confirmed_blocked');
+        $already = $decision === null
+            ? $blocked->exists()
+            : $blocked->where('id', '>', $decision->id)->exists();
+
+        if ($already) {
+            return;
+        }
+
+        $pct = (int) $booking->commission_pct;
+        $cap = $this->config->businessRules()->commission->capPct;
+
+        History::record($booking, 'booking.confirmed_blocked', after: [
+            'what' => 'Deposit settled — CONFIRMED blocked: commission '.$pct.' % above the '.$cap.' % cap (FIN-005)',
+            'commission_pct' => $pct,
+            'cap_pct' => $cap,
+        ], system: true);
     }
 
     private function guardTransaction(): void

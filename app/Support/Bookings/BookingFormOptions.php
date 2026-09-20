@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support\Bookings;
 
+use App\Enums\AgencyStatus;
 use App\Enums\ChannelOfOrigin;
 use App\Enums\ChannelOfOriginGroup;
 use App\Enums\MainChannel;
 use App\Enums\PreferredChannel;
+use App\Models\Agency;
 use App\Services\Config\CurrentConfig;
 
 final class BookingFormOptions
@@ -17,7 +19,9 @@ final class BookingFormOptions
      *     main: list<array{value: string, label: string, trade: bool}>,
      *     origin: list<array{group: string, options: list<array{value: string, label: string}>}>,
      *     preferred: list<array{value: string, label: string}>,
-     *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int}
+     *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int},
+     *     commission: array{cap_pct: int, default_pct: int},
+     *     agencies: list<array{id: int, reference: string, name: string, network: string|null, commission_pct: int}>
      * }
      */
     public static function fromConfig(CurrentConfig $config): array
@@ -41,6 +45,7 @@ final class BookingFormOptions
         }
 
         $guests = $config->engineSettings()->guests;
+        $commission = $config->businessRules()->commission;
 
         return [
             'main' => array_map(
@@ -64,6 +69,23 @@ final class BookingFormOptions
                 'child_max_age' => $guests->childMaxAge,
                 'max_per_cabin' => $guests->maxPerCabin,
             ],
+            'commission' => [
+                'cap_pct' => $commission->capPct,
+                'default_pct' => $commission->defaultPct,
+            ],
+            'agencies' => Agency::query()
+                ->where('status', AgencyStatus::Approved)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Agency $agency): array => [
+                    'id' => $agency->id,
+                    'reference' => $agency->reference,
+                    'name' => $agency->name,
+                    'network' => $agency->network,
+                    'commission_pct' => $agency->commission_pct,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 }

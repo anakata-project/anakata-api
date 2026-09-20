@@ -41,6 +41,12 @@ use Illuminate\Support\Collection;
  * @property int $contact_id
  * @property int|null $group_id
  * @property int $owner_id
+ * @property int|null $agency_id
+ * @property int|null $commission_pct
+ * @property bool $commission_approved
+ * @property int|null $commission_approved_by
+ * @property Carbon|null $commission_approved_at
+ * @property string|null $commission_reason
  * @property BookingStatus $status
  * @property MainChannel $main_channel
  * @property ChannelOfOrigin $channel_of_origin
@@ -64,6 +70,8 @@ use Illuminate\Support\Collection;
  * @property-read Contact $contact
  * @property-read Group|null $group
  * @property-read User $owner
+ * @property-read Agency|null $agency
+ * @property-read User|null $commissionApprovedBy
  * @property-read RateVersion $ratesVersion
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
@@ -84,6 +92,12 @@ use Illuminate\Support\Collection;
     'contact_id',
     'group_id',
     'owner_id',
+    'agency_id',
+    'commission_pct',
+    'commission_approved',
+    'commission_approved_by',
+    'commission_approved_at',
+    'commission_reason',
     'status',
     'main_channel',
     'channel_of_origin',
@@ -113,6 +127,9 @@ class Booking extends Model
             'status' => BookingStatus::class,
             'main_channel' => MainChannel::class,
             'channel_of_origin' => ChannelOfOrigin::class,
+            'commission_pct' => 'integer',
+            'commission_approved' => 'boolean',
+            'commission_approved_at' => 'datetime',
             'adults' => 'integer',
             'children' => 'integer',
             'back_to_back' => 'boolean',
@@ -162,6 +179,22 @@ class Booking extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * @return BelongsTo<Agency, $this>
+     */
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function commissionApprovedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'commission_approved_by');
     }
 
     /**
@@ -367,6 +400,28 @@ class Booking extends Model
     public function depositAmount(): int
     {
         return Rounding::halfUp($this->total * $this->deposit_pct / 100);
+    }
+
+    public function commissionAmount(): int
+    {
+        if ($this->commission_pct === null) {
+            return 0;
+        }
+
+        return Rounding::halfUp($this->total * $this->commission_pct / 100);
+    }
+
+    /**
+     * Latest cap approve/reject row, if any. A new episode starts after this id
+     * (same-second payments must not reuse the previous blocked entry).
+     */
+    public function latestCommissionCapDecision(): ?ChangeHistory
+    {
+        return $this->history()
+            ->whereIn('event', ['booking.commission_approved', 'booking.commission_rejected'])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function holdExpired(): bool

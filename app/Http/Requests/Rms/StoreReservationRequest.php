@@ -30,6 +30,8 @@ class StoreReservationRequest extends QuoteReservationRequest
             'group.existing_group_id' => ['sometimes', 'integer', 'exists:groups,id'],
             'group.name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'internal_notes' => ['sometimes', 'nullable', 'string'],
+            'agency_id' => ['sometimes', 'nullable', 'integer', 'exists:agencies,id'],
+            'commission_pct' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:30'],
         ];
     }
 }

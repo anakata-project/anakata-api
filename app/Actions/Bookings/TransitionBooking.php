@@ -115,7 +115,9 @@ final class TransitionBooking extends Action
         }
 
         if ($to === BookingStatus::Released) {
-            return 'Request released — hold returned to inventory';
+            return $from === BookingStatus::Requested
+                ? 'Request released — hold returned to inventory'
+                : 'Reservation released — cabin returned to inventory';
         }
 
         $what = 'Status '.Transitions::statusLabel($from).' → '.Transitions::statusLabel($to);

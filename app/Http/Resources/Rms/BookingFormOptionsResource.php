@@ -12,7 +12,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     main: list<array{value: string, label: string, trade: bool}>,
  *     origin: list<array{group: string, options: list<array{value: string, label: string}>}>,
  *     preferred: list<array{value: string, label: string}>,
- *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int}
+ *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int},
+ *     commission: array{cap_pct: int, default_pct: int},
+ *     agencies: list<array{id: int, reference: string, name: string, network: string|null, commission_pct: int}>
  * } $resource
  */
 class BookingFormOptionsResource extends JsonResource
@@ -24,7 +26,9 @@ class BookingFormOptionsResource extends JsonResource
      *     main: list<array{value: string, label: string, trade: bool}>,
      *     origin: list<array{group: string, options: list<array{value: string, label: string}>}>,
      *     preferred: list<array{value: string, label: string}>,
-     *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int}
+     *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int},
+     *     commission: array{cap_pct: int, default_pct: int},
+     *     agencies: list<array{id: int, reference: string, name: string, network: string|null, commission_pct: int}>
      * }
      */
     public function toArray(Request $request): array

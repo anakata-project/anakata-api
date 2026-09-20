@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Rms\AgencyController;
 use App\Http\Controllers\Rms\BookingController;
 use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\CalendarController;
+use App\Http\Controllers\Rms\CommissionController;
 use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
@@ -100,6 +102,7 @@ Route::post('bookings/quote', [BookingController::class, 'quote']);
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/transition', [BookingController::class, 'transition'])->whereNumber('booking');
 Route::post('bookings/{booking}/overdue-decision', [BookingController::class, 'overdueDecision'])->whereNumber('booking');
+Route::post('bookings/{booking}/commission-approval', [CommissionController::class, 'decide'])->whereNumber('booking');
 Route::post('bookings/{booking}/move/preview', [BookingController::class, 'movePreview'])->whereNumber('booking');
 Route::post('bookings/{booking}/move', [BookingController::class, 'move'])->whereNumber('booking');
 Route::patch('bookings/{booking}', [BookingController::class, 'update'])->whereNumber('booking');
@@ -109,6 +112,14 @@ Route::get('bookings/{booking}/history', [BookingController::class, 'history'])-
 Route::get('bookings/{booking}/payments', [PaymentController::class, 'forBooking'])->whereNumber('booking');
 Route::post('bookings/{booking}/payments', [PaymentController::class, 'store'])->whereNumber('booking');
 Route::post('bookings/{booking}/payment-link', [PaymentLinkController::class, 'store'])->whereNumber('booking');
+
+Route::get('agencies', [AgencyController::class, 'index']);
+Route::post('agencies', [AgencyController::class, 'store']);
+Route::get('agencies/{agency}', [AgencyController::class, 'show'])->whereNumber('agency');
+Route::patch('agencies/{agency}', [AgencyController::class, 'update'])->whereNumber('agency');
+Route::post('agencies/{agency}/decide', [AgencyController::class, 'decide'])->whereNumber('agency');
+
+Route::get('commissions', [CommissionController::class, 'index']);
 
 Route::get('groups', [GroupController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);

@@ -10,6 +10,7 @@ use App\Events\ConfigPublished;
 use App\Events\HoldExpired;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\MarkRequestHoldExpired;
+use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
@@ -121,6 +122,7 @@ class AppServiceProvider extends ServiceProvider
             'internal_block' => InternalBlock::class,
             'contact' => Contact::class,
             'group' => Group::class,
+            'agency' => Agency::class,
             'booking' => Booking::class,
             'booking_request' => BookingRequest::class,
             'waitlist_entry' => WaitlistEntry::class,

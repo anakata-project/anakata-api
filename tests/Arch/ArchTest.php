@@ -17,6 +17,7 @@ arch('crm controllers do not use money or booking write paths')
         'App\Actions\Payments',
         'App\Actions\Refunds',
         'App\Actions\Commissions',
+        'App\Actions\Agencies',
         'App\Actions\Documents',
         'App\Services\Pricing',
     ]);

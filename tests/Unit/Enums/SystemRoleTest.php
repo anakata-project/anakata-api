@@ -19,6 +19,7 @@ test('manager default permissions match the sprint list', function (): void {
         Permission::ItinerariesManage->value,
         Permission::BlocksManage->value,
         Permission::OffersManage->value,
+        Permission::AgenciesManage->value,
         Permission::EngineCopyManage->value,
         Permission::PipelineMoveStage->value,
     ]);

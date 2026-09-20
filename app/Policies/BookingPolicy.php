@@ -107,6 +107,16 @@ final class BookingPolicy extends Policy
             : Response::deny('Blocked: own-records rule.');
     }
 
+    public function commissionApproval(User $actor, Booking $booking): bool
+    {
+        return $actor->hasPermission(Permission::CommissionsOverrideCap);
+    }
+
+    public function viewCommissions(User $actor): bool
+    {
+        return $actor->hasPermission(Permission::BookingsViewAll);
+    }
+
     public function update(User $actor, Booking $booking): Response
     {
         $notes = request()->exists('internal_notes');

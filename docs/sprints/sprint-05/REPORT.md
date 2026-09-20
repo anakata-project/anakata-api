@@ -400,3 +400,174 @@ Settle Stripe payment links through the ledger and add gateway reconciliation.
 EOF
 )"
 ```
+
+## Task 04 · Agencies, commissions, the FIN-005 cap and `ON_HOLD_AGENCY`
+
+### What was built
+Travel-trade bookings carry an agency and a frozen commission. A rate above `commission.cap_pct` creates the booking at `ON_HOLD_AGENCY` and blocks CONFIRMED until someone with `commissions.override_cap` approves it. Agency registrations are reviewed against `sla.agency_approval_business_days`. Accrual is a read view; nothing is paid out.
+
+### Agency model
+`agencies`: `reference` (`AG-NNN` via `ReferenceType::Agency`), name, contact, email, country, network, `commission_pct`, `payment_terms`, `status` (`PENDING · APPROVED · REJECTED`), `requested_at`, `decided_at`, `decided_by`, `decision_reason`, timestamps, audit columns.
+
+`agency_users`: name, email, `status` (`PENDING · INVITED · ACTIVE · DISABLED`). The portal invite itself is later.
+
+Morph alias `agency`. `historyLabel()` = `reference`.
+
+### SLA
+`BusinessHours::businessDaysElapsed($from, $to)` counts open Galápagos days strictly after the start day, up to and including the end day. Weekends and `holds.holidays` are skipped (same helper as request holds).
+
+`AgencySla` reads `sla.agency_approval_business_days` (2). A PENDING agency is breached when elapsed **≥** the limit. Three business days is breached; two is the boundary and is also breached.
+
+### Registration and decision
+- `POST /api/rms/agencies` — `agencies.manage`. Status PENDING, `requested_at` now, one `PENDING` user from the contact. History `agency.registered`. Default rate from `commission.default_pct` (10).
+- `GET /api/rms/agencies` — filters `status`, `q`. Each row has `sla_business_days_elapsed` and `sla_breached`. `meta.kpis`: approved count, registrations to review, agency revenue, commission accrued (approved bookings only).
+- `POST /api/rms/agencies/{agency}/decide` `{ decision: APPROVED|REJECTED, reason? }` — rejection requires a reason. Approval marks users `INVITED`. History `agency.approved` / `agency.rejected`.
+- `PATCH /api/rms/agencies/{agency}` — name, contact, network, payment terms, `commission_pct`. Changing the agency rate never touches sold bookings (H8).
+- `GET /api/rms/agencies/{agency}` — bookings, revenue, accrued commission, and `portal_preview`.
+
+`GrantAgenciesManage` (migration `200031`) adds `agencies.manage` to an existing Manager role. `SystemRole::Manager` defaults include it for fresh seeds.
+
+### Commission on a booking (H8 / G4)
+Columns: `agency_id`, `commission_pct`, `commission_approved`, `commission_approved_by`, `commission_approved_at`, `commission_reason`.
+
+`CreateReservation` accepts `agency_id` and `commission_pct`. Defaults come from the agency. An agency is only accepted on a trade channel (`MainChannel::isTrade()`); otherwise 422. **Only an APPROVED agency can be sold against** — PENDING is 422 (`The agency must be approved before it can be sold against.`).
+
+`commission_pct` is frozen at sale. `commission_amount` is derived: `Rounding::halfUp(total × pct / 100)`. A move that changes the total changes the amount only.
+
+`GET /api/rms/bookings/form-options` adds `commission` (`cap_pct`, `default_pct`) and `agencies` (APPROVED only).
+
+### The cap (FIN-005)
+`commission_pct > commission.cap_pct` → created at `ON_HOLD_AGENCY`, `commission_approved = false`, a `BOOKING` claim (G9). System history:
+
+`HELD — commission 15 % above 12 % cap · Director alert sent (FIN-005)`
+
+(`15` and `12` are the live pct and `commission.cap_pct`, never literals in code.)
+
+`Transitions::targets(ON_HOLD_AGENCY)` = CONFIRMED, RELEASED, CANCELLED.
+
+`Transitions::legalTargets` hides CONFIRMED while `commission_approved` is false. `BookingResource.allowed_transitions` goes through `Transitions::allowedFor` → `legalTargets`, not `targets()`, so the panel never offers a button the API will reject. An unapproved hold's `allowed_transitions` is RELEASED and CANCELLED only.
+
+`ApplyPaymentEffects` is the only money → status inferrer. On `ON_HOLD_AGENCY`:
+- approved + deposit settled → CONFIRMED (then FULLY_PAID if the balance is zero)
+- unapproved → stay on hold and write `booking.confirmed_blocked` **once per episode**
+
+Episode cutoff: a blocked entry already exists **newer than** the last `booking.commission_approved` / `booking.commission_rejected` (compared by history `id`, because same-second payments share `created_at`). After a reject, the next payment writes a second blocked line. Wording:
+
+`Deposit settled — CONFIRMED blocked: commission 15 % above the 12 % cap (FIN-005)`
+
+`POST /api/rms/bookings/{booking}/commission-approval` `{ approve, reason }` — `commissions.override_cap`, reason required, no own-records. Approve sets the flag (does not change `commission_pct`), writes `booking.commission_approved`, then re-runs `ApplyPaymentEffects` so a settled deposit confirms in one step. Reject writes `booking.commission_rejected` and stays on hold.
+
+### `ON_HOLD_AGENCY` exits
+The prototype table is CONFIRMED + RELEASED. **CANCELLED is the sold-booking fall-through** (reason required). A held sale is a `BOOKING` claim; release and cancel both free the cabin. Task 05 owns the penalty / refund request.
+
+`TransitionBooking` RELEASED wording:
+- from REQUESTED: `Request released — hold returned to inventory`
+- otherwise: `Reservation released — cabin returned to inventory`
+
+### Deleted & released audit — input for task 07
+Sprint 4's `GET /api/rms/bookings/audit` already lists `booking.deleted` and `booking.released`. `BookingAuditResource.what` reads `after.what` when present; the fallback is still the request copy.
+
+Released **sold** bookings (including `ON_HOLD_AGENCY → RELEASED`) now write `after.what` = `Reservation released — cabin returned to inventory`. The audit row was verified: `data.0.what` is that sentence, `why` is the reason, `reference` is the booking. Task 07's Deleted & released panel must render `what` as returned and must not assume every release is a request.
+
+### Accrual
+`GET /api/rms/commissions?from&to&status` — `bookings.view_all`. Rows: booking, agency, rate, amount, payable date (`departure + commission.payable_days_after_cruise`), status:
+
+| Status | When |
+|---|---|
+| `CANCELLED` | booking is CANCELLED / CANCELLED_POSTPAID |
+| `BLOCKED` | over cap and unapproved |
+| `PAYABLE` | COMPLETED **and** the payable date has passed |
+| `ACCRUED` | everything else, including COMPLETED before the payable date |
+
+Paying commissions out is a later sprint. The list is the prototype's accrual view only.
+
+### Portal preview
+`portal_preview` is `commission_pct` plus **net** rates (`suite_pp`, `owner_pp`, `charter_week` after `Agency::netOf`). Public Suite / Owner / Charter prices are not on the payload. The agent portal, login, and net-rate pricing for agents are still owed.
+
+### Seed (local/testing)
+`DemoAgenciesSeeder` after `DemoBookingsSeeder`. Values from `seed-data.json` `agencies`:
+
+| Agency | Status | Rate | Notes |
+|---|---|---|---|
+| AG-001 Blue Latitude | APPROVED | 10 % | attached to `ANK-2026-0007` |
+| AG-002 Meridian Voyages | APPROVED | 15 % | `ANK-2026-0021` `ON_HOLD_AGENCY` on ANAMARA S1 2027-11-14 |
+| AG-003 Andes Luxe | PENDING | 10 % | pre-invite user `PENDING`; SLA already breached as of 2026-09-20 |
+
+Idempotent. `ensureAtLeast` Agency 3, Booking 21.
+
+### Checks
+`composer check` passed: 598 Pest tests, Pint, Larastan level 6.
+
+### Deviations
+- **APPROVED-only to sell against.** A PENDING agency exists in `agencies` but `CreateReservation` rejects it. The task did not say this; selling against an unreviewed partner would put money on a name that might be rejected.
+- **`AgencyUserStatus::PENDING`.** The task listed `INVITED · ACTIVE · DISABLED`. Staff registration creates a user before the invite; PENDING is that pre-invite state. Approval moves them to INVITED. Seed maps “Invite on approval” to PENDING.
+
+### Open questions
+None for this task.
+
+### Notes for later
+- Task 05: penalty and refund request on CANCELLED from `ON_HOLD_AGENCY` (existing `TODO(task 05)` in `TransitionBooking`).
+- Task 07: Deleted & released now includes released sold bookings; render `what` as returned (`Reservation released — cabin returned to inventory`). Payments tab is unchanged by this task.
+- Task 09: B2B & Agent Portal screens consume the agency index / show / decide endpoints and the net-only preview.
+- Task 10: New Reservation agency + commission fields; `form-options.agencies` is APPROVED only.
+- Task 11: PAY-* e2e for the cap hold, approval, and release wording.
+- Agent portal login and net-rate pricing: later sprint.
+- Commission payout ledger: later sprint.
+
+### Git (do not run; no tag)
+
+```
+git add app/Actions/Agencies
+git add app/Actions/Bookings/CreateReservation.php
+git add app/Actions/Bookings/TransitionBooking.php
+git add app/Actions/Commissions/DecideCommissionCap.php
+git add app/Enums/AgencyStatus.php
+git add app/Enums/AgencyUserStatus.php
+git add app/Enums/CommissionAccrualStatus.php
+git add app/Enums/SystemRole.php
+git add app/Http/Controllers/Rms/AgencyController.php
+git add app/Http/Controllers/Rms/BookingController.php
+git add app/Http/Controllers/Rms/CommissionController.php
+git add app/Http/Requests/Rms/CommissionApprovalRequest.php
+git add app/Http/Requests/Rms/DecideAgencyRequest.php
+git add app/Http/Requests/Rms/IndexAgenciesRequest.php
+git add app/Http/Requests/Rms/IndexCommissionsRequest.php
+git add app/Http/Requests/Rms/StoreAgencyRequest.php
+git add app/Http/Requests/Rms/StoreReservationRequest.php
+git add app/Http/Requests/Rms/UpdateAgencyRequest.php
+git add app/Http/Resources/Rms/AgencyResource.php
+git add app/Http/Resources/Rms/BookingFormOptionsResource.php
+git add app/Http/Resources/Rms/BookingResource.php
+git add app/Http/Resources/Rms/CommissionResource.php
+git add app/Models/Agency.php
+git add app/Models/AgencyUser.php
+git add app/Models/Booking.php
+git add app/Policies/AgencyPolicy.php
+git add app/Policies/BookingPolicy.php
+git add app/Providers/AppServiceProvider.php
+git add app/Support/Agencies
+git add app/Support/Bookings/BookingFormOptions.php
+git add app/Support/Bookings/Transitions.php
+git add app/Support/BusinessHours.php
+git add app/Support/Commissions
+git add app/Support/Payments/ApplyPaymentEffects.php
+git add app/Support/Roles/GrantAgenciesManage.php
+git add database/factories/AgencyFactory.php
+git add database/migrations/2026_09_20_200030_create_agencies_tables.php
+git add database/migrations/2026_09_20_200031_grant_agencies_manage_to_manager.php
+git add database/seeders/DatabaseSeeder.php
+git add database/seeders/DemoAgenciesSeeder.php
+git add docs/sprints/sprint-05/REPORT.md
+git add routes/api/rms.php
+git add tests/Arch/ArchTest.php
+git add tests/Feature/Agencies
+git add tests/Feature/Bookings/BookingFormOptionsTest.php
+git add tests/Unit/Enums/SystemRoleTest.php
+git add tests/Unit/Support/Bookings/TransitionsTest.php
+git add tests/Unit/Support/BusinessHoursTest.php
+git commit -m "$(cat <<'EOF'
+Add agencies, frozen commissions, and the FIN-005 ON_HOLD_AGENCY cap.
+
+EOF
+)"
+```

@@ -6,12 +6,15 @@ namespace App\Actions\Bookings;
 
 use App\Actions\Action;
 use App\Actions\Contacts\ResolveContact;
+use App\Enums\AgencyStatus;
 use App\Enums\BookingStatus;
 use App\Enums\BookingType;
 use App\Enums\ClaimKind;
 use App\Enums\ConfigKind;
+use App\Enums\MainChannel;
 use App\Enums\ReferenceType;
 use App\Exceptions\CabinUnavailableException;
+use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\Cabin;
 use App\Models\Contact;
@@ -69,6 +72,8 @@ final class CreateReservation extends Action
                 ? $terms->charterBalanceDays
                 : $terms->cabinBalanceDays;
 
+            $commission = $this->resolveCommission($data);
+
             $bookings = new Collection;
 
             foreach ($quote->parties as $party) {
@@ -84,6 +89,7 @@ final class CreateReservation extends Action
                         ? $data['internal_notes']
                         : null,
                     $data,
+                    $commission,
                 );
 
                 $cabins = $quote->type === BookingType::Charter
@@ -167,6 +173,7 @@ final class CreateReservation extends Action
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool}|null  $commission
      */
     private function createBooking(
         ReservationQuote $quote,
@@ -178,6 +185,7 @@ final class CreateReservation extends Action
         int $balanceDays,
         ?string $notes,
         array $data,
+        ?array $commission,
     ): Booking {
         $priced = $party->quote;
 
@@ -196,7 +204,12 @@ final class CreateReservation extends Action
             'contact_id' => $contact->id,
             'group_id' => $group?->id,
             'owner_id' => $actor->id,
-            'status' => BookingStatus::PendingPayment,
+            'agency_id' => $commission === null ? null : $commission['agency_id'],
+            'commission_pct' => $commission === null ? null : $commission['commission_pct'],
+            'commission_approved' => $commission === null ? false : $commission['commission_approved'],
+            'status' => $commission !== null && $commission['over_cap']
+                ? BookingStatus::OnHoldAgency
+                : BookingStatus::PendingPayment,
             'main_channel' => $data['main_channel'],
             'channel_of_origin' => $data['channel_of_origin'],
             'adults' => $party->adults,
@@ -228,7 +241,68 @@ final class CreateReservation extends Action
             'what' => $what,
         ]);
 
+        if ($commission !== null && $commission['over_cap']) {
+            $cap = $this->config->businessRules()->commission->capPct;
+            $pct = $commission['commission_pct'];
+
+            History::record($booking, 'booking.commission_held', after: [
+                'what' => 'HELD — commission '.$pct.' % above '.$cap.' % cap · Director alert sent (FIN-005)',
+                'commission_pct' => $pct,
+                'cap_pct' => $cap,
+            ], system: true);
+        }
+
         return $booking;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool}|null
+     */
+    private function resolveCommission(array $data): ?array
+    {
+        $agencyId = $data['agency_id'] ?? null;
+
+        if ($agencyId === null || $agencyId === '') {
+            return null;
+        }
+
+        $channel = $data['main_channel'] instanceof MainChannel
+            ? $data['main_channel']
+            : MainChannel::from((string) $data['main_channel']);
+
+        if (! $channel->isTrade()) {
+            throw ValidationException::withMessages([
+                'agency_id' => ['An agency can only be attached to a trade channel.'],
+            ]);
+        }
+
+        $agency = Agency::query()->find((int) $agencyId);
+
+        if (! $agency instanceof Agency) {
+            throw ValidationException::withMessages([
+                'agency_id' => ['The agency is not available.'],
+            ]);
+        }
+
+        if ($agency->status !== AgencyStatus::Approved) {
+            throw ValidationException::withMessages([
+                'agency_id' => ['The agency must be approved before it can be sold against.'],
+            ]);
+        }
+
+        $pct = isset($data['commission_pct']) && $data['commission_pct'] !== ''
+            ? (int) $data['commission_pct']
+            : $agency->commission_pct;
+        $cap = $this->config->businessRules()->commission->capPct;
+        $overCap = $pct > $cap;
+
+        return [
+            'agency_id' => $agency->id,
+            'commission_pct' => $pct,
+            'commission_approved' => ! $overCap,
+            'over_cap' => $overCap,
+        ];
     }
 
     private function requireCabin(QuotedParty $party): Cabin

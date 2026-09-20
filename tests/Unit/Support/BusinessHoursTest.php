@@ -162,6 +162,33 @@ test('remaining business minutes from Tuesday 10:00 to next Tuesday 13:00 is 48 
     expect(businessHoursCalculator()->remainingBusinessMinutes($from, $until))->toBe(48 * 60);
 });
 
+test('business days elapsed skips the start day, weekends and holidays', function (): void {
+    $hours = businessHoursCalculator(['holidays' => ['2026-09-23']]);
+
+    // Mon 21 → Wed 23: Tue + Wed, but Wed is a holiday → 1
+    expect($hours->businessDaysElapsed(
+        galtDateTime('2026-09-21 10:00:00'),
+        galtDateTime('2026-09-23 12:00:00'),
+    ))->toBe(1);
+
+    // Mon 21 → Thu 24: Tue + (Wed holiday skipped) + Thu → 2
+    expect($hours->businessDaysElapsed(
+        galtDateTime('2026-09-21 10:00:00'),
+        galtDateTime('2026-09-24 12:00:00'),
+    ))->toBe(2);
+
+    // Friday → Monday: only Monday counts
+    expect($hours->businessDaysElapsed(
+        galtDateTime('2026-09-25 10:00:00'),
+        galtDateTime('2026-09-28 12:00:00'),
+    ))->toBe(1);
+
+    expect($hours->businessDaysElapsed(
+        galtDateTime('2026-09-21 10:00:00'),
+        galtDateTime('2026-09-21 18:00:00'),
+    ))->toBe(0);
+});
+
 test('remaining business minutes is zero when the instant is past', function (): void {
     $from = galtDateTime('2026-09-29 13:00:00');
     $until = galtDateTime('2026-09-22 10:00:00');

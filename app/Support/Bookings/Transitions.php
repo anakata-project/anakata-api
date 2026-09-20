@@ -40,6 +40,11 @@ final class Transitions
             BookingStatus::OnBoard => [
                 BookingStatus::Completed,
             ],
+            BookingStatus::OnHoldAgency => [
+                BookingStatus::Confirmed,
+                BookingStatus::Released,
+                BookingStatus::Cancelled,
+            ],
             default => [],
         };
     }
@@ -86,7 +91,16 @@ final class Transitions
     {
         return array_values(array_filter(
             self::targets($booking->status),
-            fn (BookingStatus $to): bool => self::dateGuardAllowsFor($booking, $to),
+            function (BookingStatus $to) use ($booking): bool {
+                if ($booking->status === BookingStatus::OnHoldAgency
+                    && $to === BookingStatus::Confirmed
+                    && ! $booking->commission_approved
+                ) {
+                    return false;
+                }
+
+                return self::dateGuardAllowsFor($booking, $to);
+            },
         ));
     }
 

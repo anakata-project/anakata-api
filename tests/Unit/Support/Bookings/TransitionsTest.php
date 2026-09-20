@@ -16,6 +16,8 @@ test('the sprint 4 table matches TRANS minus sprint 5 states', function (): void
         ->toBe(['ON_BOARD', 'CANCELLED_POSTPAID']);
     expect(array_map(fn (BookingStatus $status): string => $status->value, Transitions::targets(BookingStatus::OnBoard)))
         ->toBe(['COMPLETED']);
+    expect(array_map(fn (BookingStatus $status): string => $status->value, Transitions::targets(BookingStatus::OnHoldAgency)))
+        ->toBe(['CONFIRMED', 'RELEASED', 'CANCELLED']);
 
     foreach ([
         BookingStatus::Completed,
@@ -23,7 +25,6 @@ test('the sprint 4 table matches TRANS minus sprint 5 states', function (): void
         BookingStatus::CancelledPostpaid,
         BookingStatus::Released,
         BookingStatus::Overdue,
-        BookingStatus::OnHoldAgency,
         BookingStatus::Waitlisted,
     ] as $terminal) {
         expect(Transitions::targets($terminal))->toBe([]);

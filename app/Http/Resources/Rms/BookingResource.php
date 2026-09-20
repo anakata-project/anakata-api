@@ -60,6 +60,13 @@ class BookingResource extends JsonResource
      *     contact: array{id: int, name: string, email: string|null, phone: string|null, country: string|null, preferred_channel: string},
      *     group: array{id: int, reference: string, name: string, coordinator: array{id: int, name: string}}|null,
      *     owner: array{id: int, name: string},
+     *     agency: array{id: int, reference: string, name: string, commission_pct: int}|null,
+     *     commission_pct: int|null,
+     *     commission_amount: int,
+     *     commission_approved: bool,
+     *     commission_approved_by: array{id: int, name: string}|null,
+     *     commission_approved_at: string|null,
+     *     commission_reason: string|null,
      *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string, remaining_business_minutes: int}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null,
      *     payment_links: list<array{id: int, kind: string, amount: int, stripe_id: string, url: string, status: string, mode: string, created_at: string}>
      * }
@@ -73,6 +80,8 @@ class BookingResource extends JsonResource
             'contact',
             'group.coordinator',
             'owner',
+            'agency',
+            'commissionApprovedBy',
             'ratesVersion',
             'bookingRequest',
             'activeClaims',
@@ -143,6 +152,21 @@ class BookingResource extends JsonResource
                 'id' => $this->owner->id,
                 'name' => $this->owner->name,
             ],
+            'agency' => $this->agency === null ? null : [
+                'id' => $this->agency->id,
+                'reference' => $this->agency->reference,
+                'name' => $this->agency->name,
+                'commission_pct' => $this->agency->commission_pct,
+            ],
+            'commission_pct' => $this->commission_pct,
+            'commission_amount' => $this->commissionAmount(),
+            'commission_approved' => $this->commission_approved,
+            'commission_approved_by' => $this->commissionApprovedBy === null ? null : [
+                'id' => $this->commissionApprovedBy->id,
+                'name' => $this->commissionApprovedBy->name,
+            ],
+            'commission_approved_at' => Iso::utc($this->commission_approved_at),
+            'commission_reason' => $this->commission_reason,
             'request' => RequestSummary::for($this->resource),
             'payment_links' => $this->relationLoaded('paymentLinks')
                 ? PaymentLinkResource::collection($this->paymentLinks)->resolve()
