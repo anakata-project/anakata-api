@@ -22,6 +22,7 @@ final class Ledger
         'payments_paid_sum',
         'payments_pledged_sum',
         'payments_count',
+        'awaiting_wire_created_at',
     ];
 
     public static function paid(Booking $booking): int

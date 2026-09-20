@@ -66,6 +66,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'HoldResource',
         'WaitlistEntryResource',
         'PaymentResource',
+        'RecordedPaymentResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }
@@ -131,7 +132,16 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     expect($conflictRef)->toContain('CabinUnavailableException');
 
     $booking = openApiSchema($spec, 'BookingResource');
-    expect($booking['properties'])->toHaveKeys(['allowed_transitions', 'request', 'paid', 'pledged', 'payments_count']);
+    expect($booking['properties'])->toHaveKeys([
+        'allowed_transitions',
+        'request',
+        'paid',
+        'pledged',
+        'payments_count',
+        'overdue',
+        'overdue_days',
+        'wire_window_ends_at',
+    ]);
 
     $payment = openApiSchema($spec, 'PaymentResource');
     expect($payment['properties'])->toHaveKeys([
@@ -144,6 +154,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'gateway_id',
         'recorded_by',
         'can_mark_wire',
+        'wire_window_ends_at',
         'booking',
     ]);
 

@@ -46,6 +46,7 @@ enum Permission: string
 
     case PipelineMoveStage = 'pipeline.move_stage';
 
+    case PaymentsRecord = 'payments.record';
     case PaymentsMarkWireReceived = 'payments.mark_wire_received';
     case RefundsExecute = 'refunds.execute';
 
@@ -82,6 +83,7 @@ enum Permission: string
             self::AgenciesManage => 'Manage agencies',
             self::GuestsViewSensitive => 'View sensitive guest data',
             self::PipelineMoveStage => 'Move lead stage',
+            self::PaymentsRecord => 'Record a payment',
             self::PaymentsMarkWireReceived => 'Mark wire received',
             self::RefundsExecute => 'Execute refunds',
             self::RefundsApprove => 'Approve refunds',
@@ -119,6 +121,7 @@ enum Permission: string
             self::AgenciesManage => 'commercial',
             self::GuestsViewSensitive => 'guests',
             self::PipelineMoveStage => 'crm',
+            self::PaymentsRecord,
             self::PaymentsMarkWireReceived,
             self::RefundsExecute => 'finance',
             self::RefundsApprove,

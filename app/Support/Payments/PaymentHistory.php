@@ -13,6 +13,8 @@ final class PaymentHistory
 {
     public const RECORDED = 'payment.recorded';
 
+    public const SETTLED = 'payment.settled';
+
     /**
      * @return array{reference: string, kind: string, method: string, amount: int, status: string}
      */

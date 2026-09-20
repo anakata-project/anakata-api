@@ -30,6 +30,7 @@ class IndexBookingsRequest extends FormRequest
             'group_id' => ['sometimes', 'integer', 'exists:groups,id'],
             'q' => ['sometimes', 'string', 'max:255'],
             'mine' => ['sometimes', 'boolean'],
+            'overdue' => ['sometimes', 'boolean'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }

@@ -139,3 +139,129 @@ Add the append-only payments ledger and compute booking balances from it.
 EOF
 )"
 ```
+
+## Task 02 · Payment-driven transitions, wires, OVERDUE and the OPS-007 decision
+
+### What was built
+Recording money moves the booking. A settled deposit confirms `PENDING_PAYMENT`; a balance that reaches zero makes it `FULLY_PAID`. Wires stay pledged until finance marks them received. A past-due balance raises a derived OVERDUE flag; the only way out is a human OPS-007 decision. No job cancels a booking.
+
+### Transitions (H4)
+`PENDING_PAYMENT → CONFIRMED` and `CONFIRMED → FULLY_PAID` were already legal. They are now also taken by **System** through `TransitionBooking` (`?User $actor`, `system: true`), with the payment reference as the reason (`Deposit settled · ANK-2026-0014-D01`). The legal table, history and claims stay in one place.
+
+`TransitionBooking` accepts an optional `what` override so OPS-007 can write the prototype sentences. The manual FULLY_PAID path is unchanged: when `Ledger::paid` is less than `total` it still appends `(marked manually — USD … not in the payments record)`.
+
+### `ApplyPaymentEffects`
+The only class that infers status from money. Caller already holds the H10 locks. Never locks. Must run inside a transaction (`guardTransaction`). Uses `Ledger::paidFresh()`.
+
+- `paid >= deposit_amount` and `PENDING_PAYMENT` → CONFIRMED (System). Draws `ANK-` if the booking still has only a request reference (G3).
+- `balance <= 0` and `CONFIRMED` → FULLY_PAID.
+- Both at once → two transitions and two `booking.status_changed` rows, in that order. After the first `TransitionBooking` the booking is re-read (it returns a fresh locked instance); without that a covering payment stayed `PENDING_PAYMENT`.
+- Idempotent: a second call in the same state does nothing. Task 03's webhook relies on that.
+- `TODO(task 04)`: also treat `ON_HOLD_AGENCY` after the commission-cap override.
+
+### `RecordPayment`
+`POST /api/rms/bookings/{booking}/payments` `{ kind, method, amount, paid_at?, note?, status? }`.
+
+Permission **`payments.record`** (new enum case). Granted to Admin (via `isAdmin()`) and the demo External finance role. **Finance, not own-records** — a Sales Exec cannot record money even on a booking they own.
+
+One transaction, Sprint 4 lock order (H10): departure → booking (`BookingMutationLock::acquire`) → draw reference → insert. `WIRE` defaults to `AWAITING_WIRE`; every other method defaults to `SETTLED`. An explicit status is accepted only for `WIRE`. Amount must be positive; `REFUND` is 422 (task 05). Overpayment is allowed and warned (`This takes the booking above its total by USD …`); never clamped.
+
+History: `payment.recorded`, then any transition as its own entry. Response is `RecordedPaymentResource`: the payment fields plus the full `BookingResource` and `warnings`.
+
+### Wires (H6)
+A wire is pledged, not paid. `MarkWireReceived` — `POST /api/rms/payments/{payment}/mark-received` `{ bank_reference }`. Permission `payments.mark_wire_received`. Only `AWAITING_WIRE` (else 422). Locks the booking, then UPDATEs `status` → `SETTLED`, stores the bank reference in **`gateway_id`**, sets `paid_at` to the Galápagos date, then `ApplyPaymentEffects`. History `payment.settled` (payload plus `bank_reference`).
+
+This is the first path that mutates a ledger row. The task 01 trigger allows `status` / `gateway_id` / `paid_at` (and audit timestamps); frozen `booking_id` / `kind` / `amount` / `reference` still SIGNAL. A test marks a wire received then asserts a raw `amount` UPDATE still throws.
+
+### Wire window — for tasks 07 / 08
+`wire_window_ends_at` is **the awaiting-wire payment's `created_at` + `payments.wire_window_hours`**, not the booking's `created_at`. A `PENDING_PAYMENT` booking with no awaiting wire returns **null**. Surfaced on both `PaymentResource` and `BookingResource`. Read `WireWindow::hours()` from `CurrentConfig`; never hard-code 72.
+
+### OVERDUE (H5)
+Not a status. `BookingStatus::Overdue` stays unused.
+
+`Booking::isOverdue()` = status is CONFIRMED or `ON_HOLD_AGENCY`, `balance > 0`, and the Galápagos calendar date is **strictly after** `balance_due_date` (due day itself is not overdue, including 23:30 GALT). `overdue_since` is the due date. `PENDING_PAYMENT` is never overdue.
+
+Due date is `balance_due_date_override` when set, else departure − frozen `balance_days`. SQL and KPIs use `PaymentStatus::paidValues()` (every status except `AWAITING_WIRE` — SETTLED **and** REFUNDED). A negative REFUNDED row can make a booking overdue. Never `status = SETTLED` only.
+
+`BookingResource` adds `overdue`, `overdue_days`, `wire_window_ends_at`. Index filter `overdue=1`. `meta.kpis` always includes `overdue_count` and `overdue_amount` for the visibility-filtered set. The amount test compares the KPI to the summed `BookingResource.balance` of **at least two** overdue bookings, one carrying a REFUNDED row.
+
+`anakata:flag-overdue` writes `booking.overdue_flagged` (System) **once per episode**. It never changes status. Skip if a flag exists at or after the last due-date change: latest `booking.overdue_extended` `created_at` when present, else `updated_at` if an override is set, else `created_at`. Scheduled `daily()` in `Pacific/Galapagos`. The flag itself is computed, not stored; only the notification marker is persisted.
+
+`anakata:set-overdue-fixture` (local/testing only) sets `ANK-2026-0018`'s `balance_due_date_override` to yesterday so PAY-08 has something overdue.
+
+### OPS-007
+`POST /api/rms/bookings/{booking}/overdue-decision` `{ decision: EXTEND|CANCEL, reason, new_due_date? }`. Permission `bookings.overdue_decision` plus own-records (403 `Blocked: own-records rule.`). Reason required for both (blank after trim is missing). Not overdue → 422.
+
+- **EXTEND:** `new_due_date` required, future Galápagos date, not after departure. Writes `balance_due_date_override`; frozen `balance_days` is untouched. History `booking.overdue_extended`, wording `OPS-007 decision — extension granted · OVERDUE → CONFIRMED`.
+- **CANCEL:** through `TransitionBooking` to CANCELLED so claims release as they already do. Wording `OPS-007 decision — cancelled per policy · OVERDUE → CANCELLED`. `TODO(task 05)` at the refund-request spot.
+
+### Concurrency
+Sprint 4 harness (`innodb_lock_wait_timeout = 1`): two `RecordPayment` calls on one booking wait **1205**, never 1213, produce two payments with distinct references, and exactly one CONFIRMED transition.
+
+### Checks
+`composer check` passed (558 tests, Pint, Larastan level 6).
+
+### Deviations
+- The transition table did not need new edges; System reaches the existing ones through `TransitionBooking`.
+- `awaiting_wire_created_at` from `withMin` is treated as “no wire” when the attribute is present and null, so the bookings list does not N+1 `payments` (BookingListQueryCountTest).
+
+### Open questions
+None for this task.
+
+### Notes for later
+- Task 03: webhook must call `ApplyPaymentEffects` (already idempotent).
+- Task 04: `ON_HOLD_AGENCY` after the commission-cap override (`TODO` in `ApplyPaymentEffects`).
+- Task 05: refund request on OPS-007 CANCEL (`TODO` in `DecideOverdue` / `TransitionBooking`).
+- Tasks 07 / 08: `wire_window_ends_at` = payment `created_at` + `payments.wire_window_hours`; null when there is no awaiting wire. Do not use booking `created_at`.
+- Task 11: PAY-* e2e. `anakata:set-overdue-fixture` is the local/testing hook for PAY-08.
+- `payments.balance_reminder_days` stays unused this sprint (Sprint 7).
+
+### Git (do not run; no tag)
+
+```
+git add app/Actions/Bookings/DecideOverdue.php
+git add app/Actions/Bookings/TransitionBooking.php
+git add app/Actions/Payments/MarkWireReceived.php
+git add app/Actions/Payments/RecordPayment.php
+git add app/Console/Commands/FlagOverdueCommand.php
+git add app/Console/Commands/SetOverdueFixtureCommand.php
+git add app/Enums/OverdueDecision.php
+git add app/Enums/Permission.php
+git add app/Http/Controllers/Rms/BookingController.php
+git add app/Http/Controllers/Rms/PaymentController.php
+git add app/Http/Requests/Rms/IndexBookingsRequest.php
+git add app/Http/Requests/Rms/MarkWireReceivedRequest.php
+git add app/Http/Requests/Rms/OverdueDecisionRequest.php
+git add app/Http/Requests/Rms/RecordPaymentRequest.php
+git add app/Http/Resources/Rms/BookingResource.php
+git add app/Http/Resources/Rms/PaymentResource.php
+git add app/Http/Resources/Rms/RecordedPaymentResource.php
+git add app/Models/Booking.php
+git add app/Policies/BookingPolicy.php
+git add app/Policies/PaymentPolicy.php
+git add app/Support/Payments/ApplyPaymentEffects.php
+git add app/Support/Payments/Ledger.php
+git add app/Support/Payments/PaymentHistory.php
+git add app/Support/Payments/RecordedPayment.php
+git add app/Support/Payments/WireWindow.php
+git add database/migrations/2026_09_20_200026_add_balance_due_date_override_to_bookings.php
+git add database/seeders/DemoUsersSeeder.php
+git add docs/sprints/sprint-05/REPORT.md
+git add routes/api/rms.php
+git add routes/console.php
+git add tests/Concurrency/RecordPaymentConcurrencyTest.php
+git add tests/Feature/Bookings/BookingOverdueTest.php
+git add tests/Feature/Bookings/FlagOverdueCommandTest.php
+git add tests/Feature/Bookings/OverdueDecisionTest.php
+git add tests/Feature/Bookings/TransitionBookingTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add tests/Feature/Payments/MarkWireReceivedTest.php
+git add tests/Feature/Payments/RecordPaymentTest.php
+git add tests/Pest.php
+git add tests/Unit/Enums/PermissionTest.php
+git commit -m "$(cat <<'EOF'
+Drive booking status from the payments ledger and add the OPS-007 overdue decision.
+
+EOF
+)"
+```

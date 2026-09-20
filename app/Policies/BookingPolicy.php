@@ -91,6 +91,22 @@ final class BookingPolicy extends Policy
             : Response::deny('Blocked: own-records rule.');
     }
 
+    public function recordPayment(User $actor, Booking $booking): bool
+    {
+        return $actor->hasPermission(Permission::PaymentsRecord);
+    }
+
+    public function overdueDecision(User $actor, Booking $booking): Response
+    {
+        if (! $actor->hasPermission(Permission::BookingsOverdueDecision)) {
+            return Response::deny();
+        }
+
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
     public function update(User $actor, Booking $booking): Response
     {
         $notes = request()->exists('internal_notes');

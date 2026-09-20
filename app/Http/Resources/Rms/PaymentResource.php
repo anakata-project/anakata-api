@@ -8,6 +8,8 @@ use App\Enums\PaymentStatus;
 use App\Enums\Permission;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\Iso;
+use App\Support\Payments\WireWindow;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,6 +32,7 @@ class PaymentResource extends JsonResource
      *     gateway_id: string|null,
      *     recorded_by: string|null,
      *     can_mark_wire: bool,
+     *     wire_window_ends_at: string|null,
      *     booking: array{id: int, display_reference: string|null}
      * }
      */
@@ -53,6 +56,7 @@ class PaymentResource extends JsonResource
             'can_mark_wire' => $actor instanceof User
                 && $actor->hasPermission(Permission::PaymentsMarkWireReceived)
                 && $this->status === PaymentStatus::AwaitingWire,
+            'wire_window_ends_at' => Iso::utc(WireWindow::endsAtFor($this->resource)),
             'booking' => [
                 'id' => $this->booking->id,
                 'display_reference' => $this->booking->displayReference(),

@@ -36,9 +36,9 @@ final class TransitionBooking extends Action
      *
      * @throws CabinUnavailableException
      */
-    public function handle(Booking $booking, array $data, User $actor): Booking
+    public function handle(Booking $booking, array $data, ?User $actor, bool $system = false): Booking
     {
-        return $this->transaction(function () use ($booking, $data, $actor): Booking {
+        return $this->transaction(function () use ($booking, $data, $actor, $system): Booking {
             $expectedDepartureId = (int) $booking->departure_id;
             $booking = BookingMutationLock::acquire($booking, $expectedDepartureId);
             $booking->load(['departure.yacht.cabins', 'cabin', 'contact', 'claims']);
@@ -64,7 +64,7 @@ final class TransitionBooking extends Action
                 $booking->reference = $this->references->next(ReferenceType::Booking);
             }
 
-            $what = $this->wording($booking, $from, $to);
+            $what = $this->wording($booking, $from, $to, $data);
             $client = $booking->contact->name;
 
             $booking->status = $to;
@@ -78,7 +78,7 @@ final class TransitionBooking extends Action
                 'status' => $to->value,
                 'what' => $what,
                 'client' => $client,
-            ], reason: $reason, actor: $actor);
+            ], reason: $reason, actor: $system ? null : $actor, system: $system);
 
             return $booking->refresh()->load([
                 'departure.yacht',
@@ -105,8 +105,15 @@ final class TransitionBooking extends Action
         return $reason === '' ? null : $reason;
     }
 
-    private function wording(Booking $booking, BookingStatus $from, BookingStatus $to): string
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function wording(Booking $booking, BookingStatus $from, BookingStatus $to, array $data = []): string
     {
+        if (isset($data['what']) && is_string($data['what']) && $data['what'] !== '') {
+            return $data['what'];
+        }
+
         if ($to === BookingStatus::Released) {
             return 'Request released — hold returned to inventory';
         }
@@ -149,7 +156,7 @@ final class TransitionBooking extends Action
                 $booking,
                 $to === BookingStatus::Released ? ReleaseReason::Released : ReleaseReason::Cancelled,
             );
-            // TODO(Sprint 5): penalty, refund request, and client notification (G6).
+            // TODO(task 05): penalty, refund request, and client notification (G6).
 
             return;
         }

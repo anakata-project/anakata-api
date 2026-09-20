@@ -30,6 +30,7 @@ test('the sprint 0 stub values still exist', function (): void {
         'bookings.move',
         'bookings.delete',
         'users.manage',
+        'payments.record',
         'payments.mark_wire_received',
         'refunds.execute',
         'commissions.override_cap',

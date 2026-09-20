@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Policies\BookingPolicy;
 use App\Support\Bookings\RequestSummary;
 use App\Support\Bookings\Transitions;
+use App\Support\Iso;
 use App\Support\Payments\Ledger;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -45,6 +46,9 @@ class BookingResource extends JsonResource
      *     deposit_amount: int,
      *     balance_days: int,
      *     balance_due_date: string,
+     *     overdue: bool,
+     *     overdue_days: int|null,
+     *     wire_window_ends_at: string|null,
      *     price_lines: list<array{code: string, label: string, amount: int}>,
      *     rates_version: array{id: int, version: int},
      *     internal_notes: string|null,
@@ -100,6 +104,9 @@ class BookingResource extends JsonResource
             'deposit_amount' => $this->depositAmount(),
             'balance_days' => $this->balance_days,
             'balance_due_date' => $this->balanceDueDate()->toDateString(),
+            'overdue' => $this->isOverdue(),
+            'overdue_days' => $this->overdueDays(),
+            'wire_window_ends_at' => Iso::utc($this->wireWindowEndsAt()),
             'price_lines' => $this->price_lines,
             'rates_version' => [
                 'id' => $this->ratesVersion->id,

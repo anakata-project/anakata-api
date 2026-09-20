@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\CalendarDate;
 use App\Enums\BookingSegment;
 use App\Enums\BookingStatus;
 use App\Enums\BookingType;
@@ -12,7 +13,9 @@ use App\Enums\MainChannel;
 use App\Enums\PaymentStatus;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Support\BusinessTime;
 use App\Support\Payments\Ledger;
+use App\Support\Payments\WireWindow;
 use App\Support\Rounding;
 use Carbon\CarbonImmutable;
 use Database\Factories\BookingFactory;
@@ -49,6 +52,7 @@ use Illuminate\Support\Collection;
  * @property int $total
  * @property int $deposit_pct
  * @property int $balance_days
+ * @property CarbonImmutable|null $balance_due_date_override
  * @property string|null $internal_notes
  * @property Carbon|null $deleted_at
  * @property int|null $created_by
@@ -68,6 +72,7 @@ use Illuminate\Support\Collection;
  * @property-read int|null $payments_paid_sum
  * @property-read int|null $payments_pledged_sum
  * @property-read int $payments_count
+ * @property-read string|null $awaiting_wire_created_at
  */
 #[Fillable([
     'reference',
@@ -89,6 +94,7 @@ use Illuminate\Support\Collection;
     'total',
     'deposit_pct',
     'balance_days',
+    'balance_due_date_override',
     'internal_notes',
 ])]
 class Booking extends Model
@@ -113,6 +119,7 @@ class Booking extends Model
             'total' => 'integer',
             'deposit_pct' => 'integer',
             'balance_days' => 'integer',
+            'balance_due_date_override' => CalendarDate::class,
         ];
     }
 
@@ -236,9 +243,116 @@ class Booking extends Model
 
     public function balanceDueDate(): CarbonImmutable
     {
+        if ($this->balance_due_date_override instanceof CarbonImmutable) {
+            return $this->balance_due_date_override;
+        }
+
         $this->loadMissing('departure');
 
         return $this->departure->date->subDays($this->balance_days);
+    }
+
+    public function isOverdue(): bool
+    {
+        if (! in_array($this->status, [BookingStatus::Confirmed, BookingStatus::OnHoldAgency], true)) {
+            return false;
+        }
+
+        if ($this->balance() <= 0) {
+            return false;
+        }
+
+        return BusinessTime::now()->toDateString() > $this->balanceDueDate()->toDateString();
+    }
+
+    public function overdueDays(): ?int
+    {
+        if (! $this->isOverdue()) {
+            return null;
+        }
+
+        return (int) $this->balanceDueDate()->diffInDays(BusinessTime::now()->toDateString());
+    }
+
+    public function overdueSince(): ?CarbonImmutable
+    {
+        if (! $this->isOverdue()) {
+            return null;
+        }
+
+        return $this->balanceDueDate();
+    }
+
+    public function wireWindowEndsAt(): ?CarbonImmutable
+    {
+        $started = $this->awaitingWireStartedAt();
+
+        if ($started === null) {
+            return null;
+        }
+
+        return WireWindow::endsAt($started);
+    }
+
+    public function dueDateChangedAt(): CarbonImmutable
+    {
+        if ($this->balance_due_date_override instanceof CarbonImmutable) {
+            $extended = $this->history()
+                ->where('event', 'booking.overdue_extended')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($extended !== null) {
+                return CarbonImmutable::instance($extended->created_at);
+            }
+
+            return CarbonImmutable::instance($this->updated_at);
+        }
+
+        return CarbonImmutable::instance($this->created_at);
+    }
+
+    /**
+     * SQL fragment: total minus payments that count as paid (paidValues()).
+     *
+     * @return array{0: string, 1: list<string>}
+     */
+    public static function balanceSql(): array
+    {
+        $paid = PaymentStatus::paidValues();
+        $placeholders = implode(', ', array_fill(0, count($paid), '?'));
+
+        return [
+            'bookings.total - COALESCE((
+                SELECT SUM(payments.amount) FROM payments
+                WHERE payments.booking_id = bookings.id
+                  AND payments.status IN ('.$placeholders.')
+            ), 0)',
+            $paid,
+        ];
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    public function scopeOverdue(Builder $query): void
+    {
+        $today = BusinessTime::now()->toDateString();
+        [$balanceSql, $paid] = self::balanceSql();
+
+        $query
+            ->whereIn('bookings.status', [
+                BookingStatus::Confirmed->value,
+                BookingStatus::OnHoldAgency->value,
+            ])
+            ->whereRaw('('.$balanceSql.') > 0', $paid)
+            ->whereRaw(
+                '? > COALESCE(bookings.balance_due_date_override, DATE_SUB((
+                    SELECT departures.date FROM departures WHERE departures.id = bookings.departure_id
+                ), INTERVAL bookings.balance_days DAY))',
+                [$today],
+            );
     }
 
     public function depositAmount(): int
@@ -294,7 +408,37 @@ class Booking extends Model
                 ['payments as payments_pledged_sum' => fn ($payments) => $payments->where('status', PaymentStatus::AwaitingWire)],
                 'amount',
             )
-            ->withCount('payments');
+            ->withCount('payments')
+            ->withMin([
+                'payments as awaiting_wire_created_at' => fn ($payments) => $payments->where('status', PaymentStatus::AwaitingWire),
+            ], 'created_at');
+    }
+
+    private function awaitingWireStartedAt(): ?CarbonImmutable
+    {
+        if (array_key_exists('awaiting_wire_created_at', $this->getAttributes())) {
+            $aggregated = $this->getAttribute('awaiting_wire_created_at');
+
+            if ($aggregated instanceof \DateTimeInterface) {
+                return CarbonImmutable::instance($aggregated);
+            }
+
+            if (is_string($aggregated) && $aggregated !== '') {
+                return CarbonImmutable::parse($aggregated);
+            }
+
+            return null;
+        }
+
+        $this->loadMissing('payments');
+
+        $started = $this->payments
+            ->first(fn (Payment $payment): bool => $payment->status === PaymentStatus::AwaitingWire)
+            ?->created_at;
+
+        return $started instanceof \DateTimeInterface
+            ? CarbonImmutable::instance($started)
+            : null;
     }
 
     /**

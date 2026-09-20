@@ -2,18 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Enums\BookingStatus;
 use App\Enums\ConfigKind;
+use App\Enums\PaymentKind;
+use App\Enums\PaymentStatus;
 use App\Enums\Permission;
 use App\Enums\SystemRole;
+use App\Models\Booking;
+use App\Models\Payment;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Config\ConfigRegistry;
 use App\Services\Inventory\ClaimService;
+use App\Support\BusinessTime;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\SensitiveFields;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\Bookings\ReservationFixtures;
 use Tests\Support\Config\TestConfigDocument;
 use Tests\Support\Config\TestConfigVersion;
 use Tests\TestCase;
@@ -82,6 +89,7 @@ function externalFinanceUser(array $attributes = []): User
         'permissions' => [
             Permission::PanelRms,
             Permission::BookingsViewAll,
+            Permission::PaymentsRecord,
             Permission::PaymentsMarkWireReceived,
             Permission::RefundsExecute,
         ],
@@ -160,6 +168,60 @@ function businessRulesDocument(array $overrides = []): array
     $document = array_replace_recursive(BusinessRulesDocument::initial(), $overrides);
 
     return $document;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function pendingCabin(array $overrides = []): Booking
+{
+    $departure = $overrides['departure'] ?? ReservationFixtures::anamaraDeparture();
+    unset($overrides['departure']);
+
+    return Booking::factory()->create([
+        'departure_id' => $departure->id,
+        'cabin_id' => $departure->yacht->cabins->firstWhere('code', 'S1')?->id,
+        'status' => BookingStatus::PendingPayment,
+        'total' => 26600,
+        'deposit_pct' => 10,
+        ...$overrides,
+    ]);
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function overdueCabin(array $overrides = []): Booking
+{
+    $departure = $overrides['departure'] ?? ReservationFixtures::anamaraDeparture();
+    unset($overrides['departure']);
+    $cabin = $overrides['cabin_code'] ?? 'S1';
+    unset($overrides['cabin_code']);
+    $skipDeposit = (bool) ($overrides['skip_deposit'] ?? false);
+    unset($overrides['skip_deposit']);
+
+    $booking = Booking::factory()->create([
+        'departure_id' => $departure->id,
+        'cabin_id' => $departure->yacht->cabins->firstWhere('code', $cabin)?->id,
+        'status' => BookingStatus::Confirmed,
+        'total' => 26600,
+        'deposit_pct' => 10,
+        'balance_days' => 120,
+        'balance_due_date_override' => BusinessTime::now()->subDay()->toDateString(),
+        ...$overrides,
+    ]);
+
+    if (! $skipDeposit) {
+        Payment::factory()->create([
+            'booking_id' => $booking->id,
+            'kind' => PaymentKind::Deposit,
+            'status' => PaymentStatus::Settled,
+            'amount' => $booking->depositAmount(),
+            'reference' => $booking->displayReference().'-D01',
+        ]);
+    }
+
+    return $booking->fresh() ?? $booking;
 }
 
 function limitedAdminRole(): Role

@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\BusinessTime;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -10,4 +11,9 @@ Artisan::command('inspire', function () {
 
 Schedule::command('inventory:release-expired-holds')
     ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('anakata:flag-overdue')
+    ->daily()
+    ->timezone(BusinessTime::zone())
     ->withoutOverlapping();

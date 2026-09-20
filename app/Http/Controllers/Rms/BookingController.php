@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Rms;
 
 use App\Actions\Bookings\CreateReservation;
+use App\Actions\Bookings\DecideOverdue;
 use App\Actions\Bookings\DeleteBooking;
 use App\Actions\Bookings\MoveBooking;
 use App\Actions\Bookings\TransitionBooking;
@@ -19,6 +20,7 @@ use App\Http\Requests\Rms\DeleteBookingRequest;
 use App\Http\Requests\Rms\IndexBookingAuditRequest;
 use App\Http\Requests\Rms\IndexBookingsRequest;
 use App\Http\Requests\Rms\MoveBookingRequest;
+use App\Http\Requests\Rms\OverdueDecisionRequest;
 use App\Http\Requests\Rms\PreviewMoveBookingRequest;
 use App\Http\Requests\Rms\QuoteReservationRequest;
 use App\Http\Requests\Rms\StoreReservationRequest;
@@ -61,21 +63,9 @@ final class BookingController extends Controller
         $perPage = $request->integer('per_page', 50);
         $search = $request->validated('q');
 
-        $bookings = Booking::query()
+        $query = Booking::query()
             ->select('bookings.*')
             ->join('departures', 'departures.id', '=', 'bookings.departure_id')
-            ->withLedgerAggregates()
-            ->with([
-                'departure.yacht',
-                'departure.itinerary',
-                'cabin',
-                'contact',
-                'group.coordinator',
-                'owner',
-                'ratesVersion',
-                'bookingRequest',
-                'activeClaims',
-            ])
             ->when(
                 ! $actor->hasPermission(Permission::BookingsViewAll),
                 fn (Builder $query) => $query->where('bookings.owner_id', $actor->id),
@@ -115,12 +105,31 @@ final class BookingController extends Controller
                                 ->orWhere('email', 'like', $like);
                         });
                 });
-            })
+            });
+
+        $kpis = $this->overdueKpis(clone $query);
+
+        $bookings = $query
+            ->when($request->boolean('overdue'), fn (Builder $query) => $query->overdue())
+            ->withLedgerAggregates()
+            ->with([
+                'departure.yacht',
+                'departure.itinerary',
+                'cabin',
+                'contact',
+                'group.coordinator',
+                'owner',
+                'ratesVersion',
+                'bookingRequest',
+                'activeClaims',
+            ])
             ->orderBy('departures.date')
             ->orderBy('bookings.reference')
             ->paginate($perPage);
 
-        return BookingResource::collection($bookings);
+        return BookingResource::collection($bookings)->additional([
+            'meta' => ['kpis' => $kpis],
+        ]);
     }
 
     public function formOptions(CurrentConfig $config): BookingFormOptionsResource
@@ -255,6 +264,25 @@ final class BookingController extends Controller
         return new BookingResource($action->handle($booking, $request->validated(), $actor));
     }
 
+    /**
+     * @throws CabinUnavailableException
+     */
+    public function overdueDecision(
+        OverdueDecisionRequest $request,
+        Booking $booking,
+        DecideOverdue $action,
+    ): BookingResource {
+        $this->authorize('overdueDecision', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new BookingResource($action->handle($booking, $request->validated(), $actor));
+    }
+
     public function movePreview(
         PreviewMoveBookingRequest $request,
         Booking $booking,
@@ -307,6 +335,27 @@ final class BookingController extends Controller
         $action->handle($booking, $request->validated(), $actor);
 
         return response()->noContent();
+    }
+
+    /**
+     * @param  Builder<Booking>  $query
+     * @return array{overdue_count: int, overdue_amount: int}
+     */
+    private function overdueKpis(Builder $query): array
+    {
+        [$balanceSql, $paid] = Booking::balanceSql();
+
+        $row = $query
+            ->overdue()
+            ->toBase()
+            ->select([])
+            ->selectRaw('COUNT(*) as overdue_count, COALESCE(SUM('.$balanceSql.'), 0) as overdue_amount', $paid)
+            ->first();
+
+        return [
+            'overdue_count' => (int) ($row->overdue_count ?? 0),
+            'overdue_amount' => (int) ($row->overdue_amount ?? 0),
+        ];
     }
 
     private function galapagosDayStart(string $date): CarbonImmutable

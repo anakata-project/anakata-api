@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Enums\BookingStatus;
 use App\Enums\ClaimKind;
 use App\Enums\HoldType;
+use App\Enums\PaymentStatus;
 use App\Enums\ReleaseReason;
 use App\Models\Booking;
 use App\Models\CabinClaim;
 use App\Models\ChangeHistory;
+use App\Models\Payment;
 use App\Services\Inventory\Availability;
 use App\Services\Inventory\ClaimService;
 use Carbon\CarbonImmutable;
@@ -274,6 +276,26 @@ test('manual fully paid records the prototype wording', function (): void {
 
     $history = ChangeHistory::query()->where('event', 'booking.status_changed')->latest('id')->firstOrFail();
     expect($history->after['what'] ?? '')->toContain('marked manually — USD 26,600 not in the payments record');
+});
+
+test('manual fully paid wording uses the remaining ledger balance', function (): void {
+    $booking = bookedCabin(['status' => BookingStatus::Confirmed]);
+    Payment::factory()->create([
+        'booking_id' => $booking->id,
+        'amount' => 2660,
+        'status' => PaymentStatus::Settled,
+        'reference' => $booking->displayReference().'-D01',
+    ]);
+
+    $this->actingAs($booking->owner)
+        ->postJson('/api/rms/bookings/'.$booking->id.'/transition', [
+            'to' => 'FULLY_PAID',
+            'reason' => 'Seen at the bank',
+        ])
+        ->assertOk();
+
+    $history = ChangeHistory::query()->where('event', 'booking.status_changed')->latest('id')->firstOrFail();
+    expect($history->after['what'] ?? '')->toContain('marked manually — USD 23,940 not in the payments record');
 });
 
 test('allowed_transitions differ for lucia mateo and carolina on the same booking', function (): void {

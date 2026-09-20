@@ -23,20 +23,30 @@ final class DemoUsersSeeder extends Seeder
         $manager = Role::query()->where('slug', SystemRole::Manager->value)->firstOrFail();
         $salesExec = Role::query()->where('slug', SystemRole::SalesExec->value)->firstOrFail();
 
+        $financePermissions = [
+            Permission::PanelRms,
+            Permission::BookingsViewAll,
+            Permission::PaymentsRecord,
+            Permission::PaymentsMarkWireReceived,
+            Permission::RefundsExecute,
+        ];
+
         $externalFinance = Role::query()->firstOrCreate(
             ['slug' => 'external-finance'],
             [
                 'name' => 'External finance',
                 'description' => null,
-                'permissions' => [
-                    Permission::PanelRms,
-                    Permission::BookingsViewAll,
-                    Permission::PaymentsMarkWireReceived,
-                    Permission::RefundsExecute,
-                ],
+                'permissions' => $financePermissions,
                 'is_system' => false,
             ],
         );
+
+        if ($externalFinance->permissions->pluck('value')->sort()->values()->all()
+            !== collect($financePermissions)->map(fn (Permission $permission): string => $permission->value)->sort()->values()->all()
+        ) {
+            $externalFinance->permissions = $financePermissions;
+            $externalFinance->save();
+        }
 
         $this->seedUser('Carolina M.', 'carolina@anakata.test', $admin);
         $this->seedUser('Mateo R.', 'mateo@anakata.test', $manager);

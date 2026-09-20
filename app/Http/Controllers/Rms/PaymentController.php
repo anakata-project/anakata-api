@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Rms;
 
+use App\Actions\Payments\MarkWireReceived;
+use App\Actions\Payments\RecordPayment;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IndexPaymentsRequest;
+use App\Http\Requests\Rms\MarkWireReceivedRequest;
+use App\Http\Requests\Rms\RecordPaymentRequest;
 use App\Http\Resources\Rms\PaymentResource;
+use App\Http\Resources\Rms\RecordedPaymentResource;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\Payments\RecordedPayment;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class PaymentController extends Controller
@@ -94,5 +102,53 @@ final class PaymentController extends Controller
             ->get();
 
         return PaymentResource::collection($payments);
+    }
+
+    #[DocumentedResponse(
+        status: 201,
+        type: 'array{id: int, reference: string, date: string, kind: string, method: string, amount: int, status: string, gateway_id: string|null, recorded_by: string|null, can_mark_wire: bool, wire_window_ends_at: string|null, booking: App\\Http\\Resources\\Rms\\BookingResource, warnings: list<string>}',
+    )]
+    public function store(RecordPaymentRequest $request, Booking $booking, RecordPayment $action): JsonResponse
+    {
+        $this->authorize('recordPayment', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        $recorded = $action->handle($booking, $request->validated(), $actor);
+
+        $recorded = new RecordedPayment(
+            $recorded->payment->load(['booking', 'recordedBy']),
+            Booking::query()->withLedgerAggregates()->with([
+                'departure.yacht',
+                'departure.itinerary',
+                'cabin',
+                'contact',
+                'group.coordinator',
+                'owner',
+                'ratesVersion',
+                'bookingRequest',
+                'activeClaims',
+            ])->findOrFail($recorded->booking->getKey()),
+            $recorded->warnings,
+        );
+
+        return (new RecordedPaymentResource($recorded))->response()->setStatusCode(201);
+    }
+
+    public function markReceived(MarkWireReceivedRequest $request, Payment $payment, MarkWireReceived $action): PaymentResource
+    {
+        $this->authorize('markReceived', $payment);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new PaymentResource($action->handle($payment, $request->validated(), $actor));
     }
 }

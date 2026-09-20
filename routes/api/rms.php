@@ -85,6 +85,7 @@ Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
 
 Route::get('payments', [PaymentController::class, 'index']);
+Route::post('payments/{payment}/mark-received', [PaymentController::class, 'markReceived'])->whereNumber('payment');
 
 Route::get('bookings', [BookingController::class, 'index']);
 Route::get('bookings/audit', [BookingController::class, 'audit']);
@@ -93,6 +94,7 @@ Route::get('bookings/form-options', [BookingController::class, 'formOptions']);
 Route::post('bookings/quote', [BookingController::class, 'quote']);
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/transition', [BookingController::class, 'transition'])->whereNumber('booking');
+Route::post('bookings/{booking}/overdue-decision', [BookingController::class, 'overdueDecision'])->whereNumber('booking');
 Route::post('bookings/{booking}/move/preview', [BookingController::class, 'movePreview'])->whereNumber('booking');
 Route::post('bookings/{booking}/move', [BookingController::class, 'move'])->whereNumber('booking');
 Route::patch('bookings/{booking}', [BookingController::class, 'update'])->whereNumber('booking');
@@ -100,6 +102,7 @@ Route::delete('bookings/{booking}', [BookingController::class, 'destroy'])->wher
 Route::get('bookings/{booking}', [BookingController::class, 'show'])->whereNumber('booking');
 Route::get('bookings/{booking}/history', [BookingController::class, 'history'])->whereNumber('booking');
 Route::get('bookings/{booking}/payments', [PaymentController::class, 'forBooking'])->whereNumber('booking');
+Route::post('bookings/{booking}/payments', [PaymentController::class, 'store'])->whereNumber('booking');
 
 Route::get('groups', [GroupController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);
