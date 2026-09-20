@@ -1414,3 +1414,58 @@ Do **not** run these here. Each task already listed its exact `git add` set. Run
 3. **anakata-panel** — tasks 06 (itineraries), 07 (departures), 08 (calendar + layout), 09 (blocks).
 
 Full command blocks live under each Task section above. `anakata-engine` has no Sprint 3 commits.
+
+---
+
+## Sprint 3 · review fixes
+
+### What was built
+`hold.expired` was attributed to the signed-in user when `ClaimService::claim()` released an expired hold on the way to a new claim. `History::record()` treated a missing `$actor` as “use `Auth::user()`”, so cleanup inside Carolina’s request wrote her as the actor.
+
+**`History::record(..., system: true)`.** When `system` is true the entry is always System (`actor_id` null, `actor_label` `System`), even if a user is authenticated or an `$actor` was passed. The default path is unchanged.
+
+**`ClaimService::releaseExpiredByIds()`** (used by both `claim()` cleanup and `inventory:release-expired-holds`) now calls `History::record($holder, 'hold.expired', system: true)`.
+
+### Files touched
+- `app/Support/History/History.php`
+- `app/Services/Inventory/ClaimService.php`
+- `.cursor/rules/laravel.mdc`
+- `tests/Feature/History/HistoryWriterTest.php`
+- `tests/Feature/Inventory/CabinClaimsTest.php`
+- `tests/Feature/Inventory/ReleaseExpiredHoldsTest.php`
+- `docs/sprints/sprint-03/REPORT.md`
+
+### Deviations
+None. Chose a `system: true` flag on `record()` rather than `recordAsSystem()` so reason, diffs and extra context stay on the same method.
+
+### Open questions
+None.
+
+### Notes for later
+Other automated events that may run inside a user request (`config` schema-evolution publishes, future hold/waitlist jobs) should pass `system: true` the same way.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 376 tests (2602 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/History/History.php \
+  app/Services/Inventory/ClaimService.php \
+  .cursor/rules/laravel.mdc \
+  tests/Feature/History/HistoryWriterTest.php \
+  tests/Feature/Inventory/CabinClaimsTest.php \
+  tests/Feature/Inventory/ReleaseExpiredHoldsTest.php \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Attribute hold.expired history to System, not the claiming user.
+
+Cleanup inside claim() ran under Auth::user(); system: true forces
+the actor so expiry is never credited to the staff who reused the cabin.
+EOF
+)"
+```

@@ -47,11 +47,16 @@ final class History
         ?string $reason = null,
         ?User $actor = null,
         array $extraContext = [],
+        bool $system = false,
     ): ChangeHistory {
         self::guardTransaction();
 
-        $actor ??= Auth::user();
-        $actor = $actor instanceof User ? $actor : null;
+        if ($system) {
+            $actor = null;
+        } else {
+            $actor ??= Auth::user();
+            $actor = $actor instanceof User ? $actor : null;
+        }
 
         $entry = new ChangeHistory([
             'subject_type' => $subject->getMorphClass(),

@@ -166,6 +166,44 @@ test('claiming over an expired hold releases it then succeeds', function (): voi
     expect(CabinClaim::query()->whereNull('released_at')->where('holder_id', $fresh->id)->count())->toBe(1);
 });
 
+test('hold.expired is attributed to System when a user claims over an expired hold', function (): void {
+    $carolina = adminUser(['name' => 'Carolina']);
+    $this->actingAs($carolina);
+
+    $departure = futureDeparture();
+    $cabin = cabinOn($departure->yacht, 'S5');
+    $old = newHolder('HOLD-EXP');
+
+    inClaimTransaction(fn () => app(ClaimService::class)->claim(
+        $departure,
+        collect([$cabin]),
+        $old,
+        ClaimKind::Hold,
+        HoldType::Web,
+        now()->addMinutes(20),
+    ));
+
+    CabinClaim::query()->where('holder_id', $old->id)->update([
+        'expires_at' => now()->subMinute(),
+    ]);
+
+    inClaimTransaction(fn () => app(ClaimService::class)->claim(
+        $departure,
+        collect([$cabin]),
+        newHolder('HOLD-NEW-2'),
+        ClaimKind::Block,
+    ));
+
+    $entry = ChangeHistory::query()
+        ->where('event', 'hold.expired')
+        ->where('subject_id', $old->id)
+        ->first();
+
+    expect($entry)->not->toBeNull();
+    expect($entry?->actor_id)->toBeNull();
+    expect($entry?->actor_label)->toBe('System');
+});
+
 test('convert moves claims between holders atomically', function (): void {
     $departure = futureDeparture();
     $cabins = $departure->yacht->cabins()->whereIn('code', ['S1', 'S2'])->orderBy('sort')->get();

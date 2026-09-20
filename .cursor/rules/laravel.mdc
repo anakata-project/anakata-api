@@ -78,6 +78,7 @@ app/
 ## History
 - Event names are `{subject}.{verb}` in dot notation (`user.invited`, `role.updated`).
 - Every Action writes exactly one `change_history` entry per logical change, through `App\Support\History\History`, inside the Action's transaction. A no-op (nothing changed) writes no entry.
+- The actor is the authenticated user, else System. Pass `system: true` to force System even when a user is signed in (automated events such as `hold.expired`).
 - A reason is required where a document says so (cancellations, manual FULLY_PAID, OPS-007 decisions, deletion, release). Validate it in the FormRequest; do not invent it in the Action.
 - Sensitive values (and `password` / `remember_token`) are redacted automatically by `History`. The key stays; the value becomes `[redacted]`.
 - History is never written from controllers. Controllers call Actions; Actions call `History`.

@@ -213,7 +213,7 @@ final class ClaimService
             $holder = $claim?->holder;
 
             if ($holder instanceof Model) {
-                History::record($holder, 'hold.expired');
+                History::record($holder, 'hold.expired', system: true);
             }
 
             $released++;

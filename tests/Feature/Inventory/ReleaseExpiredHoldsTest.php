@@ -46,6 +46,7 @@ test('the job releases expired holds in batches and writes hold.expired', functi
     expect(CabinClaim::query()->where('holder_id', $expired->id)->value('release_reason'))->toBe(ReleaseReason::Expired);
     expect(CabinClaim::query()->where('holder_id', $live->id)->value('released_at'))->toBeNull();
     expect(ChangeHistory::query()->where('event', 'hold.expired')->where('subject_id', $expired->id)->count())->toBe(1);
+    expect(ChangeHistory::query()->where('event', 'hold.expired')->value('actor_id'))->toBeNull();
     expect(ChangeHistory::query()->where('event', 'hold.expired')->value('actor_label'))->toBe('System');
 });
 
