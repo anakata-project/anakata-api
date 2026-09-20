@@ -9,6 +9,7 @@ use App\Enums\CabinState;
 use App\Enums\ClaimKind;
 use App\Enums\DepartureStatus;
 use App\Enums\EngineLabelCode;
+use App\Models\Booking;
 use App\Models\CabinClaim;
 use App\Models\Departure;
 use App\Models\InternalBlock;
@@ -17,6 +18,8 @@ use App\Support\Inventory\DepartureSnapshot;
 use App\Support\Inventory\EngineLabel;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 
 final class Availability
@@ -39,7 +42,13 @@ final class Availability
 
         $claims = CabinClaim::query()
             ->whereIn('departure_id', $models->modelKeys())
-            ->with(['cabin', 'holder'])
+            ->with(['cabin', 'holder' => function (Relation $morph): void {
+                if ($morph instanceof MorphTo) {
+                    $morph->morphWith([
+                        Booking::class => ['owner'],
+                    ]);
+                }
+            }])
             ->get()
             ->groupBy('departure_id');
 
@@ -193,7 +202,7 @@ final class Availability
     }
 
     /**
-     * @return array{kind: string, hold_type: string|null, expires_at: string|null, holder: array{type: string, id: int, reference: string|null, label: string|null, detail: array{reason: string, reason_label: string}|null}}
+     * @return array{kind: string, hold_type: string|null, expires_at: string|null, holder: array{type: string, id: int, reference: string|null, label: string|null, detail: array{reason: string, reason_label: string}|array{status: string, type: string, segment: string, display_reference: string|null, owner_id: int, owner_name: string, party_label: string, hold_expired: bool}|null}}
      */
     private function claimSummary(CabinClaim $claim): array
     {
@@ -214,18 +223,33 @@ final class Availability
     }
 
     /**
-     * @return array{reason: string, reason_label: string}|null
+     * @return array{reason: string, reason_label: string}|array{status: string, type: string, segment: string, display_reference: string|null, owner_id: int, owner_name: string, party_label: string, hold_expired: bool}|null
      */
     private function holderDetail(?Model $holder): ?array
     {
-        if (! $holder instanceof InternalBlock) {
-            return null;
+        if ($holder instanceof InternalBlock) {
+            return [
+                'reason' => $holder->reason->value,
+                'reason_label' => $holder->reason->label(),
+            ];
         }
 
-        return [
-            'reason' => $holder->reason->value,
-            'reason_label' => $holder->reason->label(),
-        ];
+        if ($holder instanceof Booking) {
+            $holder->loadMissing('owner');
+
+            return [
+                'status' => $holder->status->value,
+                'type' => $holder->type->value,
+                'segment' => $holder->segment()->value,
+                'display_reference' => $holder->displayReference(),
+                'owner_id' => $holder->owner_id,
+                'owner_name' => $holder->owner->name,
+                'party_label' => $holder->partyLabel(),
+                'hold_expired' => $holder->holdExpired(),
+            ];
+        }
+
+        return null;
     }
 
     private function holderLabel(?Model $holder): ?string

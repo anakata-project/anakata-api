@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Rms\BookingController;
 use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\CalendarController;
+use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
+use App\Http\Controllers\Rms\GroupController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\PermissionController;
@@ -76,6 +79,15 @@ Route::get('departures/{departure}', [DepartureController::class, 'show'])->wher
 Route::patch('departures/{departure}', [DepartureController::class, 'update'])->whereNumber('departure');
 Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])->whereNumber('departure');
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
+
+Route::get('bookings', [BookingController::class, 'index']);
+Route::post('bookings/quote', [BookingController::class, 'quote']);
+Route::post('bookings', [BookingController::class, 'store']);
+Route::get('bookings/{booking}', [BookingController::class, 'show'])->whereNumber('booking');
+Route::get('bookings/{booking}/history', [BookingController::class, 'history'])->whereNumber('booking');
+
+Route::get('groups', [GroupController::class, 'index']);
+Route::get('contacts', [ContactController::class, 'index']);
 
 Route::get('blocks', [InternalBlockController::class, 'index']);
 Route::post('blocks', [InternalBlockController::class, 'store']);

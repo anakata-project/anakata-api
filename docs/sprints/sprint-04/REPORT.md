@@ -287,3 +287,200 @@ business time instead of wall-clock hours.
 EOF
 )"
 ```
+
+## Task 03 · Contacts, groups, bookings, pricing at sale
+
+### What was built
+The RMS can quote and create reservations: one cabin, several cabins as a group, or a whole-yacht charter. Each booking is priced by `CabinPricer` from the published rates, frozen at sale, and occupies its cabins through `ClaimService` in one transaction. The unique active-claim index is still the last word on availability.
+
+`POST /api/rms/bookings/quote` writes nothing. `POST /api/rms/bookings` (`CreateReservation`) locks first, re-quotes, resolves the contact, draws references, creates the booking(s), then claims. A conflict is the Sprint 3 `CabinUnavailableException` 409; the transaction rolls back bookings, claims and sequence draws.
+
+Reads: `GET /api/rms/bookings` (filters, own-records, paginated), show, history, `GET /api/rms/groups?departure_id=`, `GET /api/rms/contacts?q=` (top 10). Policy: view needs `bookings.view_all` or ownership; `can_act` is the own-records rule.
+
+Morph aliases: `contact`, `group`, `booking`. Soft-delete column on `bookings` only (G8); no delete action this task.
+
+### Lock order
+`CreateReservation` (and the demo seeder) lock **before** any quote write or insert. Quote itself takes no lock.
+
+| Step | What | How |
+|---|---|---|
+| 1 | departure(s) | `DepartureLocks::lock` / `lockMany` (PK `FOR UPDATE`) |
+| 2 | contact row | `ResolveContact`: `INSERT … ON DUPLICATE KEY UPDATE id = id` (X on the unique email, or a new row). No email → ordinary insert. Empty-field fill is `UPDATE` by primary key only |
+| 3 | GRP counter | `ReferenceService::next(Group)` only when a new group is created |
+| 4 | ANK counter | `ReferenceService::next(Booking)` per booking, then `claim()` |
+
+Create then calls `ClaimService::claim`, which takes the departure PK lock again (already held in this transaction).
+
+**S→X.** An insert into `cabin_claims` takes a shared lock on the parent `departures` row. Taking that insert first and then `FOR UPDATE` on the same row upgrades S→X and deadlocks (1213). The departure lock stays first. Contact upsert never does find-then-insert: a `SELECT` that takes S on the unique email, then an insert that needs X, is the same upgrade. `INSERT … ON DUPLICATE KEY UPDATE id = id` creates the row or takes X on the existing one directly.
+
+### ResolveContact (G1)
+Email is normalised in the Action (`Contact::normalizeEmail`) before the query builder — the builder bypasses the model mutator.
+
+With an email: (a) insert-or-no-op on the unique email; (b) `SELECT` by that normalised email; (c) if the row already existed, `UPDATE` by primary key only the fields that are empty and have a non-empty incoming value, and record `contact.updated` with exactly those fields' before/after. A new row records `contact.created`. No email → always create + `contact.created`.
+
+**Created detection.** Laravel does not set PDO `CLIENT_FOUND_ROWS` / `MYSQL_ATTR_FOUND_ROWS` on the mysql connection (`config('database.connections.mysql.options')`). A no-op `id = id` duplicate therefore returns **0** affected rows, not 2. Created = affected === 1; existing = anything else. Asserted in `ContactResolutionTest`.
+
+### Groups (G2)
+Prototype `saveNew` / `nbAddCab`: a new `GRP` is created only when there are **more than one** cabin, or the actor joins a **visible** `existing_group_id` on the same departure (`Group::visibleTo` — same own-records rule as `GET /groups`). A single-cabin `{ name }` is ignored. A charter has no group (one booking, nine claims). Existing group on another departure, or a group the actor cannot see → 422.
+
+### Channel enums
+Values are the prototype `#newmodal` strings (en-dashes, not hyphens).
+
+**`MainChannel` (8), labels = values:**
+
+`D2C` · `B2B` · `B2B – Travel Advisor` · `B2B – Tour Operator` · `B2B – Corporate` · `Wholesale / Distribution` · `Partners` · `Other`
+
+Segment (`Booking::segment` / prototype `seg`): charter by type; else B2B when the main channel starts with `B2B`, `Wholesale` or is `Partners`.
+
+**`ChannelOfOrigin` (40)** with `group()`:
+
+| Group (`ChannelOfOriginGroup`) | Values |
+|---|---|
+| Direct | Hotel Website Inquiry, Hotel Booking Engine, Phone, Email, WhatsApp |
+| Marketing | Hotel Social, Organic Search, Paid Search, Paid Ads, AI / LLM, Email Marketing, Referral |
+| Trade, corporate & groups | Travel Advisor, Luxury Agency, Host Agency, Consortia, Tour Operator, Luxury Tour Operator, DMC, Incoming Operator, Wholesaler, Corporate Direct, Corporate Travel Agency, Business Travel, MICE, Group |
+| Distribution, partners & other | GDS, CRS, Switch, Hotel Partner, Airline, Credit Card, Membership Club, Affiliate, Influencer, Brand Partnership, Complimentary, Owner, Staff, Unknown |
+
+### Seed map
+`ChannelSeedMap::fromPrototype` (asserted in `DemoBookingsSeederTest`):
+
+| Seed `chan` | `main_channel` | `channel_of_origin` |
+|---|---|---|
+| `WEB_DIRECT` | D2C | Hotel Booking Engine |
+| `INBOUND` | D2C | Email |
+| `AGENCY` | B2B – Travel Advisor | Travel Advisor |
+| `CHARTER_DIRECT` | D2C | Email |
+
+Eleven seed bookings (the two `REQUESTED` skipped for task 05). Owner by first name. ANAMARA departure on the seed date index (`dep`). `OVERDUE` → `CONFIRMED` (the flag is Sprint 5 / G6). GRP-007 with its coordinator. Claims through `ClaimService` (10 cabin + 9 charter). `ensureAtLeast` Group 7 / Booking 19 @ 2026 so the next draws are `GRP-008` and `ANK-2026-0020`. Idempotent.
+
+### Seed-total vs calculator
+`DemoBookingsSeeder::$priceDifferences` records `{ reference, seed_total, calculator_total }` whenever they differ. After a fresh seed the list is **empty** — all 11 stored totals match `CabinPricer` (including festive charter `ANK-2026-0012` at 211,500). The seed data and the rules agree on these fixtures.
+
+### `balance` placeholder (G6)
+`Booking::balance()` returns `total`. One method; Sprint 5 changes this one place. `deposit_amount` uses `Rounding::halfUp` (same as `Quote`). `balance_due_date` is the departure date minus frozen `balance_days`. `allowed_transitions` is `[]` until task 04. `Booking::holdExpired()` is `false` until task 05.
+
+### `holdsInventory` (G9)
+`BookingStatus::holdsInventory()` is false only for `RELEASED`, `CANCELLED`, `CANCELLED_POSTPAID`. Create writes `PENDING_PAYMENT` + `BOOKING` claims. The seeder claims only when the status holds inventory. Task 04 reuses this for transitions.
+
+### Concurrency
+`tests/Concurrency/CreateReservationConcurrencyTest.php`, session `innodb_lock_wait_timeout = 1`.
+
+| Race | Observed |
+|---|---|
+| Two creates on the same departure, different cabins, first holds the departure lock uncommitted | waiter **1205**, never 1213 |
+| Two creates on the same cabin after the first commits | second **409**, one booking / one claim |
+
+### `@throws CabinUnavailableException`
+`BookingController::store` and `CreateReservation::handle` declare it (task 01 rule). Scramble attaches the named 409 to `POST /rms/bookings`.
+
+### Responses typed (task 06)
+`BookingResource`, `ReservationQuoteResource`, `ReservationCreatedResource`, `GroupResource`, `ContactResource`. Claim `holder.detail` is a PHPDoc union: block `{ reason, reason_label }` **or** booking `{ status, type, segment, display_reference, owner_id, owner_name, party_label, hold_expired }`. Availability `morphWith`s `Booking::owner`.
+
+### Files touched
+- `app/Enums/PreferredChannel.php`, `BookingType.php`, `BookingSegment.php`, `BookingStatus.php`, `MainChannel.php`, `ChannelOfOrigin.php`, `ChannelOfOriginGroup.php` (new)
+- `database/migrations/2026_09_20_200020_create_contacts_table.php`, `200021_create_groups_table.php`, `200022_create_bookings_table.php` (new)
+- `app/Models/Contact.php`, `Group.php`, `Booking.php` (new)
+- `database/factories/ContactFactory.php`, `GroupFactory.php`, `BookingFactory.php` (new)
+- `app/Actions/Contacts/ResolveContact.php`, `app/Actions/Bookings/CreateReservation.php` (new)
+- `app/Services/Pricing/ReservationQuoter.php`, `ReservationQuote.php`, `QuotedParty.php` (new)
+- `app/Support/Bookings/ReservationCreated.php`, `ChannelSeedMap.php` (new)
+- `app/Http/Controllers/Rms/BookingController.php`, `GroupController.php`, `ContactController.php` (new)
+- `app/Http/Requests/Rms/QuoteReservationRequest.php`, `StoreReservationRequest.php`, `IndexBookingsRequest.php`, `IndexGroupsRequest.php`, `IndexContactsRequest.php` (new)
+- `app/Http/Resources/Rms/BookingResource.php`, `ReservationQuoteResource.php`, `ReservationCreatedResource.php`, `GroupResource.php`, `ContactResource.php` (new)
+- `app/Policies/BookingPolicy.php` (new)
+- `app/Providers/AppServiceProvider.php` (morph map)
+- `app/Services/Inventory/Availability.php` (booking `holder.detail`, `morphWith`)
+- `app/Http/Resources/Rms/DepartureResource.php`, `CalendarGridResource.php`, `app/Support/Inventory/DepartureSnapshot.php` (detail union)
+- `routes/api/rms.php`
+- `database/seeders/DemoBookingsSeeder.php` (new), `DatabaseSeeder.php`
+- `tests/Feature/Bookings/*`, `tests/Support/Bookings/ReservationFixtures.php`, `tests/Concurrency/CreateReservationConcurrencyTest.php` (new)
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `docs/sprints/sprint-04/REPORT.md`
+
+### Deviations
+- Create locks the departure **before** the quote (task text listed resolve-contact first). Quote is still server-side and never trusted; a client-sent `total` is ignored.
+- Contact upsert is insert-or-no-op, not find-then-update/insert (G10 / S→X).
+- New group only when there are several cabins or a visible `existing_group_id` — not whenever `{ name }` is sent (prototype).
+- `existing_group_id` uses the same visibility as `GET /groups`, not “any group on the departure”.
+- Charter ignores `group`.
+- Seed `OVERDUE` stored as `CONFIRMED`.
+- `ReservationCreated` is an Eloquent `Collection` so `load()` works after create.
+
+### Open questions
+None.
+
+### Notes for later
+- **Task 05 — occupancy:** add `Booking::occupiesInventory(): bool` = `status->holdsInventory() && ! holdExpired()`. G9: an expired request hold frees the cabin without cancelling the request. Release/claim paths must use `occupiesInventory()`, not `holdsInventory()` alone.
+- Task 04 fills `allowedTransitions()`.
+- Task 05 seeds the two `REQUESTED` bookings and implements `holdExpired()` from the hold claim.
+- Task 06: regenerate types; add the five new resource schemas and the booking `holder.detail` union.
+- Task 11: seeded bookings table from `seed-data.json` + the channel map above; calculator totals (no seed/calculator diffs).
+
+### Quality
+anakata-api: `composer check` inside Docker — 436 tests (2931 assertions; create-reservation races observed 1205 and 409), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/PreferredChannel.php \
+  app/Enums/BookingType.php \
+  app/Enums/BookingSegment.php \
+  app/Enums/BookingStatus.php \
+  app/Enums/MainChannel.php \
+  app/Enums/ChannelOfOrigin.php \
+  app/Enums/ChannelOfOriginGroup.php \
+  database/migrations/2026_09_20_200020_create_contacts_table.php \
+  database/migrations/2026_09_20_200021_create_groups_table.php \
+  database/migrations/2026_09_20_200022_create_bookings_table.php \
+  app/Models/Contact.php \
+  app/Models/Group.php \
+  app/Models/Booking.php \
+  database/factories/ContactFactory.php \
+  database/factories/GroupFactory.php \
+  database/factories/BookingFactory.php \
+  app/Actions/Contacts/ResolveContact.php \
+  app/Actions/Bookings/CreateReservation.php \
+  app/Services/Pricing/ReservationQuoter.php \
+  app/Services/Pricing/ReservationQuote.php \
+  app/Services/Pricing/QuotedParty.php \
+  app/Support/Bookings/ReservationCreated.php \
+  app/Support/Bookings/ChannelSeedMap.php \
+  app/Http/Controllers/Rms/BookingController.php \
+  app/Http/Controllers/Rms/GroupController.php \
+  app/Http/Controllers/Rms/ContactController.php \
+  app/Http/Requests/Rms/QuoteReservationRequest.php \
+  app/Http/Requests/Rms/StoreReservationRequest.php \
+  app/Http/Requests/Rms/IndexBookingsRequest.php \
+  app/Http/Requests/Rms/IndexGroupsRequest.php \
+  app/Http/Requests/Rms/IndexContactsRequest.php \
+  app/Http/Resources/Rms/BookingResource.php \
+  app/Http/Resources/Rms/ReservationQuoteResource.php \
+  app/Http/Resources/Rms/ReservationCreatedResource.php \
+  app/Http/Resources/Rms/GroupResource.php \
+  app/Http/Resources/Rms/ContactResource.php \
+  app/Http/Resources/Rms/DepartureResource.php \
+  app/Http/Resources/Rms/CalendarGridResource.php \
+  app/Policies/BookingPolicy.php \
+  app/Providers/AppServiceProvider.php \
+  app/Services/Inventory/Availability.php \
+  app/Support/Inventory/DepartureSnapshot.php \
+  routes/api/rms.php \
+  database/seeders/DemoBookingsSeeder.php \
+  database/seeders/DatabaseSeeder.php \
+  tests/Feature/Bookings \
+  tests/Support/Bookings \
+  tests/Concurrency/CreateReservationConcurrencyTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add contacts, groups and reservation create with frozen prices.
+
+Quote and create lock the departure first, upsert the contact
+without an S→X upgrade, and occupy cabins in one transaction.
+EOF
+)"
+```

@@ -1,0 +1,270 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Enums\BookingSegment;
+use App\Enums\BookingStatus;
+use App\Enums\BookingType;
+use App\Enums\ChannelOfOrigin;
+use App\Enums\MainChannel;
+use App\Models\Concerns\HasAuditColumns;
+use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Support\Rounding;
+use Carbon\CarbonImmutable;
+use Database\Factories\BookingFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+
+/**
+ * @property int $id
+ * @property string|null $reference
+ * @property string|null $request_reference
+ * @property BookingType $type
+ * @property int $departure_id
+ * @property int|null $cabin_id
+ * @property int $contact_id
+ * @property int|null $group_id
+ * @property int $owner_id
+ * @property BookingStatus $status
+ * @property MainChannel $main_channel
+ * @property ChannelOfOrigin $channel_of_origin
+ * @property int $adults
+ * @property int $children
+ * @property bool $back_to_back
+ * @property int $rates_version_id
+ * @property list<array{code: string, label: string, amount: int}> $price_lines
+ * @property int $total
+ * @property int $deposit_pct
+ * @property int $balance_days
+ * @property string|null $internal_notes
+ * @property Carbon|null $deleted_at
+ * @property int|null $created_by
+ * @property int|null $updated_by
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property-read Departure $departure
+ * @property-read Cabin|null $cabin
+ * @property-read Contact $contact
+ * @property-read Group|null $group
+ * @property-read User $owner
+ * @property-read RateVersion $ratesVersion
+ * @property-read Collection<int, CabinClaim> $claims
+ */
+#[Fillable([
+    'reference',
+    'request_reference',
+    'type',
+    'departure_id',
+    'cabin_id',
+    'contact_id',
+    'group_id',
+    'owner_id',
+    'status',
+    'main_channel',
+    'channel_of_origin',
+    'adults',
+    'children',
+    'back_to_back',
+    'rates_version_id',
+    'price_lines',
+    'total',
+    'deposit_pct',
+    'balance_days',
+    'internal_notes',
+])]
+class Booking extends Model
+{
+    /** @use HasFactory<BookingFactory> */
+    use HasAuditColumns, HasFactory, SerializesDatesAsUtc, SoftDeletes;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'type' => BookingType::class,
+            'status' => BookingStatus::class,
+            'main_channel' => MainChannel::class,
+            'channel_of_origin' => ChannelOfOrigin::class,
+            'adults' => 'integer',
+            'children' => 'integer',
+            'back_to_back' => 'boolean',
+            'price_lines' => 'array',
+            'total' => 'integer',
+            'deposit_pct' => 'integer',
+            'balance_days' => 'integer',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<Departure, $this>
+     */
+    public function departure(): BelongsTo
+    {
+        return $this->belongsTo(Departure::class);
+    }
+
+    /**
+     * @return BelongsTo<Cabin, $this>
+     */
+    public function cabin(): BelongsTo
+    {
+        return $this->belongsTo(Cabin::class);
+    }
+
+    /**
+     * @return BelongsTo<Contact, $this>
+     */
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class);
+    }
+
+    /**
+     * @return BelongsTo<Group, $this>
+     */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * @return BelongsTo<RateVersion, $this>
+     */
+    public function ratesVersion(): BelongsTo
+    {
+        return $this->belongsTo(RateVersion::class, 'rates_version_id');
+    }
+
+    /**
+     * @return MorphMany<CabinClaim, $this>
+     */
+    public function claims(): MorphMany
+    {
+        return $this->morphMany(CabinClaim::class, 'holder');
+    }
+
+    /**
+     * @return MorphMany<ChangeHistory, $this>
+     */
+    public function history(): MorphMany
+    {
+        return $this->morphMany(ChangeHistory::class, 'subject');
+    }
+
+    public function displayReference(): ?string
+    {
+        return $this->reference ?? $this->request_reference;
+    }
+
+    public function partyLabel(): string
+    {
+        $label = $this->adults.' AD';
+
+        if ($this->children > 0) {
+            $label .= ' + '.$this->children.' CH';
+        }
+
+        return $label;
+    }
+
+    public function segment(): BookingSegment
+    {
+        if ($this->type !== BookingType::Cabin) {
+            return BookingSegment::Charter;
+        }
+
+        return $this->main_channel->segment();
+    }
+
+    /**
+     * Until Sprint 5 (G6) the balance equals the contracted total.
+     */
+    public function balance(): int
+    {
+        return $this->total;
+    }
+
+    public function balanceDueDate(): CarbonImmutable
+    {
+        $this->loadMissing('departure');
+
+        return $this->departure->date->subDays($this->balance_days);
+    }
+
+    public function depositAmount(): int
+    {
+        return Rounding::halfUp($this->total * $this->deposit_pct / 100);
+    }
+
+    public function holdExpired(): bool
+    {
+        return false;
+    }
+
+    public function cabinLabel(): string
+    {
+        if ($this->type === BookingType::Charter) {
+            return 'Full yacht';
+        }
+
+        $this->loadMissing('cabin');
+
+        $cabin = $this->cabin;
+
+        return $cabin instanceof Cabin ? $cabin->label : 'Cabin';
+    }
+
+    public function historyLabel(): string
+    {
+        return $this->displayReference() ?? 'booking';
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    public function scopeOfSegment(Builder $query, BookingSegment $segment): void
+    {
+        if ($segment === BookingSegment::Charter) {
+            $query->where('type', BookingType::Charter);
+
+            return;
+        }
+
+        $b2b = array_values(array_map(
+            fn (MainChannel $channel): string => $channel->value,
+            array_filter(
+                MainChannel::cases(),
+                fn (MainChannel $channel): bool => $channel->segment() === BookingSegment::B2B,
+            ),
+        ));
+
+        $query->where('type', BookingType::Cabin);
+
+        if ($segment === BookingSegment::B2B) {
+            $query->whereIn('main_channel', $b2b);
+
+            return;
+        }
+
+        $query->whereNotIn('main_channel', $b2b);
+    }
+}

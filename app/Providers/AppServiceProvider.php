@@ -8,9 +8,12 @@ use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Events\ConfigPublished;
 use App\Listeners\ClearCurrentConfigCache;
+use App\Models\Booking;
 use App\Models\BusinessRuleVersion;
+use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\EngineSettingsVersion;
+use App\Models\Group;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
 use App\Models\RateVersion;
@@ -95,6 +98,9 @@ class AppServiceProvider extends ServiceProvider
             'itinerary' => Itinerary::class,
             'departure' => Departure::class,
             'internal_block' => InternalBlock::class,
+            'contact' => Contact::class,
+            'group' => Group::class,
+            'booking' => Booking::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(
