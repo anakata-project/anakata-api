@@ -767,3 +767,239 @@ confirm falls through to a fresh claim if convert races expiry.
 EOF
 )"
 ```
+
+## Task 06 · anakata-ui · Regenerate types, retire hand-written ones, release v0.5.0
+
+### What was built
+PHPDoc-only prelude on the API so Scramble emits the Sprint 4 shapes, then `pnpm types:api` against `http://localhost:8000/docs/api.json`. Layer `0.4.2` → `0.5.0`. Types only: no composables, components, or behaviour.
+
+Calendar dates (`departure.date`, `return_date`, `balance_due_date`, calendar keys, generate-season `from` / `to`) stay `string` (`YYYY-MM-DD`). Instants stay ISO strings.
+
+### API prelude (PHPDoc only)
+Tried first, then regenerated.
+
+| Target | What worked |
+|---|---|
+| `POST /rms/bookings` 201 `bookings` | `#[DocumentedResponse]` on `BookingController::store` (`list<BookingResource>`). Named `ReservationCreatedResource` PHPDoc is the booking-show shape; Scramble still emits that schema’s `bookings` as `string[]` (`list<BookingResource>` collapsed). The layer alias uses `operations['booking.store']` 201. |
+| `GET /rms/requests` `meta.rules` | `#[DocumentedResponse]` on `RequestController::index` (six keys, same pattern as departures `meta.kpis`). |
+| `DepartureMutationResource` holder `detail` | PHPDoc union: block `{ reason, reason_label }` **or** booking `{ status, type, segment, display_reference, owner_id, owner_name, party_label, hold_expired }`. |
+| Booking enum schemas | Already named from FormRequests (`BookingStatus`, `BookingType`, `BookingSegment`, `MainChannel`, `ChannelOfOrigin`). Resource **fields** stay `string` — FQCN / short enum `@return` failed Larastan (`return.type` vs `->value` strings) and Scramble still emitted `string`. Reverted. |
+| `allowed_transitions` items | PHPDoc stays `list<array{to: string, reason_required: bool}>`. Scramble still serialises `items` as `[]` (task 04 leftover). Overlay in the layer; the OpenAPI test only asserts the field exists unless items grow properties. |
+
+`PanelResponseSchemasTest` now also checks created-bookings `$ref` / show keys, request `meta.rules`, and the five enum schemas.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/inventory.ts` | 339 | 247 |
+| `app/types/config.ts` | 363 | 368 |
+| `app/types/bookings.ts` | — | 171 |
+
+`config.ts` grew: G5 `holds.*` fields added; published documents stay hand-written (`{[key: string]: unknown}` / unusable `oneOf`).
+
+### Retired (now generated or a thin alias)
+
+| Alias | Now |
+|---|---|
+| `CabinCategory` | `components['schemas']['CabinCategory']` |
+| `GenerateSeasonResult` | `GenerateSeasonResource` |
+| `DepartureKpis` | `operations['departure.index']` `meta.kpis` |
+| `AvailabilityCounts` | `DepartureResource.availability.counts` |
+| `DepartureLocks` | `DepartureResource.locks` |
+| `ItineraryCompleteness` | `ItineraryResource.completeness` |
+| `CalendarGrid` / `CalendarDeparture` / `CalendarRow` | `CalendarGridResource` + overlays for `status` / `Cabin` / `CabinState` |
+| `CabinUnavailableError` / `CabinUnavailableItem` | generated `CabinUnavailableException` 409 + `held_by.kind` overlay |
+
+`Departure`, `InternalBlock`, `Availability`, `ClaimSummary` stay overlays because they nest leftover unions.
+
+### Kept (task 01 list + leftover overlays)
+
+Each leftover has a `Mirrors App\…` comment.
+
+- **`ItineraryPair`** — PHPDoc tuple; Scramble still types `day_plan` / `facts` / `faqs` as `string[]`.
+- **Closed unions still `string`:** `CabinState`, `ClaimKind`, `HoldType`, `EngineLabelCode`, `EngineLabelTone`.
+- **`ItineraryDefaults`** — generated schema freezes seed literals and types `day_plan` as `string[]`.
+- **`Cabin`** — generated `id` / `sort` are `string`.
+- **`Itinerary`** — `hero_image_url: string \| null`; pairs via `ItineraryPair`.
+- **`ClaimHolderDetail`** — generated `oneOf` is usable; enums on each arm stay `string`.
+- Config documents (`RatesDocument`, `BusinessRulesDocument`, `EngineSettingsDocument` and nested `*Rules`) — still untyped objects.
+
+### Booking aliases (`app/types/bookings.ts`)
+
+| Alias | Source |
+|---|---|
+| `BookingStatus` / `BookingType` / `BookingSegment` | named enum schemas |
+| `MainChannel` / `ChannelOfOrigin` / `PreferredChannel` | named enum schemas |
+| `Booking` / `BookingListItem` | `BookingResource` + overlays (`can_act: boolean`, enum fields, `allowed_transitions`, `price_lines`, `contact`, `group`) |
+| `AllowedTransition` | hand-written (`to` + `reason_required`) — items serialise as `[]` |
+| `PriceLine` | hand-written `{ code, label, amount }` |
+| `BookingQuoteRequest` | `QuoteReservationRequest` |
+| `CreateReservationRequest` | `StoreReservationRequest` |
+| `BookingQuote` | hand-written — generated cabins is `unknown[]`; totals freeze as `0 \| null` |
+| `CreateReservationResponse` | `operations['booking.store']` 201 + `bookings: Array<Booking>` |
+| `MovePreview` | `MovePreviewResource` |
+| `BookingAuditRow` | `BookingAuditResource` — generated `client` / `what` are `unknown` |
+| `Group` | `GroupResource` + `statuses: Array<BookingStatus>` |
+| `GroupSummary` | `{ id, reference, name, coordinator }` |
+| `Contact` / `ContactSearchResult` | `ContactResource` |
+| `RequestQueueItem` | `BookingRequestResource` — generated `can_act` is `string`; `party` freezes a seed literal |
+| `RequestQueueRules` | `operations['request.index']` `meta.rules` |
+| `HoldListItem` | hand-written — generated `departure` and `remaining_business_minutes` are `string` |
+| `WaitlistEntry` | `WaitlistEntryResource` + `cabin_category: CabinCategory` |
+| Claim holder `detail` | `ClaimHolderDetail` in `inventory.ts` (block \| booking \| `null`) |
+
+**No `ChannelOfOriginGroup` const map** in the layer. The API should send the grouped channel list; that is task 08 input.
+
+### Panel
+One type-only commit: README layer row `` `extends: ['../anakata-ui']` (`v0.5.0`) ``, and `calendarHelpers` narrows blocked-cell `detail`.
+
+`holder.type` is an untyped morph alias (`string`) in the spec, so TypeScript will not discriminate the generated `oneOf` on `internal_block` / `BLOCK`. Narrow by shape: `detail !== null && 'reason' in detail`.
+
+Engine README is `extends: ['../anakata-ui']` with **no** version pin — no engine commit.
+
+No panel import broke on a retired name; the aliases kept the Sprint 3 names.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Http/Controllers/Rms/BookingController.php`
+- `app/Http/Controllers/Rms/RequestController.php`
+- `app/Http/Resources/Rms/ReservationCreatedResource.php`
+- `app/Http/Resources/Rms/DepartureMutationResource.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/inventory.ts`
+- `app/types/config.ts`
+- `app/types/bookings.ts` (new)
+- `app/types/index.ts`
+- `package.json` (`0.5.0`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel**
+- `README.md`
+- `app/components/calendar/calendarHelpers.ts`
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-04/REPORT.md`
+
+### Deviations
+- `config.ts` did not shrink (363 → 368): G5 fields added; documents still untyped.
+- `list<BookingResource>` on the named created schema becomes `string[]`; 201 path uses `#[DocumentedResponse]`.
+- Enum classes on resource `@return` rejected by Larastan and ignored by Scramble.
+- `allowed_transitions` items still `[]`.
+- Several booking resources (`HoldResource`, `ReservationQuoteResource`, `BookingRequestResource.can_act`) infer badly; overlays rather than more PHPDoc that Scramble would ignore.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08: grouped `ChannelOfOrigin` list from the API (no const map in the layer).
+- `allowed_transitions` item properties if Scramble ever expands `list<array{…}>`.
+- Engine sprint / later pin: add a README version line only if the engine starts naming a layer tag.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 497 tests (3311 assertions), Pint, Larastan OK.
+- anakata-ui: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` — pass.
+- anakata-panel: `pnpm typecheck`, `pnpm test` (137), `pnpm build` — pass.
+- anakata-engine: `pnpm typecheck`, `pnpm build` — pass.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout so `extends: ['../anakata-ui']` resolves). Overlayed the working trees (tag `v0.5.0` is not on origin yet). Confirmed the ui clone has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: `pnpm typecheck` pass
+  - panel / engine: `pnpm build` pass
+  - **Repeat this clone after the pushes below**, checking out `anakata-ui` at `v0.5.0` with **no** overlay.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+`v0.3.0` exists locally on anakata-ui and is **not** on origin. Tag `v0.5.0` after the ui commit so it points at the regenerated types.
+
+```bash
+# 1. anakata-api prelude (PHPDoc only — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/BookingController.php \
+  app/Http/Controllers/Rms/RequestController.php \
+  app/Http/Resources/Rms/ReservationCreatedResource.php \
+  app/Http/Resources/Rms/DepartureMutationResource.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Type reservation create and request-queue OpenAPI responses.
+
+Scramble now emits created bookings as BookingResource and
+request index meta.rules so the layer can regenerate against them.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag the regenerated types, then push
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/inventory.ts \
+  app/types/config.ts \
+  app/types/index.ts \
+  app/types/bookings.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for bookings, requests and holds.
+
+Sprint 4 aliases replace the superseded inventory hand-writes;
+calendar dates stay YYYY-MM-DD strings.
+EOF
+)"
+git tag v0.5.0
+git push origin HEAD
+git push origin v0.3.0
+git push origin v0.5.0
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/components/calendar/calendarHelpers.ts
+git commit -m "$(cat <<'EOF'
+Pin the layer to v0.5.0 and narrow blocked-cell detail.
+
+holder.type does not discriminate the generated oneOf, so the
+calendar helper narrows on reason in detail.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine — skip
+# README is `extends: ['../anakata-ui']` with no version. No files changed.
+```
+
+```bash
+# 5. anakata-api report (this file only; prelude commit is already on the branch)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 4 task 06: regenerated UI API types.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.5.0
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```

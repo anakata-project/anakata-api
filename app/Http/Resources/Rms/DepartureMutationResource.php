@@ -44,7 +44,7 @@ class DepartureMutationResource extends DepartureResource
      *                     id: int,
      *                     reference: string|null,
      *                     label: string|null,
-     *                     detail: array{reason: string, reason_label: string}|null
+     *                     detail: array{reason: string, reason_label: string}|array{status: string, type: string, segment: string, display_reference: string|null, owner_id: int, owner_name: string, party_label: string, hold_expired: bool}|null
      *                 }
      *             }|null
      *         }>

@@ -35,6 +35,7 @@ use App\Models\User;
 use App\Services\Pricing\ReservationQuoter;
 use App\Support\BusinessTime;
 use Carbon\CarbonImmutable;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -123,6 +124,10 @@ final class BookingController extends Controller
     /**
      * @throws CabinUnavailableException
      */
+    #[DocumentedResponse(
+        status: 201,
+        type: 'array{bookings: list<App\\Http\\Resources\\Rms\\BookingResource>, group: array{id: int, reference: string, name: string, coordinator: array{id: int, name: string}}|null, warnings: list<string>}',
+    )]
     public function store(StoreReservationRequest $request, CreateReservation $action): JsonResponse
     {
         $this->authorize('create', Booking::class);

@@ -17,11 +17,16 @@ use App\Models\Booking;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\Bookings\RequestQueueRules;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class RequestController extends Controller
 {
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\BookingRequestResource>, meta: array{rules: array{near_term_business_hours: int, long_lead_business_days: int, near_term_max_days: int, response_hours: int, business_day_minutes: int, cabin_deposit_pct: int}}}',
+    )]
     public function index(IndexRequestsRequest $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Booking::class);

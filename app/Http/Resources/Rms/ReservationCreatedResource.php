@@ -18,7 +18,38 @@ class ReservationCreatedResource extends JsonResource
 
     /**
      * @return array{
-     *     bookings: list<array<string, mixed>>,
+     *     bookings: list<array{
+     *         id: int,
+     *         reference: string|null,
+     *         request_reference: string|null,
+     *         display_reference: string|null,
+     *         type: string,
+     *         status: string,
+     *         segment: string,
+     *         main_channel: string,
+     *         channel_of_origin: string,
+     *         adults: int,
+     *         children: int,
+     *         party_label: string,
+     *         back_to_back: bool,
+     *         total: int,
+     *         balance: int,
+     *         deposit_pct: int,
+     *         deposit_amount: int,
+     *         balance_days: int,
+     *         balance_due_date: string,
+     *         price_lines: list<array{code: string, label: string, amount: int}>,
+     *         rates_version: array{id: int, version: int},
+     *         internal_notes: string|null,
+     *         can_act: bool,
+     *         allowed_transitions: list<array{to: string, reason_required: bool}>,
+     *         departure: array{id: int, date: string, yacht: array{id: int, code: string, name: string}},
+     *         cabin: array{id: int, code: string, label: string}|null,
+     *         cabin_label: string,
+     *         contact: array{id: int, name: string, email: string|null, phone: string|null, country: string|null, preferred_channel: string},
+     *         group: array{id: int, reference: string, name: string, coordinator: array{id: int, name: string}}|null,
+     *         owner: array{id: int, name: string}
+     *     }>,
      *     group: array{id: int, reference: string, name: string, coordinator: array{id: int, name: string}}|null,
      *     warnings: list<string>
      * }

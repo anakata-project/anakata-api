@@ -131,6 +131,67 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     $booking = openApiSchema($spec, 'BookingResource');
     expect($booking['properties'])->toHaveKey('allowed_transitions');
 
+    $transitionItems = $booking['properties']['allowed_transitions']['items'] ?? [];
+    $transitionItemProps = is_array($transitionItems)
+        ? ($transitionItems['properties'] ?? $transitionItems['anyOf'][0]['properties'] ?? [])
+        : [];
+    if ($transitionItemProps !== []) {
+        expect($transitionItemProps)->toHaveKeys(['to', 'reason_required']);
+    } else {
+        expect($transitionItems)->toBeArray();
+    }
+
+    $created = openApiSchema($spec, 'ReservationCreatedResource');
+    expect($created['properties'])->toHaveKey('bookings');
+
+    $store = $spec['paths']['/rms/bookings']['post']
+        ?? $spec['paths']['/api/rms/bookings']['post']
+        ?? null;
+    expect($store)->toBeArray();
+    $storeBookings = $store['responses']['201']['content']['application/json']['schema']['properties']['bookings']['items']
+        ?? $created['properties']['bookings']['items']
+        ?? null;
+    expect($storeBookings)->toBeArray();
+    $storeBookingRef = $storeBookings['$ref'] ?? null;
+    $storeBookingProps = $storeBookings['properties'] ?? [];
+    if (is_string($storeBookingRef)) {
+        expect($storeBookingRef)->toContain('BookingResource');
+    } else {
+        expect($storeBookingProps)->toHaveKeys(['id', 'status', 'type']);
+    }
+
+    $requests = $spec['paths']['/rms/requests']['get']
+        ?? $spec['paths']['/api/rms/requests']['get']
+        ?? null;
+    expect($requests)->toBeArray();
+    $requestSchema = $requests['responses']['200']['content']['application/json']['schema'] ?? [];
+    $rules = $requestSchema['properties']['meta']['properties']['rules']['properties']
+        ?? $requestSchema['properties']['meta']['properties']['rules']
+        ?? null;
+    expect($rules)->toBeArray();
+    $ruleFields = $rules['properties'] ?? $rules;
+    expect($ruleFields)->toHaveKeys([
+        'near_term_business_hours',
+        'long_lead_business_days',
+        'near_term_max_days',
+        'response_hours',
+        'business_day_minutes',
+        'cabin_deposit_pct',
+    ]);
+
+    foreach ([
+        'BookingStatus',
+        'BookingType',
+        'BookingSegment',
+        'MainChannel',
+        'ChannelOfOrigin',
+    ] as $enum) {
+        $schema = $spec['components']['schemas'][$enum] ?? null;
+        expect($schema)->toBeArray("schema {$enum} is missing");
+        expect($schema['enum'] ?? $schema['oneOf'] ?? $schema['anyOf'] ?? null)
+            ->not->toBeNull("schema {$enum} is not an enum");
+    }
+
     $transition = $spec['paths']['/rms/bookings/{booking}/transition']['post']
         ?? $spec['paths']['/api/rms/bookings/{booking}/transition']['post']
         ?? null;
