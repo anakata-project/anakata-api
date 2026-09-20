@@ -11,6 +11,7 @@ use App\Enums\DepartureStatus;
 use App\Enums\EngineLabelCode;
 use App\Models\CabinClaim;
 use App\Models\Departure;
+use App\Models\InternalBlock;
 use App\Support\Inventory\DepartureLocks;
 use App\Support\Inventory\DepartureSnapshot;
 use App\Support\Inventory\EngineLabel;
@@ -192,7 +193,7 @@ final class Availability
     }
 
     /**
-     * @return array{kind: string, hold_type: string|null, expires_at: string|null, holder: array{type: string, id: int, reference: string|null, label: string|null}}
+     * @return array{kind: string, hold_type: string|null, expires_at: string|null, holder: array{type: string, id: int, reference: string|null, label: string|null, detail: array{reason: string, reason_label: string}|null}}
      */
     private function claimSummary(CabinClaim $claim): array
     {
@@ -207,7 +208,23 @@ final class Availability
                 'id' => $claim->holder_id,
                 'reference' => $this->holderField($holder, 'reference'),
                 'label' => $this->holderLabel($holder),
+                'detail' => $this->holderDetail($holder),
             ],
+        ];
+    }
+
+    /**
+     * @return array{reason: string, reason_label: string}|null
+     */
+    private function holderDetail(?Model $holder): ?array
+    {
+        if (! $holder instanceof InternalBlock) {
+            return null;
+        }
+
+        return [
+            'reason' => $holder->reason->value,
+            'reason_label' => $holder->reason->label(),
         ];
     }
 

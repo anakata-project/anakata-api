@@ -1028,3 +1028,146 @@ when the API returns warnings.
 EOF
 )"
 ```
+
+## Task 08 · Calendar and Yacht Layout
+
+### What was built
+RMS Calendar (`/rms/reservations/calendar`) and Yacht Layout (`/rms/reservations/yacht-layout`). Both pages **present** `GET /api/rms/calendar` — no availability is computed in the panel, and there is no `/api/rms/blocks` join.
+
+**`holder.detail` (API).** `Availability::claimSummary()` adds `holder.detail = { reason, reason_label }` when the holder is an `InternalBlock`, otherwise `null`. Demo `BLK-001` is `FAM_TRIP` / `Fam trip` on calendar cells and on `GET /api/rms/departures/{DEP-003}/layout`. Hold claims have `detail: null`.
+
+**anakata-ui `v0.4.2`.** `ClaimHolder.detail` hand-added on the inventory overlay. `useApi().useFetch` now accepts `MaybeRefOrGetter<string>` so a computed calendar URL typechecks (Nuxt `useFetch` already did at runtime).
+
+**Calendar.** DateRangeFilter defaults to today → +6 months (`addMonths`, preset starts as `custom`). Columns are **dates**, not departure ids. A yacht with no sailing that day is `.cell.c-none` (`—`, hairline, `--iv38`). Both yachts × nine cabins. Legend is the prototype’s nine entries. Blocked cells show `FAM` / `MAINT` / `NEG` / `COURT` from `claim.holder.detail.reason` and link to `/rms/operations/blocks?open=BLK-001`. Free cells are not clickable. Sticky first column. `SOLD` and `lock` are `TODO(Sprint 4)`.
+
+**Yacht Layout.** Same calendar fetch. Departure select of dates (`7 Nov 2027`, `19 Dec 2027 · FESTIVE`); selection is kept when the range still contains it. **Both** yachts side by side (prototype shows ANAMARA only). No sailing: dimmed deck + “No sailing”. Owner’s Suite first, then Suite 01–08. ANAMARA S7–S8 on 14 Nov: `Blocked · Fam trip`.
+
+**Notice wording** (kept as the SLA requirement; dropped the untrue nightly-hold sentence):
+
+> Availability changes propagate to the public site in < 30 seconds (SLA). No overbooking: cells with any active claim are unsellable, enforced at database level.
+
+**Token proposal (not added):** `--ok-bright: #8FBF8A` for Fully paid. `.c-full` / the Fully-paid swatch use `var(--ok)` for now.
+
+### Files touched
+
+**anakata-api**
+
+- `app/Services/Inventory/Availability.php`
+- `tests/Feature/Inventory/AvailabilityEndpointsTest.php`
+- `docs/sprints/sprint-03/REPORT.md`
+
+**anakata-ui**
+
+- `app/types/inventory.ts`
+- `app/composables/useApi.ts`
+- `package.json` (`0.4.2`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel**
+
+- `app/pages/rms/reservations/calendar.vue`
+- `app/pages/rms/reservations/yacht-layout.vue`
+- `app/components/calendar/calendarHelpers.ts`
+- `app/components/calendar/CalendarCell.vue`
+- `app/components/lists/dateRange.ts`
+- `app/components/lists/DateRangeFilter.vue`
+- `app/assets/css/inventory.css`
+- `app/types/api.ts`
+- `app/i18n` → `i18n/locales/en.json`
+- `eslint.config.mjs`
+- `tests/unit/calendarHelpers.test.ts`
+- `tests/unit/dateRange.test.ts`
+
+### Deviations from the task
+- Data source is the calendar endpoint for **both** pages (one request). Layout `/departures/{id}/layout` is unused here; the calendar payload already has `state`, `claim.holder.detail`, festive, and both yachts.
+- `table.grid { display: table }` so Tailwind’s `grid` utility does not break the table.
+- `useApi().useFetch` typed as `MaybeRefOrGetter<string>` (ui `v0.4.2`) so computed filter URLs typecheck. Same wrapper already accepted them at runtime.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 09: `/rms/operations/blocks?open=BLK-001` still lands on the Sprint 3 placeholder.
+- Sprint 4: booking cell states (`c-conf`, `c-full`, `c-dep`, `c-charter`), own-records `lock`, create-reservation on free cells.
+- Layer token `--ok-bright` if Fully paid must match `#8FBF8A`.
+
+### Quality
+- anakata-api: `composer check` in Docker — pass (Pint, Pest, Larastan).
+- anakata-ui: `pnpm lint`, `typecheck`, `test`, `build` — pass.
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (129), `build` — pass.
+
+### Browser check
+Carolina, both themes. Default range is today (20 Sep 2026) → 20 Mar 2027, so the seed Sundays are **empty** until **Year 2027**. After that:
+
+- 8 date columns 7 Nov–26 Dec 2027; both yachts × 9 cabin rows; legend all nine entries.
+- FAM on ANAMARA Suite 07–08, 14 Nov; tooltip `Suite 07 · 14 Nov 2027 · ANAMARA — Blocked: Fam trip (BLK-001)`.
+- Click FAM → `/rms/operations/blocks?open=BLK-001` (placeholder).
+- Yacht layout 14 Nov: ANAMARA S7–S8 `Blocked · Fam trip`; ANATIVA all Available; Owner’s Suite first on both decks.
+- This local DB has ANAMARA 14 Nov `festive: true` (seed is `false`), so that column/option also shows FESTIVE. 19 and 26 Dec are festive as seeded. Column festive is “any yacht that day”.
+- Lucía: pages have no write controls. `lucia can read calendar and layout` covers the API; the who-menu switch was not used in this pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# 1. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Services/Inventory/Availability.php \
+  tests/Feature/Inventory/AvailabilityEndpointsTest.php \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Expose internal-block reason on calendar and layout claims.
+
+The panel maps FAM / MAINT / NEG / COURT from holder.detail
+instead of joining /api/rms/blocks.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  app/types/inventory.ts \
+  app/composables/useApi.ts \
+  package.json \
+  CHANGELOG.md \
+  README.md
+git commit -m "$(cat <<'EOF'
+Add claim holder.detail and typed computed useFetch URLs.
+
+Internal-block cells need reason / reason_label. Calendar
+filters pass a computed URL into useApi().useFetch.
+EOF
+)"
+git tag v0.4.2
+git push origin HEAD
+git push origin v0.4.2
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/reservations/calendar.vue \
+  app/pages/rms/reservations/yacht-layout.vue \
+  app/components/calendar \
+  app/components/lists/dateRange.ts \
+  app/components/lists/DateRangeFilter.vue \
+  app/assets/css/inventory.css \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/calendarHelpers.test.ts \
+  tests/unit/dateRange.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS calendar grid and both-yacht deck layout.
+
+Cells map FREE / BLOCKED / HELD from the calendar payload.
+Blocked cabins open Internal Blocks; booking states wait for Sprint 4.
+EOF
+)"
+```

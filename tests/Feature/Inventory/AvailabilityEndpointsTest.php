@@ -68,6 +68,7 @@ test('the demo calendar is free except the seeded fam-trip block', function (): 
                 'cabin' => $row['cabin']['code'],
                 'state' => $cell['state'],
                 'reference' => $cell['claim']['holder']['reference'] ?? null,
+                'detail' => $cell['claim']['holder']['detail'] ?? null,
             ];
         }
     }
@@ -77,6 +78,66 @@ test('the demo calendar is free except the seeded fam-trip block', function (): 
     expect(collect($blocked)->pluck('yacht')->unique()->all())->toBe(['ANAMARA']);
     expect(collect($blocked)->pluck('state')->unique()->all())->toBe(['BLOCKED']);
     expect(collect($blocked)->pluck('reference')->unique()->all())->toBe(['BLK-001']);
+    expect(collect($blocked)->pluck('detail')->unique()->all())->toBe([
+        ['reason' => 'FAM_TRIP', 'reason_label' => 'Fam trip'],
+    ]);
+});
+
+test('the demo layout exposes the fam-trip block detail on ANAMARA S7 and S8', function (): void {
+    $this->seed(DemoInventorySeeder::class);
+    $departure = Departure::query()->where('reference', 'DEP-003')->firstOrFail();
+
+    $response = $this->actingAs(managerUser())
+        ->getJson("/api/rms/departures/{$departure->id}/layout")
+        ->assertOk();
+
+    $blocked = collect($response->json('availability.cabins'))
+        ->filter(fn (array $row): bool => $row['state'] === 'BLOCKED')
+        ->values();
+
+    expect($blocked)->toHaveCount(2);
+    expect($blocked->pluck('cabin.code')->sort()->values()->all())->toBe(['S7', 'S8']);
+
+    foreach ($blocked as $row) {
+        expect($row['claim']['holder']['reference'])->toBe('BLK-001');
+        expect($row['claim']['holder']['detail'])->toBe([
+            'reason' => 'FAM_TRIP',
+            'reason_label' => 'Fam trip',
+        ]);
+    }
+
+    $free = collect($response->json('availability.cabins'))
+        ->first(fn (array $row): bool => $row['state'] === 'FREE');
+
+    expect($free['claim'])->toBeNull();
+});
+
+test('a hold claim has a null holder detail', function (): void {
+    $yacht = Yacht::query()->where('code', 'ANAMARA')->firstOrFail();
+    $departure = Departure::factory()->create([
+        'yacht_id' => $yacht->id,
+        'itinerary_id' => Itinerary::factory()->create(['status' => ItineraryStatus::Published])->id,
+        'date' => '2028-04-02',
+    ]);
+    $holder = ClaimHolder::query()->create(['reference' => 'HLD-NULL', 'name' => 'Hold']);
+    $cabin = $yacht->cabins()->where('code', 'S1')->firstOrFail();
+
+    DB::transaction(function () use ($departure, $cabin, $holder): void {
+        app(ClaimService::class)->claim(
+            $departure,
+            collect([$cabin]),
+            $holder,
+            ClaimKind::Hold,
+            HoldType::Agency,
+            now()->addDay(),
+        );
+    });
+
+    $this->actingAs(managerUser())
+        ->getJson("/api/rms/departures/{$departure->id}/layout")
+        ->assertOk()
+        ->assertJsonPath('availability.cabins.0.state', 'HELD')
+        ->assertJsonPath('availability.cabins.0.claim.holder.detail', null);
 });
 
 test('calendar and the departure list do not N+1 over sixteen departures', function (): void {
