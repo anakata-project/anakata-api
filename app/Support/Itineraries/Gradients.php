@@ -28,6 +28,20 @@ final class Gradients
         return array_keys(self::ALL);
     }
 
+    /**
+     * @return list<array{key: string, css: string}>
+     */
+    public static function catalog(): array
+    {
+        $entries = [];
+
+        foreach (self::ALL as $key => $css) {
+            $entries[] = ['key' => $key, 'css' => $css];
+        }
+
+        return $entries;
+    }
+
     public static function css(string $key): string
     {
         if (! array_key_exists($key, self::ALL)) {

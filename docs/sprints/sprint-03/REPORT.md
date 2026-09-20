@@ -758,3 +758,160 @@ Record sprint 3 task 05: regenerated UI API types.
 EOF
 )"
 ```
+
+## Task 06 · Panel itineraries page
+
+### What was built
+RMS Itineraries at `/rms/booking-engine/itineraries` (dedicated page beats the catch-all). Carolina / Mateo edit; Lucía reads.
+
+**API prelude.** `ItineraryResource` still emits `fallback_gradient` as CSS (`Gradients::css`) and now also `fallback_gradient_key` (the stored GRADS name). `Defaults::payload()` adds `fallback_gradient_key` and `gradients: [{ key, css }, …]` from `Gradients::catalog()` (Western / Northern / Festive). Empty draft strings that Laravel’s `ConvertEmptyStringsToNull` turned into `null` are restored to `''` in the itinerary FormRequests so a panel-shaped POST can save an incomplete DRAFT.
+
+**anakata-ui `v0.4.1`.** Hand-added `fallback_gradient_key` on `Itinerary`, `ItineraryGradient`, and `gradients` + `fallback_gradient_key` on `ItineraryDefaults`. `package.json` `0.4.0` → `0.4.1`. CHANGELOG `## v0.4.1`.
+
+**Notice** (prototype minus “publishes in < 30 seconds”):
+
+> The booking engine reads itinerary content from here: the **itinerary cards** (Step 2) and the full **Trip Details page** — facts, day by day, includes/excludes, FAQs (Step 3). Drafts and hidden itineraries never show.
+
+Toolbar `{n} published · {m} total`. **＋ New itinerary** only with `itineraries.manage`. **Engine feed (JSON)** omitted. Engine preview is the existing stub (`EnginePreviewBox`). No Remove photo.
+
+**Save & publish.** New: `POST` DRAFT → `adoptCreated` (id stored, code locked, photo / Hide / Delete / History unlocked) → `PATCH { …content, status: PUBLISHED }`. A 422 (`Cannot publish — missing: …`) leaves existing mode; the next click is PATCH only. Existing: one PATCH. Gradients bind to `fallback_gradient_key` from the API catalog; the card background uses `fallback_gradient` CSS. No local GRADS table, no CSS→key reverse map.
+
+**F8.** Holds & Waitlist `sprint` `3` → `4` in `app/navigation/rms.ts`.
+
+**Drawer.** 600px `USlideover` + `history-drawer` class. Lucía: *“Sales Exec role: view only. Itinerary content is managed by Admin / Manager.”* (`user.role.name`), disabled `fieldset.edfs`, Close only (History hidden). `confirmUnsaved` extracted from `useUnsavedGuard` for route-leave and drawer close. Close uses `defineModel('open')` so the parent `v-model:open` actually dismisses.
+
+### Files touched
+
+**anakata-api**
+
+- `app/Http/Resources/Rms/ItineraryResource.php`
+- `app/Support/Itineraries/Defaults.php`
+- `app/Support/Itineraries/Gradients.php`
+- `app/Http/Requests/Rms/Concerns/ValidatesItineraryContent.php`
+- `app/Http/Requests/Rms/StoreItineraryRequest.php`
+- `app/Http/Requests/Rms/UpdateItineraryRequest.php`
+- `tests/Feature/Inventory/ItineraryEndpointsTest.php`
+- `docs/sprints/sprint-03/REPORT.md`
+
+**anakata-ui**
+
+- `app/types/inventory.ts`
+- `app/types/index.ts`
+- `package.json`
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel**
+
+- `app/pages/rms/booking-engine/itineraries.vue`
+- `app/components/itineraries/ItineraryCard.vue`
+- `app/components/itineraries/ItineraryEditor.vue`
+- `app/components/itineraries/itineraryHelpers.ts`
+- `app/assets/css/inventory.css`
+- `app/components/history/describe.ts`
+- `app/composables/useUnsavedGuard.ts`
+- `app/navigation/rms.ts`
+- `app/types/api.ts`
+- `eslint.config.mjs`
+- `i18n/locales/en.json`
+- `nuxt.config.ts`
+- `tests/unit/describe.test.ts`
+- `tests/unit/itineraryHelpers.test.ts`
+
+### Deviations from the task
+- API FormRequests restore empty strings after `ConvertEmptyStringsToNull`. Without that, a panel create with empty `hero_alt` / `card_description` 422s (`must be a string`) and the draft→publish-missing flow cannot run. Test: `a panel-shaped create with empty draft strings succeeds`.
+- Drawer close is `defineModel('open')` + `v-model:open` on the page. `:open` + `@update:open="editorOpen = $event"` did not dismiss `USlideover` when Close emitted `false`.
+- Photo upload updates the last-saved snapshot so the unsaved confirm does not fire after a successful image POST.
+
+### Open questions
+None.
+
+### Notes for later
+Departures / Calendar / Blocks can reuse `.ebtool`, `.pill` / `.p-conf` / `.p-pend` / `.p-wait`, and `inventory.css`. Live engine card preview and Remove photo stay out of this sprint.
+
+### Browser check
+Panel `:3001`, API `:8000`. Demo inventory was missing on this machine (0 yachts); `InventorySeeder` + `DemoInventorySeeder` brought WEST / NORTH / FEST back.
+
+- Carolina: SOUTH · Southern Isles → Save as draft → Save & publish → `Cannot publish — missing: card description, day-by-day plan.` Drawer stayed existing. Fill + publish succeeded.
+- Photo upload: card hero is `url(http://localhost:8000/storage/itineraries/…)`; overlay gone; alt prefilled `Southern Isles — Galápagos`.
+- Hide from engine: HIDDEN pill, toolbar `3 published · 4 total`.
+- WEST Delete disabled `(has departures)`. SOUTH Delete confirmed and gone (`3 published · 3 total`).
+- Mateo: New itinerary + Save / Hide / Delete / History. Lucía: no New itinerary, fieldset disabled, notice *“Sales Exec role: view only…”*, Close only.
+- Dark (default) and light: notice, toolbar, gradient cards, completeness `77% COMPLETE · MISSING: HERO PHOTO, SEO TITLE, SEO DESCRIPTION` (`--sand` bar).
+
+### Quality
+- anakata-api: `composer check` inside Docker — 372 passed.
+- anakata-ui: `pnpm lint`, `pnpm typecheck`, `pnpm test` (34), `pnpm build` — pass.
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (110), `pnpm build` — pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Three repos, in this order.
+
+```bash
+# 1. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Resources/Rms/ItineraryResource.php \
+  app/Support/Itineraries/Defaults.php \
+  app/Support/Itineraries/Gradients.php \
+  app/Http/Requests/Rms/Concerns/ValidatesItineraryContent.php \
+  app/Http/Requests/Rms/StoreItineraryRequest.php \
+  app/Http/Requests/Rms/UpdateItineraryRequest.php \
+  tests/Feature/Inventory/ItineraryEndpointsTest.php \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Expose itinerary gradient keys so the panel can bind the select.
+
+The resource already sent CSS; the editor needs the stored name and
+the defaults catalog. Empty draft strings stay empty after Laravel
+converts them to null.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/inventory.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Add itinerary gradient key types for panel v0.4.1.
+
+The editor select binds fallback_gradient_key and options from
+defaults.gradients; regenerating api.d.ts is optional.
+EOF
+)"
+git tag v0.4.1
+git push origin HEAD
+git push origin v0.4.1
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/booking-engine/itineraries.vue \
+  app/components/itineraries \
+  app/assets/css/inventory.css \
+  app/components/history/describe.ts \
+  app/composables/useUnsavedGuard.ts \
+  app/navigation/rms.ts \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  tests/unit/describe.test.ts \
+  tests/unit/itineraryHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS itineraries page and 600px editor drawer.
+
+Staff publish from the prototype layout; Lucía is view-only. New
+itineraries POST then adopt before the publish PATCH.
+EOF
+)"
+```

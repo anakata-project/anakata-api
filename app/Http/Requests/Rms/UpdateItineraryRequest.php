@@ -42,6 +42,8 @@ class UpdateItineraryRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->restoreEmptyStrings();
+
         if ($this->exists('slug') && $this->input('slug') === '') {
             $this->merge(['slug' => null]);
         }

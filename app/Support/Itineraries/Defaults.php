@@ -96,6 +96,8 @@ final class Defaults
         $attributes = self::attributes();
         unset($attributes['hero_image_path']);
         $attributes['fallback_gradient'] = Gradients::css(Gradients::DEFAULT_KEY);
+        $attributes['fallback_gradient_key'] = Gradients::DEFAULT_KEY;
+        $attributes['gradients'] = Gradients::catalog();
         $attributes['status'] = ItineraryStatus::Draft->value;
 
         return $attributes;

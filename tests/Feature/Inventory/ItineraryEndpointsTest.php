@@ -59,6 +59,7 @@ test('mateo can create a draft itinerary with mkItin defaults', function (): voi
         ->assertJsonPath('nights', 7)
         ->assertJsonPath('embark', 'San Cristóbal (SCY)')
         ->assertJsonPath('fallback_gradient', Gradients::css(Gradients::DEFAULT_KEY))
+        ->assertJsonPath('fallback_gradient_key', Gradients::DEFAULT_KEY)
         ->assertJsonPath('chips.0', Defaults::CHIPS[0]);
 
     expect(Itinerary::query()->where('code', 'SOUTH')->firstOrFail()->status)->toBe(ItineraryStatus::Draft);
@@ -66,6 +67,31 @@ test('mateo can create a draft itinerary with mkItin defaults', function (): voi
     $entry = ChangeHistory::query()->where('event', 'itinerary.created')->first();
     expect($entry)->not->toBeNull();
     expect($entry?->subject_type)->toBe('itinerary');
+});
+
+test('a panel-shaped create with empty draft strings succeeds', function (): void {
+    $mateo = managerUser();
+
+    $this->actingAs($mateo)
+        ->postJson('/api/rms/itineraries', [
+            'code' => 'SOUTH',
+            'name' => 'Southern Isles',
+            'hero_alt' => '',
+            'card_description' => '',
+            'long_description' => '',
+            'meta_title' => '',
+            'meta_description' => '',
+            'slug' => '',
+            'fallback_gradient' => Gradients::DEFAULT_KEY,
+            'highlights' => [],
+            'day_plan' => [],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('code', 'SOUTH')
+        ->assertJsonPath('status', 'DRAFT')
+        ->assertJsonPath('hero_alt', '')
+        ->assertJsonPath('card_description', '')
+        ->assertJsonPath('slug', null);
 });
 
 test('defaults match mkItin', function (): void {
@@ -80,7 +106,29 @@ test('defaults match mkItin', function (): void {
         ->assertJsonPath('sort_order', 9)
         ->assertJsonPath('embark', 'San Cristóbal (SCY)')
         ->assertJsonPath('facts.0.0', 'Accommodation')
-        ->assertJsonPath('fallback_gradient', Gradients::ALL[Gradients::DEFAULT_KEY]);
+        ->assertJsonPath('fallback_gradient', Gradients::ALL[Gradients::DEFAULT_KEY])
+        ->assertJsonPath('fallback_gradient_key', Gradients::DEFAULT_KEY)
+        ->assertJsonPath('gradients', Gradients::catalog());
+});
+
+test('itinerary rows expose fallback_gradient_key alongside the css', function (): void {
+    $itinerary = Itinerary::factory()->create([
+        'code' => 'NORTH',
+        'fallback_gradient' => 'Northern (forest)',
+    ]);
+    $mateo = managerUser();
+
+    $this->actingAs($mateo)
+        ->getJson("/api/rms/itineraries/{$itinerary->id}")
+        ->assertOk()
+        ->assertJsonPath('fallback_gradient', Gradients::css('Northern (forest)'))
+        ->assertJsonPath('fallback_gradient_key', 'Northern (forest)');
+
+    $this->actingAs($mateo)
+        ->getJson('/api/rms/itineraries')
+        ->assertOk()
+        ->assertJsonPath('data.0.fallback_gradient_key', 'Northern (forest)')
+        ->assertJsonPath('data.0.fallback_gradient', Gradients::css('Northern (forest)'));
 });
 
 test('code is immutable after creation', function (): void {

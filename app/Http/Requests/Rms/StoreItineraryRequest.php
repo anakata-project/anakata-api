@@ -30,6 +30,8 @@ class StoreItineraryRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->restoreEmptyStrings();
+
         $code = $this->input('code');
 
         if (is_string($code)) {

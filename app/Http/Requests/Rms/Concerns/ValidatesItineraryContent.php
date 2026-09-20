@@ -10,6 +10,39 @@ use Illuminate\Validation\Rule;
 trait ValidatesItineraryContent
 {
     /**
+     * ConvertEmptyStringsToNull turns "" into null; draft fields stay empty strings.
+     *
+     * @var list<string>
+     */
+    private const EMPTYABLE_STRINGS = [
+        'name',
+        'embark',
+        'disembark',
+        'tagline',
+        'hero_alt',
+        'card_description',
+        'overview',
+        'long_description',
+        'meta_title',
+        'meta_description',
+    ];
+
+    protected function restoreEmptyStrings(): void
+    {
+        $merge = [];
+
+        foreach (self::EMPTYABLE_STRINGS as $key) {
+            if ($this->exists($key) && $this->input($key) === null) {
+                $merge[$key] = '';
+            }
+        }
+
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
+    }
+
+    /**
      * @return array<string, array<int, mixed>>
      */
     protected function contentRules(): array
