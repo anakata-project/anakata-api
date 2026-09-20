@@ -915,3 +915,116 @@ itineraries POST then adopt before the publish PATCH.
 EOF
 )"
 ```
+
+## Task 07 · Panel Departures page
+
+### What was built
+RMS Departures at `/rms/booking-engine/departures` (dedicated page; nav already pointed here). Carolina / Manager write; Lucía (`panel.rms` only) reads.
+
+**DateRangeFilter** is new (Sprint 1–2 never built one). Shared helper `dateRange.ts` + `DateRangeFilter.vue` for later lists. Year presets are the Galápagos calendar year of `today`, then Y+1 and Y+2 — not hard-coded 2026–2028. `today = 2029-06-01` yields 2029 / 2030 / 2031. Filters `from` / `to` / `yacht_id` go on `GET /api/rms/departures` so `meta.kpis` match the visible rows.
+
+**Count copy.** No range: `{total} departures · all dates`. Range or yacht filter: still `{total} departures · all dates` when dates are unset; with a range, `Showing {total} departures`. `meta.total` is already filtered, so there is no “of M” without a second unfiltered request.
+
+**Page.** Prototype notice (i18n `<b>` splits). Four `AnkKpi`s from `meta.kpis`. Yacht chips resolve `yacht_id` from `GET /api/rms/yachts` by `code`. Table `per_page=500`. Festive pill / checkbox amount from `GET /api/rms/rates` `document.rules.festive_supplement_pp` (live seed is USD 800, never hard-coded 750). Engine label is `availability.engine_label` — not recomputed. Inventory bar widths `(n / 9 * 100).toFixed(1) + '%'`.
+
+**Status select.** Immediate `PATCH { status }`. Success → toast + refresh (row + KPIs). Failure → `revertStatus` puts the select back; toast is `firstApiMessage`.
+
+**Editor.** 600px `USlideover` + `history-drawer`. New defaults: ANAMARA + WEST + `CLOSED` + threshold 3 + waitlist on. After create/update, `afterMutation(wasNew, warnings)`: empty warnings → close + toast + refresh; non-empty → **keep open**, success toast, `.warnbox` shows `warnings[]`. A new row **adopts** the response (`id`, `reference`, locks, cabins) so History / Delete unlock. Save wording is **Save**, not “Save — publish to engine”. Delete confirm `Delete DEP-001?` (no 30-second claim). DEP-003: date/yacht stay editable (blocks do not lock); Delete disabled `2 blocked`.
+
+**Generate season.** Defaults: next Sunday after the latest listed date, +12 weeks (seed → `2028-01-02` … `2028-03-26`). Patterns ALT / WEST / NORTH. Toast `{n} created as Closed…` (or `and on sale.`) plus `{n} skipped.`
+
+**History.** `departure.created|updated|status_changed|deleted` in `describe.ts`.
+
+### Files touched
+
+**anakata-panel**
+
+- `app/pages/rms/booking-engine/departures.vue`
+- `app/components/departures/DepartureEditor.vue`
+- `app/components/departures/GenerateSeasonDrawer.vue`
+- `app/components/departures/departureHelpers.ts`
+- `app/components/lists/DateRangeFilter.vue`
+- `app/components/lists/dateRange.ts`
+- `app/assets/css/inventory.css`
+- `app/assets/css/lists.css`
+- `app/components/history/describe.ts`
+- `app/types/api.ts`
+- `eslint.config.mjs`
+- `i18n/locales/en.json`
+- `tests/unit/describe.test.ts`
+- `tests/unit/dateRange.test.ts`
+- `tests/unit/departureHelpers.test.ts`
+
+**anakata-api**
+
+- `docs/sprints/sprint-03/REPORT.md`
+
+### Deviations from the task
+- List filters are appended to the URL (`/api/rms/departures?per_page=500&yacht_id=…`). `useApi().useFetch` replaces `$fetch` with a wrapper that drops ofetch `query`, so `useFetch(url, { query })` never sent `yacht_id` / `from` / `to`. Same wrapper is why TeamMembersPanel-style `{ query }` did not refetch here.
+- Range count has no “of M” (API already returns the filtered total).
+- Save button is “Save”, not “Save — publish to engine” (no engine push yet).
+- Offer badges omitted on the pulldown preview (offers sprint).
+
+### Open questions
+None.
+
+### Notes for later
+Calendar / Blocks / Bookings can reuse `DateRangeFilter`. Engine availability push and offer badges stay out of this sprint. `useApi` `query` forwarding would let later lists pass a computed query object instead of building the URL.
+
+### Browser check
+Panel `:3001` (`nuxt dev --host 0.0.0.0`), API `:8000`. Demo inventory already present.
+
+- Carolina, all dates: 16 on sale of 16 · 142 bookable (15×9 + DEP-003’s 7) · 0 only-N · 0 full. Year presets 2026 / 2027 / 2028 (today 20 Sep 2026). Festive pill `FESTIVE +USD 800 PP`.
+- Filter ANATIVA: 8 rows, 8 on sale, 72 bookable. DEP-002 → Closed: label `CLOSED — ENQUIRE`, KPIs 7 of 8 / 63 bookable.
+- Failed inline PATCH (intercepted 422): select snapped back to On sale.
+- DEP-003: date and yacht enabled; Delete disabled `Delete (2 blocked)`; no date/yacht lock notice (blocks do not lock).
+- Monday create `2028-01-03`: 422 `Anakata sails Sunday → Sunday. 3 Jan 2028 is not a Sunday.` Drawer stayed New departure.
+- Festive on DEP-003 (NORTH): drawer stayed open; `.warnbox` `ANATIVA's departure on 14 Nov 2027 is not festive.` and `This departure is festive but itinerary NORTH is not.`; success toast fired.
+- Generate 2 Jan–26 Mar 2028: 26 created (16 → 42). Again: 0 created, 26 skipped (still 42).
+- Lucía (earlier session): no Generate / New, disabled `.tsel`, view-only drawer + Cancel only.
+- Light and dark: notice, KPIs, chips, inventory bar, festive coral pill, status select.
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (120), `pnpm build` — pass.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Two repos, in this order.
+
+```bash
+# 1. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/booking-engine/departures.vue \
+  app/components/departures \
+  app/components/lists \
+  app/assets/css/inventory.css \
+  app/assets/css/lists.css \
+  app/components/history/describe.ts \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/describe.test.ts \
+  tests/unit/dateRange.test.ts \
+  tests/unit/departureHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS departures page, editor, and generate-season drawer.
+
+Staff filter by yacht and date so KPIs match the list. Warnings keep
+the editor open; a failed status PATCH puts the select back.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 3 task 07: panel departures page.
+
+DateRangeFilter years are computed from today. The drawer stays open
+when the API returns warnings.
+EOF
+)"
+```
