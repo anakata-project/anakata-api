@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\ClaimKind;
+use App\Enums\HoldType;
+use App\Enums\ItineraryStatus;
+use App\Enums\ReleaseReason;
+use App\Models\CabinClaim;
+use App\Models\ChangeHistory;
+use App\Models\Departure;
+use App\Models\Itinerary;
+use App\Models\Yacht;
+use App\Services\Inventory\ClaimService;
+use Database\Seeders\InventorySeeder;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\DB;
+use Tests\Support\Inventory\ClaimHolder;
+
+beforeEach(function (): void {
+    $this->seed(InventorySeeder::class);
+});
+
+test('the job releases expired holds in batches and writes hold.expired', function (): void {
+    $yacht = Yacht::query()->where('code', 'ANAMARA')->firstOrFail();
+    $departure = Departure::factory()->create([
+        'yacht_id' => $yacht->id,
+        'itinerary_id' => Itinerary::factory()->create(['status' => ItineraryStatus::Published])->id,
+        'date' => '2028-04-02',
+    ]);
+    $expired = ClaimHolder::query()->create(['reference' => 'EXP-1', 'name' => 'Expired']);
+    $live = ClaimHolder::query()->create(['reference' => 'LIVE-1', 'name' => 'Live']);
+    $s1 = $yacht->cabins()->where('code', 'S1')->firstOrFail();
+    $s2 = $yacht->cabins()->where('code', 'S2')->firstOrFail();
+
+    DB::transaction(function () use ($departure, $s1, $s2, $expired, $live): void {
+        $service = app(ClaimService::class);
+        $service->claim($departure, collect([$s1]), $expired, ClaimKind::Hold, HoldType::Web, now()->addMinutes(20));
+        $service->claim($departure, collect([$s2]), $live, ClaimKind::Hold, HoldType::Agency, now()->addDay());
+    });
+
+    CabinClaim::query()->where('holder_id', $expired->id)->update(['expires_at' => now()->subMinute()]);
+
+    $this->artisan('inventory:release-expired-holds')->assertSuccessful();
+
+    expect(CabinClaim::query()->where('holder_id', $expired->id)->value('release_reason'))->toBe(ReleaseReason::Expired);
+    expect(CabinClaim::query()->where('holder_id', $live->id)->value('released_at'))->toBeNull();
+    expect(ChangeHistory::query()->where('event', 'hold.expired')->where('subject_id', $expired->id)->count())->toBe(1);
+    expect(ChangeHistory::query()->where('event', 'hold.expired')->value('actor_label'))->toBe('System');
+});
+
+test('the release command is scheduled every minute without overlapping', function (): void {
+    $events = collect(app(Schedule::class)->events());
+    $event = $events->first(
+        fn ($scheduled): bool => str_contains((string) ($scheduled->command ?? ''), 'inventory:release-expired-holds'),
+    );
+
+    expect($event)->not->toBeNull();
+    expect($event?->expression)->toBe('* * * * *');
+    expect($event?->withoutOverlapping)->toBeTrue();
+});

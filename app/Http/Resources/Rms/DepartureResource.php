@@ -7,12 +7,12 @@ namespace App\Http\Resources\Rms;
 use App\Enums\ConfigKind;
 use App\Models\Departure;
 use App\Services\Config\CurrentConfig;
+use App\Services\Inventory\Availability;
+use App\Support\Inventory\DepartureSnapshot;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Task 03 extends this resource with availability, engine_label and locks.
- *
  * @mixin Departure
  */
 class DepartureResource extends JsonResource
@@ -20,30 +20,20 @@ class DepartureResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array{
-     *     id: int,
-     *     reference: string,
-     *     date: string,
-     *     return_date: string,
-     *     yacht_id: int,
-     *     itinerary_id: int,
-     *     status: string,
-     *     urgency_threshold: int,
-     *     waitlist_enabled: bool,
-     *     public_note: string|null,
-     *     festive: bool,
-     *     yacht: array{id: int, code: string, name: string},
-     *     itinerary: array{id: int, code: string, name: string, status: string, festive: bool},
-     *     rates: array{year: int, suite_from: int|null}
-     * }
+     * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         $this->resource->loadMissing(['yacht', 'itinerary']);
 
         $year = (int) $this->date->format('Y');
+        $method = $request->route()?->getActionMethod();
+        $isDetail = in_array($method, ['show', 'layout', 'store', 'update'], true);
+        $withCabins = $isDetail || $request->boolean('with_cabins');
+        $withLocks = $isDetail;
+        $snapshot = $this->snapshot();
 
-        return [
+        $payload = [
             'id' => $this->id,
             'reference' => $this->reference,
             'date' => $this->date->toDateString(),
@@ -71,7 +61,32 @@ class DepartureResource extends JsonResource
                 'year' => $year,
                 'suite_from' => $this->suiteFrom($year),
             ],
+            'availability' => [
+                'counts' => $snapshot->counts,
+                'engine_label' => $snapshot->engineLabel,
+            ],
         ];
+
+        if ($withCabins) {
+            $payload['availability']['cabins'] = $snapshot->cabins;
+        }
+
+        if ($withLocks) {
+            $payload['locks'] = $snapshot->locks;
+        }
+
+        return $payload;
+    }
+
+    private function snapshot(): DepartureSnapshot
+    {
+        if ($this->resource->snapshot instanceof DepartureSnapshot) {
+            return $this->resource->snapshot;
+        }
+
+        $computed = app(Availability::class)->forDepartures(collect([$this->resource]));
+
+        return $computed[$this->id];
     }
 
     private function suiteFrom(int $year): ?int

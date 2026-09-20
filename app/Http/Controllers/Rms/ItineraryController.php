@@ -16,6 +16,7 @@ use App\Http\Resources\Rms\ChangeHistoryResource;
 use App\Http\Resources\Rms\ItineraryDefaultsResource;
 use App\Http\Resources\Rms\ItineraryResource;
 use App\Models\Itinerary;
+use App\Support\Inventory\Snapshots;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -33,6 +34,8 @@ final class ItineraryController extends Controller
             ->orderBy('name')
             ->get();
 
+        Snapshots::attachLiveCounts($itineraries);
+
         return ItineraryResource::collection($itineraries);
     }
 
@@ -47,6 +50,8 @@ final class ItineraryController extends Controller
     {
         $this->authorize('view', $itinerary);
 
+        Snapshots::attachLiveCounts(collect([$itinerary]));
+
         return new ItineraryResource($itinerary);
     }
 
@@ -55,6 +60,7 @@ final class ItineraryController extends Controller
         $this->authorize('create', Itinerary::class);
 
         $itinerary = $action->handle($request->validated());
+        Snapshots::attachLiveCounts(collect([$itinerary]));
 
         return (new ItineraryResource($itinerary))->response()->setStatusCode(201);
     }
@@ -63,7 +69,10 @@ final class ItineraryController extends Controller
     {
         $this->authorize('update', $itinerary);
 
-        return new ItineraryResource($action->handle($itinerary, $request->validated()));
+        $updated = $action->handle($itinerary, $request->validated());
+        Snapshots::attachLiveCounts(collect([$updated]));
+
+        return new ItineraryResource($updated);
     }
 
     public function image(StoreItineraryImageRequest $request, Itinerary $itinerary, ReplaceItineraryImage $action): ItineraryResource

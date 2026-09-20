@@ -8,14 +8,17 @@ use App\Casts\CalendarDate;
 use App\Enums\DepartureStatus;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Support\Inventory\DepartureSnapshot;
 use Carbon\CarbonImmutable;
 use Database\Factories\DepartureFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * @property int $id
@@ -34,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $updated_at
  * @property-read Yacht $yacht
  * @property-read Itinerary $itinerary
+ * @property-read Collection<int, CabinClaim> $claims
  */
 #[Fillable([
     'reference',
@@ -50,6 +54,8 @@ class Departure extends Model
 {
     /** @use HasFactory<DepartureFactory> */
     use HasAuditColumns, HasFactory, SerializesDatesAsUtc;
+
+    public ?DepartureSnapshot $snapshot = null;
 
     /**
      * @return array<string, string>
@@ -87,6 +93,14 @@ class Departure extends Model
     public function history(): MorphMany
     {
         return $this->morphMany(ChangeHistory::class, 'subject');
+    }
+
+    /**
+     * @return HasMany<CabinClaim, $this>
+     */
+    public function claims(): HasMany
+    {
+        return $this->hasMany(CabinClaim::class);
     }
 
     public function returnDate(): CarbonImmutable

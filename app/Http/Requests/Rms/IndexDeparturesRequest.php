@@ -26,6 +26,7 @@ class IndexDeparturesRequest extends FormRequest
             'yacht_id' => ['sometimes', 'integer', 'exists:yachts,id'],
             'status' => ['sometimes', Rule::enum(DepartureStatus::class)],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:500'],
+            'with_cabins' => ['sometimes', 'boolean'],
         ];
     }
 }

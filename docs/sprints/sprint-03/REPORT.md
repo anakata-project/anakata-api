@@ -297,3 +297,178 @@ and the prototype ALT pattern. Demo seed keeps DEP-001–016.
 EOF
 )"
 ```
+
+## Task 03 · Cabin claims, holds, availability
+
+### What was built
+One `cabin_claims` table is the only occupancy source (F1). The database refuses two active claims on the same cabin and departure via a generated `active_key`. Availability, calendar, layout, engine labels and KPIs are computed from it. Holds are claims with an expiry (F3). No real holders yet — tests use `claim_holder`; task 04 adds `internal_block`.
+
+**Table `cabin_claims`:** FKs `departure_id` / `cabin_id` (`restrictOnDelete`), morph holder, `kind` (`BLOCK` / `HOLD` / `BOOKING`), `hold_type` (`WEB` / `REQUEST` / `AGENCY` / `CHARTER_QUOTE`, only for HOLD), `expires_at`, `released_at`, `release_reason` (`RELEASED` / `EXPIRED` / `CONVERTED` / `CANCELLED` / `MOVED`), generated `active_key`, unique on `active_key`, indexes `(departure_id, released_at)`, `(holder_type, holder_id)`, `(kind, expires_at)`, audit columns. Claims are never deleted: model `delete()` throws; MySQL `BEFORE DELETE` trigger `cabin_claims_prevent_delete`.
+
+### Generated-column DDL
+As created by MySQL 8:
+
+```sql
+`active_key` varchar(64) GENERATED ALWAYS AS (
+  if((`released_at` is null), concat(`departure_id`, '-', `cabin_id`), NULL)
+) STORED
+UNIQUE KEY `cabin_claims_active_key_unique` (`active_key`)
+```
+
+Released rows store `active_key` NULL, so many released claims can share a (departure, cabin).
+
+### ClaimService
+The only writer. Must run inside the caller's transaction (same guard as `History` / `ReferenceService`).
+
+`claim()` inside that transaction:
+
+1. Plain `SELECT` (no locking clause) of ids of active `HOLD` rows with `expires_at` in the past for exactly `(departure_id, cabin_ids being claimed)`. If none, skip to insert.
+2. For each id: `UPDATE … WHERE id = ? AND released_at IS NULL AND expires_at < now`. Write `hold.expired` on the holder only when the update affected 1 row.
+3. Insert in cabin `sort` order. A 1062 on `cabin_claims_active_key_unique` is a real conflict → `CabinUnavailableException` (409, `{ message, unavailable }`). No retry.
+
+`releaseExpired()` (the job) uses the same pattern: plain `SELECT` of up to 500 expired active HOLD ids, then PK `UPDATE` per id. No range `UPDATE` and no `FOR UPDATE`.
+
+`convert()` is append-only: release the from-holder `CONVERTED`, then insert for the to-holder.
+
+Every successful claim / release / convert / releaseExpired dispatches `AvailabilityChanged` (`ShouldDispatchAfterCommit`). No listener.
+
+### Why not 1062-then-retry, and why not FOR UPDATE
+Deviation from the task file's "on unique violation, release the expired hold and retry once":
+
+- A failed insert takes a **shared** lock on the conflicting row. Releasing it afterwards needs an **exclusive** lock. Two concurrent claimers upgrading shared → exclusive deadlock (**1213**).
+- `SELECT … FOR UPDATE` of the expired range also deadlocks in the usual case (no expired rows): InnoDB still takes **gap locks** on the scanned range. Two concurrent claimers of the same free cabin both hold the gap; both inserts wait on each other → **1213**.
+- Updating by primary key takes record locks only.
+
+The job uses the same unlocked SELECT + PK UPDATE so it cannot take gap locks that block or deadlock concurrent claims.
+
+### Concurrency test outcome
+`TruncatingTestCase` + `mysql_lock` + `innodb_lock_wait_timeout = 1`. Both races observed **1205** (lock wait timeout). Never 1213. Never two active rows.
+
+| Case | Observed |
+|---|---|
+| Two claimers, same FREE cabin, no expired holds | 1205 |
+| Two claimers, same expired hold | 1205 |
+
+### Engine label precedence
+
+| # | Condition | code | text | tone |
+|---|---|---|---|---|
+| 1 | status `HIDDEN` or itinerary not `PUBLISHED` | `NOT_SHOWN` | NOT SHOWN | wait |
+| 2 | all 9 cabins `SOLD` under one holder | `CHARTERED` | CHARTERED — NOT SHOWN | wait |
+| 3 | status `CLOSED` | `CLOSED` | CLOSED — ENQUIRE | comp |
+| 4 | status `CHARTER` | `CHARTER` | PRIVATE CHARTER ONLY | pend |
+| 5 | `free == 0` and `held > 0` (F9) | `LIMITED` | LIMITED AVAILABILITY | hold |
+| 6 | `free == 0` | `FULL` | FULL · WAITLIST or FULL | canc |
+| 7 | `free ≤ urgency_threshold` | `ONLY_N_LEFT` | ONLY N CABIN(S) LEFT | hold |
+| 8 | otherwise | `AVAILABLE` | AVAILABLE | conf |
+
+`LIMITED` tone is `hold` (warning). The prototype `engLabel` has no F9 rule. Expired but unreleased holds count as `FREE`.
+
+KPIs (`meta.kpis`) follow prototype `renderDeps` over the **live** subset of the filtered list (`ON_SALE` and label not `NOT_SHOWN` / `CHARTERED`), not the current page: `on_sale_on_engine`, `cabins_bookable`, `showing_only_n_left`, `full`.
+
+### Departure locks
+- Date/yacht: locked while any **active** unexpired `HOLD` or `BOOKING` exists. Blocks do not lock. 409: `Date and yacht are locked — {n} cabin(s) sold or held on this departure. Move guests with "Move to another departure" on each booking first.`
+- Delete: any claim row blocks, because claims are never deleted and `departure_id` is `restrictOnDelete`.
+  - Active claims → 409 with counts (`2 blocked`, `1 held`, `1 sold` as present).
+  - Only released claims → 409 `This departure has inventory history (released blocks or holds). Close or hide it instead.`
+- Detail `locks: { date_and_yacht, delete, reason }`. `delete` is true in both claim cases.
+
+### Endpoints
+All `panel.rms`. `GET /api/rms/calendar?from&to&yacht_id` (default Galápagos today → +6 months, max 18 months). `GET /api/rms/departures/{id}/layout`. List `with_cabins=1`. Itinerary rows gain `live_departures_count`.
+
+Job `inventory:release-expired-holds` every minute, `withoutOverlapping()`.
+
+### Files touched
+- `app/Enums/ClaimKind.php`, `HoldType.php`, `ReleaseReason.php`, `CabinState.php`, `EngineLabelCode.php`, `EngineLabelTone.php`
+- `app/Models/CabinClaim.php`; `Departure.php` / `Itinerary.php` (snapshot, claims, live count)
+- `app/Services/Inventory/ClaimService.php`, `Availability.php`
+- `app/Support/Inventory/EngineLabel.php`, `DepartureSnapshot.php`, `DepartureLocks.php`, `Snapshots.php`
+- `app/Exceptions/CabinUnavailableException.php`
+- `app/Events/AvailabilityChanged.php`
+- `app/Console/Commands/ReleaseExpiredHoldsCommand.php`
+- `app/Actions/Departures/UpdateDeparture.php`, `DeleteDeparture.php`
+- `app/Http/Controllers/Rms/DepartureController.php`, `ItineraryController.php`, `CalendarController.php`
+- `app/Http/Requests/Rms/IndexDeparturesRequest.php`, `IndexCalendarRequest.php`
+- `app/Http/Resources/Rms/DepartureResource.php`, `ItineraryResource.php`
+- `database/migrations/2026_09_20_200017_create_cabin_claims_table.php`
+- `routes/api/rms.php`, `routes/console.php`
+- `tests/TestCase.php`, `tests/TruncatingTestCase.php`
+- `tests/Support/Inventory/ClaimHolder.php`
+- `tests/database/migrations/2026_09_20_000002_create_claim_holders_table.php`
+- `tests/Feature/Inventory/CabinClaimsTest.php`, `AvailabilityEndpointsTest.php`, `DepartureLocksTest.php`, `ReleaseExpiredHoldsTest.php`
+- `tests/Feature/Database/DatabaseSetupTest.php`
+- `tests/Unit/Support/Inventory/EngineLabelTest.php`
+- `tests/Concurrency/ClaimServiceConcurrencyTest.php`
+
+### Deviations
+- Expired-hold cleanup is a plain SELECT of ids then PK UPDATE, then insert — not "1062 then retry once", and not `SELECT … FOR UPDATE`. Same pattern on the job. See above.
+- Delete checks **all** claim rows, not only active ones, so a released block 409s instead of 500 on the FK.
+- `LIMITED` tone `hold` is assigned here; the prototype has no pill for F9.
+- Engine label codes for CLOSED / CHARTER / FULL / ONLY_N_LEFT / AVAILABLE are derived from the task texts (the task only named `NOT_SHOWN`, `CHARTERED`, `LIMITED`).
+
+### Open questions
+For Sprint 4 (TEC-004 / hold durations):
+- (a) What "business hours" means for TEC-004 holds (days, hours, Galápagos public holidays?).
+- (b) Where "near-term" ends and "long-lead" begins (48 business hours vs 5 business days).
+
+### Notes for later
+- Task 04 is the first real holder (`internal_block`) and the demo S7–S8 block on 14 Nov 2027 ANAMARA. Calendar is all `FREE` until then.
+- Task 07 maps `engine_label.tone` → pill class and reads `meta.kpis` / `locks`.
+- Task 08 maps `FREE` / `HELD` / `SOLD` / `BLOCKED` → calendar cell classes; booking sub-states stay Sprint 4.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 352 tests (2600 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/ClaimKind.php \
+  app/Enums/HoldType.php \
+  app/Enums/ReleaseReason.php \
+  app/Enums/CabinState.php \
+  app/Enums/EngineLabelCode.php \
+  app/Enums/EngineLabelTone.php \
+  app/Models/CabinClaim.php \
+  app/Models/Departure.php \
+  app/Models/Itinerary.php \
+  app/Services/Inventory \
+  app/Support/Inventory \
+  app/Exceptions/CabinUnavailableException.php \
+  app/Events/AvailabilityChanged.php \
+  app/Console/Commands/ReleaseExpiredHoldsCommand.php \
+  app/Actions/Departures/UpdateDeparture.php \
+  app/Actions/Departures/DeleteDeparture.php \
+  app/Http/Controllers/Rms/DepartureController.php \
+  app/Http/Controllers/Rms/ItineraryController.php \
+  app/Http/Controllers/Rms/CalendarController.php \
+  app/Http/Requests/Rms/IndexDeparturesRequest.php \
+  app/Http/Requests/Rms/IndexCalendarRequest.php \
+  app/Http/Resources/Rms/DepartureResource.php \
+  app/Http/Resources/Rms/ItineraryResource.php \
+  database/migrations/2026_09_20_200017_create_cabin_claims_table.php \
+  routes/api/rms.php \
+  routes/console.php \
+  tests/TestCase.php \
+  tests/TruncatingTestCase.php \
+  tests/Support/Inventory \
+  tests/database/migrations/2026_09_20_000002_create_claim_holders_table.php \
+  tests/Feature/Inventory/CabinClaimsTest.php \
+  tests/Feature/Inventory/AvailabilityEndpointsTest.php \
+  tests/Feature/Inventory/DepartureLocksTest.php \
+  tests/Feature/Inventory/ReleaseExpiredHoldsTest.php \
+  tests/Feature/Database/DatabaseSetupTest.php \
+  tests/Unit/Support/Inventory \
+  tests/Concurrency/ClaimServiceConcurrencyTest.php \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add cabin claims, computed availability, and departure locks.
+
+The database unique active_key is the double-booking guard.
+Expired holds are released by PK update before insert, never after a 1062.
+EOF
+)"
+```

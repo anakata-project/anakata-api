@@ -19,11 +19,14 @@ use App\Http\Resources\Rms\ChangeHistoryResource;
 use App\Http\Resources\Rms\DepartureResource;
 use App\Models\Departure;
 use App\Models\Yacht;
+use App\Services\Inventory\Availability;
 use App\Support\Departures\Warnings;
+use App\Support\Inventory\Snapshots;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 final class DepartureController extends Controller
 {
@@ -32,8 +35,9 @@ final class DepartureController extends Controller
         $this->authorize('viewAny', Departure::class);
 
         $perPage = $request->integer('per_page', 100);
+        $page = $request->integer('page', 1);
 
-        $departures = Departure::query()
+        $query = Departure::query()
             ->with(['yacht', 'itinerary'])
             ->when($request->filled('from'), fn (Builder $query) => $query->whereDate('date', '>=', (string) $request->validated('from')))
             ->when($request->filled('to'), fn (Builder $query) => $query->whereDate('date', '<=', (string) $request->validated('to')))
@@ -42,15 +46,39 @@ final class DepartureController extends Controller
             ->orderBy('date')
             ->orderBy(
                 Yacht::query()->select('code')->whereColumn('yachts.id', 'departures.yacht_id'),
-            )
-            ->paginate($perPage);
+            );
 
-        return DepartureResource::collection($departures);
+        $all = $query->get();
+        $snapshots = Snapshots::attach($all);
+        $kpis = app(Availability::class)->kpis($all, $snapshots);
+
+        $paginator = new LengthAwarePaginator(
+            $all->forPage($page, $perPage)->values(),
+            $all->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+
+        return DepartureResource::collection($paginator)->additional([
+            'meta' => ['kpis' => $kpis],
+        ]);
     }
 
     public function show(Departure $departure): DepartureResource
     {
         $this->authorize('view', $departure);
+
+        Snapshots::attach(collect([$departure]));
+
+        return new DepartureResource($departure);
+    }
+
+    public function layout(Departure $departure): DepartureResource
+    {
+        $this->authorize('view', $departure);
+
+        Snapshots::attach(collect([$departure]));
 
         return new DepartureResource($departure);
     }
@@ -60,6 +88,7 @@ final class DepartureController extends Controller
         $this->authorize('create', Departure::class);
 
         $departure = $action->handle($request->validated());
+        Snapshots::attach(collect([$departure]));
 
         return response()->json([
             ...((new DepartureResource($departure))->resolve()),
@@ -72,6 +101,7 @@ final class DepartureController extends Controller
         $this->authorize('update', $departure);
 
         $updated = $action->handle($departure, $request->validated());
+        Snapshots::attach(collect([$updated]));
 
         return response()->json([
             ...((new DepartureResource($updated))->resolve()),

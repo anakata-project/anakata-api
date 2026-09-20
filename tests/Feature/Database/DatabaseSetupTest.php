@@ -31,4 +31,8 @@ test('core tables exist after migration', function (): void {
     expect(Schema::hasTable('calendar_date_hosts'))->toBeTrue(
         'calendar_date_hosts missing — tests/database/migrations must be registered for the whole suite.',
     );
+    expect(Schema::hasTable('cabin_claims'))->toBeTrue('cabin_claims table missing after migration.');
+    expect(Schema::hasTable('claim_holders'))->toBeTrue(
+        'claim_holders missing — tests/database/migrations must be registered for the whole suite.',
+    );
 });

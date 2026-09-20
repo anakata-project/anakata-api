@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Actions\Departures;
 
 use App\Actions\Action;
+use App\Exceptions\ConflictException;
 use App\Models\Departure;
 use App\Models\Yacht;
 use App\Support\Departures\YachtDateConflict;
 use App\Support\History\History;
+use App\Support\Inventory\DepartureLocks;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
@@ -39,6 +41,19 @@ final class UpdateDeparture extends Action
         }
 
         $yacht = Yacht::query()->findOrFail($yachtId);
+
+        $dateChanging = array_key_exists('date', $data)
+            && $date->toDateString() !== $departure->date->toDateString();
+        $yachtChanging = array_key_exists('yacht_id', $data)
+            && $yachtId !== $departure->yacht_id;
+
+        if ($dateChanging || $yachtChanging) {
+            $locked = DepartureLocks::dateAndYachtCount(DepartureLocks::claimsFor($departure));
+
+            if ($locked > 0) {
+                throw new ConflictException(DepartureLocks::dateAndYachtMessage($locked));
+            }
+        }
 
         return YachtDateConflict::guard($yacht, $date, function () use ($departure, $data): Departure {
             return $this->transaction(function () use ($departure, $data): Departure {

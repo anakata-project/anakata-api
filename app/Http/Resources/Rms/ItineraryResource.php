@@ -48,7 +48,8 @@ class ItineraryResource extends JsonResource
      *     meta_title: string,
      *     meta_description: string,
      *     completeness: array{pct: int, missing: list<string>, blocking: list<string>},
-     *     departures_count: int
+     *     departures_count: int,
+     *     live_departures_count: int
      * }
      */
     public function toArray(Request $request): array
@@ -83,6 +84,7 @@ class ItineraryResource extends JsonResource
             'meta_description' => $this->meta_description,
             'completeness' => Completeness::for($this->resource)->toArray(),
             'departures_count' => $this->departuresCount(),
+            'live_departures_count' => $this->liveDeparturesCount(),
         ];
     }
 

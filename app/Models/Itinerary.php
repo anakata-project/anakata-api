@@ -50,6 +50,7 @@ use LogicException;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read int|null $departures_count
+ * @property int|null $live_departures_count
  */
 #[Fillable([
     'code',
@@ -83,6 +84,8 @@ class Itinerary extends Model
 {
     /** @use HasFactory<ItineraryFactory> */
     use HasAuditColumns, HasFactory, SerializesDatesAsUtc;
+
+    public ?int $live_departures_count = null;
 
     /**
      * @return array<string, string>
@@ -142,5 +145,14 @@ class Itinerary extends Model
         }
 
         return $this->departures()->count();
+    }
+
+    public function liveDeparturesCount(): int
+    {
+        if (isset($this->live_departures_count)) {
+            return $this->live_departures_count;
+        }
+
+        return 0;
     }
 }
