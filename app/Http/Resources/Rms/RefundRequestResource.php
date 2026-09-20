@@ -23,7 +23,29 @@ class RefundRequestResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     status: string,
+     *     booking: array{id: int, reference: string|null, display_reference: string|null},
+     *     client: string,
+     *     cancelled_at: string,
+     *     days_before_departure: int,
+     *     band_min_days: int,
+     *     band_label: string,
+     *     penalty_pct: int,
+     *     penalty_amount: int,
+     *     paid_at_cancellation: int,
+     *     refund_due: int,
+     *     due_by: string,
+     *     business_days_remaining: int,
+     *     sla_breached: bool,
+     *     decision_reason: string|null,
+     *     decided_at: string|null,
+     *     decided_by: array{id: int, name: string}|null,
+     *     executed_payment_id: int|null,
+     *     can_approve: bool,
+     *     can_execute: bool
+     * }
      */
     public function toArray(Request $request): array
     {

@@ -19,6 +19,7 @@ use App\Http\Resources\Rms\RecordedPaymentResource;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\Payments\PaymentsKpis;
 use App\Support\Payments\RecordedPayment;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class PaymentController extends Controller
 {
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\PaymentResource>, links: array{first: string|null, last: string|null, prev: string|null, next: string|null}, meta: array{current_page: int, from: int|null, last_page: int, links: list<array{url: string|null, label: string, active: bool}>, path: string|null, per_page: int, to: int|null, total: int, kpis: array{collected: int, deposits: int, pending: int, pending_count: int, overdue_count: int, overdue_amount: int, commission_accrued: int, cabin_deposit_pct: int, charter_deposit_pct: int, cabin_balance_days: int, commission_payable_days: int}}}',
+    )]
     public function index(IndexPaymentsRequest $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Booking::class);
@@ -39,6 +44,13 @@ final class PaymentController extends Controller
 
         $perPage = $request->integer('per_page', 50);
         $search = $request->validated('q');
+        $from = $request->validated('from');
+        $to = $request->validated('to');
+        $kpis = PaymentsKpis::for(
+            $actor,
+            is_string($from) ? $from : null,
+            is_string($to) ? $to : null,
+        );
 
         $payments = Payment::query()
             ->whereHas('booking')
@@ -88,7 +100,9 @@ final class PaymentController extends Controller
             ->orderByDesc('id')
             ->paginate($perPage);
 
-        return PaymentResource::collection($payments);
+        return PaymentResource::collection($payments)->additional([
+            'meta' => ['kpis' => $kpis],
+        ]);
     }
 
     public function forBooking(Booking $booking): AnonymousResourceCollection

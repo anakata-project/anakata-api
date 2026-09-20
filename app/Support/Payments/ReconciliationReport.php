@@ -17,9 +17,9 @@ final class ReconciliationReport
 
     /**
      * @return array{
-     *     matched: list<array<string, mixed>>,
-     *     in_gateway_not_rms: list<array<string, mixed>>,
-     *     to_review: list<array<string, mixed>>,
+     *     matched: list<array{gateway: string, stripe_id: string, payment_intent: string|null, date: string, amount: int, description: string, booking_id?: int, reference?: string, ledger_amount?: int}>,
+     *     in_gateway_not_rms: list<array{gateway: string, stripe_id: string, payment_intent: string|null, date: string, amount: int, description: string}>,
+     *     to_review: list<array{gateway: string, stripe_id: string, payment_intent: string|null, date: string, amount: int, description: string, booking_id?: int, reference?: string, ledger_amount?: int}>,
      *     counts: array{matched: int, in_gateway_not_rms: int, to_review: int},
      *     meta: array{from: string, to: string, mode: string},
      *     note: string

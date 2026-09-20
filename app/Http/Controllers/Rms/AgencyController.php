@@ -17,12 +17,17 @@ use App\Http\Resources\Rms\AgencyResource;
 use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class AgencyController extends Controller
 {
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\AgencyResource>, meta: array{kpis: array{approved_agencies: int, registrations_to_review: int, agency_revenue: int, commission_accrued: int}}}',
+    )]
     public function index(IndexAgenciesRequest $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Agency::class);

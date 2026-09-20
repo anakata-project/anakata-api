@@ -24,7 +24,48 @@ class AgencyResource extends JsonResource
     public bool $detailed = false;
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     reference: string,
+     *     name: string,
+     *     contact: string,
+     *     email: string,
+     *     country: string|null,
+     *     network: string|null,
+     *     commission_pct: int,
+     *     payment_terms: string,
+     *     status: string,
+     *     requested_at: string,
+     *     decided_at: string|null,
+     *     decided_by: array{id: int, name: string}|null,
+     *     decision_reason: string|null,
+     *     sla_business_days_elapsed: int,
+     *     sla_breached: bool,
+     *     users: list<array{id: int, name: string, email: string, status: string}>
+     * }|array{
+     *     id: int,
+     *     reference: string,
+     *     name: string,
+     *     contact: string,
+     *     email: string,
+     *     country: string|null,
+     *     network: string|null,
+     *     commission_pct: int,
+     *     payment_terms: string,
+     *     status: string,
+     *     requested_at: string,
+     *     decided_at: string|null,
+     *     decided_by: array{id: int, name: string}|null,
+     *     decision_reason: string|null,
+     *     sla_business_days_elapsed: int,
+     *     sla_breached: bool,
+     *     users: list<array{id: int, name: string, email: string, status: string}>,
+     *     revenue: int,
+     *     commission_accrued: int,
+     *     bookings_count: int,
+     *     bookings: list<array{id: int, reference: string|null, status: string, total: int, commission_pct: int|null, commission_amount: int, commission_approved: bool, departure_date: string, client: string}>,
+     *     portal_preview: array{commission_pct: int, net_rates: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>}
+     * }
      */
     public function toArray(Request $request): array
     {

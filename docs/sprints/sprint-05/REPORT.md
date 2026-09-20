@@ -655,3 +655,237 @@ Queue frozen cancellation refunds and execute them as negative ledger rows.
 EOF
 )"
 ```
+
+## Task 06 · anakata-ui · Regenerate types, release `v0.6.0`
+
+### What was built
+PHPDoc + `GET /rms/payments` `meta.kpis` prelude on the API so Scramble emits the Sprint 5 shapes, then `pnpm types:api` against `http://localhost:8000/docs/api.json`. Layer `0.5.3` → `0.6.0`. Types only: no composables, components, or panel behaviour.
+
+Calendar dates (`PaymentResource.date`, `payable_date`, `departure_date`) stay `string` (`YYYY-MM-DD`). Instants stay ISO strings.
+
+### API prelude
+
+| Target | What landed |
+|---|---|
+| `GET /rms/payments` `meta.kpis` | `#[DocumentedResponse]` + `PaymentsKpis::for()`. Keys: `collected`, `deposits`, `pending`, `pending_count`, `overdue_count`, `overdue_amount`, `commission_accrued`, `cabin_deposit_pct`, `charter_deposit_pct`, `cabin_balance_days`, `commission_payable_days`. |
+| `AgencyResource` | Typed list \| detailed `@return`. Scramble emits `anyOf`; the OpenAPI test unwraps the detailed arm. |
+| `RefundRequestResource` | Typed `@return`. |
+| `ReconciliationResource` / `ReconciliationReport` | Typed row shape (base + optional match fields). |
+| `AgencyController::index` | `#[DocumentedResponse]` for `meta.kpis`. |
+| `BookingResource` test keys | `agency`, `commission_*`, `refund`, `payment_links`. |
+| Enum schemas | `AgencyStatus`, `CommissionAccrualStatus`, `RefundRequestStatus` added to the OpenAPI test. `PaymentKind` / `PaymentMethod` / `PaymentStatus` already named. |
+
+`RecordedPaymentResource.booking` stays `array<string, mixed>` in PHPDoc (FQCN failed Larastan `return.type`). The 201 `DocumentedResponse` on `PaymentController::store` already names `BookingResource`.
+
+### Payments `meta.kpis`
+
+One extra aggregate on the ledger index (booking query with two paid-sum subselects). Query count still does not grow with extra payments.
+
+Reuse only:
+
+- `collected` / `deposits` — `SUM(amount)` where `status` is in `PaymentStatus::paidValues()` (SETTLED + REFUNDED). `collected` is DEPOSIT + BALANCE; `deposits` is DEPOSIT only. Window: `payments.paid_at` `from` / `to`, same as the ledger.
+- `pending` / `pending_count` — `Booking::balanceSql()` over `PENDING_PAYMENT`, `CONFIRMED`, `ON_HOLD_AGENCY` with balance `> 0`. Window: `departures.date` `from` / `to`. Visibility: same as the ledger (own-records unless `bookings.view_all`; no soft-deleted bookings).
+- `overdue_count` / `overdue_amount` — Task 02 `Booking::scopeOverdue()` conditions (`CONFIRMED` / `ON_HOLD_AGENCY`, balance `> 0`, Galápagos today after the due date).
+- `commission_accrued` — Task 04: `commission_approved` and not `CANCELLED` / `CANCELLED_POSTPAID`, `ROUND(total × commission_pct / 100)` (same as `Booking::commissionAmount()` / Accrual’s cancelled branch).
+- Sub-label integers — `CurrentConfig` rates terms + `commission.payableDaysAfterCruise`. Never literals.
+
+**`pending` includes the overdue amount.** The owing set is the prototype’s `pend` (balance `> 0`, not REQUESTED). Overdue rows are a subset (CONFIRMED / ON_HOLD_AGENCY past due). Task 08 prints both KPIs side by side: pending is the superset, overdue is the subset. `pending_count` is the booking count on that same aggregate (the prototype’s `{n} payments` sub-label).
+
+`kind` / `method` / `status` / `q` / `booking_id` filter the page only, not the KPIs.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 368 | 368 |
+| `app/types/bookings.ts` | 195 | 206 |
+| `app/types/payments.ts` | — | 142 |
+
+### Schema → alias (`app/types/payments.ts`)
+
+| Alias | Source |
+|---|---|
+| `PaymentKind` / `PaymentMethod` / `PaymentStatus` | named enum schemas |
+| `Payment` / `PaymentListItem` | `PaymentResource` + overlays (`kind` / `method` / `status`, `can_mark_wire: boolean`). Two exported names on the same schema; they are identical today and may diverge. |
+| `PaymentLink` | `PaymentLinkResource` + `PaymentLinkStatus` leftover (`OPEN \| PAID \| CANCELLED \| EXPIRED` — no FormRequest schema) |
+| `ReconciliationRow` | leftover (base row + optional match fields) |
+| `ReconciliationReport` | `ReconciliationResource` + `Array<ReconciliationRow>` |
+| `AgencyStatus` | named enum schema |
+| `AgencyUser` | leftover `{ id, name, email, status }` (`AgencyUserStatus` has no schema) |
+| `AgencyListItem` / `Agency` | `AgencyResource` anyOf arms + overlays (`status`, `sla_breached: boolean`; `portal_preview.net_rates.year` is `number`) |
+| `CommissionStatus` | `CommissionAccrualStatus` schema |
+| `CommissionRow` | `CommissionResource` + `status: CommissionStatus` |
+| `RefundStatus` | `RefundRequestStatus` schema |
+| `CancellationBandLabel` | `string` — `CancellationPenalty::label()`, not a closed enum |
+| `RefundRequest` | `RefundRequestResource` + overlays (`status`, `band_label`, `business_days_remaining: number`, bools) |
+| `PaymentsKpis` | generated `operations['payment.index']` `meta.kpis` |
+
+### Booking
+
+Same `Booking` alias. Scalars `paid`, `pledged`, `overdue`, `overdue_days`, `wire_window_ends_at`, `agency`, `commission_*` come from `BookingResource`. Overlays added for `refund` (nullable) and `payment_links` (generated `unknown[]`).
+
+### Enums that stayed `string` on resource fields
+
+Named schemas exist for `PaymentKind`, `PaymentMethod`, `PaymentStatus`, `AgencyStatus`, `CommissionAccrualStatus`, `RefundRequestStatus`. Resource fields still serialise as `string` (Sprint 4 finding). Overlays point those fields at the named enums.
+
+Hand-written (no component schema): `PaymentLinkStatus`, `AgencyUser.status`.
+
+### Kept leftovers
+
+No inventory/config leftovers retired. New leftovers listed above, each with a `Mirrors App\…` comment.
+
+No methods/kinds/status label map. `BookingFormOptions` already carries Task 04 `commission` + `agencies`.
+
+### Pins
+
+Panel and engine README rows now say `` `extends: ['../anakata-ui']` (`v0.6.0`) ``. **Neither pin is enforced** — the apps resolve the sibling folder, so the version line is documentation only (Sprint 4 finding).
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Support/Payments/PaymentsKpis.php` (new)
+- `app/Http/Controllers/Rms/PaymentController.php`
+- `app/Http/Controllers/Rms/AgencyController.php`
+- `app/Http/Resources/Rms/AgencyResource.php`
+- `app/Http/Resources/Rms/RefundRequestResource.php`
+- `app/Http/Resources/Rms/ReconciliationResource.php`
+- `app/Support/Payments/ReconciliationReport.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `tests/Feature/Payments/PaymentIndexTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/payments.ts` (new)
+- `app/types/bookings.ts`
+- `app/types/index.ts`
+- `package.json` (`0.6.0`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel / anakata-engine**
+- `README.md` (documentation pin only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-05/REPORT.md`
+
+### Deviations
+- `AgencyResource` is `anyOf` (list vs detailed). The OpenAPI test unwraps the detailed arm. Layer splits `Agency` / `AgencyListItem`.
+- `pending` window is departure date; `collected` / `deposits` window is `paid_at`. Same request `from` / `to`, two calendar columns.
+- `RecordedPaymentResource.booking` PHPDoc not tightened (Larastan).
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08: KPI cards from `meta.kpis`; pending is the superset of overdue.
+- Task 07: form-options lists for methods / kinds (no const map in the layer).
+- Task 10: `BookingFormOptions.payments.wire_window_hours`.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 625 tests (4228 assertions), Pint, Larastan OK.
+- anakata-ui: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` — pass.
+- anakata-panel / anakata-engine: `pnpm typecheck` — pass.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout). Overlayed the working trees (tag `v0.6.0` is not on origin yet). Confirmed the ui clone has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: `pnpm typecheck` pass
+  - panel / engine: `pnpm build` pass
+  - **Repeat this clone after the pushes below**, checking out `anakata-ui` at `v0.6.0` with **no** overlay.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude (PHPDoc + payments meta.kpis — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Payments/PaymentsKpis.php \
+  app/Http/Controllers/Rms/PaymentController.php \
+  app/Http/Controllers/Rms/AgencyController.php \
+  app/Http/Resources/Rms/AgencyResource.php \
+  app/Http/Resources/Rms/RefundRequestResource.php \
+  app/Http/Resources/Rms/ReconciliationResource.php \
+  app/Support/Payments/ReconciliationReport.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Feature/Payments/PaymentIndexTest.php
+git commit -m "$(cat <<'EOF'
+Type payment, agency and refund OpenAPI responses and ledger KPIs.
+
+GET /rms/payments now emits meta.kpis so the layer can regenerate
+PaymentsKpis instead of hand-writing the shape.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/bookings.ts \
+  app/types/index.ts \
+  app/types/payments.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for payments, agencies and refunds.
+
+Sprint 5 aliases live in payments.ts; PaymentsKpis is generated
+from GET /rms/payments meta.kpis.
+EOF
+)"
+git tag v0.6.0
+git push origin HEAD
+git push origin v0.6.0
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.6.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.6.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-05/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 5 task 06: regenerated UI API types.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.6.0
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+

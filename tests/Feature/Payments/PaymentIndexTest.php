@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Enums\BookingStatus;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\Permission;
+use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Config\CurrentConfig;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
@@ -163,6 +166,106 @@ test('the ledger query count does not grow with extra payments', function (): vo
     $after = count(DB::getQueryLog());
 
     expect($after)->toBe($before);
+});
+
+test('ledger kpis reuse paidValues overdue and Accrual and pending includes overdue', function (): void {
+    $role = Role::factory()->create([
+        'permissions' => [Permission::PanelRms, Permission::BookingsCreate],
+    ]);
+    $sales = User::factory()->create(['role_id' => $role->id]);
+    $other = managerUser();
+    $agency = Agency::factory()->create(['commission_pct' => 10]);
+
+    $overdue = overdueCabin([
+        'reference' => 'ANK-2026-0601',
+        'cabin_code' => 'S1',
+        'owner_id' => $sales->id,
+        'agency_id' => $agency->id,
+        'commission_pct' => 10,
+        'commission_approved' => true,
+    ]);
+    $pending = pendingCabin([
+        'reference' => 'ANK-2026-0602',
+        'owner_id' => $sales->id,
+        'cabin_id' => ReservationFixtures::anamaraDeparture()->yacht->cabins->firstWhere('code', 'S2')?->id,
+    ]);
+    $confirmed = Booking::factory()->create([
+        'departure_id' => ReservationFixtures::anamaraDeparture()->id,
+        'cabin_id' => ReservationFixtures::anamaraDeparture()->yacht->cabins->firstWhere('code', 'S3')?->id,
+        'owner_id' => $sales->id,
+        'status' => BookingStatus::Confirmed,
+        'reference' => 'ANK-2026-0603',
+        'total' => 26600,
+        'deposit_pct' => 10,
+    ]);
+    Payment::factory()->create([
+        'booking_id' => $confirmed->id,
+        'kind' => PaymentKind::Deposit,
+        'status' => PaymentStatus::Settled,
+        'amount' => $confirmed->depositAmount(),
+        'reference' => 'ANK-2026-0603-D01',
+        'paid_at' => '2026-07-02',
+    ]);
+    $theirs = indexPaymentBooking($other, 'S4', 'ANK-2026-0604');
+    Payment::factory()->create([
+        'booking_id' => $theirs->id,
+        'kind' => PaymentKind::Deposit,
+        'status' => PaymentStatus::Settled,
+        'amount' => $theirs->depositAmount(),
+        'reference' => 'ANK-2026-0604-D01',
+        'paid_at' => '2026-07-03',
+    ]);
+    Payment::factory()->create([
+        'booking_id' => $pending->id,
+        'kind' => PaymentKind::Deposit,
+        'method' => PaymentMethod::Wire,
+        'status' => PaymentStatus::AwaitingWire,
+        'amount' => $pending->depositAmount(),
+        'reference' => 'ANK-2026-0602-D01',
+        'paid_at' => '2026-07-04',
+    ]);
+
+    $overdueBalance = $overdue->fresh()?->balance();
+    $pendingBalance = $pending->fresh()?->balance();
+    $confirmedBalance = $confirmed->fresh()?->balance();
+    expect($overdueBalance)->toBeInt()->toBeGreaterThan(0);
+    expect($pendingBalance)->toBeInt()->toBeGreaterThan(0);
+    expect($confirmedBalance)->toBeInt()->toBeGreaterThan(0);
+
+    $config = app(CurrentConfig::class);
+    $terms = $config->rates()->terms;
+
+    $own = $this->actingAs($sales)
+        ->getJson('/api/rms/payments')
+        ->assertOk();
+
+    expect($own->json('meta.kpis.collected'))->toBe(
+        $overdue->depositAmount() + $confirmed->depositAmount(),
+    );
+    expect($own->json('meta.kpis.deposits'))->toBe(
+        $overdue->depositAmount() + $confirmed->depositAmount(),
+    );
+    expect($own->json('meta.kpis.pending'))->toBe($overdueBalance + $pendingBalance + $confirmedBalance);
+    expect($own->json('meta.kpis.pending'))->toBeGreaterThan($own->json('meta.kpis.overdue_amount'));
+    expect($own->json('meta.kpis.pending_count'))->toBe(3);
+    expect($own->json('meta.kpis.overdue_count'))->toBe(1);
+    expect($own->json('meta.kpis.overdue_amount'))->toBe($overdueBalance);
+    expect($own->json('meta.kpis.commission_accrued'))->toBe($overdue->fresh()?->commissionAmount());
+    expect($own->json('meta.kpis.cabin_deposit_pct'))->toBe($terms->cabinDepositPct);
+    expect($own->json('meta.kpis.charter_deposit_pct'))->toBe($terms->charterDepositPct);
+    expect($own->json('meta.kpis.cabin_balance_days'))->toBe($terms->cabinBalanceDays);
+    expect($own->json('meta.kpis.commission_payable_days'))->toBe(
+        $config->businessRules()->commission->payableDaysAfterCruise,
+    );
+
+    $finance = $this->actingAs(externalFinanceUser())
+        ->getJson('/api/rms/payments')
+        ->assertOk();
+
+    expect($finance->json('meta.kpis.collected'))->toBe(
+        $own->json('meta.kpis.collected') + $theirs->depositAmount(),
+    );
+    expect($finance->json('meta.kpis.pending_count'))->toBe(4);
 });
 
 test('a role without panel.rms cannot list payments', function (): void {

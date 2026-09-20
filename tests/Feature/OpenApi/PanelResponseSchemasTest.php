@@ -14,6 +14,14 @@ function openApiSchema(array $spec, string $name): array
     $schema = $spec['components']['schemas'][$name] ?? null;
 
     expect($schema)->toBeArray("schema {$name} is missing");
+
+    if (! isset($schema['properties'])) {
+        $arms = $schema['anyOf'] ?? $schema['oneOf'] ?? [];
+        $schema = collect(is_array($arms) ? $arms : [])
+            ->sortByDesc(fn (mixed $arm): int => is_array($arm) ? count($arm['properties'] ?? []) : 0)
+            ->first() ?? $schema;
+    }
+
     expect($schema['properties'] ?? null)->toBeArray("schema {$name} has no properties");
     expect($schema['properties'])->not->toBeEmpty("schema {$name} properties are empty");
 
@@ -69,6 +77,9 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'RecordedPaymentResource',
         'PaymentLinkResource',
         'ReconciliationResource',
+        'AgencyResource',
+        'CommissionResource',
+        'RefundRequestResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }
@@ -143,6 +154,12 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'overdue',
         'overdue_days',
         'wire_window_ends_at',
+        'agency',
+        'commission_pct',
+        'commission_amount',
+        'commission_approved',
+        'refund',
+        'payment_links',
     ]);
 
     $payment = openApiSchema($spec, 'PaymentResource');
@@ -164,6 +181,73 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         ?? $spec['paths']['/api/rms/payments']['get']
         ?? null;
     expect($ledger)->toBeArray();
+    $ledgerSchema = $ledger['responses']['200']['content']['application/json']['schema'] ?? [];
+    $paymentKpis = $ledgerSchema['properties']['meta']['properties']['kpis']['properties']
+        ?? $ledgerSchema['properties']['meta']['properties']['kpis']
+        ?? null;
+    expect($paymentKpis)->toBeArray();
+    $paymentKpiFields = $paymentKpis['properties'] ?? $paymentKpis;
+    expect($paymentKpiFields)->toHaveKeys([
+        'collected',
+        'deposits',
+        'pending',
+        'pending_count',
+        'overdue_count',
+        'overdue_amount',
+        'commission_accrued',
+        'cabin_deposit_pct',
+        'charter_deposit_pct',
+        'cabin_balance_days',
+        'commission_payable_days',
+    ]);
+
+    $agency = openApiSchema($spec, 'AgencyResource');
+    expect($agency['properties'])->toHaveKeys([
+        'reference',
+        'commission_pct',
+        'status',
+        'sla_business_days_elapsed',
+        'sla_breached',
+        'users',
+    ]);
+
+    $agencies = $spec['paths']['/rms/agencies']['get']
+        ?? $spec['paths']['/api/rms/agencies']['get']
+        ?? null;
+    expect($agencies)->toBeArray();
+    $agenciesSchema = $agencies['responses']['200']['content']['application/json']['schema'] ?? [];
+    $agencyKpis = $agenciesSchema['properties']['meta']['properties']['kpis']['properties']
+        ?? $agenciesSchema['properties']['meta']['properties']['kpis']
+        ?? null;
+    expect($agencyKpis)->toBeArray();
+    $agencyKpiFields = $agencyKpis['properties'] ?? $agencyKpis;
+    expect($agencyKpiFields)->toHaveKeys([
+        'approved_agencies',
+        'registrations_to_review',
+        'agency_revenue',
+        'commission_accrued',
+    ]);
+
+    $refund = openApiSchema($spec, 'RefundRequestResource');
+    expect($refund['properties'])->toHaveKeys([
+        'band_label',
+        'refund_due',
+        'penalty_amount',
+        'can_approve',
+        'can_execute',
+    ]);
+
+    $reconciliation = openApiSchema($spec, 'ReconciliationResource');
+    expect($reconciliation['properties'])->toHaveKeys([
+        'matched',
+        'in_gateway_not_rms',
+        'to_review',
+        'counts',
+        'meta',
+        'note',
+    ]);
+    $matchedItem = $reconciliation['properties']['matched']['items']['properties'] ?? [];
+    expect($matchedItem)->toHaveKeys(['gateway', 'stripe_id', 'amount', 'date']);
     $bookingDeparture = $booking['properties']['departure']['properties'] ?? [];
     expect($bookingDeparture)->toHaveKeys(['itinerary_name', 'return_date', 'embark', 'festive']);
 
@@ -274,6 +358,9 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'PaymentKind',
         'PaymentMethod',
         'PaymentStatus',
+        'AgencyStatus',
+        'CommissionAccrualStatus',
+        'RefundRequestStatus',
     ] as $enum) {
         $schema = $spec['components']['schemas'][$enum] ?? null;
         expect($schema)->toBeArray("schema {$enum} is missing");
