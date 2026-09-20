@@ -32,3 +32,5 @@ Thumbs.db
 !/tests/e2e/runs/_RUN_TEMPLATE.md
 !/tests/e2e/runs/example-run.md
 /tests/e2e/runs/.logs/
+
+*.plan.md

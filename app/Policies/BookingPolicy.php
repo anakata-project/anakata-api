@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Enums\Permission;
 use App\Models\Booking;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 final class BookingPolicy extends Policy
 {
@@ -26,8 +27,56 @@ final class BookingPolicy extends Policy
         return $this->view($actor, $booking);
     }
 
+    public function viewAudit(User $actor): bool
+    {
+        return $actor->hasPermission(Permission::BookingsViewAll);
+    }
+
     public function create(User $actor): bool
     {
         return $actor->hasPermission(Permission::BookingsCreate);
+    }
+
+    public function changeStatus(User $actor, Booking $booking): Response
+    {
+        if (! $actor->hasPermission(Permission::BookingsChangeStatus)) {
+            return Response::deny();
+        }
+
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
+    public function move(User $actor, Booking $booking): Response
+    {
+        if (! $actor->hasPermission(Permission::BookingsMove)) {
+            return Response::deny();
+        }
+
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
+    public function delete(User $actor, Booking $booking): bool
+    {
+        return $actor->hasPermission(Permission::BookingsDelete);
+    }
+
+    public function update(User $actor, Booking $booking): Response
+    {
+        $notes = request()->exists('internal_notes');
+        $owner = request()->exists('owner_id');
+
+        if ($owner && ! $actor->hasPermission(Permission::RecordsActOnAny)) {
+            return Response::deny();
+        }
+
+        if (($notes || ! $owner) && ! $this->ownsOrMayActOnAny($actor, $booking)) {
+            return Response::deny('Blocked: own-records rule.');
+        }
+
+        return Response::allow();
     }
 }

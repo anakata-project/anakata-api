@@ -73,7 +73,10 @@ test('can_act follows the own-records rule', function (): void {
         ->getJson('/api/rms/bookings/'.$booking->id)
         ->assertOk()
         ->assertJsonPath('can_act', true)
-        ->assertJsonPath('allowed_transitions', [])
+        ->assertJsonPath('allowed_transitions.0.to', 'CONFIRMED')
+        ->assertJsonPath('allowed_transitions.0.reason_required', false)
+        ->assertJsonPath('allowed_transitions.1.to', 'CANCELLED')
+        ->assertJsonPath('allowed_transitions.1.reason_required', true)
         ->assertJsonPath('balance', $booking->total);
 });
 

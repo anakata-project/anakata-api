@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Support\Bookings\Transitions;
+
 enum BookingStatus: string
 {
     case Requested = 'REQUESTED';
@@ -37,6 +39,6 @@ enum BookingStatus: string
      */
     public function allowedTransitions(): array
     {
-        return [];
+        return Transitions::targets($this);
     }
 }

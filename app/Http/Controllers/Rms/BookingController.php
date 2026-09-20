@@ -5,24 +5,40 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Rms;
 
 use App\Actions\Bookings\CreateReservation;
+use App\Actions\Bookings\DeleteBooking;
+use App\Actions\Bookings\MoveBooking;
+use App\Actions\Bookings\TransitionBooking;
+use App\Actions\Bookings\UpdateBooking;
 use App\Enums\BookingSegment;
 use App\Enums\BookingStatus;
 use App\Enums\Permission;
 use App\Exceptions\CabinUnavailableException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Rms\DeleteBookingRequest;
+use App\Http\Requests\Rms\IndexBookingAuditRequest;
 use App\Http\Requests\Rms\IndexBookingsRequest;
+use App\Http\Requests\Rms\MoveBookingRequest;
+use App\Http\Requests\Rms\PreviewMoveBookingRequest;
 use App\Http\Requests\Rms\QuoteReservationRequest;
 use App\Http\Requests\Rms\StoreReservationRequest;
+use App\Http\Requests\Rms\TransitionBookingRequest;
+use App\Http\Requests\Rms\UpdateBookingRequest;
+use App\Http\Resources\Rms\BookingAuditResource;
 use App\Http\Resources\Rms\BookingResource;
 use App\Http\Resources\Rms\ChangeHistoryResource;
+use App\Http\Resources\Rms\MovePreviewResource;
 use App\Http\Resources\Rms\ReservationCreatedResource;
 use App\Http\Resources\Rms\ReservationQuoteResource;
 use App\Models\Booking;
+use App\Models\ChangeHistory;
 use App\Models\User;
 use App\Services\Pricing\ReservationQuoter;
+use App\Support\BusinessTime;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 final class BookingController extends Controller
 {
@@ -149,5 +165,122 @@ final class BookingController extends Controller
             ->paginate(25);
 
         return ChangeHistoryResource::collection($entries);
+    }
+
+    public function audit(IndexBookingAuditRequest $request): AnonymousResourceCollection
+    {
+        $this->authorize('viewAudit', Booking::class);
+
+        $perPage = $request->integer('per_page', 50);
+        $from = $request->validated('from');
+        $to = $request->validated('to');
+
+        $entries = ChangeHistory::query()
+            ->whereIn('event', ['booking.deleted', 'booking.released'])
+            ->when(is_string($from) && $from !== '', function (Builder $query) use ($from): void {
+                $query->where('created_at', '>=', $this->galapagosDayStart($from));
+            })
+            ->when(is_string($to) && $to !== '', function (Builder $query) use ($to): void {
+                $query->where('created_at', '<=', $this->galapagosDayEnd($to));
+            })
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        return BookingAuditResource::collection($entries);
+    }
+
+    /**
+     * @throws CabinUnavailableException
+     */
+    public function transition(
+        TransitionBookingRequest $request,
+        Booking $booking,
+        TransitionBooking $action,
+    ): BookingResource {
+        $this->authorize('changeStatus', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new BookingResource($action->handle($booking, $request->validated(), $actor));
+    }
+
+    public function movePreview(
+        PreviewMoveBookingRequest $request,
+        Booking $booking,
+        MoveBooking $action,
+    ): MovePreviewResource {
+        $this->authorize('move', $booking);
+
+        return new MovePreviewResource($action->preview($booking, $request->validated()));
+    }
+
+    /**
+     * @throws CabinUnavailableException
+     */
+    public function move(MoveBookingRequest $request, Booking $booking, MoveBooking $action): BookingResource
+    {
+        $this->authorize('move', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new BookingResource($action->handle($booking, $request->validated(), $actor));
+    }
+
+    public function update(UpdateBookingRequest $request, Booking $booking, UpdateBooking $action): BookingResource
+    {
+        $this->authorize('update', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new BookingResource($action->handle($booking, $request->validated(), $actor));
+    }
+
+    public function destroy(DeleteBookingRequest $request, Booking $booking, DeleteBooking $action): Response
+    {
+        $this->authorize('delete', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        $action->handle($booking, $request->validated(), $actor);
+
+        return response()->noContent();
+    }
+
+    private function galapagosDayStart(string $date): CarbonImmutable
+    {
+        return $this->galapagosDay($date)->startOfDay()->utc();
+    }
+
+    private function galapagosDayEnd(string $date): CarbonImmutable
+    {
+        return $this->galapagosDay($date)->endOfDay()->utc();
+    }
+
+    private function galapagosDay(string $date): CarbonImmutable
+    {
+        $parsed = CarbonImmutable::createFromFormat('!Y-m-d', $date, BusinessTime::zone());
+
+        if (! $parsed instanceof CarbonImmutable) {
+            abort(422, 'Invalid date.');
+        }
+
+        return $parsed;
     }
 }

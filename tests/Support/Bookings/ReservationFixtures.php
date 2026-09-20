@@ -15,6 +15,19 @@ final class ReservationFixtures
     {
         $yacht = Yacht::query()->where('code', 'ANAMARA')->firstOrFail();
 
+        $existing = Departure::query()
+            ->where('yacht_id', $yacht->id)
+            ->whereDate('date', $date)
+            ->first();
+
+        if ($existing instanceof Departure) {
+            if ($festive && ! $existing->festive) {
+                $existing->update(['festive' => true]);
+            }
+
+            return $existing->load(['yacht.cabins']);
+        }
+
         return Departure::factory()->create([
             'yacht_id' => $yacht->id,
             'itinerary_id' => Itinerary::factory()->create(['status' => ItineraryStatus::Published])->id,

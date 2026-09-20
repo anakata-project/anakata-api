@@ -59,6 +59,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'ReservationCreatedResource',
         'GroupResource',
         'ContactResource',
+        'MovePreviewResource',
+        'BookingAuditResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }
@@ -122,4 +124,19 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     $conflictRef = $conflict['$ref'] ?? $conflict['content']['application/json']['schema']['$ref'] ?? null;
     expect($conflictRef)->toBeString();
     expect($conflictRef)->toContain('CabinUnavailableException');
+
+    $booking = openApiSchema($spec, 'BookingResource');
+    expect($booking['properties'])->toHaveKey('allowed_transitions');
+
+    $transition = $spec['paths']['/rms/bookings/{booking}/transition']['post']
+        ?? $spec['paths']['/api/rms/bookings/{booking}/transition']['post']
+        ?? null;
+    expect($transition)->toBeArray();
+    expect($transition['responses']['409'] ?? null)->toBeArray();
+
+    $move = $spec['paths']['/rms/bookings/{booking}/move']['post']
+        ?? $spec['paths']['/api/rms/bookings/{booking}/move']['post']
+        ?? null;
+    expect($move)->toBeArray();
+    expect($move['responses']['409'] ?? null)->toBeArray();
 });

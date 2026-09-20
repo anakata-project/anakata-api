@@ -484,3 +484,177 @@ without an S→X upgrade, and occupy cabins in one transaction.
 EOF
 )"
 ```
+
+## Task 04 · Status transitions, date/cabin move, deletion, audit
+
+### What was built
+A booking changes status only through `App\Support\Bookings\Transitions`. Date or cabin moves re-quote at current rates; staff confirm the new total. Admins soft-delete with a reason. `GET /api/rms/bookings/audit` lists deletions and released requests.
+
+Every mutating Action (`TransitionBooking`, `MoveBooking`, `DeleteBooking`, `UpdateBooking`) goes through `BookingMutationLock::acquire`: lock departure row(s) ascending, lock the booking PK, then if the locked `departure_id` differs from the plain-read id → 409 `"This booking changed — reload and try again."` Preview is read-only and takes no lock.
+
+### Transition table
+
+| From | To |
+|---|---|
+| `REQUESTED` | `PENDING_PAYMENT`, `CONFIRMED`, `RELEASED`, `CANCELLED` |
+| `PENDING_PAYMENT` | `CONFIRMED`, `CANCELLED` |
+| `CONFIRMED` | `FULLY_PAID`, `CANCELLED` |
+| `FULLY_PAID` | `ON_BOARD`, `CANCELLED_POSTPAID` |
+| `ON_BOARD` | `COMPLETED` |
+| `COMPLETED`, `CANCELLED`, `CANCELLED_POSTPAID`, `RELEASED` | — |
+| `OVERDUE`, `ON_HOLD_AGENCY`, `WAITLISTED` | — (Sprint 5 / G7; not accepted as `to`) |
+
+`BookingStatus::allowedTransitions()` delegates to `Transitions::targets()`. `allowed_transitions` on the resource is table ∩ date guards, and is empty when the actor lacks `bookings.change_status` or fails own-records.
+
+### Reason rules
+Required (trim; blank counts as missing) for `CANCELLED`, `CANCELLED_POSTPAID`, `FULLY_PAID`, `RELEASED`. Optional otherwise.
+
+Illegal `to` after the locks → 422 on `to` listing the **currently** legal targets (`Allowed: none.` when empty).
+
+### Date guards (Galápagos `Y-m-d`)
+- `ON_BOARD` only when today ≥ departure date
+- `COMPLETED` only when today ≥ **return date**
+
+**Return date.** `Departure::returnDate()` uses `itinerary.nights` when `> 0`, else `Departure::DEFAULT_NIGHTS = 7`. No new column.
+
+### Claims (G9)
+- `REQUESTED` → `PENDING_PAYMENT` / `CONFIRMED`: active HOLD → `convert(…, BOOKING)`; no active claim → `claim(…, BOOKING)`. Taken cabin → 409 `"The cabin was taken after this request's hold expired."`
+- Confirming a request with `reference === null` draws `ANK-` and keeps `request_reference`
+- → `RELEASED` / `CANCELLED` / `CANCELLED_POSTPAID` → `release()` then `// TODO(Sprint 5): penalty, refund request, and client notification (G6).` in `TransitionBooking::applyClaims`, immediately after `release`
+- `RELEASED` history event is `booking.released` (`what`: `"Request released — hold returned to inventory"`). Other transitions: `booking.status_changed`. `FULLY_PAID` with `balance() > 0` appends ` (marked manually — USD … not in the payments record)`
+
+### Move rules
+1. Plain-read old `departure_id`
+2. `BookingMutationLock::acquire` → `lockMany([old, new])` then booking row; stale departure → 409 reload sentence
+3. **Then** group check, quote, availability, `confirm_total` compare, release, claim
+
+- Same departure + same cabin(s) → 422 `"Nothing to move."` (preview and move)
+- Target date must be **after** Galápagos today
+- `REQUESTED` with no active claim → 422 `"This request's hold has expired — confirm or release it first."` Active HOLD still moves and keeps `expires_at`
+- Group on another departure → 409 `"This booking belongs to {GRP-NNN} — moving a group to another departure isn't supported yet."` Cabin change on the same departure is allowed
+- Charter sends `departure_id` only; nine claims move
+- Stale `confirm_total` → 409 after locks
+- After a move: `rates_version_id` is the **new** published rates version; `deposit_pct` and `balance_days` stay from the sale
+- Festive 7 Nov → 19 Dec 2027, 2 AD, fee 0: `confirm_total` = 28,100; `festive_changes: true`; old cabin `FREE`, new cabin `SOLD`
+
+### FIN-006
+Read `CurrentConfig::businessRules()->modificationFeeUsd` (`modification_fee_usd` on the document; **path exists; seed 0**). If `> 0`, append `{ code: modification_fee, label: "Modification fee (FIN-006)", amount }` into `new_total` / `difference` on preview **and** move. If `0`, no line. Never hard-coded as “no fee”.
+
+### Lock order
+`CreateReservation` is unchanged: **departure → contact → counters** (no booking row yet).
+
+This task’s writers: **departure(s) → booking → (contact if any) → reference counters**. Transition always locks the departure, even when claims are not touched.
+
+| Caller | First lock | Then |
+|---|---|---|
+| `BookingMutationLock::acquire` | `DepartureLocks::lockMany` (unique, ascending) | `Booking` PK `lockForUpdate`; stale `departure_id` → 409 |
+| `TransitionBooking` / `DeleteBooking` / `UpdateBooking` | booking’s departure | booking row |
+| `MoveBooking` | old + new departures | booking row, then quote / `confirm_total` / claims |
+| `MoveBooking::preview` | none | — |
+
+### Concurrency
+`tests/Concurrency/BookingMutationConcurrencyTest.php`, session `innodb_lock_wait_timeout = 1`.
+
+A runs the real `TransitionBooking` inside an outer `beginTransaction()` (`Action::transaction()` is a savepoint, so the departure + booking locks stay held). B’s `DeleteBooking` on the same booking waits **1205**, never **1213**. After A rolls back the booking is still there (B never wrote). A’s locks are not simulated by hand.
+
+### Audit
+`GET /api/rms/bookings/audit` (`bookings.view_all`). Events `booking.deleted` and `booking.released`, newest first. `from` / `to` are Galápagos calendar days converted to UTC instants (`startOfDay` / `endOfDay` in `Pacific/Galapagos`, then UTC). Soft-deleted rows 404 on show / history / transition / move / patch; audit still lists them.
+
+### PATCH
+Notes change → `booking.updated`. Owner change → `booking.owner_changed` (active RMS user). Both in one request → two history rows. No-op → no row. Still takes the locks.
+
+### DELETE
+204. Manager 403 (`bookings.delete` is Admin). Claims released. Reason required.
+
+### Endpoints
+
+| Method | Path | Auth |
+|---|---|---|
+| `GET` | `/api/rms/bookings/audit` | `viewAudit` |
+| `POST` | `/api/rms/bookings/{booking}/transition` | `changeStatus` |
+| `POST` | `/api/rms/bookings/{booking}/move/preview` | `move` |
+| `POST` | `/api/rms/bookings/{booking}/move` | `move` |
+| `PATCH` | `/api/rms/bookings/{booking}` | `update` / `reassign` |
+| `DELETE` | `/api/rms/bookings/{booking}` | `delete` |
+
+`audit` is registered before `{booking}`. `@throws CabinUnavailableException` on `transition` and `move`.
+
+### Files touched
+- `app/Support/Bookings/Transitions.php`, `BookingMutationLock.php` (new)
+- `app/Actions/Bookings/TransitionBooking.php`, `MoveBooking.php`, `DeleteBooking.php`, `UpdateBooking.php` (new)
+- `app/Http/Requests/Rms/TransitionBookingRequest.php`, `PreviewMoveBookingRequest.php`, `MoveBookingRequest.php`, `DeleteBookingRequest.php`, `UpdateBookingRequest.php`, `IndexBookingAuditRequest.php` (new)
+- `app/Http/Resources/Rms/MovePreviewResource.php`, `BookingAuditResource.php` (new)
+- `app/Enums/BookingStatus.php` (`allowedTransitions` delegates)
+- `app/Models/Departure.php` (`DEFAULT_NIGHTS`, `returnDate`)
+- `app/Policies/BookingPolicy.php`, `app/Http/Controllers/Rms/BookingController.php`, `app/Http/Resources/Rms/BookingResource.php`, `routes/api/rms.php`
+- `tests/Unit/Support/Bookings/TransitionsTest.php`
+- `tests/Feature/Bookings/TransitionBookingTest.php`, `MoveBookingTest.php`, `DeleteBookingTest.php`, `UpdateBookingTest.php`, `BookingAuditTest.php`
+- `tests/Feature/Bookings/BookingReadTest.php` (`allowed_transitions` no longer `[]`)
+- `tests/Concurrency/BookingMutationConcurrencyTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `tests/Support/Bookings/ReservationFixtures.php` (find-or-create by yacht + date)
+- `docs/sprints/sprint-04/REPORT.md`
+
+### Deviations
+- Scramble does not expand `list<array{to: string, reason_required: bool}>` into item properties (`items` serialises as `[]`). PHPDoc on `BookingResource` still documents the shape; the OpenAPI test asserts the field exists. Same class of issue as task 01 `ItineraryPair`.
+- `ReservationFixtures::anamaraDeparture` finds the existing yacht+date row (and can set `festive`) instead of always inserting — the unique index rejected a second 7 Nov / 19 Dec ANAMARA departure.
+
+### Open questions
+With `FIN-006` (`modification_fee_usd`) **> 0**, each move re-quotes `price_lines` from current rates and then appends **one** fee line. A second move therefore drops the first move’s fee line and writes a new quote + a new fee. Whether a charged fee should stick across later moves is a client question for when the fee is non-zero (seed is 0).
+
+### Notes for later
+- **Sprint 5 / payments:** a move that raises the price of a `FULLY_PAID` booking leaves an amount owed; payments must handle it. `Booking::balance()` is still `total` until then.
+- **Sprint 5 / G6:** penalty, refund request, and client notification after cancel/release — the TODO is in `TransitionBooking::applyClaims` immediately after `release`.
+- **Sprint 5 / G7:** `OVERDUE`, `ON_HOLD_AGENCY`, `WAITLISTED` stay on the enum with empty targets.
+- **Task 05:** once `holdExpiry` is wired, moving an expired request may take a fresh hold. Until then, a `REQUESTED` with no active claim is 422. Do not call `Booking::holdExpired()` yet (still `false`).
+- Task 06: regenerate types; `MovePreviewResource`, `BookingAuditResource`, and `allowed_transitions` (`to` + `reason_required`) — overlay the item shape if Scramble still emits `[]`.
+
+### Quality
+anakata-api: `composer check` inside Docker — 477 tests (3172 assertions; held transition vs delete observed 1205), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Bookings/Transitions.php \
+  app/Support/Bookings/BookingMutationLock.php \
+  app/Actions/Bookings/TransitionBooking.php \
+  app/Actions/Bookings/MoveBooking.php \
+  app/Actions/Bookings/DeleteBooking.php \
+  app/Actions/Bookings/UpdateBooking.php \
+  app/Http/Requests/Rms/TransitionBookingRequest.php \
+  app/Http/Requests/Rms/PreviewMoveBookingRequest.php \
+  app/Http/Requests/Rms/MoveBookingRequest.php \
+  app/Http/Requests/Rms/DeleteBookingRequest.php \
+  app/Http/Requests/Rms/UpdateBookingRequest.php \
+  app/Http/Requests/Rms/IndexBookingAuditRequest.php \
+  app/Http/Resources/Rms/MovePreviewResource.php \
+  app/Http/Resources/Rms/BookingAuditResource.php \
+  app/Enums/BookingStatus.php \
+  app/Models/Departure.php \
+  app/Policies/BookingPolicy.php \
+  app/Http/Controllers/Rms/BookingController.php \
+  app/Http/Resources/Rms/BookingResource.php \
+  routes/api/rms.php \
+  tests/Unit/Support/Bookings/TransitionsTest.php \
+  tests/Feature/Bookings/TransitionBookingTest.php \
+  tests/Feature/Bookings/MoveBookingTest.php \
+  tests/Feature/Bookings/DeleteBookingTest.php \
+  tests/Feature/Bookings/UpdateBookingTest.php \
+  tests/Feature/Bookings/BookingAuditTest.php \
+  tests/Feature/Bookings/BookingReadTest.php \
+  tests/Concurrency/BookingMutationConcurrencyTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Support/Bookings/ReservationFixtures.php \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add booking status transitions, date/cabin moves, delete and audit.
+
+Mutations lock departure then booking and reject a stale departure
+with 409; moves re-quote at current rates after the locks.
+EOF
+)"
+```

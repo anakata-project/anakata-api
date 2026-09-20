@@ -8,6 +8,7 @@ use App\Models\Booking;
 use App\Models\Group;
 use App\Models\User;
 use App\Policies\BookingPolicy;
+use App\Support\Bookings\Transitions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -43,7 +44,7 @@ class BookingResource extends JsonResource
      *     rates_version: array{id: int, version: int},
      *     internal_notes: string|null,
      *     can_act: bool,
-     *     allowed_transitions: list<string>,
+     *     allowed_transitions: list<array{to: string, reason_required: bool}>,
      *     departure: array{id: int, date: string, yacht: array{id: int, code: string, name: string}},
      *     cabin: array{id: int, code: string, label: string}|null,
      *     cabin_label: string,
@@ -94,7 +95,9 @@ class BookingResource extends JsonResource
             ],
             'internal_notes' => $this->internal_notes,
             'can_act' => $canAct,
-            'allowed_transitions' => [],
+            'allowed_transitions' => $actor instanceof User
+                ? Transitions::allowedFor($this->resource, $actor)
+                : [],
             'departure' => [
                 'id' => $this->departure->id,
                 'date' => $this->departure->date->toDateString(),

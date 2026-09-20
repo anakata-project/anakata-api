@@ -103,9 +103,15 @@ class Departure extends Model
         return $this->hasMany(CabinClaim::class);
     }
 
+    public const DEFAULT_NIGHTS = 7;
+
     public function returnDate(): CarbonImmutable
     {
-        return $this->date->addDays(7);
+        $this->loadMissing('itinerary');
+
+        $nights = $this->itinerary->nights;
+
+        return $this->date->addDays($nights > 0 ? $nights : self::DEFAULT_NIGHTS);
     }
 
     public function historyLabel(): string
