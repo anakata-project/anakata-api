@@ -20,12 +20,16 @@ use App\Models\Group;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
 use App\Models\Payment;
+use App\Models\PaymentLink;
 use App\Models\RateVersion;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WaitlistEntry;
 use App\Services\Config\ConfigRegistry;
 use App\Services\Config\CurrentConfig;
+use App\Services\Stripe\FakeStripeGateway;
+use App\Services\Stripe\StripeGateway;
+use App\Services\Stripe\StripeSdkGateway;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
@@ -33,6 +37,7 @@ use App\Support\Iso;
 use DateTimeInterface;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -54,6 +59,13 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(CurrentConfig::class);
         $this->app->singleton(ConfigRegistry::class);
+
+        if ($this->app->environment('testing')) {
+            $this->app->singleton(FakeStripeGateway::class);
+            $this->app->singleton(StripeGateway::class, fn (Application $app): FakeStripeGateway => $app->make(FakeStripeGateway::class));
+        } else {
+            $this->app->singleton(StripeGateway::class, StripeSdkGateway::class);
+        }
     }
 
     /**
@@ -73,6 +85,10 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth-email', function (Request $request): Limit {
             return Limit::perMinute(6)->by($request->ip() ?? 'unknown');
+        });
+
+        RateLimiter::for('stripe-webhook', function (Request $request): Limit {
+            return Limit::perMinute(120)->by($request->ip() ?? 'stripe');
         });
 
         Password::defaults(function (): Password {
@@ -109,6 +125,7 @@ class AppServiceProvider extends ServiceProvider
             'booking_request' => BookingRequest::class,
             'waitlist_entry' => WaitlistEntry::class,
             'payment' => Payment::class,
+            'payment_link' => PaymentLink::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(

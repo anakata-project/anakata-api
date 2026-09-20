@@ -105,7 +105,22 @@ Tests use the `anakata_test` database (pinned in `phpunit.xml`). Credentials com
 | Horizon (local only) | http://localhost:8000/horizon |
 | Mailpit | http://localhost:8025 |
 
-Horizon runs inside the `app` container (supervisor). Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`, `/api/auth/*`.
+Horizon runs inside the `app` container (supervisor). Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`, `/api/auth/*`, `/api/stripe/webhook` (signed, no session).
+
+## Stripe
+
+The RMS creates Stripe Payment Links; Stripe's webhook (`POST /api/stripe/webhook`) settles them. Anakata stores Stripe ids only — never card numbers or last four digits (TEC-001).
+
+Set these in `.env` (empty in `.env.example`; the client still owes test and live keys):
+
+| Variable | What |
+|---|---|
+| `STRIPE_SECRET` | Secret or restricted key (`sk_test_…` / `rk_test_…`) |
+| `STRIPE_PUBLISHABLE` | Publishable key (`pk_test_…`) |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret from `stripe listen` or the Dashboard |
+| `STRIPE_MODE` | `test` locally; `live` in production |
+
+Manual test-mode check: `stripe listen --forward-to http://localhost:8000/api/stripe/webhook`, create a deposit link in the RMS, pay it with card `4242 4242 4242 4242`.
 
 Sibling apps (separate repos): booking engine `http://localhost:3000`, staff panel `http://localhost:3001`.
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\PaymentKind;
+use App\Enums\PaymentLinkStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 
@@ -22,6 +23,8 @@ test('payment labels match the prototype', function (): void {
     expect(PaymentStatus::AwaitingWire->label())->toBe('Awaiting wire');
     expect(PaymentStatus::Refunded->label())->toBe('Refunded');
     expect(PaymentKind::Deposit->label())->toBe('Deposit');
+    expect(PaymentLinkStatus::Open->label())->toBe('Open');
+    expect(PaymentLinkStatus::Paid->label())->toBe('Paid');
 });
 
 test('countsAsPaid is everything except awaiting wire', function (): void {

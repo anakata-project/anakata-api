@@ -67,6 +67,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'WaitlistEntryResource',
         'PaymentResource',
         'RecordedPaymentResource',
+        'PaymentLinkResource',
+        'ReconciliationResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }

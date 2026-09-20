@@ -13,8 +13,10 @@ use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\PaymentController;
+use App\Http\Controllers\Rms\PaymentLinkController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
+use App\Http\Controllers\Rms\ReconciliationController;
 use App\Http\Controllers\Rms\RequestController;
 use App\Http\Controllers\Rms\RoleController;
 use App\Http\Controllers\Rms\UserController;
@@ -85,7 +87,10 @@ Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
 
 Route::get('payments', [PaymentController::class, 'index']);
+Route::get('payments/reconciliation', [ReconciliationController::class, 'index']);
+Route::post('payments/reconciliation/apply', [ReconciliationController::class, 'apply']);
 Route::post('payments/{payment}/mark-received', [PaymentController::class, 'markReceived'])->whereNumber('payment');
+Route::post('payment-links/{paymentLink}/cancel', [PaymentLinkController::class, 'cancel'])->whereNumber('paymentLink');
 
 Route::get('bookings', [BookingController::class, 'index']);
 Route::get('bookings/audit', [BookingController::class, 'audit']);
@@ -103,6 +108,7 @@ Route::get('bookings/{booking}', [BookingController::class, 'show'])->whereNumbe
 Route::get('bookings/{booking}/history', [BookingController::class, 'history'])->whereNumber('booking');
 Route::get('bookings/{booking}/payments', [PaymentController::class, 'forBooking'])->whereNumber('booking');
 Route::post('bookings/{booking}/payments', [PaymentController::class, 'store'])->whereNumber('booking');
+Route::post('bookings/{booking}/payment-link', [PaymentLinkController::class, 'store'])->whereNumber('booking');
 
 Route::get('groups', [GroupController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);

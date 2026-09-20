@@ -14,4 +14,9 @@ final class PaymentPolicy extends Policy
     {
         return $actor->hasPermission(Permission::PaymentsMarkWireReceived);
     }
+
+    public function viewReconciliation(User $actor): bool
+    {
+        return $actor->hasPermission(Permission::BookingsViewAll);
+    }
 }

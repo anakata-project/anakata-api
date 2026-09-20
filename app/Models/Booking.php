@@ -68,6 +68,7 @@ use Illuminate\Support\Collection;
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
  * @property-read Collection<int, Payment> $payments
+ * @property-read Collection<int, PaymentLink> $paymentLinks
  * @property-read BookingRequest|null $bookingRequest
  * @property-read int|null $payments_paid_sum
  * @property-read int|null $payments_pledged_sum
@@ -185,6 +186,14 @@ class Booking extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * @return HasMany<PaymentLink, $this>
+     */
+    public function paymentLinks(): HasMany
+    {
+        return $this->hasMany(PaymentLink::class)->orderByDesc('id');
     }
 
     /**

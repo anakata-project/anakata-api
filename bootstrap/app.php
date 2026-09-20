@@ -31,10 +31,17 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware(['api', 'throttle:engine'])
                 ->prefix('api/engine')
                 ->group(base_path('routes/api/engine.php'));
+
+            Route::middleware(['api', 'throttle:stripe-webhook'])
+                ->prefix('api/stripe')
+                ->group(base_path('routes/api/stripe.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->validateCsrfTokens(except: [
+            'api/stripe/webhook',
+        ]);
         $middleware->redirectGuestsTo(function (Request $request): ?string {
             if ($request->is('api/*')) {
                 return null;

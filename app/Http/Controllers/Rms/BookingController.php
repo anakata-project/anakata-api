@@ -41,7 +41,6 @@ use App\Services\Config\CurrentConfig;
 use App\Services\Pricing\ReservationQuoter;
 use App\Support\Bookings\BookingFormOptions;
 use App\Support\BusinessTime;
-use Carbon\CarbonImmutable;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -184,6 +183,7 @@ final class BookingController extends Controller
                 'ratesVersion',
                 'bookingRequest',
                 'activeClaims',
+                'paymentLinks',
             ])
             ->findOrFail($booking->getKey());
 
@@ -214,10 +214,10 @@ final class BookingController extends Controller
         $entries = ChangeHistory::query()
             ->whereIn('event', ['booking.deleted', 'booking.released'])
             ->when(is_string($from) && $from !== '', function (Builder $query) use ($from): void {
-                $query->where('created_at', '>=', $this->galapagosDayStart($from));
+                $query->where('created_at', '>=', BusinessTime::dayStartUtc($from));
             })
             ->when(is_string($to) && $to !== '', function (Builder $query) use ($to): void {
-                $query->where('created_at', '<=', $this->galapagosDayEnd($to));
+                $query->where('created_at', '<=', BusinessTime::dayEndUtc($to));
             })
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -356,26 +356,5 @@ final class BookingController extends Controller
             'overdue_count' => (int) ($row->overdue_count ?? 0),
             'overdue_amount' => (int) ($row->overdue_amount ?? 0),
         ];
-    }
-
-    private function galapagosDayStart(string $date): CarbonImmutable
-    {
-        return $this->galapagosDay($date)->startOfDay()->utc();
-    }
-
-    private function galapagosDayEnd(string $date): CarbonImmutable
-    {
-        return $this->galapagosDay($date)->endOfDay()->utc();
-    }
-
-    private function galapagosDay(string $date): CarbonImmutable
-    {
-        $parsed = CarbonImmutable::createFromFormat('!Y-m-d', $date, BusinessTime::zone());
-
-        if (! $parsed instanceof CarbonImmutable) {
-            abort(422, 'Invalid date.');
-        }
-
-        return $parsed;
     }
 }

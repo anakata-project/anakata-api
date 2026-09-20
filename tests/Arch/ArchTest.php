@@ -6,6 +6,8 @@ use App\Models\ChangeHistory;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
 use App\Models\ReferenceSequence;
+use App\Models\StripeEvent;
+use App\Services\Stripe\StripeSdkGateway;
 use App\Support\History\History;
 
 arch('crm controllers do not use money or booking write paths')
@@ -28,6 +30,7 @@ arch('models use HasAuditColumns')
         SerializesDatesAsUtc::class,
         // Infrastructure counter: no audit columns and no history.
         ReferenceSequence::class,
+        StripeEvent::class,
     ]);
 
 arch('models serialize dates as UTC')
@@ -36,7 +39,13 @@ arch('models serialize dates as UTC')
     ->ignoring([
         HasAuditColumns::class,
         SerializesDatesAsUtc::class,
+        StripeEvent::class,
     ]);
+
+arch('only the Stripe SDK wrapper imports Stripe classes')
+    ->expect('App')
+    ->not->toUse('Stripe')
+    ->ignoring(StripeSdkGateway::class);
 
 arch('controllers do not write history')
     ->expect('App\Http\Controllers')

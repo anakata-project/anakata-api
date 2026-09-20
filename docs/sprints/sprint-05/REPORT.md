@@ -265,3 +265,138 @@ Drive booking status from the payments ledger and add the OPS-007 overdue decisi
 EOF
 )"
 ```
+
+## Task 03 · Stripe: payment links, webhooks, reconciliation
+
+### What was built
+The RMS creates Stripe **Payment Links** for a booking’s deposit or balance. Stripe’s signed webhook settles them exactly once. Finance can compare Stripe charges to the ledger and apply an unmatched one through the same settle path.
+
+### Chosen Stripe object
+**Payment Links**, not Checkout Sessions. Staff copy the URL now; email/CRM delivery is Sprint 7 / 9. A Checkout Session in `mode=payment` expires in 24 hours, so a copied link would die before it is sent. A Payment Link stays live until deactivated, takes a one-off amount via `price_data`, and is limited to one completion (`restrictions.completed_sessions.limit = 1`). Paid event is `checkout.session.completed` (Stripe opens a session under the link). There is no `payment_link.payment_completed`. Cancel deactivates the link (`active: false`) → `CANCELLED`. `EXPIRED` exists on the enum but is not written this task.
+
+`stripe/stripe-php` **v21.3.2**. Compatibility checked with `composer require stripe/stripe-php:^21 --dry-run` (PHP 8.4). Cents only inside `StripeSdkGateway`. No `payment_method_types`. `StripeClient` + API version `2026-07-29.dahlia`. Nothing else in `App\` imports `Stripe\*`.
+
+Settlement `gateway_id` is the **PaymentIntent** (`pi_…`). A later refund row’s `gateway_id` is the **Stripe refund id** (`re_…`).
+
+### Two idempotency guards
+1. `stripe_events.stripe_event_id` unique — `insertOrIgnore`; duplicate delivery → 200, no job.
+2. Job check first: a payment whose `gateway_id` is this PaymentIntent already exists → stop. Unique index on generated **`stripe_gateway_id`** is the race backstop (1062), not the first line of defence.
+
+`gateway_id` itself is **not** unique. Task 02 stores wire bank references there; one transfer can cover deposit and balance. A plain unique would 1062 inside `MarkWireReceived`. Same generated-column pattern as `cabin_claims.active_key`:
+
+`stripe_gateway_id = gateway_id` when `method in (CARD_STRIPE, STRIPE_LINK)`, else `NULL`, unique. Wires stay NULL and can share a bank reference.
+
+### Webhook
+`POST /api/stripe/webhook` — `routes/api/stripe.php`, `api` + `throttle:stripe-webhook` (120/min), **no Sanctum, no CSRF, no session**. CSRF excepted in `bootstrap/app.php`. Bad signature → 400, one log line without the body, nothing stored. Valid → redact card fields (`last4`, `number`, `cvc`, `iin`, `fingerprint`), persist, dispatch `ProcessStripeEvent` after commit, **200**.
+
+`phpunit.xml` uses `QUEUE_CONNECTION=sync`. HTTP tests that must not run the job use `Queue::fake()`. Production is Redis + Horizon.
+
+`checkout.session.completed` → H10 lock → `SettleGatewayPayment` (`STRIPE_LINK`, `SETTLED`, System) → `ApplyPaymentEffects` → link `PAID`. Unresolvable booking: `error` set, `processed_at` null, job throws, webhook already 200.
+
+`charge.refunded` **never changes status**, never relabels a positive payment, never inserts a refund row. It matches a task 05 `REFUND` row by Stripe refund id (`re_…`) and stamps `gateway_id`, or records the event as `unmatched` and marks it processed. `REFUNDED` already counts as paid (task 01).
+
+### Reconciliation
+`GET /api/rms/payments/reconciliation?from&to` — `bookings.view_all` (same `viewAudit` gate as the booking audit). `from` / `to` are Galápagos calendar days, converted with `BusinessTime::dayStartUtc` / `dayEndUtc` (the helpers the audit filter now uses) before they become Stripe `created[gte]` / `created[lte]`.
+
+**Matching key:** a Stripe charge’s **PaymentIntent** against a **settlement** row only — `method` is `CARD_STRIPE` or `STRIPE_LINK`, **positive** `amount`, `gateway_id` = that `pi_…`. Implemented in `ReconciliationMatch`. Refund rows carry `re_…` in the same column and must not win the bucket. A fixture with both a settlement and a refund on one charge stays **matched** (not `to_review`).
+
+Buckets: `matched` / `in_gateway_not_rms` / `to_review`. `meta.mode` so the panel can say “test mode”. `note`: wires are not in Stripe; they reconcile against the OpCo bank statement (LEG-004 pending).
+
+`POST /api/rms/payments/reconciliation/apply` `{ stripe_id, booking_id, kind }` — `payments.record`. Same `SettleGatewayPayment` path, method `CARD_STRIPE`, note `applied from gateway reconciliation`. Laravel returns 201 because the ledger row `wasRecentlyCreated`.
+
+### Fake gateway
+`FakeStripeGateway` is bound in `testing` (singleton, same instance as the interface). Deterministic `plink_test_…` / `pi_test_…`. `signedEvent()` builds a valid `Stripe-Signature`. Seeded charges carry explicit UTC `created` instants for the Galápagos boundary test (`2026-09-20 02:00:00 UTC` is 19 Sep 20:00 GALT).
+
+### Manual test-mode procedure
+The client still owes test and live keys (sprint README question 1). `.env.example` has empty `STRIPE_*`. When keys exist:
+
+1. `stripe listen --forward-to http://localhost:8000/api/stripe/webhook`
+2. Put the printed `whsec_…` in `STRIPE_WEBHOOK_SECRET`
+3. As finance, `POST /api/rms/bookings/{id}/payment-link` `{ "kind": "DEPOSIT" }`
+4. Open the URL, pay with `4242 4242 4242 4242`
+5. Booking becomes CONFIRMED, one `SETTLED` `STRIPE_LINK` row, link `PAID`. A second webhook delivery changes nothing.
+
+### Checks
+`composer check` passed: 581 Pest tests, Pint, Larastan level 6.
+
+### Deviations
+- Reconciliation GET authorises through `BookingPolicy::viewAudit` (`bookings.view_all`), not a new Payment ability. System Sales Exec already holds `bookings.view_all`; the 403 fixture is a role with only `panel.rms`.
+- `EXPIRED` is stored on the enum only.
+
+### Open questions
+Stripe keys (test and live, plus webhook signing secrets) are still owed by the client.
+
+### Notes for later
+- Task 05 writes the negative `REFUNDED` row and captures `re_…`; this job then matches that id.
+- Task 07: Payments tab copies the URL from booking show `payment_links`.
+- Sprint 7 / 9: email and CRM delivery of the same URL.
+
+### Git (do not run; no tag)
+
+```
+git add .env.example
+git add .env.testing.example
+git add README.md
+git add app/Actions/Payments/ApplyUnmatchedGatewayPayment.php
+git add app/Actions/Payments/CancelPaymentLink.php
+git add app/Actions/Payments/CreatePaymentLink.php
+git add app/Actions/Payments/SettleGatewayPayment.php
+git add app/Enums/PaymentLinkStatus.php
+git add app/Exceptions/InvalidStripeSignature.php
+git add app/Exceptions/UnresolvableStripeEvent.php
+git add app/Http/Controllers/Rms/BookingController.php
+git add app/Http/Controllers/Rms/PaymentLinkController.php
+git add app/Http/Controllers/Rms/ReconciliationController.php
+git add app/Http/Controllers/StripeWebhookController.php
+git add app/Http/Requests/Rms/ApplyReconciliationRequest.php
+git add app/Http/Requests/Rms/CreatePaymentLinkRequest.php
+git add app/Http/Requests/Rms/ReconciliationRequest.php
+git add app/Http/Resources/Rms/BookingResource.php
+git add app/Http/Resources/Rms/PaymentLinkResource.php
+git add app/Http/Resources/Rms/ReconciliationResource.php
+git add app/Jobs/ProcessStripeEvent.php
+git add app/Models/Booking.php
+git add app/Models/PaymentLink.php
+git add app/Models/StripeEvent.php
+git add app/Policies/PaymentPolicy.php
+git add app/Providers/AppServiceProvider.php
+git add app/Services/Stripe/CreatedPaymentLink.php
+git add app/Services/Stripe/FakeStripeGateway.php
+git add app/Services/Stripe/StripeCharge.php
+git add app/Services/Stripe/StripeGateway.php
+git add app/Services/Stripe/StripeSdkGateway.php
+git add app/Services/Stripe/VerifiedStripeEvent.php
+git add app/Support/BusinessTime.php
+git add app/Support/Payments/PaymentHistory.php
+git add app/Support/Payments/ReconciliationMatch.php
+git add app/Support/Payments/ReconciliationReport.php
+git add app/Support/Stripe/RedactStripePayload.php
+git add app/Support/Stripe/StripeMoney.php
+git add app/Support/Stripe/StripeWebhookSignature.php
+git add bootstrap/app.php
+git add composer.json
+git add composer.lock
+git add config/services.php
+git add database/factories/PaymentLinkFactory.php
+git add database/migrations/2026_09_20_200027_create_payment_links_table.php
+git add database/migrations/2026_09_20_200028_create_stripe_events_table.php
+git add database/migrations/2026_09_20_200029_add_stripe_gateway_id_to_payments.php
+git add docs/sprints/sprint-05/REPORT.md
+git add phpunit.xml
+git add routes/api/rms.php
+git add routes/api/stripe.php
+git add tests/Arch/ArchTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add tests/Feature/Payments/CreatePaymentLinkTest.php
+git add tests/Feature/Payments/ReconciliationTest.php
+git add tests/Feature/Payments/StripeGatewayIdUniquenessTest.php
+git add tests/Feature/Payments/StripeRefundWebhookTest.php
+git add tests/Feature/Payments/StripeWebhookTest.php
+git add tests/Unit/Enums/PaymentEnumsTest.php
+git add tests/Unit/Support/RedactStripePayloadTest.php
+git commit -m "$(cat <<'EOF'
+Settle Stripe payment links through the ledger and add gateway reconciliation.
+
+EOF
+)"
+```
