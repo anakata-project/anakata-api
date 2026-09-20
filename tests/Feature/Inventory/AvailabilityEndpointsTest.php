@@ -43,7 +43,7 @@ test('lucia can read calendar and layout', function (): void {
         ->assertJsonCount(9, 'availability.cabins');
 });
 
-test('the demo calendar is all free', function (): void {
+test('the demo calendar is free except the seeded fam-trip block', function (): void {
     $this->seed(DemoInventorySeeder::class);
     $mateo = managerUser();
 
@@ -53,12 +53,30 @@ test('the demo calendar is all free', function (): void {
 
     expect($response->json('departures'))->toHaveCount(16);
 
+    $blocked = [];
+
     foreach ($response->json('rows') as $row) {
-        foreach ($row['cells'] as $cell) {
-            expect($cell['state'])->toBe('FREE');
-            expect($cell['claim'])->toBeNull();
+        foreach ($row['cells'] as $departureId => $cell) {
+            if ($cell['state'] === 'FREE') {
+                expect($cell['claim'])->toBeNull();
+
+                continue;
+            }
+
+            $blocked[] = [
+                'yacht' => $row['yacht']['code'],
+                'cabin' => $row['cabin']['code'],
+                'state' => $cell['state'],
+                'reference' => $cell['claim']['holder']['reference'] ?? null,
+            ];
         }
     }
+
+    expect($blocked)->toHaveCount(2);
+    expect(collect($blocked)->pluck('cabin')->sort()->values()->all())->toBe(['S7', 'S8']);
+    expect(collect($blocked)->pluck('yacht')->unique()->all())->toBe(['ANAMARA']);
+    expect(collect($blocked)->pluck('state')->unique()->all())->toBe(['BLOCKED']);
+    expect(collect($blocked)->pluck('reference')->unique()->all())->toBe(['BLK-001']);
 });
 
 test('calendar and the departure list do not N+1 over sixteen departures', function (): void {

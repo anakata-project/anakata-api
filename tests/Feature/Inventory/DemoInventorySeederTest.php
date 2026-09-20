@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\BlockReason;
+use App\Enums\ClaimKind;
 use App\Enums\DepartureStatus;
 use App\Enums\ItineraryStatus;
 use App\Enums\ReferenceType;
 use App\Models\Departure;
+use App\Models\InternalBlock;
 use App\Models\Itinerary;
 use App\Models\Yacht;
 use App\Services\References\ReferenceService;
@@ -132,4 +135,24 @@ test('the next departure created after the demo seed is DEP-017', function (): v
         ])
         ->assertCreated()
         ->assertJsonPath('reference', 'DEP-017');
+});
+
+test('the demo seed creates BLK-001 on ANAMARA S7-S8 14 Nov 2027 and the next block is BLK-002', function (): void {
+    $this->seed(InventorySeeder::class);
+    $this->seed(DemoInventorySeeder::class);
+    $this->seed(DemoInventorySeeder::class);
+
+    $block = InternalBlock::query()->where('reference', 'BLK-001')->firstOrFail();
+    $departure = Departure::query()->where('reference', 'DEP-003')->firstOrFail();
+
+    expect($block->reason)->toBe(BlockReason::FamTrip);
+    expect($block->notes)->toBe('Virtuoso agents fam — 4 pax');
+    expect($block->created_by)->toBeNull();
+    expect($block->claims()->whereNull('released_at')->count())->toBe(2);
+    expect($block->claims()->whereNull('released_at')->pluck('kind')->unique()->all())->toBe([ClaimKind::Block]);
+    expect($block->claims()->whereNull('released_at')->pluck('departure_id')->unique()->all())->toBe([$departure->id]);
+    expect($block->claims()->with('cabin')->get()->pluck('cabin.code')->sort()->values()->all())->toBe(['S7', 'S8']);
+
+    $next = DB::transaction(fn (): string => app(ReferenceService::class)->next(ReferenceType::Block));
+    expect($next)->toBe('BLK-002');
 });

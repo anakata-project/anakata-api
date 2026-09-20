@@ -472,3 +472,138 @@ Expired holds are released by PK update before insert, never after a 1062.
 EOF
 )"
 ```
+
+## Task 04 · Internal blocks; Sprint 2 follow-ups
+
+### What was built
+`InternalBlock` is the first real claim holder. Staff take cabins off sale (`FAM_TRIP` / `MAINTENANCE` / `NEGOTIATION_HOLD` / `COURTESY`) through `ClaimService::claim(..., ClaimKind::Block)` in one transaction. Availability, calendar and layout already map `BLOCK` → `BLOCKED`; this task adds the write path, `/api/rms/blocks`, the demo fam-trip row, and the three Sprint 2 departure-aware config checks.
+
+**Table `internal_blocks`:** `reference` (`BLK-NNN`, `ReferenceType::Block`, pad 3, global counter), `reason`, `notes` (max 500), `released_at` / `released_by` / `release_note`, audit columns. Morph alias `internal_block`. Blocks are never deleted (`delete()` throws; no DELETE route). Scope never changes after create — release and make a new block.
+
+**Actions** (one history row each):
+- `CreateInternalBlock` — 1–20 departures, cabins `S1`–`S8` / `OWNER` or `ALL`. All-or-nothing. Past departure → 422. Conflict → 409 with the full list (`"Suite 02 on 14 Nov 2027 · ANATIVA is held."`) plus `unavailable[]`. After the first unique-index miss, remaining requested pairs are read with a **plain SELECT** (no `FOR UPDATE` / lock in share mode) so the message lists every collision without bringing back gap locks. History `block.created` with the scope.
+- `ReleaseInternalBlock` — `ClaimService::release(..., RELEASED)`, sets released fields. Second release → 409 `This block is already released.` History `block.released`.
+- `UpdateInternalBlockNotes` — reason and notes only. No-op writes no history. Event `block.updated`. Allowed on released blocks (task 04 does not restrict; the panel can hide the form).
+
+**Endpoints** under `/api/rms/blocks`. Viewing needs `panel.rms`; writes need `blocks.manage`. `GET /` filters `status=active|released|all` (default active), `from` / `to` (departure dates of claims), `yacht_id`. Each row carries `scope_summary`, reason, notes, created/released actors, and claims. `POST /`, `PATCH /{block}`, `POST /{block}/release`, `GET /{block}/history`.
+
+**Demo seed (F6, local/testing):** `BLK-001`, FAM_TRIP, ANAMARA S7–S8 on 14 Nov 2027 (`DEP-003`), notes `Virtuoso agents fam — 4 pax`, created by System. Next live block is `BLK-002`.
+
+**Sprint 2 follow-ups** live in injected `DepartureConfigChecks` (not static `rules()` / not `app()` inside documents). Wired into `ConfigValidator` and `ConfigPublisher`. Documents stay unit-testable; the three `TODO(Sprint 3)` comments are gone.
+
+### Scope-summary rules
+Pure `App\Support\Blocks\ScopeSummary`. Groups claims by date then yacht code. One group: `{YACHT} · {cabins} · {j M Y}`. Several groups joined with `"; "`.
+
+| Cabins | Label |
+|---|---|
+| All 9 (`S1`–`S8` + `OWNER`) | `Full yacht` |
+| Consecutive suites | `Suite 07–08` (en-dash, zero-padded) |
+| Gapped suites | `Suite 01, Suite 03` |
+| Owner | `Owner's Suite` (after suites) |
+| Mixed | `Suite 07–08, Owner's Suite` |
+
+Examples: `ANATIVA · Suite 07–08 · 14 Nov 2027`, `ANAMARA · Full yacht · 31 Oct 2027`.
+
+### Seed-data inconsistencies
+- Prototype static `v-block` table shows **ANATIVA** · Suite 07–08 · 14 Nov 2027. Prototype `occ()` and this seed use **ANAMARA** S7–S8 on that date (matches the calendar).
+- Prototype maintenance row (ANAMARA · Full yacht · 31 Oct 2027) has **no** matching departure in `seed-data.json`. Not seeded.
+
+### Exact texts of the new rates and engine checks
+
+| Check | When | Path | Text |
+|---|---|---|---|
+| Rates error | A published year is removed and that year still has departures | `years` (publish: `document.years`) | `Can't remove {year} — {n} departures sail that year.` |
+| Rates warning | Departures exist in a year that is not in the draft rates | `years` | `Departures in {year} have no rates.` |
+| Engine warning | `calendar.default_search_from` is before the first bookable month (`ON_SALE` and engine label not `NOT_SHOWN` / `CHARTERED`) | `calendar.default_search_from` | `Default search starts before the first bookable month (Nov 2027) — guests would open on empty months.` |
+
+Removing a year with zero departures is fine. With the demo seed, publishing rates without 2027 is refused (16 departures). Fresh seed first bookable month is `2027-11`.
+
+**OPS-006:** `source_display` unchanged (`Sales open 1 Nov 2026 · first cruise 7 Nov 2027`). PRO-001 note kept. Current display is `First cruise 7 Nov 2027` when the earliest departure is 7 Nov 2027 (`differs: false`); any other first date (`differs: true`); no departures → `No departures yet` / `differs: null`.
+
+### Files touched
+- `.cursor/rules/laravel.mdc`
+- `app/Enums/BlockReason.php`, `app/Enums/ReferenceType.php`
+- `app/Models/InternalBlock.php`
+- `app/Actions/Blocks/CreateInternalBlock.php`, `ReleaseInternalBlock.php`, `UpdateInternalBlockNotes.php`
+- `app/Support/Blocks/ScopeSummary.php`, `ConflictMessage.php`
+- `app/Policies/InternalBlockPolicy.php`
+- `app/Http/Controllers/Rms/InternalBlockController.php`
+- `app/Http/Requests/Rms/IndexInternalBlocksRequest.php`, `StoreInternalBlockRequest.php`, `UpdateInternalBlockRequest.php`, `ReleaseInternalBlockRequest.php`
+- `app/Http/Resources/Rms/InternalBlockResource.php`
+- `app/Services/Config/DepartureConfigChecks.php`, `ConfigValidator.php`, `ConfigPublisher.php`
+- `app/Support/BusinessRules/Registry.php`
+- `app/Support/Config/Documents/RatesDocument.php`, `EngineSettingsDocument.php`
+- `app/Providers/AppServiceProvider.php`
+- `database/migrations/2026_09_20_200018_create_internal_blocks_table.php`
+- `database/seeders/DemoInventorySeeder.php`
+- `routes/api/rms.php`
+- `tests/Feature/Inventory/InternalBlocksTest.php`, `AvailabilityEndpointsTest.php`, `DemoInventorySeederTest.php`
+- `tests/Feature/Config/DepartureConfigChecksTest.php`
+- `tests/Feature/References/ReferenceServiceTest.php`
+- `tests/Feature/Database/DatabaseSetupTest.php`
+- `tests/Unit/Support/Blocks/ScopeSummaryTest.php`
+- `docs/sprints/sprint-03/REPORT.md`
+
+### Deviations
+- Collision scan after the first unique-index miss is a plain SELECT (approved in the plan). A locking read would bring back the gap locks task 03 removed.
+- Notes/reason PATCH is allowed on released blocks. Task 04 does not forbid it; task 09 can hide the form.
+- Multi-group `scope_summary` joins groups with `"; "`. Conflict lines join with a space (each already ends with a period).
+
+### Open questions
+None.
+
+### Notes for later
+- Task 09 panel: `/rms/operations/blocks`, 409 modal, “To change cabins or dates, release this block and create a new one.”
+- Task 10 E2E: `INV-*` including calendar BLOCKED cells and rates-without-2027.
+- First bookable month ignores the day (month only), matching prototype `ymd.slice(0,7)`.
+- Demo inventory is fixed in Nov–Dec 2027 and `ClaimService` refuses past departures, so after **14 Nov 2027** the demo block (and the e2e reset) will fail to seed. Before then, make demo dates relative to “today” or skip past-dated demo claims.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 370 tests (2569 assertions), Pint, Larastan OK.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  .cursor/rules/laravel.mdc \
+  app/Enums/BlockReason.php \
+  app/Enums/ReferenceType.php \
+  app/Models/InternalBlock.php \
+  app/Actions/Blocks \
+  app/Support/Blocks \
+  app/Policies/InternalBlockPolicy.php \
+  app/Http/Controllers/Rms/InternalBlockController.php \
+  app/Http/Requests/Rms/IndexInternalBlocksRequest.php \
+  app/Http/Requests/Rms/StoreInternalBlockRequest.php \
+  app/Http/Requests/Rms/UpdateInternalBlockRequest.php \
+  app/Http/Requests/Rms/ReleaseInternalBlockRequest.php \
+  app/Http/Resources/Rms/InternalBlockResource.php \
+  app/Services/Config/DepartureConfigChecks.php \
+  app/Services/Config/ConfigValidator.php \
+  app/Services/Config/ConfigPublisher.php \
+  app/Support/BusinessRules/Registry.php \
+  app/Support/Config/Documents/RatesDocument.php \
+  app/Support/Config/Documents/EngineSettingsDocument.php \
+  app/Providers/AppServiceProvider.php \
+  database/migrations/2026_09_20_200018_create_internal_blocks_table.php \
+  database/seeders/DemoInventorySeeder.php \
+  routes/api/rms.php \
+  tests/Feature/Inventory/InternalBlocksTest.php \
+  tests/Feature/Inventory/AvailabilityEndpointsTest.php \
+  tests/Feature/Inventory/DemoInventorySeederTest.php \
+  tests/Feature/Config/DepartureConfigChecksTest.php \
+  tests/Feature/References/ReferenceServiceTest.php \
+  tests/Feature/Database/DatabaseSetupTest.php \
+  tests/Unit/Support/Blocks \
+  docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add internal blocks and departure-aware config checks.
+
+Staff take cabins off sale through the claim table; rates and engine
+settings now refuse or warn using the departure calendar.
+EOF
+)"
+```

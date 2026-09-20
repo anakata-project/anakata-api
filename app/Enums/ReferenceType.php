@@ -9,6 +9,7 @@ enum ReferenceType: string
     case Booking = 'booking';
     case Request = 'request';
     case Departure = 'departure';
+    case Block = 'block';
     case Group = 'group';
     case Offer = 'offer';
     case Agency = 'agency';
@@ -44,6 +45,7 @@ enum ReferenceType: string
             self::Booking => "ANK-{$year}-{$number}",
             self::Request => "ANK-R-{$year}-{$number}",
             self::Departure => "DEP-{$number}",
+            self::Block => "BLK-{$number}",
             self::Group => "GRP-{$number}",
             self::Offer => "OF-{$number}",
             self::Agency => "AG-{$number}",

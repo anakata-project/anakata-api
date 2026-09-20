@@ -11,6 +11,7 @@ use App\Listeners\ClearCurrentConfigCache;
 use App\Models\BusinessRuleVersion;
 use App\Models\Departure;
 use App\Models\EngineSettingsVersion;
+use App\Models\InternalBlock;
 use App\Models\Itinerary;
 use App\Models\RateVersion;
 use App\Models\Role;
@@ -93,6 +94,7 @@ class AppServiceProvider extends ServiceProvider
             'engine_settings_version' => EngineSettingsVersion::class,
             'itinerary' => Itinerary::class,
             'departure' => Departure::class,
+            'internal_block' => InternalBlock::class,
         ]);
 
         $this->app->make(ConfigRegistry::class)->register(

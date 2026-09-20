@@ -83,7 +83,7 @@ app/
 - History is never written from controllers. Controllers call Actions; Actions call `History`.
 
 ## References
-- The business reference column is `reference`, a unique string (`ANK-2026-0005`, `DEP-012`…).
+- The business reference column is `reference`, a unique string (`ANK-2026-0005`, `DEP-012`, `BLK-001`…).
 - `App\Services\References\ReferenceService` is the only generator. Nothing derives a reference from `id`.
 - Draw inside the creating Action's transaction so a rollback also rolls the counter back.
 

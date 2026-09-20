@@ -261,9 +261,6 @@ final class RatesDocument extends ConfigDocument
             }
         }
 
-        // TODO(Sprint 3): warn when departures exist in a year with no rates.
-        // TODO(Sprint 3): reject removing a year that has departures.
-
         return $warnings;
     }
 

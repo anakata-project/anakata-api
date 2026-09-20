@@ -1,0 +1,100 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\Rms;
+
+use App\Models\CabinClaim;
+use App\Models\InternalBlock;
+use App\Models\User;
+use App\Support\Blocks\ScopeSummary;
+use App\Support\Iso;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
+
+/**
+ * @mixin InternalBlock
+ */
+class InternalBlockResource extends JsonResource
+{
+    public static $wrap = null;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        $this->resource->loadMissing([
+            'createdBy',
+            'releasedBy',
+            'claims.cabin',
+            'claims.departure.yacht',
+        ]);
+
+        $claims = $this->claims;
+
+        return [
+            'id' => $this->id,
+            'reference' => $this->reference,
+            'reason' => $this->reason->value,
+            'reason_label' => $this->reason->label(),
+            'notes' => $this->notes,
+            'scope_summary' => $this->scopeSummary($claims),
+            'created_by' => $this->actorPayload($this->createdBy),
+            'created_at' => Iso::utc($this->created_at),
+            'released_at' => $this->released_at !== null ? Iso::utc($this->released_at) : null,
+            'released_by' => $this->actorPayload($this->releasedBy),
+            'release_note' => $this->release_note,
+            'claims' => $claims->map(fn (CabinClaim $claim): array => [
+                'id' => $claim->id,
+                'kind' => $claim->kind->value,
+                'released_at' => $claim->released_at !== null ? Iso::utc($claim->released_at) : null,
+                'cabin' => [
+                    'id' => $claim->cabin->id,
+                    'code' => $claim->cabin->code,
+                    'label' => $claim->cabin->label,
+                ],
+                'departure' => [
+                    'id' => $claim->departure->id,
+                    'reference' => $claim->departure->reference,
+                    'date' => $claim->departure->date->toDateString(),
+                    'yacht' => [
+                        'id' => $claim->departure->yacht->id,
+                        'code' => $claim->departure->yacht->code,
+                        'name' => $claim->departure->yacht->name,
+                    ],
+                ],
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, CabinClaim>  $claims
+     */
+    private function scopeSummary($claims): string
+    {
+        $scopes = $claims->map(fn (CabinClaim $claim): array => [
+            'yacht_code' => $claim->departure->yacht->code,
+            'date' => $claim->departure->date->toDateString(),
+            'cabin_codes' => [$claim->cabin->code],
+        ])->all();
+
+        return ScopeSummary::format($scopes);
+    }
+
+    /**
+     * @return array{id: int, name: string}|null
+     */
+    private function actorPayload(?User $user): ?array
+    {
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+        ];
+    }
+}

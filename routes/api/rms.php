@@ -6,6 +6,7 @@ use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\CalendarController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
+use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
@@ -75,3 +76,9 @@ Route::get('departures/{departure}', [DepartureController::class, 'show'])->wher
 Route::patch('departures/{departure}', [DepartureController::class, 'update'])->whereNumber('departure');
 Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])->whereNumber('departure');
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
+
+Route::get('blocks', [InternalBlockController::class, 'index']);
+Route::post('blocks', [InternalBlockController::class, 'store']);
+Route::patch('blocks/{block}', [InternalBlockController::class, 'update'])->whereNumber('block');
+Route::post('blocks/{block}/release', [InternalBlockController::class, 'release'])->whereNumber('block');
+Route::get('blocks/{block}/history', [InternalBlockController::class, 'history'])->whereNumber('block');

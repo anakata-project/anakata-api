@@ -11,6 +11,7 @@ use App\Exceptions\ConflictException;
 use App\Models\ConfigVersion;
 use App\Models\User;
 use App\Support\Config\Change;
+use App\Support\Config\Documents\RatesDocument;
 use App\Support\History\History;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Validator;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 final class ConfigPublisher extends Action
 {
+    public function __construct(private DepartureConfigChecks $departureChecks) {}
+
     /**
      * @param  array<string, mixed>  $document
      */
@@ -73,6 +76,23 @@ final class ConfigPublisher extends Action
         $published = $current instanceof ConfigVersion
             ? $current->asDocument()
             : null;
+
+        if ($kind === ConfigKind::Rates && $typed instanceof RatesDocument) {
+            $yearErrors = $this->departureChecks->rateYearErrors(
+                $typed,
+                $published instanceof RatesDocument ? $published : null,
+            );
+
+            if ($yearErrors !== []) {
+                $prefixed = [];
+
+                foreach ($yearErrors as $path => $messages) {
+                    $prefixed['document.'.$path] = $messages;
+                }
+
+                throw ValidationException::withMessages($prefixed);
+            }
+        }
 
         $changes = $typed->changesAgainst($published);
 

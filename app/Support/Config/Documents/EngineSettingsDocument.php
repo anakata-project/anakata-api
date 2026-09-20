@@ -443,8 +443,6 @@ final class EngineSettingsDocument extends ConfigDocument
             }
         }
 
-        // TODO(Sprint 3): warn when the default search starts before the first bookable month.
-
         return $warnings;
     }
 

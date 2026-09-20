@@ -21,6 +21,7 @@ test('every reference type uses its format', function (): void {
     expect(draw($service, ReferenceType::Booking, $at))->toBe('ANK-2026-0001');
     expect(draw($service, ReferenceType::Request, $at))->toBe('ANK-R-2026-0001');
     expect(draw($service, ReferenceType::Departure))->toBe('DEP-001');
+    expect(draw($service, ReferenceType::Block))->toBe('BLK-001');
     expect(draw($service, ReferenceType::Group))->toBe('GRP-001');
     expect(draw($service, ReferenceType::Offer))->toBe('OF-001');
     expect(draw($service, ReferenceType::Agency))->toBe('AG-001');

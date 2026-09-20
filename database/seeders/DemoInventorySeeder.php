@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\BlockReason;
+use App\Enums\ClaimKind;
 use App\Enums\ReferenceType;
+use App\Models\Cabin;
 use App\Models\Departure;
+use App\Models\InternalBlock;
 use App\Models\Itinerary;
 use App\Models\Yacht;
+use App\Services\Inventory\ClaimService;
 use App\Services\References\ReferenceService;
 use App\Support\Departures\SeedMapper as DepartureSeedMapper;
+use App\Support\History\History;
 use App\Support\Itineraries\SeedMapper;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +73,57 @@ final class DemoInventorySeeder extends Seeder
         }
 
         DB::transaction(fn () => app(ReferenceService::class)->ensureAtLeast(ReferenceType::Departure, 16));
+
+        $this->seedDemoBlock();
+    }
+
+    private function seedDemoBlock(): void
+    {
+        $departure = Departure::query()
+            ->where('reference', 'DEP-003')
+            ->with('yacht.cabins')
+            ->first();
+
+        if (! $departure instanceof Departure) {
+            return;
+        }
+
+        $cabins = $departure->yacht->cabins
+            ->filter(fn (Cabin $cabin): bool => in_array($cabin->code, ['S7', 'S8'], true))
+            ->sortBy('sort')
+            ->values();
+
+        DB::transaction(function () use ($departure, $cabins): void {
+            $block = InternalBlock::query()->firstOrCreate(
+                ['reference' => 'BLK-001'],
+                [
+                    'reason' => BlockReason::FamTrip,
+                    'notes' => 'Virtuoso agents fam — 4 pax',
+                ],
+            );
+
+            if ($block->claims()->whereNull('released_at')->doesntExist()) {
+                app(ClaimService::class)->claim(
+                    $departure,
+                    $cabins,
+                    $block,
+                    ClaimKind::Block,
+                );
+
+                if ($block->wasRecentlyCreated) {
+                    History::record($block, 'block.created', after: [
+                        'reason' => $block->reason->value,
+                        'notes' => $block->notes,
+                        'departures' => [[
+                            'departure_id' => $departure->id,
+                            'cabin_codes' => ['S7', 'S8'],
+                        ]],
+                    ]);
+                }
+            }
+
+            app(ReferenceService::class)->ensureAtLeast(ReferenceType::Block, 1);
+        });
     }
 
     /**

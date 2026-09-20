@@ -9,6 +9,7 @@ use App\Enums\RuleGroup;
 use App\Enums\RuleStatus;
 use App\Enums\RuleWhere;
 use App\Services\Config\CurrentConfig;
+use App\Services\Config\DepartureConfigChecks;
 use App\Support\Config\DocumentDiff;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
@@ -176,10 +177,7 @@ final class Registry
             RuleWhere::Here => self::hereCurrent($definition, $current),
             RuleWhere::Rates => self::ratesCurrent($definition, $current),
             RuleWhere::EngineSettings => self::engineCurrent($definition, $current),
-            RuleWhere::Departures => [
-                'display' => 'Set in Departures (Sprint 3)',
-                'differs' => null,
-            ],
+            RuleWhere::Departures => app(DepartureConfigChecks::class)->ops006Current(),
             RuleWhere::Locked => [
                 'display' => self::lockedDisplay($definition->key),
                 'differs' => null,
