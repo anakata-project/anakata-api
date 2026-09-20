@@ -12,6 +12,7 @@ use App\Actions\Bookings\UpdateBooking;
 use App\Enums\BookingSegment;
 use App\Enums\BookingStatus;
 use App\Enums\Permission;
+use App\Enums\UserStatus;
 use App\Exceptions\CabinUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\DeleteBookingRequest;
@@ -24,6 +25,7 @@ use App\Http\Requests\Rms\StoreReservationRequest;
 use App\Http\Requests\Rms\TransitionBookingRequest;
 use App\Http\Requests\Rms\UpdateBookingRequest;
 use App\Http\Resources\Rms\BookingAuditResource;
+use App\Http\Resources\Rms\BookingOwnerResource;
 use App\Http\Resources\Rms\BookingResource;
 use App\Http\Resources\Rms\ChangeHistoryResource;
 use App\Http\Resources\Rms\MovePreviewResource;
@@ -61,11 +63,14 @@ final class BookingController extends Controller
             ->join('departures', 'departures.id', '=', 'bookings.departure_id')
             ->with([
                 'departure.yacht',
+                'departure.itinerary',
                 'cabin',
                 'contact',
                 'group.coordinator',
                 'owner',
                 'ratesVersion',
+                'bookingRequest',
+                'activeClaims',
             ])
             ->when(
                 ! $actor->hasPermission(Permission::BookingsViewAll),
@@ -149,11 +154,14 @@ final class BookingController extends Controller
 
         $booking->load([
             'departure.yacht',
+            'departure.itinerary',
             'cabin',
             'contact',
             'group.coordinator',
             'owner',
             'ratesVersion',
+            'bookingRequest',
+            'activeClaims',
         ]);
 
         return new BookingResource($booking);
@@ -193,6 +201,25 @@ final class BookingController extends Controller
             ->paginate($perPage);
 
         return BookingAuditResource::collection($entries);
+    }
+
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\BookingOwnerResource>}',
+    )]
+    public function owners(): AnonymousResourceCollection
+    {
+        $this->authorize('viewOwners', Booking::class);
+
+        $owners = User::query()
+            ->where('status', UserStatus::Active)
+            ->with('role')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (User $user): bool => $user->hasPermission(Permission::PanelRms))
+            ->values();
+
+        return BookingOwnerResource::collection($owners);
     }
 
     /**

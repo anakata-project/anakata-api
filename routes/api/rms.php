@@ -85,6 +85,7 @@ Route::get('departures/{departure}/history', [DepartureController::class, 'histo
 
 Route::get('bookings', [BookingController::class, 'index']);
 Route::get('bookings/audit', [BookingController::class, 'audit']);
+Route::get('bookings/owners', [BookingController::class, 'owners']);
 Route::post('bookings/quote', [BookingController::class, 'quote']);
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/transition', [BookingController::class, 'transition'])->whereNumber('booking');

@@ -59,6 +59,7 @@ use Illuminate\Support\Collection;
  * @property-read User $owner
  * @property-read RateVersion $ratesVersion
  * @property-read Collection<int, CabinClaim> $claims
+ * @property-read Collection<int, CabinClaim> $activeClaims
  * @property-read BookingRequest|null $bookingRequest
  */
 #[Fillable([
@@ -170,6 +171,14 @@ class Booking extends Model
     public function claims(): MorphMany
     {
         return $this->morphMany(CabinClaim::class, 'holder');
+    }
+
+    /**
+     * @return MorphMany<CabinClaim, $this>
+     */
+    public function activeClaims(): MorphMany
+    {
+        return $this->claims()->whereNull('released_at');
     }
 
     /**

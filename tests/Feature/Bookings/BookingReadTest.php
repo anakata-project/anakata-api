@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Actions\Bookings\CreateBookingRequest;
 use App\Enums\Permission;
+use App\Enums\UserStatus;
 use App\Models\Booking;
 use App\Models\Contact;
 use App\Models\Group;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Itineraries\Defaults;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
@@ -77,7 +80,36 @@ test('can_act follows the own-records rule', function (): void {
         ->assertJsonPath('allowed_transitions.0.reason_required', false)
         ->assertJsonPath('allowed_transitions.1.to', 'CANCELLED')
         ->assertJsonPath('allowed_transitions.1.reason_required', true)
-        ->assertJsonPath('balance', $booking->total);
+        ->assertJsonPath('balance', $booking->total)
+        ->assertJsonPath('request', null)
+        ->assertJsonPath('departure.date', $departure->date->toDateString())
+        ->assertJsonPath('departure.return_date', $departure->returnDate()->toDateString())
+        ->assertJsonPath('departure.itinerary_name', $departure->itinerary->name)
+        ->assertJsonPath('departure.embark', $departure->itinerary->embark)
+        ->assertJsonPath('departure.festive', $departure->festive);
+});
+
+test('a REQUESTED booking show includes the request summary and notes', function (): void {
+    $departure = ReservationFixtures::anamaraDeparture();
+    $actor = managerUser();
+    $booking = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload($departure, [
+            'preferred_channel' => 'WHATSAPP',
+            'travel_advisor' => true,
+            'notes' => 'Anniversary on board',
+        ]),
+        $actor,
+    );
+
+    $this->actingAs($actor)
+        ->getJson('/api/rms/bookings/'.$booking->id)
+        ->assertOk()
+        ->assertJsonPath('request.preferred_channel', 'WHATSAPP')
+        ->assertJsonPath('request.travel_advisor', true)
+        ->assertJsonPath('request.notes', 'Anniversary on board')
+        ->assertJsonPath('request.hold.expired', false)
+        ->assertJsonPath('request.hold.rule', $booking->bookingRequest?->hold_rule->value)
+        ->assertJsonPath('departure.embark', Defaults::EMBARK);
 });
 
 test('contacts search returns the top 10 matches', function (): void {
@@ -119,4 +151,54 @@ test('groups are scoped like bookings.view_all', function (): void {
         ->getJson('/api/rms/groups?departure_id='.$departure->id)
         ->assertOk()
         ->assertJsonCount(0, 'data');
+});
+
+test('groups filter by departure date from and to', function (): void {
+    $nov = ReservationFixtures::anamaraDeparture('2027-11-07');
+    $dec = ReservationFixtures::anamaraDeparture('2027-12-19', festive: true);
+    $novGroup = Group::factory()->create(['departure_id' => $nov->id]);
+    $decGroup = Group::factory()->create(['departure_id' => $dec->id]);
+    Booking::factory()->create([
+        'departure_id' => $nov->id,
+        'group_id' => $novGroup->id,
+        'owner_id' => adminUser()->id,
+        'cabin_id' => $nov->yacht->cabins->firstWhere('code', 'S1')?->id,
+    ]);
+    Booking::factory()->create([
+        'departure_id' => $dec->id,
+        'group_id' => $decGroup->id,
+        'owner_id' => adminUser()->id,
+        'cabin_id' => $dec->yacht->cabins->firstWhere('code', 'S1')?->id,
+    ]);
+
+    $this->actingAs(adminUser())
+        ->getJson('/api/rms/groups?from=2027-11-01&to=2027-11-30')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $novGroup->id);
+
+    $this->actingAs(adminUser())
+        ->getJson('/api/rms/groups?from=2027-12-01&to=2027-12-31')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $decGroup->id);
+});
+
+test('booking owners lists active panel.rms users to records.act_on_any', function (): void {
+    $carolina = adminUser(['name' => 'Carolina M.']);
+    $mateo = managerUser(['name' => 'Mateo R.']);
+    $lucia = salesExecUser(['name' => 'Lucia B.']);
+    salesExecUser(['name' => 'Gone', 'status' => UserStatus::Disabled]);
+
+    $this->actingAs($carolina)
+        ->getJson('/api/rms/bookings/owners')
+        ->assertOk()
+        ->assertJsonFragment(['id' => $carolina->id, 'name' => 'Carolina M.'])
+        ->assertJsonFragment(['id' => $mateo->id, 'name' => 'Mateo R.'])
+        ->assertJsonFragment(['id' => $lucia->id, 'name' => 'Lucia B.'])
+        ->assertJsonMissing(['name' => 'Gone']);
+
+    $this->actingAs($lucia)
+        ->getJson('/api/rms/bookings/owners')
+        ->assertForbidden();
 });

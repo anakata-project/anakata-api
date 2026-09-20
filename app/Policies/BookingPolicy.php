@@ -32,6 +32,11 @@ final class BookingPolicy extends Policy
         return $actor->hasPermission(Permission::BookingsViewAll);
     }
 
+    public function viewOwners(User $actor): bool
+    {
+        return $actor->hasPermission(Permission::RecordsActOnAny);
+    }
+
     public function create(User $actor): bool
     {
         return $actor->hasPermission(Permission::BookingsCreate);

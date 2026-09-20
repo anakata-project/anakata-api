@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Rms;
 
-use App\Enums\ClaimKind;
 use App\Models\Booking;
-use App\Models\CabinClaim;
 use App\Models\User;
 use App\Policies\BookingPolicy;
 use App\Services\Config\CurrentConfig;
 use App\Support\Bookings\RequestParty;
+use App\Support\Bookings\RequestSummary;
 use App\Support\BusinessHours;
-use App\Support\Iso;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -45,38 +43,40 @@ class BookingRequestResource extends JsonResource
             'cabin',
             'contact',
             'bookingRequest',
-            'claims',
+            'activeClaims',
         ]);
 
         $actor = $request->user();
         $canAct = $actor instanceof User
             && app(BookingPolicy::class)->ownsOrMayActOnAny($actor, $this->resource);
 
-        $details = $this->bookingRequest;
-        $holdClaim = $this->claims
-            ->filter(fn (CabinClaim $claim): bool => $claim->kind === ClaimKind::Hold)
-            ->sortByDesc('id')
-            ->first();
-
-        $expired = $this->holdExpired();
+        $summary = RequestSummary::for($this->resource);
+        $hold = $summary['hold'] ?? [
+            'expires_at' => null,
+            'expired' => $this->holdExpired(),
+            'rule' => '',
+        ];
+        $sla = $summary['sla'] ?? [
+            'due_at' => '',
+            'remaining_minutes' => 0,
+            'breached' => false,
+        ];
+        $holdClaim = RequestSummary::holdClaim($this->resource);
         $expiresAt = $holdClaim?->expires_at;
         $rules = app(CurrentConfig::class)->businessRules();
         $hours = BusinessHours::fromDocument($rules);
-        $remaining = ($expiresAt !== null && ! $expired)
+        $remaining = ($expiresAt !== null && ! $hold['expired'])
             ? $hours->remainingBusinessMinutes(now(), $expiresAt)
             : 0;
-
-        $dueAt = $details?->sla_due_at;
-        $remainingSla = $dueAt === null ? 0 : (int) now()->diffInMinutes($dueAt, false);
 
         return [
             'id' => $this->id,
             'display_reference' => $this->displayReference(),
             'contact' => [
                 'name' => $this->contact->name,
-                'preferred_channel' => $details?->preferred_channel->value ?? $this->contact->preferred_channel->value,
+                'preferred_channel' => $summary['preferred_channel'] ?? $this->contact->preferred_channel->value,
             ],
-            'travel_advisor' => (bool) $details?->travel_advisor,
+            'travel_advisor' => (bool) ($summary['travel_advisor'] ?? false),
             'party' => RequestParty::label($this->adults, $this->children),
             'departure' => [
                 'id' => $this->departure->id,
@@ -90,16 +90,12 @@ class BookingRequestResource extends JsonResource
             'cabin_label' => $this->cabinLabel(),
             'estimated_value' => $this->total,
             'hold' => [
-                'expires_at' => Iso::utc($expiresAt),
-                'rule' => $details?->hold_rule->value ?? '',
+                'expires_at' => $hold['expires_at'],
+                'rule' => $hold['rule'],
                 'remaining_business_minutes' => $remaining,
-                'expired' => $expired,
+                'expired' => $hold['expired'],
             ],
-            'sla' => [
-                'due_at' => Iso::utc($dueAt) ?? '',
-                'remaining_minutes' => $remainingSla,
-                'breached' => $remainingSla < 0,
-            ],
+            'sla' => $sla,
             'can_act' => $canAct,
         ];
     }

@@ -10,6 +10,7 @@ use App\Http\Resources\Rms\GroupResource;
 use App\Models\Booking;
 use App\Models\Group;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class GroupController extends Controller
@@ -28,8 +29,22 @@ final class GroupController extends Controller
             ->visibleTo($actor)
             ->with(['coordinator', 'departure.yacht', 'bookings.cabin'])
             ->when(
+                $request->filled('from'),
+                fn (Builder $query) => $query->whereHas(
+                    'departure',
+                    fn (Builder $departure) => $departure->whereDate('date', '>=', (string) $request->validated('from')),
+                ),
+            )
+            ->when(
+                $request->filled('to'),
+                fn (Builder $query) => $query->whereHas(
+                    'departure',
+                    fn (Builder $departure) => $departure->whereDate('date', '<=', (string) $request->validated('to')),
+                ),
+            )
+            ->when(
                 $request->filled('departure_id'),
-                fn ($query) => $query->where('departure_id', $request->validated('departure_id')),
+                fn (Builder $query) => $query->where('departure_id', $request->validated('departure_id')),
             )
             ->orderBy('reference')
             ->get();

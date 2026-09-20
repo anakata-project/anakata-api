@@ -1003,3 +1003,159 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # ui / panel / engine: pnpm typecheck
 # panel / engine: pnpm build
 ```
+
+## Task 07 · anakata-panel · Bookings list, booking panel (Overview + History), Groups, Deleted & released
+
+### What was built
+`/rms/reservations/bookings` is the prototype `v-book`: date-range on departure date, All / D2C / B2B / Charter chips, 300 ms search, Mine, the bookings table (no GUESTS line), Groups (OPS-008) from `GET /groups?from&to`, and Deleted & released from `GET /bookings/audit` (hidden without `bookings.view_all`).
+
+The booking panel (shared 600 px drawer) shows Overview and History. Guests / Extras / Payments / Documents are listed and disabled with “Arrives in Sprint 6/5/7”. Money, `allowed_transitions`, `can_act`, `balance` and `price_lines` come from `BookingResource` (list = show). Request hold/SLA/notes come from `RequestSummary` on the list (eager-loaded `bookingRequest` + `activeClaims`).
+
+Status changes, delete and request release use a square `UModal` (not `prompt`). Move pages every future departure from Galápagos tomorrow (`per_page=100` until `last_page`); 19 Dec 2027 is in that list. 422 / 409 stay in `.warnbox`. `?open=` matches `display_reference` exactly.
+
+Header and toolbar “New reservation” stay disabled (task 08). Paid is USD 0 with “Payments arrive in Sprint 5”; balance is the API’s `balance` (equals total until Sprint 5).
+
+### API prelude (this task)
+`GET /bookings` eager-loads `bookingRequest` and `activeClaims`. `BookingListQueryCountTest` asserts the list query count does not grow with more REQUESTED bookings. `GET /bookings/owners` (`records.act_on_any`, active `panel.rms`). Groups accept `from` / `to`. `RequestSummary` is shared by list, show and the request queue.
+
+### Dates
+`useDates().format(Date, 'iso')` is the configured zone (panel: `Pacific/Galapagos`), not UTC. Unit tests: at `2026-09-21T05:30:00.000Z` (23:30 GALT) iso is `2026-09-20`; `galapagosTomorrowIso` is `2026-09-21`. Move uses that helper, not a UTC date.
+
+### Disabled tabs
+Overview and History are live. Guests and Extras → Sprint 6. Payments → Sprint 5. Documents → Sprint 7.
+
+### Omitted GUESTS line
+The list client cell is name + optional group/coordinator only. A note on the panel: “The GUESTS line arrives in Sprint 6.”
+
+### Reason modal
+`ReasonModal` titles `Status CONFIRMED → CANCELLED`, `Delete reservation {ref}`, or the release hold title. Hint is `(required)` / `(optional)` from `reason_required`. Record stays disabled while a required reason is empty. Errors stay in the modal.
+
+### Move dialog
+Departure select (all future, festive labelled) + cabin select (FREE, plus the booking’s current code). Preview shows current → new, difference (`--warn` / `--ok` / muted), new lines, sailing-year / festive notes, “No modification fee (FIN-006).” Confirm posts `confirm_total`. A 409 refreshes the preview and keeps the dialog open.
+
+### Browser
+As Carolina: 11 seeded bookings, chips, date range, GRP-007. Opened ANK-2026-0003: Overview kv rows, Rates v1 lines, → FULLY PAID / → CANCELLED, reason modal “Status CONFIRMED → CANCELLED” (required), move list includes `19 Dec 2027 · ANAMARA · Festive Expeditions · FESTIVE`. History: `Reservation created in RMS — Suite 01 · 2 AD · seeded`. New reservation disabled. Did **not** confirm cancel / move / delete against seed. Lucía 🔒 and Mateo delete-disabled were not re-run as those users this session (they follow `can_act` / `bookings.delete`). Light theme uses the same tokens; the theme toggle was blocked by the open modal overlay.
+
+Local API was missing `booking_requests` until `php artisan migrate` — list 500’d before that.
+
+### Quality
+- anakata-panel: `pnpm lint`, `pnpm typecheck`, `pnpm test` (148), `pnpm build` — pass
+- anakata-ui: existing `useDates` GALT iso test
+- anakata-api: prelude already covered by `composer check` / `BookingListQueryCountTest`
+
+### Files touched
+**anakata-api**
+- `app/Http/Controllers/Rms/BookingController.php` (eager-load, owners)
+- `app/Http/Controllers/Rms/GroupController.php` (`from` / `to`)
+- `app/Http/Requests/Rms/IndexGroupsRequest.php`
+- `app/Http/Resources/Rms/BookingResource.php`, `BookingRequestResource.php`, `ReservationCreatedResource.php`
+- `app/Http/Resources/Rms/BookingOwnerResource.php` (new)
+- `app/Support/Bookings/RequestSummary.php` (new)
+- `app/Models/Booking.php` (`activeClaims`)
+- `app/Policies/BookingPolicy.php` (`viewOwners`)
+- `routes/api/rms.php`
+- `tests/Feature/Bookings/BookingReadTest.php`, `BookingListQueryCountTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui (v0.5.1)**
+- `app/types/api.d.ts`, `bookings.ts`, `index.ts`
+- `tests/unit/useDates.test.ts`
+- `package.json`, `CHANGELOG.md`, `README.md`
+
+**anakata-panel**
+- `app/pages/rms/reservations/bookings.vue`
+- `app/components/bookings/*` (`bookingHelpers`, `requestActions`, `BookingPanel`, `GroupDrawer`, `MoveBookingModal`, `ReasonModal`)
+- `app/components/history/describe.ts` + `tests/unit/describe.test.ts`
+- `tests/unit/bookingHelpers.test.ts`
+- `app/assets/css/bookings.css`, `nuxt.config.ts`, `eslint.config.mjs`
+- `i18n/locales/en.json`, `app/types/api.ts`, `app/layouts/default.vue`, `README.md`
+
+### Deviations
+- Paid/balance copy is “Payments arrive in Sprint 5” (G6), not the prototype’s live paid figure.
+- New reservation is disabled (task 08), header and toolbar.
+- Group drawer lists bookings only — no coordinator editor (not in this task).
+- Browser mutation checks (cancel, festive move, delete, Lucía/Mateo) were not executed against seed.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08: enable New reservation and wire the modal.
+- Task 09: request queue reuses `requestActions` and `BookingPanel`.
+- Task 10: calendar opens `BookingPanel` with `?open=`.
+- Sprint 5: Paid / balance from payments; drop the Sprint 5 note.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+# 1. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/BookingController.php \
+  app/Http/Controllers/Rms/GroupController.php \
+  app/Http/Requests/Rms/IndexGroupsRequest.php \
+  app/Http/Resources/Rms/BookingResource.php \
+  app/Http/Resources/Rms/BookingRequestResource.php \
+  app/Http/Resources/Rms/ReservationCreatedResource.php \
+  app/Http/Resources/Rms/BookingOwnerResource.php \
+  app/Support/Bookings/RequestSummary.php \
+  app/Models/Booking.php \
+  app/Policies/BookingPolicy.php \
+  routes/api/rms.php \
+  tests/Feature/Bookings/BookingReadTest.php \
+  tests/Feature/Bookings/BookingListQueryCountTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Eager-load request holds on the bookings list and expose owners.
+
+RequestSummary reads hold.expires_at from the active HOLD claim,
+so the index must load bookingRequest and activeClaims without
+an N+1. Groups accept a departure from/to filter.
+EOF
+)"
+
+# 2. anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  app/types/api.d.ts \
+  app/types/bookings.ts \
+  app/types/index.ts \
+  tests/unit/useDates.test.ts \
+  package.json \
+  CHANGELOG.md \
+  README.md
+git commit -m "$(cat <<'EOF'
+Regenerate booking types and pin Galápagos iso dates.
+
+format(Date, 'iso') is the configured zone; at 23:30 GALT
+the calendar day stays the Galápagos date, not UTC tomorrow.
+EOF
+)"
+git tag v0.5.1
+
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/pages/rms/reservations/bookings.vue \
+  app/components/bookings \
+  app/components/history/describe.ts \
+  app/assets/css/bookings.css \
+  app/layouts/default.vue \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  eslint.config.mjs \
+  tests/unit/bookingHelpers.test.ts \
+  tests/unit/describe.test.ts
+git commit -m "$(cat <<'EOF'
+Add the bookings list and Overview/History panel.
+
+Money, transitions and own-records come from the API. The
+reason modal replaces prompt; move pages all future departures.
+EOF
+)"
+```

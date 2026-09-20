@@ -8,6 +8,7 @@ use App\Models\Booking;
 use App\Models\Group;
 use App\Models\User;
 use App\Policies\BookingPolicy;
+use App\Support\Bookings\RequestSummary;
 use App\Support\Bookings\Transitions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -45,23 +46,27 @@ class BookingResource extends JsonResource
      *     internal_notes: string|null,
      *     can_act: bool,
      *     allowed_transitions: list<array{to: string, reason_required: bool}>,
-     *     departure: array{id: int, date: string, yacht: array{id: int, code: string, name: string}},
+     *     departure: array{id: int, date: string, return_date: string, itinerary_name: string, embark: string, festive: bool, yacht: array{id: int, code: string, name: string}},
      *     cabin: array{id: int, code: string, label: string}|null,
      *     cabin_label: string,
      *     contact: array{id: int, name: string, email: string|null, phone: string|null, country: string|null, preferred_channel: string},
      *     group: array{id: int, reference: string, name: string, coordinator: array{id: int, name: string}}|null,
-     *     owner: array{id: int, name: string}
+     *     owner: array{id: int, name: string},
+     *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null
      * }
      */
     public function toArray(Request $request): array
     {
         $this->resource->loadMissing([
             'departure.yacht',
+            'departure.itinerary',
             'cabin',
             'contact',
             'group.coordinator',
             'owner',
             'ratesVersion',
+            'bookingRequest',
+            'activeClaims',
         ]);
 
         $actor = $request->user();
@@ -101,6 +106,10 @@ class BookingResource extends JsonResource
             'departure' => [
                 'id' => $this->departure->id,
                 'date' => $this->departure->date->toDateString(),
+                'return_date' => $this->departure->returnDate()->toDateString(),
+                'itinerary_name' => $this->departure->itinerary->name,
+                'embark' => $this->departure->itinerary->embark,
+                'festive' => $this->departure->festive,
                 'yacht' => [
                     'id' => $this->departure->yacht->id,
                     'code' => $this->departure->yacht->code,
@@ -119,6 +128,7 @@ class BookingResource extends JsonResource
                 'id' => $this->owner->id,
                 'name' => $this->owner->name,
             ],
+            'request' => RequestSummary::for($this->resource),
         ];
     }
 

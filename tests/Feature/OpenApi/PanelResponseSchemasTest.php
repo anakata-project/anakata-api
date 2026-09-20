@@ -129,7 +129,22 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     expect($conflictRef)->toContain('CabinUnavailableException');
 
     $booking = openApiSchema($spec, 'BookingResource');
-    expect($booking['properties'])->toHaveKey('allowed_transitions');
+    expect($booking['properties'])->toHaveKeys(['allowed_transitions', 'request']);
+    $bookingDeparture = $booking['properties']['departure']['properties'] ?? [];
+    expect($bookingDeparture)->toHaveKeys(['itinerary_name', 'return_date', 'embark', 'festive']);
+
+    $owners = $spec['paths']['/rms/bookings/owners']['get']
+        ?? $spec['paths']['/api/rms/bookings/owners']['get']
+        ?? null;
+    expect($owners)->toBeArray();
+
+    $groups = $spec['paths']['/rms/groups']['get']
+        ?? $spec['paths']['/api/rms/groups']['get']
+        ?? null;
+    expect($groups)->toBeArray();
+    $groupParams = collect($groups['parameters'] ?? [])
+        ->mapWithKeys(fn (array $parameter): array => [($parameter['name'] ?? '') => $parameter]);
+    expect($groupParams->keys()->all())->toContain('from', 'to');
 
     $transitionItems = $booking['properties']['allowed_transitions']['items'] ?? [];
     $transitionItemProps = is_array($transitionItems)
