@@ -68,6 +68,8 @@ test('generate season alternates west and north for two yachts over six weeks', 
 
     expect($response->json('created'))->toHaveCount(12);
     expect($response->json('skipped'))->toBe([]);
+    expect($response->json())->toHaveKeys(['created', 'skipped']);
+    expect($response->json())->not->toHaveKey('data');
 
     foreach (altSixWeekTable() as $week) {
         foreach (['ANAMARA', 'ANATIVA'] as $yacht) {

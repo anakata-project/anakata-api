@@ -98,6 +98,32 @@ final class DepartureLocks
             ->get();
     }
 
+    public static function lock(int $id): Departure
+    {
+        return Departure::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return Collection<int, Departure>
+     */
+    public static function lockMany(array $ids): Collection
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map(intval(...), $ids),
+            fn (int $id): bool => $id > 0,
+        )));
+        sort($ids);
+
+        $locked = new Collection;
+
+        foreach ($ids as $id) {
+            $locked->put($id, self::lock($id));
+        }
+
+        return $locked;
+    }
+
     private static function locksDateAndYacht(CabinClaim $claim): bool
     {
         if ($claim->kind === ClaimKind::Booking) {

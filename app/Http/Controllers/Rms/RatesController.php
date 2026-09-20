@@ -8,6 +8,7 @@ use App\Enums\CabinCategory;
 use App\Enums\ConfigKind;
 use App\Http\Requests\Rms\PriceCheckRequest;
 use App\Http\Resources\Rms\PriceCheckResource;
+use App\Http\Resources\Rms\RatesCurrentResource;
 use App\Services\Config\ConfigValidator;
 use App\Services\Config\CurrentConfig;
 use App\Services\Pricing\CabinPricer;
@@ -22,6 +23,15 @@ class RatesController extends ConfigController
     protected function kind(): ConfigKind
     {
         return ConfigKind::Rates;
+    }
+
+    public function current(CurrentConfig $current): RatesCurrentResource
+    {
+        $this->authorizeView();
+
+        $version = $current->version($this->kind())->load('publisher');
+
+        return new RatesCurrentResource($version);
     }
 
     public function priceCheck(

@@ -6,14 +6,14 @@ namespace App\Http\Controllers\Rms;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IndexCalendarRequest;
+use App\Http\Resources\Rms\CalendarGridResource;
 use App\Models\Departure;
 use App\Models\Yacht;
 use App\Support\Inventory\Snapshots;
-use Illuminate\Http\JsonResponse;
 
 final class CalendarController extends Controller
 {
-    public function __invoke(IndexCalendarRequest $request): JsonResponse
+    public function __invoke(IndexCalendarRequest $request): CalendarGridResource
     {
         $this->authorize('viewAny', Departure::class);
 
@@ -76,7 +76,7 @@ final class CalendarController extends Controller
             }
         }
 
-        return response()->json([
+        return new CalendarGridResource([
             'departures' => $departures->map(fn (Departure $departure): array => [
                 'id' => $departure->id,
                 'reference' => $departure->reference,
@@ -93,7 +93,7 @@ final class CalendarController extends Controller
                 ],
                 'festive' => $departure->festive,
                 'status' => $departure->status->value,
-            ])->values(),
+            ])->values()->all(),
             'rows' => $rows,
         ]);
     }

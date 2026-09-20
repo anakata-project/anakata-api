@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Rms;
 use App\Actions\Blocks\CreateInternalBlock;
 use App\Actions\Blocks\ReleaseInternalBlock;
 use App\Actions\Blocks\UpdateInternalBlockNotes;
+use App\Exceptions\CabinUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IndexInternalBlocksRequest;
 use App\Http\Requests\Rms\ReleaseInternalBlockRequest;
@@ -50,6 +51,9 @@ final class InternalBlockController extends Controller
         return InternalBlockResource::collection($blocks);
     }
 
+    /**
+     * @throws CabinUnavailableException
+     */
     public function store(StoreInternalBlockRequest $request, CreateInternalBlock $action): JsonResponse
     {
         $this->authorize('create', InternalBlock::class);

@@ -31,7 +31,27 @@ class YachtResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
-            'cabins' => CabinResource::collection($this->cabins)->resolve(),
+            'cabins' => $this->cabinPayloads(),
         ];
+    }
+
+    /**
+     * @return list<array{id: int, code: string, label: string, category: string, sort: int}>
+     */
+    private function cabinPayloads(): array
+    {
+        $cabins = [];
+
+        foreach ($this->cabins as $cabin) {
+            $cabins[] = [
+                'id' => $cabin->id,
+                'code' => $cabin->code,
+                'label' => $cabin->label,
+                'category' => $cabin->category->value,
+                'sort' => $cabin->sort,
+            ];
+        }
+
+        return $cabins;
     }
 }

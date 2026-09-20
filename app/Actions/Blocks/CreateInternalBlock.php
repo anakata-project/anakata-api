@@ -30,6 +30,8 @@ final class CreateInternalBlock extends Action
 
     /**
      * @param  array<string, mixed>  $data
+     *
+     * @throws CabinUnavailableException
      */
     public function handle(array $data): InternalBlock
     {

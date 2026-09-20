@@ -16,12 +16,14 @@ use App\Http\Requests\Rms\IndexDeparturesRequest;
 use App\Http\Requests\Rms\StoreDepartureRequest;
 use App\Http\Requests\Rms\UpdateDepartureRequest;
 use App\Http\Resources\Rms\ChangeHistoryResource;
+use App\Http\Resources\Rms\DepartureMutationResource;
 use App\Http\Resources\Rms\DepartureResource;
+use App\Http\Resources\Rms\GenerateSeasonResource;
 use App\Models\Departure;
 use App\Models\Yacht;
 use App\Services\Inventory\Availability;
-use App\Support\Departures\Warnings;
 use App\Support\Inventory\Snapshots;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -30,6 +32,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 final class DepartureController extends Controller
 {
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\DepartureResource>, links: array{first: string|null, last: string|null, prev: string|null, next: string|null}, meta: array{current_page: int, from: int|null, last_page: int, links: list<array{url: string|null, label: string, active: bool}>, path: string|null, per_page: int, to: int|null, total: int, kpis: array{on_sale_on_engine: int, cabins_bookable: int, showing_only_n_left: int, full: int}}}',
+    )]
     public function index(IndexDeparturesRequest $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Departure::class);
@@ -61,7 +67,7 @@ final class DepartureController extends Controller
         );
 
         return DepartureResource::collection($paginator)->additional([
-            'meta' => ['kpis' => $kpis],
+            'meta' => $this->indexMeta($kpis),
         ]);
     }
 
@@ -90,23 +96,19 @@ final class DepartureController extends Controller
         $departure = $action->handle($request->validated());
         Snapshots::attach(collect([$departure]));
 
-        return response()->json([
-            ...((new DepartureResource($departure))->resolve()),
-            'warnings' => Warnings::for($departure),
-        ], 201);
+        return (new DepartureMutationResource($departure))
+            ->response()
+            ->setStatusCode(201);
     }
 
-    public function update(UpdateDepartureRequest $request, Departure $departure, UpdateDeparture $action): JsonResponse
+    public function update(UpdateDepartureRequest $request, Departure $departure, UpdateDeparture $action): DepartureMutationResource
     {
         $this->authorize('update', $departure);
 
         $updated = $action->handle($departure, $request->validated());
         Snapshots::attach(collect([$updated]));
 
-        return response()->json([
-            ...((new DepartureResource($updated))->resolve()),
-            'warnings' => Warnings::for($updated),
-        ]);
+        return new DepartureMutationResource($updated);
     }
 
     public function destroy(Departure $departure, DeleteDeparture $action): Response
@@ -118,7 +120,7 @@ final class DepartureController extends Controller
         return response()->noContent();
     }
 
-    public function generate(GenerateSeasonRequest $request, GenerateSeason $action): JsonResponse
+    public function generate(GenerateSeasonRequest $request, GenerateSeason $action): GenerateSeasonResource
     {
         $this->authorize('generate', Departure::class);
 
@@ -133,7 +135,7 @@ final class DepartureController extends Controller
             DepartureStatus::from((string) $validated['status']),
         );
 
-        return response()->json($result);
+        return new GenerateSeasonResource($result);
     }
 
     public function history(Departure $departure): AnonymousResourceCollection
@@ -147,5 +149,14 @@ final class DepartureController extends Controller
             ->paginate(25);
 
         return ChangeHistoryResource::collection($entries);
+    }
+
+    /**
+     * @param  array{on_sale_on_engine: int, cabins_bookable: int, showing_only_n_left: int, full: int}  $kpis
+     * @return array{kpis: array{on_sale_on_engine: int, cabins_bookable: int, showing_only_n_left: int, full: int}}
+     */
+    private function indexMeta(array $kpis): array
+    {
+        return ['kpis' => $kpis];
     }
 }

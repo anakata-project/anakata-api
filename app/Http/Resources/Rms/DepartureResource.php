@@ -20,7 +20,43 @@ class DepartureResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     reference: string,
+     *     date: string,
+     *     return_date: string,
+     *     yacht_id: int,
+     *     itinerary_id: int,
+     *     status: string,
+     *     urgency_threshold: int,
+     *     waitlist_enabled: bool,
+     *     public_note: string|null,
+     *     festive: bool,
+     *     yacht: array{id: int, code: string, name: string},
+     *     itinerary: array{id: int, code: string, name: string, status: string, festive: bool},
+     *     rates: array{year: int, suite_from: int|null},
+     *     availability: array{
+     *         counts: array{sold: int, held: int, blocked: int, free: int, suites_free: int, owner_free: bool},
+     *         engine_label: array{code: string, text: string, tone: string},
+     *         cabins?: list<array{
+     *             cabin: array{code: string, label: string, category: string},
+     *             state: string,
+     *             claim: array{
+     *                 kind: string,
+     *                 hold_type: string|null,
+     *                 expires_at: string|null,
+     *                 holder: array{
+     *                     type: string,
+     *                     id: int,
+     *                     reference: string|null,
+     *                     label: string|null,
+     *                     detail: array{reason: string, reason_label: string}|null
+     *                 }
+     *             }|null
+     *         }>
+     *     },
+     *     locks?: array{date_and_yacht: bool, delete: bool, reason: string|null}
+     * }
      */
     public function toArray(Request $request): array
     {

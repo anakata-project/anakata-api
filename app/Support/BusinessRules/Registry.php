@@ -73,7 +73,24 @@ final class Registry
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<array{
+     *     key: string,
+     *     group: string,
+     *     group_label: string,
+     *     source_code: string,
+     *     name: string,
+     *     status: string,
+     *     where: string,
+     *     paths: list<string>,
+     *     source_display: string,
+     *     source_value: mixed,
+     *     current_display: string,
+     *     differs: bool|null,
+     *     used_in: string,
+     *     lock_reason: string|null,
+     *     note: string|null,
+     *     link: string|null
+     * }>
      */
     public static function rows(CurrentConfig $current): array
     {

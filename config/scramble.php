@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\OpenApi\CabinUnavailableExceptionToResponseExtension;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
 return [
@@ -153,7 +154,9 @@ return [
         RestrictedDocsAccess::class,
     ],
 
-    'extensions' => [],
+    'extensions' => [
+        CabinUnavailableExceptionToResponseExtension::class,
+    ],
 
     /*
      * Automatically document API security (OpenAPI `security` / `securitySchemes`) based on route

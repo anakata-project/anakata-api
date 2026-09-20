@@ -135,6 +135,10 @@ test('mateo can create a departure with return_date and empty warnings', functio
         ->assertJsonPath('rates.suite_from', 13965)
         ->assertJsonPath('warnings', []);
 
+    $created = $response->json();
+    expect($created)->toHaveKeys(['id', 'reference', 'warnings', 'availability', 'locks']);
+    expect($created)->not->toHaveKey('data');
+
     expect(ChangeHistory::query()->where('event', 'departure.created')->count())->toBe(1);
     expect(ChangeHistory::query()->where('event', 'departure.created')->value('subject_type'))->toBe('departure');
 });
@@ -259,10 +263,14 @@ test('updating a non-festive departure warns when the twin is festive', function
     ]);
     $mateo = managerUser();
 
-    $this->actingAs($mateo)
+    $updated = $this->actingAs($mateo)
         ->patchJson("/api/rms/departures/{$departure->id}", ['festive' => false])
         ->assertOk()
-        ->assertJsonPath('warnings.0', "ANATIVA's departure on 19 Dec 2027 is festive.");
+        ->assertJsonPath('warnings.0', "ANATIVA's departure on 19 Dec 2027 is festive.")
+        ->json();
+
+    expect($updated)->toHaveKeys(['id', 'reference', 'warnings', 'availability', 'locks']);
+    expect($updated)->not->toHaveKey('data');
 });
 
 test('a non-festive departure on a festive itinerary warns', function (): void {

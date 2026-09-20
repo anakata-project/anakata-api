@@ -30,10 +30,14 @@ test('lucia can read calendar and layout', function (): void {
     $lucia = salesExecUser();
     $departure = Departure::query()->where('reference', 'DEP-001')->firstOrFail();
 
-    $this->actingAs($lucia)
+    $calendar = $this->actingAs($lucia)
         ->getJson('/api/rms/calendar?from=2027-11-01&to=2027-12-31')
         ->assertOk()
-        ->assertJsonPath('departures.0.reference', 'DEP-001');
+        ->assertJsonPath('departures.0.reference', 'DEP-001')
+        ->json();
+
+    expect($calendar)->toHaveKeys(['departures', 'rows']);
+    expect($calendar)->not->toHaveKey('data');
 
     $this->actingAs($lucia)
         ->getJson("/api/rms/departures/{$departure->id}/layout")

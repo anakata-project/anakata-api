@@ -14,6 +14,7 @@ use App\Models\CabinClaim;
 use App\Models\Departure;
 use App\Support\BusinessTime;
 use App\Support\History\History;
+use App\Support\Inventory\DepartureLocks;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -40,6 +41,7 @@ final class ClaimService
         ?CarbonInterface $expiresAt = null,
     ): Collection {
         $this->guardTransaction();
+        $departure = DepartureLocks::lock((int) $departure->id);
         $this->assertClaimable($departure, $kind, $holdType, $expiresAt);
 
         $ordered = $cabins->sortBy('sort')->values();
@@ -83,6 +85,22 @@ final class ClaimService
     public function convert(Model $fromHolder, Model $toHolder, ClaimKind $kind): Collection
     {
         $this->guardTransaction();
+
+        $active = CabinClaim::query()
+            ->where('holder_type', $fromHolder->getMorphClass())
+            ->where('holder_id', $fromHolder->getKey())
+            ->whereNull('released_at')
+            ->with(['cabin', 'departure'])
+            ->get();
+
+        if ($active->isEmpty()) {
+            return new Collection;
+        }
+
+        DepartureLocks::lockMany(array_map(
+            intval(...),
+            $active->pluck('departure_id')->unique()->values()->all(),
+        ));
 
         $active = CabinClaim::query()
             ->where('holder_type', $fromHolder->getMorphClass())

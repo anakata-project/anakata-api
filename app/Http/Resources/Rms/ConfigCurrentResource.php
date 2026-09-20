@@ -18,6 +18,10 @@ class ConfigCurrentResource extends JsonResource
     public static $wrap = null;
 
     /**
+     * Shared envelope. Kind-specific `document` shapes live on the current
+     * resources (`RatesCurrentResource`, `BusinessRulesCurrentResource`,
+     * `EngineSettingsCurrentResource`).
+     *
      * @return array{
      *     version: int,
      *     document: array<string, mixed>,

@@ -164,7 +164,18 @@ final class BusinessRulesDocument extends ConfigDocument
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     commission: array{cap_pct: int, default_pct: int, payable_days_after_cruise: int},
+     *     modification_fee_usd: int,
+     *     payments: array{extras_due_hours: int, wire_window_hours: int, balance_reminder_days: list<int>},
+     *     discounts: array{online_deposit_discount_pct: int, max_total_discount_pct: int|null},
+     *     holds: array{web_minutes: int, web_extension_minutes: int, near_term_business_hours: int, long_lead_business_days: int},
+     *     sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
+     *     manifests: array{dpng_fit_days: int, dpng_charter_days: int},
+     *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
+     *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int},
+     *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
+     * }
      */
     public function toArray(): array
     {

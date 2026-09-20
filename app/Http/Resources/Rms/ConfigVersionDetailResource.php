@@ -18,9 +18,88 @@ class ConfigVersionDetailResource extends JsonResource
     public static $wrap = null;
 
     /**
+     * Shared by rates, business-rules and engine-settings version show/store.
+     * `document` is a union (OpenAPI oneOf) of the three published shapes.
+     *
      * @return array{
      *     version: int,
-     *     document: array<string, mixed>,
+     *     document: array{
+     *         currency: string,
+     *         years: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>,
+     *         terms: array{
+     *             cabin_deposit_pct: int,
+     *             cabin_balance_days: int,
+     *             charter_deposit_pct: int,
+     *             charter_deposit_business_days: int,
+     *             charter_balance_days: int
+     *         },
+     *         rules: array{
+     *             single_supplement_pct: int,
+     *             triple_discount_pct: int,
+     *             child_discount_pct: int,
+     *             child_discounts_per_adult: int,
+     *             child_discounts_per_cabin: int,
+     *             back_to_back_pct: int,
+     *             festive_supplement_pp: int,
+     *             festive_supplement_charter: int
+     *         }
+     *     }|array{
+     *         commission: array{cap_pct: int, default_pct: int, payable_days_after_cruise: int},
+     *         modification_fee_usd: int,
+     *         payments: array{extras_due_hours: int, wire_window_hours: int, balance_reminder_days: list<int>},
+     *         discounts: array{online_deposit_discount_pct: int, max_total_discount_pct: int|null},
+     *         holds: array{web_minutes: int, web_extension_minutes: int, near_term_business_hours: int, long_lead_business_days: int},
+     *         sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
+     *         manifests: array{dpng_fit_days: int, dpng_charter_days: int},
+     *         alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
+     *         retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int},
+     *         cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
+     *     }|array{
+     *         guests: array{
+     *             max_per_cabin: int,
+     *             max_per_yacht: int,
+     *             child_min_age: int,
+     *             child_max_age: int,
+     *             adult_required_with_children: bool,
+     *             under_age_message: string
+     *         },
+     *         calendar: array{
+     *             default_search_from: string,
+     *             default_search_to: string,
+     *             default_adults: int,
+     *             horizon_months: int
+     *         },
+     *         locale: array{default: string, live: list<string>, currency: string},
+     *         fees: array{
+     *             tct_pp: int,
+     *             png: array{
+     *                 foreign_over_12: int,
+     *                 foreign_12_and_under: int,
+     *                 can_adult: int,
+     *                 can_minor: int,
+     *                 national_or_resident: int,
+     *                 exempt_under_age: int
+     *             },
+     *             show_in_price_panel: bool,
+     *             footnote: string
+     *         },
+     *         copy: array{
+     *             book_now_pay_later: string,
+     *             traveling_with_children: string,
+     *             solo_and_triple: string,
+     *             pay_today: string,
+     *             details_note: string,
+     *             confirmation_steps: list<string>
+     *         },
+     *         charter: array{
+     *             headline: string,
+     *             intro: string,
+     *             itinerary_label: string,
+     *             response_sla_hours: int,
+     *             group_contexts: list<string>,
+     *             thank_you: string
+     *         }
+     *     },
      *     published_at: string,
      *     published_by: array{id: int, name: string}|null,
      *     approval_reference: string|null,

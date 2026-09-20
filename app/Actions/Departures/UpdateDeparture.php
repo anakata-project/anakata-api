@@ -42,21 +42,24 @@ final class UpdateDeparture extends Action
 
         $yacht = Yacht::query()->findOrFail($yachtId);
 
-        $dateChanging = array_key_exists('date', $data)
-            && $date->toDateString() !== $departure->date->toDateString();
-        $yachtChanging = array_key_exists('yacht_id', $data)
-            && $yachtId !== $departure->yacht_id;
+        return YachtDateConflict::guard($yacht, $date, function () use ($departure, $data, $date): Departure {
+            return $this->transaction(function () use ($departure, $data, $date): Departure {
+                $departure = DepartureLocks::lock((int) $departure->id);
 
-        if ($dateChanging || $yachtChanging) {
-            $locked = DepartureLocks::dateAndYachtCount(DepartureLocks::claimsFor($departure));
+                $yachtId = (int) ($data['yacht_id'] ?? $departure->yacht_id);
+                $dateChanging = array_key_exists('date', $data)
+                    && $date->toDateString() !== $departure->date->toDateString();
+                $yachtChanging = array_key_exists('yacht_id', $data)
+                    && $yachtId !== $departure->yacht_id;
 
-            if ($locked > 0) {
-                throw new ConflictException(DepartureLocks::dateAndYachtMessage($locked));
-            }
-        }
+                if ($dateChanging || $yachtChanging) {
+                    $locked = DepartureLocks::dateAndYachtCount(DepartureLocks::claimsFor($departure));
 
-        return YachtDateConflict::guard($yacht, $date, function () use ($departure, $data): Departure {
-            return $this->transaction(function () use ($departure, $data): Departure {
+                    if ($locked > 0) {
+                        throw new ConflictException(DepartureLocks::dateAndYachtMessage($locked));
+                    }
+                }
+
                 foreach ($data as $key => $value) {
                     $departure->setAttribute($key, $value);
                 }

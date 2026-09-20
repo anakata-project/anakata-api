@@ -21,7 +21,31 @@ class InternalBlockResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     reference: string,
+     *     reason: string,
+     *     reason_label: string,
+     *     notes: string|null,
+     *     scope_summary: string,
+     *     created_by: array{id: int, name: string}|null,
+     *     created_at: string|null,
+     *     released_at: string|null,
+     *     released_by: array{id: int, name: string}|null,
+     *     release_note: string|null,
+     *     claims: list<array{
+     *         id: int,
+     *         kind: string,
+     *         released_at: string|null,
+     *         cabin: array{id: int, code: string, label: string},
+     *         departure: array{
+     *             id: int,
+     *             reference: string,
+     *             date: string,
+     *             yacht: array{id: int, code: string, name: string}
+     *         }
+     *     }>
+     * }
      */
     public function toArray(Request $request): array
     {
