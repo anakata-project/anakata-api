@@ -37,7 +37,7 @@ test('the queue lists requests with meta.rules and SLA order', function (): void
         $actor,
     );
 
-    $this->actingAs($actor)
+    $response = $this->actingAs($actor)
         ->getJson('/api/rms/requests')
         ->assertOk()
         ->assertJsonPath('data.0.id', $first->id)
@@ -53,6 +53,10 @@ test('the queue lists requests with meta.rules and SLA order', function (): void
         ->assertJsonPath('meta.rules.response_hours', 24)
         ->assertJsonPath('meta.rules.business_day_minutes', 540)
         ->assertJsonPath('meta.rules.cabin_deposit_pct', 10);
+
+    expect($response->json('data.0.hold.remaining_business_minutes'))
+        ->toBeInt()
+        ->toBeGreaterThan(0);
 });
 
 test('confirm converts the hold and release requires a reason', function (): void {
@@ -123,5 +127,51 @@ test('the holds list shows TEC-004 rule text from the document', function (): vo
         ->assertOk()
         ->assertJsonPath('data.0.type', 'REQUEST')
         ->assertJsonPath('data.0.reference', $booking->request_reference)
-        ->assertJsonPath('data.0.rule', 'TEC-004 · 5 business days (long-lead)');
+        ->assertJsonPath('data.0.booking_id', $booking->id)
+        ->assertJsonPath('data.0.rule', 'TEC-004 · 5 business days (long-lead)')
+        ->assertJsonPath('meta.rules.business_day_minutes', 540);
+});
+
+test('cfo can read holds remaining minutes and business-day rules', function (): void {
+    $booking = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture()),
+        managerUser(),
+    );
+
+    $response = $this->actingAs(externalFinanceUser(['email' => 'cfo@anakata.test']))
+        ->getJson('/api/rms/holds')
+        ->assertOk()
+        ->assertJsonPath('data.0.booking_id', $booking->id)
+        ->assertJsonPath('meta.rules.business_day_minutes', 540);
+
+    expect($response->json('data.0.remaining_business_minutes'))
+        ->toBeInt()
+        ->toBeGreaterThan(0);
+});
+
+test('the holds list filters by departure date and exposes the booking id', function (): void {
+    $actor = managerUser();
+    $november = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture('2027-11-07')),
+        $actor,
+    );
+    $december = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload(ReservationFixtures::anamaraDeparture('2027-12-19', festive: true), [
+            'cabins' => [['cabin_code' => 'S2', 'adults' => 2, 'children' => 0]],
+        ]),
+        $actor,
+    );
+
+    $this->actingAs($actor)
+        ->getJson('/api/rms/holds?from=2027-12-01&to=2027-12-31')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.booking_id', $december->id)
+        ->assertJsonPath('data.0.reference', $december->request_reference);
+
+    $this->actingAs($actor)
+        ->getJson('/api/rms/holds?from=2027-11-01&to=2027-11-30')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.booking_id', $november->id);
 });

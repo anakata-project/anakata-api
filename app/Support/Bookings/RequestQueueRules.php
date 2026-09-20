@@ -8,6 +8,15 @@ use App\Services\Config\CurrentConfig;
 
 final class RequestQueueRules
 {
+    public static function businessDayMinutes(CurrentConfig $config): int
+    {
+        $holds = $config->businessRules()->holds;
+        [$startHour, $startMinute] = array_map(intval(...), explode(':', $holds->businessDayStart));
+        [$endHour, $endMinute] = array_map(intval(...), explode(':', $holds->businessDayEnd));
+
+        return ($endHour * 60 + $endMinute) - ($startHour * 60 + $startMinute);
+    }
+
     /**
      * @return array{
      *     near_term_business_hours: int,
@@ -21,16 +30,13 @@ final class RequestQueueRules
     public static function fromConfig(CurrentConfig $config): array
     {
         $holds = $config->businessRules()->holds;
-        [$startHour, $startMinute] = array_map(intval(...), explode(':', $holds->businessDayStart));
-        [$endHour, $endMinute] = array_map(intval(...), explode(':', $holds->businessDayEnd));
-        $businessDayMinutes = ($endHour * 60 + $endMinute) - ($startHour * 60 + $startMinute);
 
         return [
             'near_term_business_hours' => $holds->nearTermBusinessHours,
             'long_lead_business_days' => $holds->longLeadBusinessDays,
             'near_term_max_days' => $holds->nearTermMaxDays,
             'response_hours' => $config->businessRules()->sla->responseHours,
-            'business_day_minutes' => $businessDayMinutes,
+            'business_day_minutes' => self::businessDayMinutes($config),
             'cabin_deposit_pct' => $config->rates()->terms->cabinDepositPct,
         ];
     }

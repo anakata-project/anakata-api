@@ -101,7 +101,7 @@ test('a REQUESTED booking show includes the request summary and notes', function
         $actor,
     );
 
-    $this->actingAs($actor)
+    $response = $this->actingAs($actor)
         ->getJson('/api/rms/bookings/'.$booking->id)
         ->assertOk()
         ->assertJsonPath('request.preferred_channel', 'WHATSAPP')
@@ -110,6 +110,10 @@ test('a REQUESTED booking show includes the request summary and notes', function
         ->assertJsonPath('request.hold.expired', false)
         ->assertJsonPath('request.hold.rule', $booking->bookingRequest?->hold_rule->value)
         ->assertJsonPath('departure.embark', Defaults::EMBARK);
+
+    expect($response->json('request.hold.remaining_business_minutes'))
+        ->toBeInt()
+        ->toBeGreaterThan(0);
 });
 
 test('contacts search returns the top 10 matches', function (): void {

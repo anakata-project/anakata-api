@@ -12,20 +12,12 @@ use App\Services\Config\CurrentConfig;
 use App\Support\Bookings\HoldRuleText;
 use App\Support\BusinessHours;
 use App\Support\Iso;
+use DateTimeInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @property array{
- *     type: string,
- *     client: string,
- *     departure: array{date: string, yacht: array{code: string, name: string}},
- *     cabin: string,
- *     expires_at: \DateTimeInterface|null,
- *     remaining_business_minutes: int,
- *     rule: string,
- *     reference: string|null
- * } $resource
+ * @mixin Booking
  */
 class HoldResource extends JsonResource
 {
@@ -40,23 +32,24 @@ class HoldResource extends JsonResource
      *     expires_at: string|null,
      *     remaining_business_minutes: int,
      *     rule: string,
-     *     reference: string|null
+     *     reference: string|null,
+     *     booking_id: int|null
      * }
      */
     public function toArray(Request $request): array
     {
-        /** @var array{type: string, client: string, departure: array{date: string, yacht: array{code: string, name: string}}, cabin: string, expires_at: \DateTimeInterface|null, remaining_business_minutes: int, rule: string, reference: string|null} $row */
-        $row = $this->resource;
+        $payload = self::fromBooking($this->resource);
 
         return [
-            'type' => $row['type'],
-            'client' => $row['client'],
-            'departure' => $row['departure'],
-            'cabin' => $row['cabin'],
-            'expires_at' => Iso::utc($row['expires_at']),
-            'remaining_business_minutes' => $row['remaining_business_minutes'],
-            'rule' => $row['rule'],
-            'reference' => $row['reference'],
+            'type' => $payload['type'],
+            'client' => $payload['client'],
+            'departure' => $payload['departure'],
+            'cabin' => $payload['cabin'],
+            'expires_at' => Iso::utc($payload['expires_at']),
+            'remaining_business_minutes' => $payload['remaining_business_minutes'],
+            'rule' => $payload['rule'],
+            'reference' => $payload['reference'],
+            'booking_id' => $payload['booking_id'],
         ];
     }
 
@@ -66,10 +59,11 @@ class HoldResource extends JsonResource
      *     client: string,
      *     departure: array{date: string, yacht: array{code: string, name: string}},
      *     cabin: string,
-     *     expires_at: \DateTimeInterface|null,
+     *     expires_at: DateTimeInterface|null,
      *     remaining_business_minutes: int,
      *     rule: string,
-     *     reference: string|null
+     *     reference: string|null,
+     *     booking_id: int|null
      * }
      */
     public static function fromBooking(Booking $booking): array
@@ -85,8 +79,6 @@ class HoldResource extends JsonResource
         $rule = $request instanceof BookingRequest ? $request->hold_rule : HoldRule::LongLead;
         $holdType = $hold?->hold_type;
 
-        $booking->loadMissing('departure.yacht');
-
         return [
             'type' => $holdType instanceof HoldType ? $holdType->value : 'REQUEST',
             'client' => $booking->contact->name,
@@ -99,11 +91,12 @@ class HoldResource extends JsonResource
             ],
             'cabin' => $booking->cabinLabel(),
             'expires_at' => $expiresAt,
-            'remaining_business_minutes' => $expiresAt === null
-                ? 0
-                : $hours->remainingBusinessMinutes(now(), $expiresAt),
+            'remaining_business_minutes' => $expiresAt instanceof DateTimeInterface
+                ? $hours->remainingBusinessMinutes(now(), $expiresAt)
+                : 0,
             'rule' => HoldRuleText::tec004($rule, $rules),
             'reference' => $booking->displayReference(),
+            'booking_id' => $booking->id,
         ];
     }
 }

@@ -205,6 +205,33 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'cabin_deposit_pct',
     ]);
 
+    $hold = openApiSchema($spec, 'HoldResource');
+    expect($hold['properties'])->toHaveKeys(['booking_id', 'departure', 'remaining_business_minutes']);
+    $holdDeparture = $hold['properties']['departure'] ?? [];
+    expect($holdDeparture['type'] ?? $holdDeparture['properties'] ?? null)->not->toBe('string');
+    expect($holdDeparture['properties'] ?? [])->toHaveKeys(['date', 'yacht']);
+    expect($hold['properties']['remaining_business_minutes']['type'] ?? null)->toBe('integer');
+    $holdRequest = $booking['properties']['request']['properties']['hold']['properties']
+        ?? $booking['properties']['request']['properties']['hold']
+        ?? [];
+    $holdRequestProps = $holdRequest['properties'] ?? $holdRequest;
+    expect($holdRequestProps)->toHaveKey('remaining_business_minutes');
+
+    $holds = $spec['paths']['/rms/holds']['get']
+        ?? $spec['paths']['/api/rms/holds']['get']
+        ?? null;
+    expect($holds)->toBeArray();
+    $holdParams = collect($holds['parameters'] ?? [])
+        ->mapWithKeys(fn (array $parameter): array => [($parameter['name'] ?? '') => $parameter]);
+    expect($holdParams->keys()->all())->toContain('from', 'to');
+    $holdsSchema = $holds['responses']['200']['content']['application/json']['schema'] ?? [];
+    $holdsRules = $holdsSchema['properties']['meta']['properties']['rules']['properties']
+        ?? $holdsSchema['properties']['meta']['properties']['rules']
+        ?? null;
+    expect($holdsRules)->toBeArray();
+    $holdsRuleFields = $holdsRules['properties'] ?? $holdsRules;
+    expect($holdsRuleFields)->toHaveKey('business_day_minutes');
+
     foreach ([
         'BookingStatus',
         'BookingType',

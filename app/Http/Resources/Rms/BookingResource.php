@@ -52,7 +52,7 @@ class BookingResource extends JsonResource
      *     contact: array{id: int, name: string, email: string|null, phone: string|null, country: string|null, preferred_channel: string},
      *     group: array{id: int, reference: string, name: string, coordinator: array{id: int, name: string}}|null,
      *     owner: array{id: int, name: string},
-     *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null
+     *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string, remaining_business_minutes: int}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null
      * }
      */
     public function toArray(Request $request): array

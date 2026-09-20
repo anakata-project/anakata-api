@@ -8,6 +8,8 @@ use App\Enums\ClaimKind;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\CabinClaim;
+use App\Services\Config\CurrentConfig;
+use App\Support\BusinessHours;
 use App\Support\Iso;
 use DateTimeInterface;
 
@@ -18,7 +20,7 @@ final class RequestSummary
      *     preferred_channel: string,
      *     travel_advisor: bool,
      *     notes: string|null,
-     *     hold: array{expires_at: string|null, expired: bool, rule: string},
+     *     hold: array{expires_at: string|null, expired: bool, rule: string, remaining_business_minutes: int},
      *     sla: array{due_at: string, remaining_minutes: int, breached: bool}
      * }|null
      */
@@ -35,6 +37,12 @@ final class RequestSummary
         $expiresAt = self::holdClaim($booking)?->expires_at;
         $dueAt = $details->sla_due_at;
         $remainingSla = (int) now()->diffInMinutes($dueAt, false);
+        $expired = $booking->holdExpired();
+        $rules = app(CurrentConfig::class)->businessRules();
+        $hours = BusinessHours::fromDocument($rules);
+        $remainingHold = ($expiresAt instanceof DateTimeInterface && ! $expired)
+            ? $hours->remainingBusinessMinutes(now(), $expiresAt)
+            : 0;
 
         return [
             'preferred_channel' => $details->preferred_channel->value,
@@ -42,8 +50,9 @@ final class RequestSummary
             'notes' => $details->notes,
             'hold' => [
                 'expires_at' => Iso::utc($expiresAt instanceof DateTimeInterface ? $expiresAt : null),
-                'expired' => $booking->holdExpired(),
+                'expired' => $expired,
                 'rule' => $details->hold_rule->value,
+                'remaining_business_minutes' => $remainingHold,
             ],
             'sla' => [
                 'due_at' => Iso::utc($dueAt),

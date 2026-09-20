@@ -7,10 +7,8 @@ namespace App\Http\Resources\Rms;
 use App\Models\Booking;
 use App\Models\User;
 use App\Policies\BookingPolicy;
-use App\Services\Config\CurrentConfig;
 use App\Support\Bookings\RequestParty;
 use App\Support\Bookings\RequestSummary;
-use App\Support\BusinessHours;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -55,19 +53,13 @@ class BookingRequestResource extends JsonResource
             'expires_at' => null,
             'expired' => $this->holdExpired(),
             'rule' => '',
+            'remaining_business_minutes' => 0,
         ];
         $sla = $summary['sla'] ?? [
             'due_at' => '',
             'remaining_minutes' => 0,
             'breached' => false,
         ];
-        $holdClaim = RequestSummary::holdClaim($this->resource);
-        $expiresAt = $holdClaim?->expires_at;
-        $rules = app(CurrentConfig::class)->businessRules();
-        $hours = BusinessHours::fromDocument($rules);
-        $remaining = ($expiresAt !== null && ! $hold['expired'])
-            ? $hours->remainingBusinessMinutes(now(), $expiresAt)
-            : 0;
 
         return [
             'id' => $this->id,
@@ -89,12 +81,7 @@ class BookingRequestResource extends JsonResource
             ],
             'cabin_label' => $this->cabinLabel(),
             'estimated_value' => $this->total,
-            'hold' => [
-                'expires_at' => $hold['expires_at'],
-                'rule' => $hold['rule'],
-                'remaining_business_minutes' => $remaining,
-                'expired' => $hold['expired'],
-            ],
+            'hold' => $hold,
             'sla' => $sla,
             'can_act' => $canAct,
         ];

@@ -1330,3 +1330,182 @@ stays disabled while the POST is in flight.
 EOF
 )"
 ```
+
+## Task 09 · Booking Requests and Holds & Waitlist
+
+### What was built
+Two live queues in anakata-panel, plus an API prelude so the holds page can format Expires without reading `/requests`.
+
+**Booking Requests** (`/rms/reservations/booking-requests`): date-range filter, verbatim notice, Incoming requests table (`renderReq`), Confirm / Release, row → BookingPanel. Nav badge is the unfiltered open-request count.
+
+**Holds & Waitlist** (`/rms/operations/holds`): Active holds + Waitlist, shared date-range, row → BookingPanel, Add / Mark notified / Remove.
+
+### API prelude
+`RequestSummary` now computes `hold.remaining_business_minutes` (same `BusinessHours` as expiry). `RequestQueueRules::businessDayMinutes()` is the single source for day length (09:00–18:00 → 540).
+
+`HoldResource` wraps `Booking` (not an untyped array) with PHPDoc so OpenAPI types `departure` as `{ date, yacht }` and `remaining_business_minutes` as integer. Adds `booking_id`.
+
+`GET /api/rms/holds` accepts `from` / `to` on the departure date (`IndexHoldsRequest`) and returns `meta.rules.business_day_minutes` from `RequestQueueRules::businessDayMinutes`. Sales Execs / CFO never need `/business-rules`.
+
+Pest: `RequestQueueTest` (queue remaining minutes, holds `booking_id` + date filter + `meta.rules` 540, **cfo@ / external finance can read remaining minutes and `meta.rules`**). `BookingReadTest` remaining minutes on `request.hold`. `PanelResponseSchemasTest`: HoldResource `departure` object + integer remaining + `booking_id`; holds `from`/`to`; `meta.rules.business_day_minutes`.
+
+### Types · anakata-ui v0.5.3
+`pnpm types:api` first. Generated `HoldResource.departure` is an object and `remaining_business_minutes` is `number`. Overlays only where Scramble still mistypes:
+
+| Alias | Overlay | Why |
+|---|---|---|
+| `HoldListItem` | `type: string`, `booking_id: number \| null` | Generated `type` is `string \| null`; `booking_id` is `number` while PHPDoc is `int\|null` (WEB/AGENCY later). |
+| `RequestQueueItem` | `hold`, `sla` (plus existing `can_act` / `party` / `contact`) | Generated `hold` / `sla` are `string \| object` because of the runtime `??` fallback; `hold.expires_at` freezes as `null`. |
+| `BookingRequestSummary.hold` | `remaining_business_minutes: number` | Already present on the generated booking `request.hold`; kept so the panel type is one object. |
+
+`HoldListRules` is the generated `hold.index` `meta.rules`. Panel README pin: `` `extends: ['../anakata-ui']` (`v0.5.3`) ``.
+
+### Notice numbers
+The Booking Requests notice is one `i18n-t` string matching the prototype, including “No request is ever auto-cancelled without team review…”. Numbers come from **that list’s** `meta.rules` (`near_term_business_hours`, `long_lead_business_days`, `response_hours`, `cabin_deposit_pct`). Seed: 48 / 5 / 24 / 10.
+
+### Countdown refresh
+- **Contact SLA:** `formatSla(slaRemainingMinutes(due_at, now))`. `useSlaNow` ticks `now` every 60s; no refetch.
+- **Hold remaining:** `formatHoldRemaining(remaining_business_minutes, business_day_minutes, expired)`. Hours when remaining hours (`minutes / 60`) &lt; 72, else days (`minutes / business_day_minutes`). Expired → `HOLD EXPIRED — CABIN NOT HELD`. If `business_day_minutes` is 0, hours only.
+- **Lists:** refetch every 5 minutes. No client-side business-minute tick.
+
+Holds Expires uses **`GET /holds` `meta.rules.business_day_minutes`**, not `useOpenRequests`. CFO has `panel.rms` + `bookings.view_all` but not `requests.confirm` / `requests.release`, so they never poll `/requests`.
+
+### Navigation badge
+`useOpenRequests`: unfiltered `GET /api/rms/requests`, count = `data.length`. Starts from the layout. Gated the same way as the nav item: `requests.confirm` **or** `requests.release`. Poll every 5 minutes and after confirm/release. Prototype `reqbadge` (`.nav-badge.pill.p-req`). CFO does not see Booking Requests and is redirected if they type the URL.
+
+### Booking panel
+Same `ConfirmRequestModal` and `formatHoldRemaining`. Confirm modal uses the booking’s frozen `deposit_pct` (queue fetches `GET /bookings/{id}` first). Release toast: “Hold released, cabin returned to inventory.” SLA notice uses `useOpenRequests.rules.response_hours` when present (hidden for CFO).
+
+### Browser (after `reset.sh`)
+As **Carolina** (dark, then light on Holds):
+- Two requests: 0042 SLA BREACH — 26h (coral), 0041 19h (green). Badge **2**. Notice 48 / 5 / 24 / 10%. Both holds **45 business hours** (5 long-lead days × 540 min = 45h, under the 72h threshold — not “business days”).
+- `inventory:expire-hold ANK-R-2026-0041` → row `HOLD EXPIRED — CABIN NOT HELD`. Confirm modal: “10% … via WHATSAPP” + Sprint 5 sentence. Confirm → PENDING_PAYMENT, gone from queue, badge **1**, toast “Request confirmed”.
+- Release modal opened (reason required). Record click was blocked by the browser tool; release completed via `TransitionBooking` with reason “Client withdrew”. Queue then empty, badge **0**.
+- Waitlist: two festive 19 Dec rows. Mark-notified modal (channel select). After notify: “Notified 20 Sep 2026 via EMAIL by Carolina M.”; Mark notified hidden, Remove remains.
+
+As **cfo@**: no Booking Requests item, no ＋ New Reservation, no RMS/CRM switch. Holds **Expires** column shows **45 business hours** for both REQUEST rows (from holds `meta.rules`, not `/requests`). Waitlist visible, no Add / Mark notified / Remove.
+
+Lucía own-records: API test still blocks confirm/release on Mateo’s request; panel `can_act` disables the buttons. A second Lucía browser pass after the CFO session was not repeated (sign-out click blocked).
+
+### Quality
+- anakata-api: `docker compose exec app sh -c "composer check"` — 506 passed, 510 files, Pint, Larastan OK
+- anakata-ui: `pnpm lint`, `typecheck`, `test` (35), `build`
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (166), `build`
+
+### Files touched
+**anakata-api**
+- `app/Support/Bookings/RequestSummary.php`, `RequestQueueRules.php`
+- `app/Http/Resources/Rms/HoldResource.php`, `BookingRequestResource.php`, `BookingResource.php`
+- `app/Http/Controllers/Rms/HoldController.php`
+- `app/Http/Requests/Rms/IndexHoldsRequest.php` (new)
+- `tests/Feature/Bookings/RequestQueueTest.php`, `BookingReadTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `docs/sprints/sprint-04/REPORT.md`
+
+**anakata-ui (v0.5.3)**
+- `app/types/api.d.ts`, `bookings.ts`, `index.ts`
+- `package.json`, `CHANGELOG.md`, `README.md`
+
+**anakata-panel**
+- `app/pages/rms/reservations/booking-requests.vue` (new)
+- `app/pages/rms/operations/holds.vue` (new)
+- `app/components/requests/requestHelpers.ts`, `ConfirmRequestModal.vue` (new)
+- `app/components/holds/AddWaitlistModal.vue`, `NotifyWaitlistModal.vue` (new)
+- `app/composables/useOpenRequests.ts`, `useSlaNow.ts` (new)
+- `app/components/bookings/BookingPanel.vue`
+- `app/layouts/default.vue`, `app/navigation/rms.ts`
+- `app/assets/css/bookings.css`, `app/assets/css/shell.css`
+- `app/types/api.ts`, `i18n/locales/en.json`, `eslint.config.mjs`, `README.md`
+- `tests/unit/requestHelpers.test.ts` (new), `tests/unit/guards.test.ts`
+
+### Deviations
+- Prototype “Notify now” → **Mark notified** (task 05 / G7; no email this sprint).
+- Seed TEC-004 holds display as **business hours** (45h &lt; 72h), not “business days”. The 72-hour rule is `remaining_minutes / 60`; 4 business days at 540 min/day is only 36 hours.
+- Confirm modal adds the Sprint 5 deposit-link sentence.
+- Release Record was not clicked in the agent browser; the modal and the API release were checked separately.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 10: Calendar / Yacht Layout occupancy (`SOLD` / hold cells).
+- Task 11: E2E `BKG-*` (queue, expire-hold, confirm, release, waitlist, Lucía `can_act`, CFO Expires without Booking Requests).
+- Sprint 5: deposit link, WEB / AGENCY hold pills with minutes from data.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Commit Task 08 first if those files are still uncommitted, then:
+
+```bash
+# 1. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Bookings/RequestSummary.php \
+  app/Support/Bookings/RequestQueueRules.php \
+  app/Http/Resources/Rms/HoldResource.php \
+  app/Http/Resources/Rms/BookingRequestResource.php \
+  app/Http/Resources/Rms/BookingResource.php \
+  app/Http/Controllers/Rms/HoldController.php \
+  app/Http/Requests/Rms/IndexHoldsRequest.php \
+  tests/Feature/Bookings/RequestQueueTest.php \
+  tests/Feature/Bookings/BookingReadTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  docs/sprints/sprint-04/REPORT.md
+git commit -m "$(cat <<'EOF'
+Type holds remaining minutes and expose business-day rules.
+
+CFO can format Expires from GET /holds without reading the
+requests queue or the business-rules document.
+EOF
+)"
+
+# 2. anakata-ui — commit, then tag, then push
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  app/types/api.d.ts \
+  app/types/bookings.ts \
+  app/types/index.ts \
+  package.json \
+  CHANGELOG.md \
+  README.md
+git commit -m "$(cat <<'EOF'
+Regenerate types for typed holds and request remaining minutes.
+
+v0.5.3 overlays only the Scramble leftovers on HoldListItem
+and RequestQueueItem hold/sla.
+EOF
+)"
+git tag v0.5.3
+git push origin HEAD
+git push origin v0.5.3
+
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/pages/rms/reservations/booking-requests.vue \
+  app/pages/rms/operations/holds.vue \
+  app/components/requests/requestHelpers.ts \
+  app/components/requests/ConfirmRequestModal.vue \
+  app/components/holds/AddWaitlistModal.vue \
+  app/components/holds/NotifyWaitlistModal.vue \
+  app/composables/useOpenRequests.ts \
+  app/composables/useSlaNow.ts \
+  app/components/bookings/BookingPanel.vue \
+  app/layouts/default.vue \
+  app/navigation/rms.ts \
+  app/assets/css/bookings.css \
+  app/assets/css/shell.css \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  tests/unit/requestHelpers.test.ts \
+  tests/unit/guards.test.ts
+git commit -m "$(cat <<'EOF'
+Add Booking Requests and Holds & Waitlist queues.
+
+Holds format Expires from their own meta.rules so CFO can
+see remaining time without the requests permission.
+EOF
+)"
+```
