@@ -1171,3 +1171,107 @@ Blocked cabins open Internal Blocks; booking states wait for Sprint 4.
 EOF
 )"
 ```
+
+## Task 09 · Panel Internal Blocks page
+
+### What was built
+RMS Internal Blocks at `/rms/operations/blocks` (dedicated page beats the catch-all placeholder). Mateo (`blocks.manage`) creates, edits reason/notes, and releases. Lucía reads.
+
+**List.** `DateRangeFilter` defaults to All dates (`fieldLabel` “Blocked date”). Status chips Active (default) · Released · All → `GET /api/rms/blocks?status=&from=&to=`. Table: Scope (`scope_summary`) · Reason (`.pill` + `reason_label`) · Created by (`System` when `created_by` is null — demo `BLK-001`) · Notes · Release (outline, `@click.stop`) or mono `--iv38` “Released {date} by {name}”. Row click opens the drawer. **＋ New block** sits under the panel, outline, only with `blocks.manage`.
+
+**`?open=BLK-001`.** Calendar already links here. `blockToOpen` matches the query to the filtered list; if missing, `GET /api/rms/blocks?status=all` (no date filter) and open that row. No show endpoint.
+
+**Drawer.** Shared 600px `USlideover` + `history-drawer`. Title is the reference; `.bid` is the reason pill. Scope listed per departure (`14 Nov 2027 · ANAMARA · Suite 07–08`, 9 cabins → `Full yacht`). Edit reason + notes only when `blocks.manage` **and** the block is active, with the notice *To change cabins or dates, release this block and create a new one.* Released / Lucía: notes as text, no form. History for anyone with `panel.rms`. `block.created` / `block.released` / `block.updated` sentences in `describe.ts`.
+
+**New block modal** (no prototype layout; square/hairline `UModal` like invitations):
+- Yacht radios from the page’s `GET /api/rms/yachts`.
+- Departures fetched **when the modal opens and when the yacht changes** (`GET /api/rms/departures?yacht_id=&from=&to=&per_page=500`), not on page load — free counts stay current after create/release in the same session. Label `7 Nov 2027 · Western Realm` plus `{n} free`. Past dates omitted. Cap 20.
+- Nine cabins in a 3×3 grid (`yacht.cabins` by `sort`) + Full yacht (sends `cabin_codes: ALL`).
+- Reason select uses the four API labels. Notes max 500 + counter.
+- Notice: *Blocked inventory is unsellable and distinct in the calendar (R-B6).*
+- 409 → `.warnbox` with the API’s joined sentences; nothing created.
+- Toast `{reference} created — {n} cabins blocked` (`n` = `claims.length`).
+
+**Release modal.** Optional note → `POST /{id}/release`. Toast `{reference} released`. 409 shows `This block is already released.`
+
+**F8.** Holds & Waitlist was already `sprint: 4` (task 06). Left unchanged.
+
+### Files touched
+
+**anakata-panel**
+
+- `app/pages/rms/operations/blocks.vue`
+- `app/components/blocks/blockHelpers.ts`
+- `app/components/blocks/BlockDrawer.vue`
+- `app/components/blocks/NewBlockModal.vue`
+- `app/components/blocks/ReleaseBlockModal.vue`
+- `app/components/history/describe.ts`
+- `app/types/api.ts`
+- `app/assets/css/inventory.css`
+- `eslint.config.mjs`
+- `i18n/locales/en.json`
+- `tests/unit/blockHelpers.test.ts`
+- `tests/unit/describe.test.ts`
+
+**anakata-api**
+
+- `docs/sprints/sprint-03/REPORT.md`
+
+### Deviations from the task
+- Holds nav sprint number was already 4; no edit.
+- Create-form departures are loaded on modal open / yacht change (approved in the plan) so free counts are not stale.
+- Past departures are omitted from the create list (API 422s them).
+- Edit form is hidden on released blocks (API would allow PATCH).
+
+### Open questions
+None.
+
+### Notes for later
+- Task 10 E2E: `INV-08` (block / see / release) and `INV-12` (Lucía read-only) can drive this page.
+- Cursor’s embedded browser reached `:3001` but could not `fetch` `:8000` (`Failed to fetch` on `/sanctum/csrf-cookie`), so the interactive Mateo/Lucía pass was not completed here. Re-run locally: sign in as `mateo@anakata.test` / `password`, then Lucía.
+
+### New form design choices (no prototype)
+Yacht radios; departure multi-select with live free counts (lazy fetch); 3×3 cabin grid + Full yacht; reason select; notes counter; R-B6 notice; 409 warnbox; success toast wording; 20-departure cap.
+
+### Elements without a prototype source
+Status chips; released-row mono line; release modal + optional note; drawer scope-per-departure + edit notice; `System` for null `created_by`; History on a read-only role; omitting past departures in the create list.
+
+### Quality
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (137), `build` — pass.
+
+### Browser check
+Login page loaded (dark). Sign-in failed in this environment: the panel’s `http://localhost:8000/sanctum/csrf-cookie` request returned no response from the Cursor browser. Panel and API answered `200` to `curl` on the host. Interactive checks (create / conflict / full yacht / release / Lucía / FAM → `?open=BLK-001`) need a normal browser on `:3001`.
+
+### Git commands for the user
+
+Do **not** run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/operations/blocks.vue \
+  app/components/blocks \
+  app/components/history/describe.ts \
+  app/types/api.ts \
+  app/assets/css/inventory.css \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/blockHelpers.test.ts \
+  tests/unit/describe.test.ts
+git commit -m "$(cat <<'EOF'
+Add the RMS Internal Blocks page.
+
+Staff can create, release and edit reason/notes; Lucía reads.
+The calendar open= query opens the matching drawer.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-03/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record Sprint 3 task 09 Internal Blocks page.
+EOF
+)"
+```
