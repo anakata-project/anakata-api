@@ -2,7 +2,7 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
-Sprint 7 `DOC-01`…`DOC-10` are written from the API plan, i18n and seeders — not yet walked on a cloud `reset.sh`. P1 grew by DOC-01 to DOC-05. Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
+Sprint 8 `WEB-01`…`WEB-12` and `OFF-01`…`OFF-04` are written from seeders, i18n, Pest and Sprint 8 tasks 07–10 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by WEB-01 to WEB-08 and OFF-01. Sprint 7 `DOC-01`…`DOC-10` are written from the API plan, i18n and seeders — not yet walked on a cloud `reset.sh`. P1 grew by DOC-01 to DOC-05. Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
 
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|
@@ -102,3 +102,19 @@ Sprint 7 `DOC-01`…`DOC-10` are written from the API plan, i18n and seeders —
 | DOC-08 | Wire instructions: LEG-004 warning and placeholder PDF | sprint-7, documents | P2 | Carolina | [documents/DOC-08-wire-instructions.md](documents/DOC-08-wire-instructions.md) |
 | DOC-09 | Documents & Manifests: filter and open the booking | sprint-7, documents | P2 | Carolina | [documents/DOC-09-documents-manifests.md](documents/DOC-09-documents-manifests.md) |
 | DOC-10 | Balance reminder: documents-due once, then nothing | sprint-7, documents | P2 | Carolina | [documents/DOC-10-balance-reminder.md](documents/DOC-10-balance-reminder.md) |
+| WEB-01 | November search matches the RMS | sprint-8, web | P1 | Guest + Carolina | [web/WEB-01-november-search-matches-rms.md](web/WEB-01-november-search-matches-rms.md) |
+| WEB-02 | Drafts, hidden, paused and promo codes never leak | sprint-8, web | P1 | Guest + Carolina | [web/WEB-02-drafts-hidden-paused-promo-never-leak.md](web/WEB-02-drafts-hidden-paused-promo-never-leak.md) |
+| WEB-03 | Block then FULL · WAITLIST then LIMITED AVAILABILITY | sprint-8, web | P1 | Guest + Carolina | [web/WEB-03-block-then-full-then-limited.md](web/WEB-03-block-then-full-then-limited.md) |
+| WEB-04 | Trip details tabs and the Western route map | sprint-8, web | P1 | Guest | [web/WEB-04-trip-details-tabs-and-west-map.md](web/WEB-04-trip-details-tabs-and-west-map.md) |
+| WEB-05 | Step 4 holds the cabin; leaving releases it | sprint-8, web | P1 | Guest + Carolina | [web/WEB-05-step4-hold-and-abandon-release.md](web/WEB-05-step4-hold-and-abandon-release.md) |
+| WEB-06 | Walkthrough with ANAKATA10 on both paths | sprint-8, web | P1 | Guest | [web/WEB-06-walkthrough-anakata10-both-paths.md](web/WEB-06-walkthrough-anakata10-both-paths.md) |
+| WEB-07 | Pay later creates an ANK-R- request | sprint-8, web | P1 | Guest + Carolina | [web/WEB-07-pay-later-request-in-rms.md](web/WEB-07-pay-later-request-in-rms.md) |
+| WEB-08 | Pay deposit → replay completed → CONFIRMED | sprint-8, web | P1 | Guest + Carolina | [web/WEB-08-pay-deposit-replay-confirmed.md](web/WEB-08-pay-deposit-replay-confirmed.md) |
+| WEB-09 | Pay deposit → replay expired → request remains | sprint-8, web | P2 | Guest + Carolina | [web/WEB-09-pay-deposit-replay-expired.md](web/WEB-09-pay-deposit-replay-expired.md) |
+| WEB-10 | A festive departure refuses every discount | sprint-8, web | P2 | Guest | [web/WEB-10-festive-refuses-discounts.md](web/WEB-10-festive-refuses-discounts.md) |
+| WEB-11 | Cabin taken in the RMS between steps 3 and 4 | sprint-8, web | P2 | Guest + Carolina | [web/WEB-11-cabin-taken-between-3-and-4.md](web/WEB-11-cabin-taken-between-3-and-4.md) |
+| WEB-12 | Complete your reservation from the payment-link email | sprint-8, web | P2 | Guest + Carolina | [web/WEB-12-complete-from-payment-link-email.md](web/WEB-12-complete-from-payment-link-email.md) |
+| OFF-01 | A PCT offer is PENDING DIRECTOR until approved, then LIVE | sprint-8, offers | P1 | Carolina + Guest | [offers/OFF-01-pct-pending-director-then-live.md](offers/OFF-01-pct-pending-director-then-live.md) |
+| OFF-02 | Pause a live offer — gone from the engine within 30 seconds | sprint-8, offers | P2 | Carolina + Guest | [offers/OFF-02-pause-live-offer-gone-in-30s.md](offers/OFF-02-pause-live-offer-gone-in-30s.md) |
+| OFF-03 | Festive itinerary cannot be selected; B2B never shows publicly | sprint-8, offers | P2 | Carolina + Guest | [offers/OFF-03-festive-blocked-b2b-never-public.md](offers/OFF-03-festive-blocked-b2b-never-public.md) |
+| OFF-04 | Charter enquiry and waitlist from the engine land in the RMS | sprint-8, offers | P2 | Guest + Carolina | [offers/OFF-04-charter-and-waitlist-land-in-rms.md](offers/OFF-04-charter-and-waitlist-land-in-rms.md) |

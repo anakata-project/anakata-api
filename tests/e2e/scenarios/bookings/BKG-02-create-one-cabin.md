@@ -18,9 +18,9 @@ A Suite · 2 adults quote must match the rates price-check total, freeze at sale
 
 ## Expected
 - [ ] E1 · After step 1 the ANATIVA Suite 01 / 7 Nov cell is `·`. Do not continue if it is not.
-- [ ] E2 · Price box header `Price · from Rates & Promotions · availability checked live`. Total `USD 26,600`. Deposit line `Deposit 10% · USD 2,660 · balance at T−120`. ⚠ UNVERIFIED — i18n + `depositLineText` / `useMoney`; amounts from the fixture (Pest).
+- [ ] E2 · Price box header `Price · from Rates & Promotions · availability checked live`. Total `USD 26,600`. Deposit line `Deposit 10% · USD 2,660 · balance at T−120`. OPENING-27 is a CREDIT (zero amount) on Nov–Dec NORTH/WEST — a credit line may appear; it must not change the 26,600 cabin total. Staff cannot send a promo code or the online-deposit flag. ⚠ UNVERIFIED — i18n + `depositLineText` / `useMoney`; amounts from the fixture (Pest). Sprint 8 D2C offers on the quote.
 - [ ] E3 · After `Done`: toast `Reservation ANK-2026-0022 created.` Panel opens on ANK-2026-0022, status `PENDING PAYMENT`, owner Carolina. No Agency kv (D2C). Next ANK after the Sprint 5 agency seed is 0022 (0021 is Meridian hold).
 - [ ] E4 · Calendar Year 2027: ANATIVA Suite 01 on 7 Nov shows `0022` (`PEND` if the cell uses the pending label). ⚠ UNVERIFIED — task 10 uses `PEND` for PENDING_PAYMENT, last-4 for CONFIRMED.
 
 ## Notes
-Target cabin is **7 Nov 2027 ANATIVA Suite 01** (DEP-002) so this scenario does not collide with ANAMARA seed claims. Amounts: `fixtures/reference-values.md` (Suite · 2 adults).
+Target cabin is **7 Nov 2027 ANATIVA Suite 01** (DEP-002) so this scenario does not collide with ANAMARA seed claims. Amounts: `fixtures/reference-values.md` (Suite · 2 adults). New Reservation must send `main_channel` on every quote (Sprint 8 task 07). D2C is correct here.

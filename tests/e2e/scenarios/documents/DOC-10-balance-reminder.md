@@ -25,7 +25,7 @@ Reminders go out on the effective due date minus `payments.balance_reminder_days
 
 ## Expected
 - [ ] E1 · Fixture prints that `balance_due_date_override` is Galápagos today + 21 days. Command refuses outside `local` / `testing`.
-- [ ] E2 · First `documents-due`: one reminder in Mailpit. Subject `Your Anakata balance — due {YYYY-MM-DD}` (that due date). Body states the cruise balance (`USD 23,940`) and the due date. ⚠ UNVERIFIED — DeliverySubject::forReminder + catch-up “smallest eligible N” = 21.
+- [ ] E2 · First `documents-due`: one reminder in Mailpit. Subject `Your Anakata balance — due {YYYY-MM-DD}` (that due date). Body states the cruise balance (`USD 23,940`) and the due date, and includes an http(s) **Complete your reservation** URL (`{ENGINE_URL}/complete/{token}`). ⚠ UNVERIFIED — DeliverySubject::forReminder + catch-up “smallest eligible N” = 21; complete link is Sprint 8.
 - [ ] E3 · Documents tab: reminder 1 status `SENT`. Reminder 2 (7 days) is still `SCHEDULED` (not yet eligible).
 - [ ] E4 · Second `documents-due`: `Sent 0 document(s).` (or no new Mailpit message). Idempotency key `reminder:{booking_id}:{due}:{21}`.
 

@@ -48,9 +48,11 @@ tests/e2e/bin/db-check.sh 'App\Models\ChangeHistory::latest("id")->first()'
 tests/e2e/bin/db-check.sh 'App\Models\User::query()->where("email","lucia@anakata.test")->first()->hasPermission(\App\Enums\Permission::BookingsDelete)'
 tests/e2e/bin/status.sh
 tests/e2e/bin/replay-stripe-checkout.sh ANK-2026-0022
+tests/e2e/bin/replay-stripe-checkout.sh ANK-R-2026-0043
+tests/e2e/bin/replay-stripe-checkout.sh --expired ANK-R-2026-0043
 ```
 
-`replay-stripe-checkout.sh` is the FakeStripe / empty-key path for PAY-05. It posts `checkout.session.completed` twice (same event id). Test-mode cards only — never live mode.
+`replay-stripe-checkout.sh` is the FakeStripe / empty-key path for PAY-05 (OPEN payment link) and WEB-08 / WEB-09 (engine Checkout Session). It posts `checkout.session.completed` twice (same event id), or `checkout.session.expired` with `--expired`. Test-mode cards only — never live mode.
 
 ## 5. Agent rules
 

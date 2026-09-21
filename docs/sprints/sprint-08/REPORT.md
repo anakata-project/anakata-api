@@ -1500,3 +1500,129 @@ EOF
 git push origin HEAD
 ```
 
+## Task 11 · E2E scenarios for Sprint 8 (written, not walked)
+
+Sixteen engine/offers scripts, the Checkout Session replay helper, fixture rows, INDEX, and revisits of the earlier files this sprint changed. **No `up.sh`, no P1 walk, no run files** — same pattern as Sprint 6 Task 10. Wording is from seeders, i18n, Pest and tasks 07–10 browser notes. Screen facts stay `⚠ UNVERIFIED`.
+
+### Replay helper
+`anakata:replay-stripe-checkout {reference} {--expired}` (local/testing only).
+
+- OPEN payment link path unchanged (PAY-05 / DOC-04): still posts `checkout.session.completed` twice.
+- Engine Checkout Session: looks up `checkout_sessions.stripe_checkout_session_id` via the booking/`ANK-R-` reference. Completed uses Pest’s engine metadata (`checkout_session_id`, `kind=DEPOSIT`, `deposit_{id}`). `--expired` posts `checkout.session.expired`.
+- `tests/e2e/bin/replay-stripe-checkout.sh [--expired] <reference>`.
+- Pest: payment-link settle-once; `--expired` refuses a payment-link booking; production refuse; engine completed once + expired fallback (`EngineCheckoutStripeTest`). **Not run in this pass.**
+
+### Fixtures
+Sprint 8 section on `tests/e2e/fixtures/reference-values.md`: OF-001…009, promo codes never listed publicly, walkthrough **placeholders** (do not copy Pest LAST12 21,067 / 20,014), departure counts 6 / 6 / 3. Registry counts unchanged (engine-settings copy keys are not BR-01 rows).
+
+### Scenarios
+
+| ID | File |
+|---|---|
+| WEB-01 | `tests/e2e/scenarios/web/WEB-01-november-search-matches-rms.md` |
+| WEB-02 | `tests/e2e/scenarios/web/WEB-02-drafts-hidden-paused-promo-never-leak.md` |
+| WEB-03 | `tests/e2e/scenarios/web/WEB-03-block-then-full-then-limited.md` |
+| WEB-04 | `tests/e2e/scenarios/web/WEB-04-trip-details-tabs-and-west-map.md` |
+| WEB-05 | `tests/e2e/scenarios/web/WEB-05-step4-hold-and-abandon-release.md` |
+| WEB-06 | `tests/e2e/scenarios/web/WEB-06-walkthrough-anakata10-both-paths.md` |
+| WEB-07 | `tests/e2e/scenarios/web/WEB-07-pay-later-request-in-rms.md` |
+| WEB-08 | `tests/e2e/scenarios/web/WEB-08-pay-deposit-replay-confirmed.md` |
+| WEB-09 | `tests/e2e/scenarios/web/WEB-09-pay-deposit-replay-expired.md` |
+| WEB-10 | `tests/e2e/scenarios/web/WEB-10-festive-refuses-discounts.md` |
+| WEB-11 | `tests/e2e/scenarios/web/WEB-11-cabin-taken-between-3-and-4.md` |
+| WEB-12 | `tests/e2e/scenarios/web/WEB-12-complete-from-payment-link-email.md` |
+| OFF-01 | `tests/e2e/scenarios/offers/OFF-01-pct-pending-director-then-live.md` |
+| OFF-02 | `tests/e2e/scenarios/offers/OFF-02-pause-live-offer-gone-in-30s.md` |
+| OFF-03 | `tests/e2e/scenarios/offers/OFF-03-festive-blocked-b2b-never-public.md` |
+| OFF-04 | `tests/e2e/scenarios/offers/OFF-04-charter-and-waitlist-land-in-rms.md` |
+
+INDEX P1 grew by WEB-01…WEB-08 and OFF-01.
+
+### Revisited
+- BKG-09 — charter panel empty after reset; web `ANK-R-` after WEB-07.
+- BKG-11 — ENGINE source is a db-check (resource does not serialise `source`).
+- PAY-04 — Sprint 7 hint + Copy guest link; emails carry `/complete/{token}`.
+- DOC-07 — already expected the complete URL; left as-is.
+- DOC-10 — reminder body includes the complete URL.
+- RATE-03 — Promotions compact list + `Manage in Offers →`.
+- BKG-02 — D2C quote may show OPENING-27 CREDIT (zero amount); still 26,600; `main_channel` on quote.
+- ENG-01 / ENG-02 — notes for `copy.online_deposit_advantage` / `online_deposit_perk`.
+
+### What was not built
+- No `sprint8-p1` or `sprints-1-8-full` walk.
+- Walkthrough totals not read off an engine + RMS pair.
+- Pest for the replay helper not executed in this pass.
+
+### Marker counts
+
+| | Count |
+|---|---|
+| Leftovers at start of this task (Sprint 4–7 `⚠ UNVERIFIED` still in `tests/e2e/`) | **66** (Sprint 7 Task 08 close) |
+| Cleared this task | **0** (no screen) |
+| New `⚠ UNVERIFIED` this task | **33** (5 fixture + 22 WEB + 5 OFF + 1 RATE-03) |
+| After this task | **66** leftovers + **33** new |
+
+### Open questions
+Compiled from this sprint’s README and tasks 01–10 — do not read as “none”:
+
+- **Discount stacking and the cap (B2 / K1)** — default is each offer’s `combinable` flag, no cap (`max_total_discount_pct` empty). PENDING CLIENT.
+- **The Option 2 perk** — 5 % advantage *and* complimentary spa, or one of them? Default: both, as the prototype. PENDING CLIENT.
+- **The real offers and promo codes** — `ANAKATA10`, `ADVISOR5`, `EARLY500` and the −10/−12/−15 % departure offers are local/testing placeholders.
+- **Route maps** — NORTH and FEST have none; WEST still San Cristóbal → Baltra, Monday in the ported map vs SCY → SCY, Sunday on sale (`TODO(OPEN: Engine route maps)`).
+- **Bot protection** — web holds take real cabins; a details-step challenge (e.g. Turnstile) is still a client question.
+- **GA4 and cookie consent (LEG-002)** — default: no analytics tag until the visitor consents. Placeholder banner copy only.
+- **Production domains** for the engine and the API (open since Sprint 1).
+- Still open outside the sprint: LEG-001 consent texts, LEG-004 bank details, TEC-002 sending mailbox, invoice numbering per version, Sprint 5–7 cloud P1 runs that ENV-stopped.
+
+### Notes for later
+Launch Task 11’s **runs** from `anakata-api` alone (`e2e/sprint-08`, `GH_TOKEN` for `install.sh`): `up.sh` → ALL UP, then Sprint 8 P1 + revisited files, then the full P1 set Sprints 1–8. Replace UNVERIFIED walkthrough lines with values read off the engine and the RMS booking. Do not loosen expectations.
+
+### Merge steps for the user
+
+Do **not** merge this as if the sprint P1 ran. After a successful cloud walk, merge `e2e/sprint-08` into `dev`.
+
+To keep the scenarios on a branch now:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git checkout -B e2e/sprint-08
+git add app/Console/Commands/ReplayStripeCheckoutCommand.php
+git add tests/Feature/Payments/ReplayStripeCheckoutCommandTest.php
+git add tests/Feature/Engine/EngineCheckoutStripeTest.php
+git add tests/e2e/bin/replay-stripe-checkout.sh
+git add tests/e2e/README.md
+git add tests/e2e/fixtures/reference-values.md
+git add tests/e2e/scenarios/INDEX.md
+git add tests/e2e/scenarios/web
+git add tests/e2e/scenarios/offers
+git add tests/e2e/scenarios/bookings/BKG-02-create-one-cabin.md
+git add tests/e2e/scenarios/bookings/BKG-09-request-queue.md
+git add tests/e2e/scenarios/bookings/BKG-11-waitlist.md
+git add tests/e2e/scenarios/payments/PAY-04-payment-link-lifecycle.md
+git add tests/e2e/scenarios/documents/DOC-10-balance-reminder.md
+git add tests/e2e/scenarios/config/RATE-03-price-check-reference.md
+git add tests/e2e/scenarios/config/ENG-01-manager-copy-no-reference.md
+git add tests/e2e/scenarios/config/ENG-02-manager-rules-locked.md
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Write Sprint 8 engine and offers e2e scenarios.
+
+Sixteen WEB/OFF scripts, Checkout Session replay, and fixture
+rows — not walked on a cloud reset.
+EOF
+)"
+git push -u origin e2e/sprint-08
+```
+
+## Sprint 8 summary
+
+### What is done
+- **API (01–05):** offers and promo codes; pricing with offers, online-deposit advantage and codes; public feed / cabins / promo / quote; checkout holds, two paths, Stripe deposit and expired fallback; complete-reservation API.
+- **Layer (06):** types regenerated; `anakata-ui` `v0.9.0`.
+- **Panel (07):** Offers page, Rates Promotions, charter enquiries, Copy guest link, `main_channel` on New Reservation quotes.
+- **Engine (08–10):** steps 1–6, charter, waitlist, complete page, consent-gated analytics.
+- **E2E (11):** scenarios written. Cloud P1 (Sprints 1–8) **not run**.
+
+### What is still open outside the sprint
+Cloud P1 attachments for Sprints 5–8; client questions listed under Task 11; CRM contacts / deals (Sprints 9–10); operational alerts (Sprint 11).
+

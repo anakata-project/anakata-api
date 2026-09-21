@@ -312,3 +312,48 @@ Both on 19 Dec 2027 ANAMARA festive (DEP-013). Position is FIFO per departure + 
 Default list range is All dates (`from`/`to` null). Index has no default status filter. After the Sprint 5 agency seed the list is **14** (12 bookings including `ANK-2026-0021` + 0041 + 0042). Date-range line `14 bookings · all dates` (screen 2026-09-21 after `reset.sh`).
 
 Group-move 409: `This booking belongs to GRP-007 — moving a group to another departure isn't supported yet.` (`MoveBooking`, Pest).
+
+## Seeded offers and promo codes (local / testing only)
+
+Source: `DemoOffersSeeder`. Placeholder seed — must not reach production (Sprint 8 README client question). All nine rows LIVE, approved as Carolina, `approval_reason` `Sprint 8 placeholder seed`. Next offer after seed is `OF-010`. ⚠ UNVERIFIED — seeder / Pest, not a reset screen.
+
+| Reference | Code | Type | Channel | Promo | Badge / price line | Travel window | Combinable |
+|---|---|---|---|---|---|---|---|
+| OF-001 | OPENING-27 | CREDIT 500 | D2C | no | OPENING OFFER · Opening season credit — on-board ancillaries | 2027-11-01 – 2027-12-31 · WEST+NORTH · Suite | no |
+| OF-002 | VIRTUOSO-EARLY | COMM 2 | B2B | no | (not public) | booking Q1 2027 · WEST+NORTH | no |
+| OF-003 | ANAKATA10 | PCT 10 | D2C | yes | Anakata welcome −10% | any · WEST+NORTH | yes |
+| OF-004 | ADVISOR5 | PCT 5 | D2C | yes | Travel advisor −5% | any · WEST+NORTH | yes |
+| OF-005 | EARLY500 | AMT 500 | D2C | yes | Early booking −USD 500 pp | any · WEST+NORTH | yes |
+| OF-006 | SHOULDER15 | PCT 15 | D2C | no | SHOULDER SEASON · Shoulder season −15% | 2027-11-14 NORTH | yes |
+| OF-007 | EARLY10-1205 | PCT 10 | D2C | no | EARLY BOOKING · Early booking −10% | 2027-12-05 WEST | yes |
+| OF-008 | LAST12 | PCT 12 | D2C | no | LAST CABINS · Last cabins −12% | 2028-01-02 WEST (no seeded departure) | yes |
+| OF-009 | EARLY10-0116 | PCT 10 | D2C | no | EARLY BOOKING · Early booking −10% | 2028-01-16 WEST (no seeded departure) | yes |
+
+Promo codes (`ANAKATA10`, `ADVISOR5`, `EARLY500`) and B2B `VIRTUOSO-EARLY` must never appear in `GET /api/engine/feed` or on any public engine page.
+
+Public badge offers after reset (feed `offers[]` + departure `offers[]`): OPENING-27 on Nov–Dec WEST/NORTH, SHOULDER15 on 14 Nov NORTH, EARLY10-1205 on 5 Dec WEST. ⚠ UNVERIFIED — task 08/09 browser once saw `offers: []`; a later reset must confirm the badges.
+
+## Engine walkthrough (2 adults · 7 Nov 2027 ANAMARA WEST · Suite 03 · ANAKATA10)
+
+Walkthrough cabin after reset: **7 Nov 2027 ANAMARA · Suite 03** (S01/S02 taken). Next request `ANK-R-2026-0043`.
+
+Do **not** copy Pest LAST12 totals (21,067 / 20,014). Those used a factory −12 % on that Sunday. Seeded LAST12 is 2 Jan 2028 WEST — no departure. Seeded Nov–Dec public offer is OPENING-27 (CREDIT, not a price cut).
+
+| Path | Expected lines and totals |
+|---|---|
+| Option 1 · pay later + `ANAKATA10` | ⚠ UNVERIFIED — read off step 5 and `POST /api/engine/quote`, then the RMS booking. Never compute by hand. |
+| Option 2 · pay deposit + `ANAKATA10` | ⚠ UNVERIFIED — same sources. Online-advantage line uses `copy.online_deposit_advantage` + live `discounts.online_deposit_discount_pct` (seed 5 %). |
+
+## Engine labels after reset (November 2027–January 2028 window)
+
+Source: Sprint 8 task 08 browser notes against the running feed. ⚠ UNVERIFIED — not a cloud `reset.sh`.
+
+| Itinerary | Slug | Departures in default window | Typical label |
+|---|---|---|---|
+| Western Realm | `western-realm` | 6 | AVAILABLE |
+| Northern Passage | `northern-passage` | 6 | AVAILABLE |
+| Festive Expeditions | `festive-expeditions` | 3 (DEP-013 `CHARTERED — NOT SHOWN`) | AVAILABLE · `+ festive` |
+
+Suites from **USD 13,300**. Default search window NOV 2027—JAN 2028 · 2 adults.
+
+Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). BR-01 leftovers (65 / 40 / 15 / 10 / 21) are unchanged here.

@@ -16,3 +16,6 @@ E3: copy-only engine changes may leave the approval empty. Managers must be able
 - [ ] E1 · Approval placeholder is `Approval ref / reason (optional)` (not required).
 - [ ] E2 · Publish succeeds. Toast `Version 2 published`. State `● PUBLISHED — V2 · … · Mateo R.`
 - [ ] E3 · **Publish history** has a row for the booking-note change. Approval / reason may be empty.
+
+## Notes
+Sprint 8 added `copy.online_deposit_advantage` (`Online deposit advantage`) and `copy.online_deposit_perk` (`Complimentary spa access aboard`) to engine settings. If those labels appear under **Booking notes & messages**, Mateo may edit them (copy). Do not treat a missing field as a failure unless the published document no longer has the keys — then **BUG**. The original booking-note control in step 2 is still the one to edit.

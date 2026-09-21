@@ -339,6 +339,70 @@ test('the minute command does not strip the advantage when stripe is complete', 
     expect($booking->fresh()?->reference)->toStartWith('ANK-');
 });
 
+test('replay-stripe-checkout settles an engine session exactly once when posted twice', function (): void {
+    Mail::fake();
+    $departure = checkoutWestDeparture();
+    $created = createCheckoutHold($departure);
+    $quote = depositQuote($departure->id, $created['cabins']);
+
+    $this->postJson(
+        '/api/engine/checkout/'.$created['token'].'/submit',
+        checkoutSubmitPayload($created['cabins'], (int) $quote['total'], [
+            'path' => CheckoutPath::PayDeposit->value,
+            'declarations' => depositDeclarations(),
+        ]),
+    )->assertOk();
+
+    $booking = Booking::query()->firstOrFail();
+    $reference = (string) $booking->request_reference;
+
+    $this->artisan('anakata:replay-stripe-checkout', ['reference' => $reference])
+        ->assertSuccessful();
+
+    expect(Payment::query()->where('booking_id', $booking->id)->count())->toBe(1);
+    expect($booking->fresh()?->status)->toBe(BookingStatus::Confirmed);
+    expect($booking->fresh()?->reference)->toStartWith('ANK-');
+
+    $this->artisan('anakata:replay-stripe-checkout', ['reference' => $reference])
+        ->assertSuccessful();
+
+    expect(Payment::query()->where('booking_id', $booking->id)->count())->toBe(1);
+});
+
+test('replay-stripe-checkout --expired removes the online advantage and keeps the request', function (): void {
+    $departure = checkoutWestDeparture();
+    $created = createCheckoutHold($departure);
+    $quote = depositQuote($departure->id, $created['cabins']);
+
+    $this->postJson(
+        '/api/engine/checkout/'.$created['token'].'/submit',
+        checkoutSubmitPayload($created['cabins'], (int) $quote['total'], [
+            'path' => CheckoutPath::PayDeposit->value,
+            'declarations' => depositDeclarations(),
+        ]),
+    )->assertOk();
+
+    $booking = Booking::query()->firstOrFail();
+    expect($booking->online_deposit)->toBeTrue();
+
+    $this->artisan('anakata:replay-stripe-checkout', [
+        'reference' => (string) $booking->request_reference,
+        '--expired' => true,
+    ])->assertSuccessful();
+
+    $booking->refresh();
+    expect($booking->status)->toBe(BookingStatus::Requested);
+    expect($booking->online_deposit)->toBeFalse();
+
+    $history = ChangeHistory::query()
+        ->where('subject_id', $booking->id)
+        ->where('event', 'booking.updated')
+        ->latest('id')
+        ->first();
+
+    expect($history?->after['what'] ?? null)->toBe(FallBackOnlineDeposit::HISTORY);
+});
+
 test('the stripe expiry command is scheduled every minute', function (): void {
     $event = collect(app(Schedule::class)->events())->first(
         fn ($scheduled): bool => str_contains((string) ($scheduled->command ?? ''), 'engine:expire-stripe-checkouts'),

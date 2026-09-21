@@ -35,6 +35,21 @@ test('replay-stripe-checkout settles an open link exactly once when posted twice
     expect($booking->fresh()->status)->toBe(BookingStatus::Confirmed);
 });
 
+test('replay-stripe-checkout --expired refuses a payment-link booking', function (): void {
+    $booking = pendingCabin(['reference' => 'ANK-2026-0601']);
+
+    $this->actingAs(adminUser())
+        ->postJson('/api/rms/bookings/'.$booking->id.'/payment-link', [
+            'kind' => PaymentKind::Deposit->value,
+        ])
+        ->assertCreated();
+
+    $this->artisan('anakata:replay-stripe-checkout', [
+        'reference' => 'ANK-2026-0601',
+        '--expired' => true,
+    ])->assertFailed();
+});
+
 test('replay-stripe-checkout refuses in production', function (): void {
     $previous = $this->app['env'];
     $this->app['env'] = 'production';
