@@ -126,20 +126,24 @@ final class GuestIssues
     }
 
     /**
-     * @return array{complete_count: int, total: int, png_known_total: int, png_pending_count: int}
+     * @return array{complete_count: int, total: int, png_known_total: int, png_pending_count: int, max: int, can_add: bool}
      */
     public function summary(Booking $booking): array
     {
         $booking->loadMissing('guests');
         $guests = $booking->guests;
+        $total = $guests->count();
+        $max = GuestCapacity::max($booking->type, $this->config->engineSettings()->guests);
 
         return [
             'complete_count' => $guests->filter(fn (Guest $guest): bool => $guest->isComplete())->count(),
-            'total' => $guests->count(),
+            'total' => $total,
             'png_known_total' => (int) $guests->sum(fn (Guest $guest): int => $guest->png_fee ?? 0),
             'png_pending_count' => $guests
                 ->filter(fn (Guest $guest): bool => $guest->png_category === PngCategory::Pending)
                 ->count(),
+            'max' => $max,
+            'can_add' => $total < $max,
         ];
     }
 

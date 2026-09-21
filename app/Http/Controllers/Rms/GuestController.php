@@ -23,7 +23,7 @@ final class GuestController extends Controller
 {
     #[DocumentedResponse(
         status: 200,
-        type: 'array{data: list<App\\Http\\Resources\\Rms\\GuestResource>, complete_count: int, total: int, png_known_total: int, png_pending_count: int, issues: list<array{severity: string, code: string, guest_id: int|null, message: string}>}',
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\GuestResource>, complete_count: int, total: int, png_known_total: int, png_pending_count: int, max: int, can_add: bool, issues: list<array{severity: string, code: string, guest_id: int|null, message: string}>}',
     )]
     public function index(Booking $booking, GuestIssues $issues): AnonymousResourceCollection
     {
@@ -38,6 +38,8 @@ final class GuestController extends Controller
                 'total' => $summary['total'],
                 'png_known_total' => $summary['png_known_total'],
                 'png_pending_count' => $summary['png_pending_count'],
+                'max' => $summary['max'],
+                'can_add' => $summary['can_add'],
                 'issues' => $issues->for($booking),
             ]);
     }

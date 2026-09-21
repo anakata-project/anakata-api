@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\Bookings\BookingMutationLock;
 use App\Support\Guests\ApplyPng;
+use App\Support\Guests\GuestCapacity;
 use App\Support\History\History;
 use Illuminate\Validation\ValidationException;
 
@@ -60,10 +61,7 @@ final class AddGuest extends Action
 
     private function assertWithinLimit(Booking $booking): void
     {
-        $settings = $this->config->engineSettings()->guests;
-        $max = $booking->type === BookingType::Charter
-            ? $settings->maxPerYacht
-            : $settings->maxPerCabin;
+        $max = GuestCapacity::max($booking->type, $this->config->engineSettings()->guests);
 
         if ($booking->guests->count() >= $max) {
             $message = $booking->type === BookingType::Charter

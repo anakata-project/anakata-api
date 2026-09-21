@@ -723,3 +723,253 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 07 · Booking panel Guests tab
+
+### What was built
+The booking panel Guests tab is live. `BOOKING_TABS.guests` is enabled. `BookingGuestsTab` mounts on first visit (`v-else-if="tab === 'guests'"`, same as Payments), fetches guests / consents / countries, and emits `updated` through `onPaymentsUpdated` so Overview, the list GUESTS line, and History refresh after every write. The panel renders API fields only — no PNG, issue, or mask arithmetic. Country names come from `GET /api/rms/countries`.
+
+### API prelude — slot limit on the guest list
+
+`GuestCapacity::max(BookingType, GuestsSettings)` is the single charter (`max_per_yacht`) vs cabin (`max_per_cabin`) rule. `AddGuest` and `GuestIssues::summary` both call it.
+
+`GuestIssues::summary` now returns `complete_count`, `total`, `png_known_total`, `png_pending_count`, `max`, `can_add` (`total < max`). `GuestController::index` additional + `#[DocumentedResponse]` PHPDoc include both keys. `PanelResponseSchemasTest` guest-index keys: `max`, `can_add`.
+
+### Types — `v0.7.1`
+
+`pnpm types:api` against `http://localhost:8000/docs/api.json`. `guest.index` gained `max: number` and `can_add: boolean`. `GuestListSummary` is still `Omit<GuestIndexBody, 'data' | 'issues'>` — no local intersection, no leftover overlay for those keys.
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 7490 | 7492 |
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 401 | 401 |
+| `app/types/bookings.ts` | 208 | 208 |
+| `app/types/payments.ts` | 161 | 161 |
+| `app/types/index.ts` | 204 | 204 |
+| `app/types/anakata-augment.d.ts` | 17 | 17 |
+| `app/types/guests.ts` | 101 | 101 |
+| `app/types/extras.ts` | 24 | 24 |
+
+Layer `0.7.0` → `0.7.1`. Panel and engine README pins to `v0.7.1` (documentation only; `extends` still resolves the sibling folder).
+
+### Tab structure
+
+1. Privacy note (§6.4).
+2. Two `AnkKpi`s: Complete `{complete_count}/{total}` (“needed for DPNG list & manifest”); PNG fees `money(png_known_total)` — subtitle `{n} guests pending data` when `png_pending_count > 0`, else “paid at SCY airport” when `booking.png_collected === false`.
+3. `summary.issues` in `.warnbox`, API order, `issueIcon` ✕ / ⚠.
+4. Cards (`guestDisplayName` uses `guest.position`, not the list index; LEAD / MINOR from `is_lead` / `is_minor_now`; country **name** from the loaded list; passport as sent; “medical note on file” only when `on_file && value === null`).
+5. One-at-a-time edit form (`SaveGuestRequest` fields). Notes only when `can('guests.view_sensitive')`. Guardian preview via `showGuardianBlock(dob, galapagosTodayIso)` — API `is_minor_now` after save.
+6. Add when `can_act && summary.can_add`; Remove when `!is_lead` and name empty.
+7. Consent table (`BookingConsent`); Record via `ReasonModal` (`how_obtained` required); no edit/delete.
+
+### What each role sees (browser)
+
+Seeded guests were missing from the running local DB (`Guest::count()` was 0). Seeded `DemoGuestsSeeder` + `DemoConsentsSeeder` (not a full `reset.sh`). Both themes on the panel.
+
+**Carolina** (Admin, `guests.view_sensitive`) on `ANK-2026-0005`: Complete 3/3; PNG USD 500, “paid at SCY airport”; Markus LEAD, Julia, Leon MINOR + guardian Markus Brandt / Father; full passports (`C4F7K2L9M`, `C4F7K8Q1R`, `C4F9T3W6Z`); PNG Foreign adult USD 200 / Foreign minor USD 100; medical / dietary / accessibility fields on the form; nationality select from `GET /countries` (250 options). Add hidden (`can_add` false at cabin max). Overview party `2 AD + 1 CH · 3/3`. List `GUESTS 3/3`.
+
+**Lucía** (Sales Exec) on `ANK-2026-0003`: issues listed (insurance undeclared); form passport empty with placeholder “Restricted — enter to replace” and help “Leave empty to keep the stored number”; no note fields. Seed 0003 has no stored passport numbers, so the card shows `Passport —`. Masking on a number she owns: `ANK-2026-0007` Mariana `Passport •••• 567` (not `AX1234567`).
+
+### Passport-replace
+
+Without `guests.view_sensitive` the input is empty. Sending `passport_no: ''` leaves the stored number unchanged (task 02). Typing replaces it. Operations see the full value and empty clears it.
+
+### Guardian preview vs `is_minor_now`
+
+`showGuardianBlock` is calendar age &lt; 18 against `todayIso` (empty DOB → false). Docblock: the API's `is_minor_now` is authoritative after save. Leon DOB 2015-03-02 showed the guardian block; after save the card uses `is_minor_now` + guardian line.
+
+### Consent recording
+
+`ANK-2026-0007` marketing was Not given. Record → `ReasonModal` “How was it obtained?” → `POST { document, how_obtained }`. Row became Staff — how obtained. No edit or delete control. Toast “Consent recorded”. Source labels are i18n (`ENGINE` / `PAYMENT_LINK` / `STAFF`).
+
+### Overview + list GUESTS line
+
+Overview: `{complete}/{total}` on the same kv row as `party_label` (`bookings.partyWithGuests`). List: mono `GUESTS {n}/{total}` under the client (`--ok` when complete, `--iv38` otherwise). `bookings.guestsOmitted` removed. No Overview DPNG `gdwarn`.
+
+### `guestDisplayName` position / gap
+
+`guestDisplayName` uses `guest.position`. Unit test: positions 1 and 3 (removed 2) read `Guest 3 — name pending`, never `Guest 2`. On `ANK-2026-0014` the empty slot rendered `Guest 2 — name pending` (position, not a zero-based index).
+
+### History
+
+`describe.ts` maps `guest.added` / `guest.updated` / `guest.removed` / `guest.guardian_consented` / `consent.recorded` via `after.what`.
+
+### Files touched
+
+**anakata-api (prelude)**
+- `app/Support/Guests/GuestCapacity.php` (new)
+- `app/Support/Guests/GuestIssues.php`
+- `app/Actions/Guests/AddGuest.php`
+- `app/Http/Controllers/Rms/GuestController.php`
+- `tests/Unit/Support/Guests/GuestCapacityTest.php` (new)
+- `tests/Feature/Guests/GuestEndpointsTest.php`
+- `tests/Feature/Guests/GuestLimitsTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `package.json` (`0.7.1`)
+- `CHANGELOG.md`
+
+**anakata-panel**
+- `app/components/guests/BookingGuestsTab.vue` (new)
+- `app/components/guests/guestHelpers.ts` (new)
+- `tests/unit/guestHelpers.test.ts` (new)
+- `app/components/bookings/BookingPanel.vue`
+- `app/components/bookings/bookingHelpers.ts`
+- `app/components/bookings/ReasonModal.vue` (optional `label`)
+- `app/components/history/describe.ts`
+- `app/pages/rms/reservations/bookings.vue`
+- `app/assets/css/bookings.css` (`.gcard`, `.gcard-inc`, `.gcard-edit`, `.gtop`, form)
+- `app/types/api.ts` (re-export `Guest`, `GuestListSummary`, `GuestIssue`, `GuestIssueSeverity`, `BookingConsent`, `Country`, `ConsentDocument`, `ConsentSource`)
+- `i18n/locales/en.json`
+- `eslint.config.mjs`
+- `tests/unit/bookingHelpers.test.ts` (disabled tabs: extras, documents)
+- `tests/unit/describe.test.ts`
+- `README.md` (pin `v0.7.1`)
+
+**anakata-engine**
+- `README.md` (pin `v0.7.1`)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-06/REPORT.md`
+
+### Deviations
+- Running API had no guest rows. Seeded guests + consents instead of `reset.sh`.
+- `ANK-2026-0003` seed has no passport numbers; Lucía masking checked on her `ANK-2026-0007`.
+- Completing Guest 2 on `ANK-2026-0014` (Alex Ellison) and recording marketing on `0007` mutated local seed data for the browser pass.
+- `ReasonModal` `hint="required"` for how-obtained (the field is the reason).
+- After a write, `onPaymentsUpdated` reloads the booking and the panel lands on Overview (same as Payments). Re-opening Guests shows the new data without a full page reload.
+
+### Open questions
+None.
+
+### Notes for later
+- Preferences / NPS (Sprint 11).
+- Overview DPNG completeness warnbox (Sprint 11).
+- Extras tab / catalogue (task 08).
+
+### Quality
+- anakata-api: `composer check` inside Docker — 779 tests (5465 assertions), Pint (758 files), Larastan level 6 (0 errors).
+- anakata-ui: `pnpm lint`, `typecheck`, `test` (35), `build` — pass.
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (204), `build` — pass.
+
+### Fresh clone (two-step, git read-only)
+
+**Step 1 — overlay (agent, before push).** Sibling clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}`, working trees overlaid. Confirmed the ui clone has **no** `app/types/nuxt.d.ts`.
+
+- ui: `pnpm typecheck` pass
+- panel / engine: `pnpm typecheck` + `pnpm build` pass
+- **OVERLAY CLONE OK**
+
+**Step 2 — real tag (user, or agent in a follow-up).** After `v0.7.1` is on origin, repeat the clone checking out `anakata-ui` at `v0.7.1` with **no** overlay. Result not recorded yet.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Guests/GuestCapacity.php \
+  app/Support/Guests/GuestIssues.php \
+  app/Actions/Guests/AddGuest.php \
+  app/Http/Controllers/Rms/GuestController.php \
+  tests/Unit/Support/Guests/GuestCapacityTest.php \
+  tests/Feature/Guests/GuestEndpointsTest.php \
+  tests/Feature/Guests/GuestLimitsTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Expose guest-list slot max and can_add from the same capacity rule.
+
+AddGuest and the list summary now share GuestCapacity so the panel
+Add button cannot drift from the API limit.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  app/types/api.d.ts
+git commit -m "$(cat <<'EOF'
+Regenerate guest-list types for max and can_add.
+
+GuestListSummary picks both up from guest.index. No leftover overlay.
+EOF
+)"
+git tag v0.7.1
+git push origin HEAD
+git push origin v0.7.1
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/assets/css/bookings.css \
+  app/components/bookings/BookingPanel.vue \
+  app/components/bookings/ReasonModal.vue \
+  app/components/bookings/bookingHelpers.ts \
+  app/components/guests/BookingGuestsTab.vue \
+  app/components/guests/guestHelpers.ts \
+  app/components/history/describe.ts \
+  app/pages/rms/reservations/bookings.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/bookingHelpers.test.ts \
+  tests/unit/describe.test.ts \
+  tests/unit/guestHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Enable the booking panel Guests tab.
+
+Passenger list, edit form, consents and the Overview/list
+completeness line render only what the API sends.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.7.1.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 6 task 07: booking panel Guests tab.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.7.1
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+

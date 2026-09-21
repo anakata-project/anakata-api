@@ -495,6 +495,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'total',
         'png_known_total',
         'png_pending_count',
+        'max',
+        'can_add',
         'issues',
     ]);
     $issueItem = $guestsProps['issues']['items']['properties'] ?? [];

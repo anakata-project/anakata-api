@@ -6,6 +6,7 @@ use App\Enums\BookingStatus;
 use App\Enums\PngCategory;
 use App\Models\Booking;
 use App\Models\Guest;
+use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConfigSeeder;
@@ -55,6 +56,8 @@ test('an empty slot can be added and listed with a pending png category', functi
         ->assertJsonPath('complete_count', 0)
         ->assertJsonPath('png_pending_count', 1)
         ->assertJsonPath('png_known_total', 0)
+        ->assertJsonPath('max', app(CurrentConfig::class)->engineSettings()->guests->maxPerCabin)
+        ->assertJsonPath('can_add', true)
         ->assertJsonPath('issues', []);
 });
 

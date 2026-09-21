@@ -34,6 +34,12 @@ test('a cabin booking cannot exceed guests.max_per_cabin', function (): void {
     }
 
     $this->actingAs($actor)
+        ->getJson('/api/rms/bookings/'.$booking->id.'/guests')
+        ->assertOk()
+        ->assertJsonPath('max', $max)
+        ->assertJsonPath('can_add', false);
+
+    $this->actingAs($actor)
         ->postJson('/api/rms/bookings/'.$booking->id.'/guests', [])
         ->assertUnprocessable()
         ->assertJsonPath('errors.guests.0', 'A suite takes up to '.$max.' guests.');
