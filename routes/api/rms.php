@@ -14,6 +14,7 @@ use App\Http\Controllers\Rms\ConsentController;
 use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\ContactsInController;
 use App\Http\Controllers\Rms\CountryController;
+use App\Http\Controllers\Rms\DeliveryController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\DocumentController;
 use App\Http\Controllers\Rms\EngineSettingsController;
@@ -110,6 +111,7 @@ Route::get('payments/options', [PaymentController::class, 'options']);
 Route::get('payments/reconciliation', [ReconciliationController::class, 'index']);
 Route::post('payments/reconciliation/apply', [ReconciliationController::class, 'apply']);
 Route::post('payments/{payment}/mark-received', [PaymentController::class, 'markReceived'])->whereNumber('payment');
+Route::post('payment-links/{paymentLink}/send', [PaymentLinkController::class, 'send'])->whereNumber('paymentLink');
 Route::post('payment-links/{paymentLink}/cancel', [PaymentLinkController::class, 'cancel'])->whereNumber('paymentLink');
 
 Route::get('bookings', [BookingController::class, 'index']);
@@ -142,8 +144,11 @@ Route::get('bookings/{booking}/documents', [DocumentController::class, 'index'])
 Route::get('bookings/{booking}/documents/{kind}/html', [DocumentController::class, 'html'])->whereNumber('booking');
 Route::post('bookings/{booking}/documents/{kind}/issue', [DocumentController::class, 'issue'])->whereNumber('booking');
 Route::get('bookings/{booking}/receipts/{payment}/html', [DocumentController::class, 'receiptHtml'])->whereNumber('booking')->whereNumber('payment');
+Route::get('bookings/{booking}/deliveries', [DeliveryController::class, 'index'])->whereNumber('booking');
+Route::post('bookings/{booking}/wire-instructions/send', [DeliveryController::class, 'sendWire'])->whereNumber('booking');
 Route::get('documents/{document}/html', [DocumentController::class, 'issuedHtml'])->whereNumber('document');
 Route::get('documents/{document}/file', [DocumentController::class, 'file'])->whereNumber('document');
+Route::post('documents/{document}/send', [DocumentController::class, 'send'])->whereNumber('document');
 Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
 Route::patch('guests/{guest}', [GuestController::class, 'update'])->whereNumber('guest');
 Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->whereNumber('guest');

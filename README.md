@@ -130,6 +130,10 @@ Set these in `.env` (empty in `.env.example`; the client still owes test and liv
 
 Manual test-mode check: `stripe listen --forward-to http://localhost:8000/api/stripe/webhook`, create a deposit link in the RMS, pay it with card `4242 4242 4242 4242`.
 
+## Mail
+
+Transactional mail goes through Laravel’s SMTP mailer. Locally and in e2e it lands in Mailpit (`http://localhost:8025`, SMTP `mailpit:1025`). Production uses ordinary SMTP credentials (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`). The sending mailbox is still a client question; `From` is `MAIL_FROM_ADDRESS`, and `Reply-To` is the issuer email from business rules (`legal_entity.email`). Do not set `MAIL_MAILER` to `failover` — a failed send is recorded as failed and is not retried onto another transport.
+
 Sibling apps (separate repos): booking engine `http://localhost:3000`, staff panel `http://localhost:3001`.
 
 ## Staff sign-in

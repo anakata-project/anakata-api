@@ -261,3 +261,101 @@ Add document templates, preview/issue endpoints, and booking billing.
 EOF
 )"
 ```
+
+## Task 03 · Email delivery (SMTP)
+
+### Transport
+Laravel’s `smtp` mailer only. No Microsoft Graph package, no `graph` mailer, no Graph env keys. **Deviation from J5 / TEC-002 / the task file:** production is ordinary SMTP (`MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD`), not Exchange via Graph. TEC-002 stays a client question.
+
+Local, testing and e2e stay on Mailpit (`mailpit:1025`, UI `:8025`). Pest uses `MAIL_MAILER=array` except the tagged Mailpit test, which switches to SMTP and self-skips if Mailpit is down. Document sends never use the `failover` mailer. `From` is `MAIL_FROM_ADDRESS`. `Reply-To` is `legal_entity.email`.
+
+### Delivery log
+`deliveries` is append-only except the status lifecycle (`QUEUED → SENT | FAILED`), H1-style: DELETE refused; identifying columns frozen. `BLOCKED` is written once and not updated.
+
+**Idempotency keys**
+
+| Kind | First send | Staff resend |
+|---|---|---|
+| Invoice / final / summary / voucher / wire | `{kind_lower}:{document_id}` | `resend:{document_id}:{uuid}` |
+| Receipt | `receipt:{payment_id}` | `resend:{document_id}:{uuid}` |
+| Reminder | `reminder:{booking_id}:{due_date}:{days}` | `resend:reminder:{booking_id}:{due_date}:{days}:{uuid}` |
+| Pre-trip | `pretrip:{booking_id}:{departure_date}` | `resend:{document_id}:{uuid}` |
+| Payment link | `payment_link:{link_id}` | `resend:payment_link:{link_id}:{uuid}` |
+
+Inserting an existing key is a no-op. **BLOCKED uses `{key}:blocked`** so adding an email later can still send on the real key.
+
+### Recipients (J6)
+`App\Support\Documents\Recipients`: billing email when set, else contact; group bookings go to the coordinator; invoices CC the agency; the summary goes to the lead guest when they have an email. No usable address → `BLOCKED` with the reason, never skipped.
+
+### Sending
+`SendDocument` / `SendPaymentRequest` resolve recipients, insert the delivery, dispatch `SendDeliveryJob` after commit. The job attaches the stored PDF (never re-rendered). History: `document.sent` / `document.send_failed`, or `payment_request.sent` / `payment_request.send_failed`.
+
+`SendDeliveryJob`: `$tries = 3`, `$backoff = [60, 300]`. Intermediate failures leave the row `QUEUED`. `failed()` is the only place that writes `FAILED` / `send_failed`. Already-`SENT` returns without sending again. Horizon’s supervisor `tries: 1` is left alone; this job’s `$tries` wins.
+
+Reminder and payment-link mailables exist so task 04 can call them. This task never schedules them.
+
+### Manual sends
+
+| Method | Path | Auth |
+|---|---|---|
+| POST | `/api/rms/documents/{document}/send` | `issueDocument` (own-records) |
+| POST | `/api/rms/payment-links/{link}/send` | `payments.record`; open links only |
+| POST | `/api/rms/bookings/{booking}/wire-instructions/send` | `payments.record` |
+| GET | `/api/rms/bookings/{booking}/deliveries` | `view` |
+
+The HTTP response is `QUEUED` (201); the job then marks `SENT`. Wire send issues the document if none exists. LEG-004 warning: `Bank details are placeholders (LEG-004) and must not be used.`
+
+### Checks
+`composer check` (Pest 842, Pint, Larastan ≥ 6) passed.
+
+### Notes for later
+- Task 04: auto-send on triggers; seed deliveries as already `SENT`; `/documents/plan`.
+- Task 06: Documents tab resend / payment-link email.
+
+### Files
+See git commands below. Do not run them from the agent.
+
+```bash
+git add .env.example
+git add README.md
+git add app/Actions/Documents/RecordDelivery.php
+git add app/Actions/Documents/SendDocument.php
+git add app/Actions/Documents/SendPaymentRequest.php
+git add app/Enums/DeliveryKind.php
+git add app/Enums/DeliveryStatus.php
+git add app/Enums/DeliveryTriggeredBy.php
+git add app/Http/Controllers/Rms/DeliveryController.php
+git add app/Http/Controllers/Rms/DocumentController.php
+git add app/Http/Controllers/Rms/PaymentLinkController.php
+git add app/Http/Requests/Rms/SendDocumentRequest.php
+git add app/Http/Requests/Rms/SendPaymentLinkRequest.php
+git add app/Http/Requests/Rms/SendWireInstructionsRequest.php
+git add app/Http/Resources/Rms/DeliveryResource.php
+git add app/Jobs/SendDeliveryJob.php
+git add app/Mail/Documents
+git add app/Models/Booking.php
+git add app/Models/Delivery.php
+git add app/Models/Document.php
+git add app/Support/Documents/DeliveryKey.php
+git add app/Support/Documents/DeliverySubject.php
+git add app/Support/Documents/IssuerMail.php
+git add app/Support/Documents/RecipientSet.php
+git add app/Support/Documents/Recipients.php
+git add app/Support/Documents/WireWarning.php
+git add database/factories/DeliveryFactory.php
+git add database/migrations/2026_09_21_200040_create_deliveries_table.php
+git add resources/views/mail/documents
+git add routes/api/rms.php
+git add tests/Feature/Documents/DeliveryEndpointsTest.php
+git add tests/Feature/Documents/DeliveryTriggersTest.php
+git add tests/Feature/Documents/MailpitDeliveryTest.php
+git add tests/Feature/Documents/RecipientsTest.php
+git add tests/Feature/Documents/SendDocumentTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add docs/sprints/sprint-07/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add SMTP document email, the delivery log, and manual send endpoints.
+
+EOF
+)"
+```

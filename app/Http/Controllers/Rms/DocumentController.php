@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Rms;
 
 use App\Actions\Documents\PrepareIssueDocument;
+use App\Actions\Documents\SendDocument;
+use App\Enums\DeliveryStatus;
 use App\Enums\DocumentKind;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IssueDocumentRequest;
+use App\Http\Requests\Rms\SendDocumentRequest;
+use App\Http\Resources\Rms\DeliveryResource;
 use App\Http\Resources\Rms\DocumentResource;
 use App\Models\Booking;
+use App\Models\Delivery;
 use App\Models\Document;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Documents\DocumentHtml;
+use App\Support\Documents\DeliveryKey;
 use App\Support\Documents\Snapshots\SnapshotFactory;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -112,6 +118,31 @@ final class DocumentController extends Controller
         return response(DocumentHtml::render($document->kind, $document->snapshot, true), 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
         ]);
+    }
+
+    public function send(SendDocumentRequest $request, Document $document, SendDocument $action): DeliveryResource
+    {
+        $this->authorize('issueDocument', $document->booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        $existing = Delivery::query()
+            ->where('idempotency_key', DeliveryKey::forDocument($document))
+            ->first();
+
+        $resend = $existing instanceof Delivery
+            && in_array($existing->status, [DeliveryStatus::Sent, DeliveryStatus::Failed], true);
+
+        return new DeliveryResource($action->handle(
+            $document->booking,
+            $document,
+            $actor,
+            resend: $resend,
+        ));
     }
 
     public function file(Document $document): Response

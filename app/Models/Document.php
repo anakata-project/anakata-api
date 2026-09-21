@@ -10,7 +10,9 @@ use App\Models\Concerns\SerializesDatesAsUtc;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use LogicException;
 
 /**
@@ -34,6 +36,7 @@ use LogicException;
  * @property-read Booking $booking
  * @property-read Payment|null $payment
  * @property-read User|null $issuedBy
+ * @property-read Collection<int, Delivery> $deliveries
  */
 #[Fillable([
     'booking_id',
@@ -113,5 +116,13 @@ class Document extends Model
     public function issuedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
+    }
+
+    /**
+     * @return HasMany<Delivery, $this>
+     */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(Delivery::class);
     }
 }
