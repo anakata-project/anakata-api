@@ -889,3 +889,256 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 07 · anakata-panel · Booking panel: Payments tab, real Paid / Balance, OPS-007
+
+### What was built
+The booking panel Overview reads `paid` / `pledged` / `balance` / `overdue` from the API. The Payments tab is the per-booking ledger plus finance actions. Kind and method **labels come from `GET /api/rms/payments/options`**, not from a panel map and not from `GET /bookings/form-options` (that route stays `bookings.create`, so External finance would be locked out).
+
+`bookings.paidZero` and the "Payments arrive in Sprint 5" note are gone.
+
+### API prelude — `GET /api/rms/payments/options`
+
+`panel.rms`. `{ kinds, methods }` of `{ value, label, recordable }`. Full lists so the ledger can label a `REFUND` row; `recordable` drives the record-payment selects (`PaymentKind::Refund` is the only non-recordable kind).
+
+`PaymentMethod::recordable()` returns `true` for every case today. A PHPDoc says it exists so a future gateway-only method can opt out, and so it is not removed as dead code.
+
+`GET /bookings/form-options` is unchanged.
+
+### Overview money rows
+
+| Row | Source | Notes |
+|---|---|---|
+| Paid | `paid` | Settled only. |
+| Pledged | `pledged` + `wire_window_ends_at` | Shown only when `pledged > 0`, warn tone. Never added to Paid. |
+| Balance | `balance` + `balance_due_date` | Tone below. |
+| Deposit | `deposit_pct` + `deposit_amount` | `--ok` tick when `paid >= deposit_amount`. |
+
+**Balance tone (three-way):** `--ok` (`.bk-balance--zero`) when `balance === 0`; coral (`.bk-balance`) only when `overdue`; default tone for a normal outstanding balance.
+
+### OPS-007
+
+When `overdue` is true: header `OVERDUE` pill next to status; `.warnbox` above transitions:
+
+> Balance overdue by {overdue_days} days — USD {balance}. OPS-007: the team decides; nothing is cancelled automatically.
+
+**Grant extension** — date picker (Galápagos tomorrow … departure) + required reason. **Cancel per policy** — required reason, plus task 05 wording: paid > 0 → "Penalty computed, refund request queued for Director approval, cabin released."; paid === 0 → "Nothing was paid, so nothing is owed." Both need `bookings.overdue_decision` **and** `can_act`. Existing `ReasonModal` (`#extra` slot for the date). No `window.confirm`.
+
+### Payments tab
+
+Enabled (Sprint 4 disabled flag / "Arrives in Sprint 5" tooltip removed). Lazy `GET /bookings/{id}/payments` + `GET /payments/options`.
+
+- Ledger columns: date, type, method, reference, amount, status. Refunds: minus sign + coral. Labels via `labelFrom`; raw value if options have not loaded.
+- While options are loading or have failed: record form **hidden** (no empty selects); short line (`Loading payment types…` / failed note). Ledger still renders.
+- Awaiting wire: **Mark received** when `can_mark_wire`; else `AWAITING WIRE` pill. Modal requires `bank_reference`.
+- Record form (`payments.record`): kind/method from `recordable` options, amount prefilled (deposit if `paid === 0`, else balance), optional date/note. Warnings in `.warnbox`, do not block. Field errors through `applyApiFormError`.
+- Payment links (`payments.record`): create deposit/balance, copy, cancel OPEN. "Copy the link — sending it by email arrives in Sprint 7". Stripe test-mode note when any link is `mode === test`.
+- Empty: "No payments yet."
+- **No receipt / invoice column** (documents are Sprint 7).
+
+### Header and list
+
+Panel header `OVERDUE` pill when `overdue`. Bookings list: same pill in the status cell; **Overdue only** toggle → `overdue=1`. No client-side overdue arithmetic.
+
+### Permissions
+
+| Control | Gate |
+|---|---|
+| `GET /payments/options` | `panel.rms` |
+| Record form + payment links | `payments.record` (not own-records) |
+| Mark received | `can_mark_wire` on the row (`payments.mark_wire_received`) |
+| OPS-007 buttons | `bookings.overdue_decision` + `can_act` |
+| Ledger | anyone who can open the booking |
+
+A Sales Exec sees the ledger and the `payments.financeOnly` line — no record form.
+
+### 0018 commands
+
+| Command | What it does |
+|---|---|
+| `anakata:set-overdue-fixture` | Sets `balance_due_date_override` to yesterday. That is enough for the OVERDUE pill and the OPS-007 block (`isOverdue()` is derived). |
+| `anakata:flag-overdue` | Writes `booking.overdue_flagged` (System), once per episode. Does **not** change status or the computed flag. |
+
+Do **not** put `set-overdue-fixture` into `reset.sh`.
+
+### History (`describe.ts`)
+
+`booking.overdue_extended`, `booking.overdue_flagged`, `payment.recorded`, `payment.settled`, `refund.not_due`, `refund.requested`.
+
+### Helpers (`paymentHelpers.ts`)
+
+`labelFrom`, `recordableOptions`, `paymentStatusPillClass` (SETTLED → `p-conf`, AWAITING_WIRE → `p-pend`, REFUNDED → `p-canc`), `signedMoney`, `overdueNotice`, `defaultPaymentAmount`. No kind/method label maps.
+
+### Line counts (anakata-ui)
+
+| File | After |
+|---|---|
+| `app/types/inventory.ts` | 247 |
+| `app/types/config.ts` | 368 |
+| `app/types/bookings.ts` | 206 |
+| `app/types/payments.ts` | 157 |
+| `app/types/api.d.ts` | 6508 |
+
+`PaymentOptions` / `PaymentOption` aliases in `payments.ts`. Layer `0.6.0` → `0.6.1`.
+
+### Files touched
+**anakata-api**
+- `app/Enums/PaymentKind.php`, `app/Enums/PaymentMethod.php`
+- `app/Support/Payments/PaymentOptions.php` (new)
+- `app/Http/Resources/Rms/PaymentOptionsResource.php` (new)
+- `app/Http/Controllers/Rms/PaymentController.php`
+- `app/Policies/PaymentPolicy.php`
+- `routes/api/rms.php`
+- `tests/Feature/Payments/PaymentOptionsTest.php` (new)
+- `tests/Unit/Enums/PaymentEnumsTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `docs/sprints/sprint-05/REPORT.md`
+
+**anakata-ui** (`v0.6.1`)
+- `app/types/api.d.ts`, `app/types/payments.ts`, `app/types/index.ts`
+- `package.json`, `CHANGELOG.md`, `README.md`
+
+**anakata-panel**
+- `app/components/payments/paymentHelpers.ts`, `BookingPaymentsTab.vue`, `MarkWireModal.vue` (new)
+- `tests/unit/paymentHelpers.test.ts` (new)
+- `app/components/bookings/BookingPanel.vue`, `ReasonModal.vue`, `bookingHelpers.ts`
+- `app/pages/rms/reservations/bookings.vue`
+- `app/components/history/describe.ts`, `tests/unit/describe.test.ts`, `tests/unit/bookingHelpers.test.ts`
+- `app/types/api.ts`
+- `i18n/locales/en.json`
+- `app/assets/css/bookings.css`, `eslint.config.mjs`
+- `README.md` (pin `v0.6.1`)
+
+**anakata-engine**
+- `README.md` (documentation pin `v0.6.1` only)
+
+### Deviations
+- Labels are not on form-options. New `GET /payments/options` (`panel.rms`) so cfo@ can load them without `bookings.create`.
+- `PaymentMethod::recordable()` is always true, kept for a future opt-out (PHPDoc).
+- Options loading/failed: form hidden, ledger stays, `labelFrom` falls back to the raw value. No empty selects.
+- Browser seed: `tests/e2e/bin/reset.sh` targets `anakata-e2e` (that stack was down). On the running compose project, `DemoBookingsSeeder` was re-run (idempotent payment insert) and the two pending Sprint 5 migrations (`agencies`, `refund_requests`) were applied. `set-overdue-fixture` then `flag-overdue` for 0018.
+- Lucía and cfo@ were **not** re-logged in this browser pass (session switch was blocked). Their gates are in the panel (`payments.record`, `can_mark_wire`, `can_act`, `bookings.change_status`) and in the API tests. Walk them in task 11.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08: Payments & Revenue KPIs / pending / ledger / reconciliation.
+- Task 09: Refund Approvals + B2B. Cancel-per-policy refund request lands there.
+- Task 11: PAY-* e2e. Lucía on Mateo's 0005 (ledger, no form, OPS-007 disabled). cfo@ mark-wire + no transitions. Do not add `set-overdue-fixture` to `reset.sh`.
+- Receipt / invoice column: Sprint 7.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 629 tests, Pint, Larastan OK.
+- anakata-ui: `pnpm lint`, `typecheck`, `test`, `build` — pass.
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (184), `build` — pass.
+- anakata-engine: `pnpm typecheck` — pass.
+
+### Browser (Carolina, both themes)
+After seeding payments on the running API (see Deviations):
+
+- **ANK-2026-0005:** Paid USD 37,905 = total; Balance USD 0 (`bk-balance--zero`, `--ok`); deposit tick; list balance USD 0 + FULLY PAID. Ledger: settled Deposit 3,791 + Balance 34,114, labels from options (`Deposit`, `Card (Stripe)`). Record form after options load; "Loading payment types…" while they load. No receipt column.
+- **ANK-2026-0014:** Paid USD 0; pledged "USD 2,660 awaiting wire · window ends …"; Balance USD 26,600 default tone (not coral). Ledger Mark received → bank reference required → CONFIRMED, list Balance USD 23,940, no reload.
+- **ANK-2026-0018:** `anakata:set-overdue-fixture` alone produced the list `OVERDUE` pill, Overdue-only filter, header pill, coral balance, OPS-007 warnbox. `anakata:flag-overdue` wrote History `OVERDUE flag · 1 days · USD 23,940`. Grant extension (2026-10-03 + reason) cleared the pill and the warnbox; History then showed the extension under Carolina and the System flag. Light theme (`html.light`) still rendered the same rows.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/PaymentKind.php \
+  app/Enums/PaymentMethod.php \
+  app/Support/Payments/PaymentOptions.php \
+  app/Http/Resources/Rms/PaymentOptionsResource.php \
+  app/Http/Controllers/Rms/PaymentController.php \
+  app/Policies/PaymentPolicy.php \
+  routes/api/rms.php \
+  tests/Feature/Payments/PaymentOptionsTest.php \
+  tests/Unit/Enums/PaymentEnumsTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Add GET /rms/payments/options for kind and method labels.
+
+panel.rms can load {value,label,recordable} without bookings.create.
+PaymentMethod::recordable stays true so a future gateway-only method can opt out.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/index.ts \
+  app/types/payments.ts
+git commit -m "$(cat <<'EOF'
+Regenerate types for GET /rms/payments/options.
+
+PaymentOptions / PaymentOption aliases; booking form-options unchanged.
+EOF
+)"
+git tag v0.6.1
+git push origin HEAD
+git push origin v0.6.1
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/assets/css/bookings.css \
+  app/components/bookings/BookingPanel.vue \
+  app/components/bookings/ReasonModal.vue \
+  app/components/bookings/bookingHelpers.ts \
+  app/components/history/describe.ts \
+  app/components/payments/BookingPaymentsTab.vue \
+  app/components/payments/MarkWireModal.vue \
+  app/components/payments/paymentHelpers.ts \
+  app/pages/rms/reservations/bookings.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/bookingHelpers.test.ts \
+  tests/unit/describe.test.ts \
+  tests/unit/paymentHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Wire the booking panel to real payments, OVERDUE and OPS-007.
+
+Labels come from GET /payments/options. The record form stays hidden
+until those options load so the selects are never empty.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.6.1.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-05/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 5 task 07: booking panel payments and OPS-007.
+EOF
+)"
+git push origin HEAD
+```
+

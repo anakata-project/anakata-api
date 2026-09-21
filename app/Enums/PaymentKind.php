@@ -33,4 +33,9 @@ enum PaymentKind: string
             self::Other => 'O',
         };
     }
+
+    public function recordable(): bool
+    {
+        return $this !== self::Refund;
+    }
 }

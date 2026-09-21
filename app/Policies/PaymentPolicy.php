@@ -10,6 +10,11 @@ use App\Models\User;
 
 final class PaymentPolicy extends Policy
 {
+    public function viewOptions(User $actor): bool
+    {
+        return $actor->hasPermission(Permission::PanelRms);
+    }
+
     public function markReceived(User $actor, Payment $payment): bool
     {
         return $actor->hasPermission(Permission::PaymentsMarkWireReceived);

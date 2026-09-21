@@ -27,6 +27,18 @@ test('payment labels match the prototype', function (): void {
     expect(PaymentLinkStatus::Paid->label())->toBe('Paid');
 });
 
+test('recordable excludes refund and keeps every method', function (): void {
+    expect(PaymentKind::Deposit->recordable())->toBeTrue();
+    expect(PaymentKind::Balance->recordable())->toBeTrue();
+    expect(PaymentKind::Extras->recordable())->toBeTrue();
+    expect(PaymentKind::Other->recordable())->toBeTrue();
+    expect(PaymentKind::Refund->recordable())->toBeFalse();
+
+    foreach (PaymentMethod::cases() as $method) {
+        expect($method->recordable())->toBeTrue();
+    }
+});
+
 test('countsAsPaid is everything except awaiting wire', function (): void {
     expect(PaymentStatus::Settled->countsAsPaid())->toBeTrue();
     expect(PaymentStatus::Refunded->countsAsPaid())->toBeTrue();

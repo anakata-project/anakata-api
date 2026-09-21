@@ -20,4 +20,13 @@ enum PaymentMethod: string
             self::Other => 'Other',
         };
     }
+
+    /**
+     * True for every case today. Exists so a future gateway-only method can
+     * opt out of the record-payment form without the method looking unused.
+     */
+    public function recordable(): bool
+    {
+        return true;
+    }
 }

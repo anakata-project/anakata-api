@@ -74,6 +74,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'HoldResource',
         'WaitlistEntryResource',
         'PaymentResource',
+        'PaymentOptionsResource',
         'RecordedPaymentResource',
         'PaymentLinkResource',
         'ReconciliationResource',
@@ -283,6 +284,18 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         ?? $spec['paths']['/api/rms/bookings/form-options']['get']
         ?? null;
     expect($formOptions)->toBeArray();
+
+    $paymentOptions = openApiSchema($spec, 'PaymentOptionsResource');
+    expect($paymentOptions['properties'])->toHaveKeys(['kinds', 'methods']);
+    $kindItem = $paymentOptions['properties']['kinds']['items']['properties']
+        ?? $paymentOptions['properties']['kinds']['items']
+        ?? [];
+    $kindItemProps = $kindItem['properties'] ?? $kindItem;
+    expect($kindItemProps)->toHaveKeys(['value', 'label', 'recordable']);
+    $paymentOptionsPath = $spec['paths']['/rms/payments/options']['get']
+        ?? $spec['paths']['/api/rms/payments/options']['get']
+        ?? null;
+    expect($paymentOptionsPath)->toBeArray();
 
     $created = openApiSchema($spec, 'ReservationCreatedResource');
     expect($created['properties'])->toHaveKey('bookings');

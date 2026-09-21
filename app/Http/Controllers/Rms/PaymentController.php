@@ -14,11 +14,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IndexPaymentsRequest;
 use App\Http\Requests\Rms\MarkWireReceivedRequest;
 use App\Http\Requests\Rms\RecordPaymentRequest;
+use App\Http\Resources\Rms\PaymentOptionsResource;
 use App\Http\Resources\Rms\PaymentResource;
 use App\Http\Resources\Rms\RecordedPaymentResource;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\Payments\PaymentOptions;
 use App\Support\Payments\PaymentsKpis;
 use App\Support\Payments\RecordedPayment;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
@@ -103,6 +105,13 @@ final class PaymentController extends Controller
         return PaymentResource::collection($payments)->additional([
             'meta' => ['kpis' => $kpis],
         ]);
+    }
+
+    public function options(): PaymentOptionsResource
+    {
+        $this->authorize('viewOptions', Payment::class);
+
+        return new PaymentOptionsResource(PaymentOptions::all());
     }
 
     public function forBooking(Booking $booking): AnonymousResourceCollection

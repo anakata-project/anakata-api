@@ -90,6 +90,7 @@ Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
 
 Route::get('payments', [PaymentController::class, 'index']);
+Route::get('payments/options', [PaymentController::class, 'options']);
 Route::get('payments/reconciliation', [ReconciliationController::class, 'index']);
 Route::post('payments/reconciliation/apply', [ReconciliationController::class, 'apply']);
 Route::post('payments/{payment}/mark-received', [PaymentController::class, 'markReceived'])->whereNumber('payment');
