@@ -761,3 +761,120 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # ui / panel / engine: pnpm typecheck
 # panel / engine: pnpm build
 ```
+
+## Task 06 · anakata-panel · CRM Contacts
+
+Panel only. Types from the sibling layer at `v0.10.0` (`CrmContact`, `ContactProfile`, `ContactBooking`, `ContactFilters`, `ContactDuplicate`, `ContactMerge`, `ContactMergeResult`, `ContactUnmergeResult`, `TimelineItem`). Re-exported from `app/types/api.ts` via `#anakata-ui/app/types`; RMS `Contact` stays the search row. No lifecycle, lifetime value, segment or consent math in the panel. No booking, payment, guest or note mutations from these screens.
+
+The catch-all `app/pages/crm/[group]/[item].vue` stays. `/crm/sales/contacts` is a real page.
+
+### List
+`GET /api/crm/contacts` with `page`, `per_page=50`, 300ms-debounced `q`, and filters: type and lifecycle from `meta.filters`; main channel and channel of origin from `GET /api/rms/bookings/form-options` when the user has `bookings.create` (otherwise those two stay on All); consent `marketing` / `transactional_only`.
+
+Notice is the task sentence (CRM is the system of record for people; passport and medical data are never here). The prototype “pushed to RMS” line is omitted (L5 / B9). Hint under the table is the prototype derived-lifecycle line.
+
+NPS is a flat “—” on every row, including agents. The API sends `null`. The prototype’s “n/a” for agents is dropped on purpose (see Deviations).
+
+Pill classes live in `app/assets/css/crm.css` (registered in `nuxt.config.ts`): `.pill.hi`, `.pill.mid`, `.pill.new`, `.pill.ok`, plus `.ro`. Pagination matches Contacts In.
+
+Duplicates: `GET /api/crm/contacts/duplicates` for every CRM user (`ContactPolicy::viewAny` is `panel.crm`). A 403 is swallowed (no toast). Merge stays behind `contacts.merge`. Reasons: `phone_e164` → “Same phone”, `name_country` → “Same name and country”. Seed after `reset.sh` has no pairs.
+
+### Profile drawer
+`ContactDrawer` (`USlideover`), opened by a row click and by `?open={id}`.
+
+`?open=` lifecycle: an old id still loads through route binding and shows the alias banner; after a merge, `router.replace` the query with the survivor’s id; closing the drawer clears `?open=`.
+
+Rows in prototype order: name, type · lifecycle · contact id; country · language + **ALL SENDS IN ENGLISH**; preferred / main / origin channels; LTV + **FROM RMS LEDGER** + segment pill; first / last touch; NPS “—”; consent transactional **ALWAYS ON**, marketing **OPTED IN** / **NOT OPTED IN**, plus “Consent register arrives in Sprint 10”. No profiling or WhatsApp rows.
+
+Partner record: `GET /api/rms/agencies?q={email}` only when lifecycle is `AGENT` or type is `TRAVEL_AGENT` and the user has `panel.rms`. Match by email, case-insensitive and trimmed. Exactly one match shows the row and links `/rms/commercial/b2b?open={id}`. Zero or several matches hide the row. There is no `agency_id` on the contact (task 01). `b2b.vue` now opens the agency drawer from `?open=`.
+
+Bookings from `profile.bookings` link to `/rms/reservations/bookings?open={display_reference}`. Timeline `GET …/timeline` renders `title` and `detail`; a `booking` link uses the same bookings URL; a `contact` link opens that contact in this drawer. Alias banner when `resolved_from_alias`: **Merged into {survivor name}**.
+
+“Not held here”: passport, date of birth, nationality, and medical, dietary or mobility notes stay in the RMS.
+
+### Edit
+Shown when `can('contacts.manage')`. Owned fields only. `PATCH /api/crm/contacts/{id}`. Errors through `applyApiFormError`.
+
+A 409 is `{ message }` in the shape `That email belongs to contact #{id} ({name}). …`. Helper `parseEmailConflictContactId` reads `/contact #(\d+)/`. A hit plus `contacts.merge` offers **Review merge**. A miss shows the server message only.
+
+This depends on the server’s message text. A structured field (for example `conflicting_contact_id`) should be requested from the backend later.
+
+### Merge and undo
+`MergeContactsModal` loads both profiles side by side and states the API rule before submit (older / lower id survives; bookings, group coordinator, waitlist and charter enquiries move; empty email / phone / country / touches on the survivor are filled). Reason required. `POST /api/crm/contacts/{id}/merge`. After success the toast says whether `swapped` was true, the list refreshes, and `?open=` becomes the survivor’s id.
+
+Undo: load `GET /api/crm/contact-merges` only with `contacts.merge`. Match `survivor_id === link.id` AND equal timestamps (`Date.parse` / `getTime`, never strings) AND `undone_at === null`. Zero matches hide Undo; one match offers it (30-day guard); two or more show a disabled Undo (“Cannot identify this merge uniquely”).
+
+The 30-day helper is a UI guard only, computed in UTC. The window is exclusive at 30 days — Undo is offered only while `now < merged_at + 30 days` (`UndoContactMerge` 422s at `now >= merged_at + 30 days`). Invalid or missing date hides Undo. The server 422 is the authority.
+
+Confirm copy uses the API’s words. `skipped_rows` from the response is shown.
+
+### Helpers
+`app/components/crm/contactHelpers.ts` + `tests/unit/crmContactHelpers.test.ts`: `segmentPillClass`, `lifecyclePillClass` (`''`), `consentPillLabel`, 409 parser, timestamp match including mixed `Z` / `+00:00`, exclusive 30-day window, partner email match.
+
+Strings under `crmContacts` in `i18n/locales/en.json`.
+
+### Deviations
+- NPS is a flat “—” for every row, including agents. The prototype’s “n/a” for agents is dropped; the API sends `null` until Sprint 11.
+- 409 Review merge parses the server message text (`/contact #(\d+)/`). Request a structured `conflicting_contact_id` later.
+- Partner row is a unique email match against `GET /api/rms/agencies?q=`. There is no `agency_id` on the contact (task 01).
+- Seed after `reset.sh` has no duplicate pairs; the duplicates panel stays hidden until a pair exists.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 07: Activity and Sync screens consume the rest of the CRM types.
+- Backend: add `conflicting_contact_id` (and name) on the 409 body so Review merge does not depend on copy.
+
+### Quality
+- anakata-panel against the sibling layer (`v0.10.0`): `pnpm lint`, `pnpm typecheck`, `pnpm test` (241), `pnpm build` — pass.
+- Fresh clone into `/tmp/anakata-fresh-s9-06` overlayed against a `v0.10.0` ui checkout: panel typecheck and build pass. Layer pin was not bumped.
+
+### Browser
+After `COMPOSE_PROJECT_NAME=anakata-api E2E_ALLOW_RESET=1 tests/e2e/bin/reset.sh`, both themes on `/crm/sales/contacts` (Carolina admin):
+
+- Seeded lifecycles and segments (BOOKED/HIGH, PROSPECT/NEW, SQL/NEW, AGENT/NEW). NPS “—” on every row.
+- Drawer: A. Fontaine `?open=12` — FROM RMS LEDGER, ALL SENDS IN ENGLISH, booking `ANK-2026-0018` → RMS, timeline, Not held here, edit.
+- Partner: S. Ferreira (`AGENT`) shows **AG-001 · Blue Latitude Travel** → `/rms/commercial/b2b?open=`.
+- Edit: Anna Whitfield → “Anna Whitfield edited”.
+- 409: email `k.osei@anakata.test` → “That email belongs to contact #20 (K. Osei).” + **Review merge**.
+- Merge 19 + 20: survivor 19, K. Osei leaves the list, `?open=20` shows **Merged into Anna Whitfield edited**. Undo (reason required) restores K. Osei; timeline says undone; query becomes `?open=19`.
+- Cancel `ANK-2026-0018` in the RMS → refresh Contacts: A. Fontaine LTV `USD 26,600` / HIGH / BOOKED becomes — / NEW / MQL. No CRM control changed the booking.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`).
+
+```bash
+# 1. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/assets/css/crm.css \
+  app/components/crm/ContactDrawer.vue \
+  app/components/crm/MergeContactsModal.vue \
+  app/components/crm/contactHelpers.ts \
+  app/pages/crm/sales/contacts.vue \
+  app/pages/rms/commercial/b2b.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  tests/unit/crmContactHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the CRM Contacts list, profile drawer, merge and undo.
+
+Staff see derived fields from the CRM API only, edit owned identity,
+and merge duplicates with a 30-day undo. Bookings open in the RMS.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 9 task 06: panel CRM Contacts.
+EOF
+)"
+```
