@@ -11,6 +11,7 @@ use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\GroupController;
+use App\Http\Controllers\Rms\GuestController;
 use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
@@ -114,6 +115,10 @@ Route::get('bookings/{booking}/history', [BookingController::class, 'history'])-
 Route::get('bookings/{booking}/payments', [PaymentController::class, 'forBooking'])->whereNumber('booking');
 Route::post('bookings/{booking}/payments', [PaymentController::class, 'store'])->whereNumber('booking');
 Route::post('bookings/{booking}/payment-link', [PaymentLinkController::class, 'store'])->whereNumber('booking');
+Route::get('bookings/{booking}/guests', [GuestController::class, 'index'])->whereNumber('booking');
+Route::post('bookings/{booking}/guests', [GuestController::class, 'store'])->whereNumber('booking');
+Route::patch('guests/{guest}', [GuestController::class, 'update'])->whereNumber('guest');
+Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->whereNumber('guest');
 
 Route::get('agencies', [AgencyController::class, 'index']);
 Route::post('agencies', [AgencyController::class, 'store']);

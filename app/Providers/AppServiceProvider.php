@@ -18,6 +18,7 @@ use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\EngineSettingsVersion;
 use App\Models\Group;
+use App\Models\Guest;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
 use App\Models\Payment;
@@ -134,6 +135,7 @@ class AppServiceProvider extends ServiceProvider
             'group' => Group::class,
             'agency' => Agency::class,
             'booking' => Booking::class,
+            'guest' => Guest::class,
             'booking_request' => BookingRequest::class,
             'waitlist_entry' => WaitlistEntry::class,
             'payment' => Payment::class,

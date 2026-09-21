@@ -6,6 +6,7 @@ use App\Actions\Bookings\CreateBookingRequest;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentStatus;
 use App\Models\Booking;
+use App\Models\Guest;
 use App\Models\Payment;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\DemoInventorySeeder;
@@ -44,12 +45,17 @@ test('the bookings list query count does not grow with extra REQUESTED bookings'
     $before = count(DB::getQueryLog());
 
     foreach (['S2', 'S3', 'S4'] as $cabin) {
-        app(CreateBookingRequest::class)->handle(
+        $extra = app(CreateBookingRequest::class)->handle(
             ReservationFixtures::requestPayload($departure, [
                 'cabins' => [['cabin_code' => $cabin, 'adults' => 2, 'children' => 0]],
             ]),
             $actor,
         );
+        Guest::factory()->create([
+            'booking_id' => $extra->id,
+            'first_name' => 'Query',
+            'last_name' => 'Count',
+        ]);
     }
 
     DB::flushQueryLog();

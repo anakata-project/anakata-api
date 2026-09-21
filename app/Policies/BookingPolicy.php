@@ -117,6 +117,19 @@ final class BookingPolicy extends Policy
         return $actor->hasPermission(Permission::BookingsViewAll);
     }
 
+    public function updateGuests(User $actor, Booking $booking): Response
+    {
+        if (! $this->ownsOrMayActOnAny($actor, $booking)) {
+            return Response::deny('Blocked: own-records rule.');
+        }
+
+        if ($this->writesSensitiveGuestNotes() && ! $actor->hasPermission(Permission::GuestsViewSensitive)) {
+            return Response::deny();
+        }
+
+        return Response::allow();
+    }
+
     public function update(User $actor, Booking $booking): Response
     {
         $notes = request()->exists('internal_notes');
@@ -131,5 +144,12 @@ final class BookingPolicy extends Policy
         }
 
         return Response::allow();
+    }
+
+    private function writesSensitiveGuestNotes(): bool
+    {
+        return request()->exists('medical_note')
+            || request()->exists('dietary_note')
+            || request()->exists('accessibility_note');
     }
 }

@@ -73,7 +73,8 @@ class BookingResource extends JsonResource
      *     commission_cap_pct: int,
      *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string, remaining_business_minutes: int}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null,
      *     payment_links: list<array{id: int, kind: string, amount: int, stripe_id: string, url: string, status: string, mode: string, created_at: string}>,
-     *     refund: array{status: string, penalty_amount: int, refund_due: int, band_label: string, due_by: string}|null
+     *     refund: array{status: string, penalty_amount: int, refund_due: int, band_label: string, due_by: string}|null,
+     *     guests_summary: array{complete: int, total: int}
      * }
      */
     public function toArray(Request $request): array
@@ -178,6 +179,10 @@ class BookingResource extends JsonResource
                 ? PaymentLinkResource::collection($this->paymentLinks)->resolve()
                 : [],
             'refund' => $this->relationLoaded('refundRequest') ? $this->refundPayload() : null,
+            'guests_summary' => [
+                'complete' => (int) ($this->resource->guests_complete_count ?? $this->resource->guests()->complete()->count()),
+                'total' => (int) ($this->resource->guests_count ?? $this->resource->guests()->count()),
+            ],
         ];
     }
 

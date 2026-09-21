@@ -76,7 +76,10 @@ use Illuminate\Support\Collection;
  * @property-read RateVersion $ratesVersion
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
+ * @property-read Collection<int, Guest> $guests
  * @property-read Collection<int, Payment> $payments
+ * @property-read int|null $guests_count
+ * @property-read int|null $guests_complete_count
  * @property-read Collection<int, PaymentLink> $paymentLinks
  * @property-read BookingRequest|null $bookingRequest
  * @property-read RefundRequest|null $refundRequest
@@ -221,6 +224,14 @@ class Booking extends Model
     public function refundRequest(): HasOne
     {
         return $this->hasOne(RefundRequest::class);
+    }
+
+    /**
+     * @return HasMany<Guest, $this>
+     */
+    public function guests(): HasMany
+    {
+        return $this->hasMany(Guest::class)->orderBy('position');
     }
 
     /**
@@ -481,6 +492,19 @@ class Booking extends Model
     public function historyLabel(): string
     {
         return $this->displayReference() ?? 'booking';
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    /**
+     * @param  Builder<self>  $query
+     */
+    public function scopeWithGuestSummary(Builder $query): void
+    {
+        $query
+            ->withCount('guests')
+            ->withCount(['guests as guests_complete_count' => fn ($guests) => $guests->complete()]);
     }
 
     /**

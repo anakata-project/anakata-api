@@ -29,6 +29,7 @@ use App\Support\Blocks\ConflictMessage;
 use App\Support\Bookings\BookingMutationLock;
 use App\Support\BusinessTime;
 use App\Support\Dates\Format;
+use App\Support\Guests\ApplyPng;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureSnapshot;
 use App\Support\Money;
@@ -49,6 +50,7 @@ final class MoveBooking extends Action
         private ClaimService $claims,
         private CurrentConfig $config,
         private Availability $availability,
+        private ApplyPng $png,
     ) {}
 
     /**
@@ -132,6 +134,7 @@ final class MoveBooking extends Action
             $booking->save();
 
             $booking->load(['departure.yacht', 'cabin']);
+            $this->png->toBooking($booking);
 
             History::record($booking, 'booking.moved', before: $before, after: $this->historySnapshot($booking), actor: $actor);
 
