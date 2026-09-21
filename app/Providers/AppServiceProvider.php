@@ -36,6 +36,7 @@ use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Iso;
+use App\Support\Stripe\StripeGatewayBinding;
 use DateTimeInterface;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -62,12 +63,20 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(CurrentConfig::class);
         $this->app->singleton(ConfigRegistry::class);
 
-        if ($this->app->environment('testing')) {
-            $this->app->singleton(FakeStripeGateway::class);
-            $this->app->singleton(StripeGateway::class, fn (Application $app): FakeStripeGateway => $app->make(FakeStripeGateway::class));
-        } else {
-            $this->app->singleton(StripeGateway::class, StripeSdkGateway::class);
-        }
+        $this->app->singleton(FakeStripeGateway::class);
+        $this->app->singleton(StripeSdkGateway::class);
+        $this->app->singleton(StripeGateway::class, function (Application $app): StripeGateway {
+            if (StripeGatewayBinding::usesFake($app)) {
+                $fake = $app->make(FakeStripeGateway::class);
+                if ($app->environment('local')) {
+                    $fake->includeFileFixture = true;
+                }
+
+                return $fake;
+            }
+
+            return $app->make(StripeSdkGateway::class);
+        });
     }
 
     /**

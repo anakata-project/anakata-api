@@ -7,6 +7,7 @@ namespace App\Services\Stripe;
 use App\Enums\PaymentKind;
 use App\Exceptions\InvalidStripeSignature;
 use App\Models\Booking;
+use App\Support\BusinessTime;
 use App\Support\Stripe\StripeWebhookSignature;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -26,6 +27,13 @@ final class FakeStripeGateway implements StripeGateway
     public array $charges = [];
 
     public int $linkSequence = 0;
+
+    public bool $includeFileFixture = false;
+
+    public static function fixturePath(): string
+    {
+        return database_path('fixtures/stripe-charges.json');
+    }
 
     public function createPaymentLink(Booking $booking, PaymentKind $kind, int $amountUsd): CreatedPaymentLink
     {
@@ -53,7 +61,7 @@ final class FakeStripeGateway implements StripeGateway
         $to = $toUtc->getTimestamp();
 
         return array_values(array_filter(
-            $this->charges,
+            $this->allCharges(),
             fn (StripeCharge $charge): bool => $charge->createdAt->getTimestamp() >= $from
                 && $charge->createdAt->getTimestamp() <= $to,
         ));
@@ -61,13 +69,84 @@ final class FakeStripeGateway implements StripeGateway
 
     public function retrieveCharge(string $stripeId): StripeCharge
     {
-        foreach ($this->charges as $charge) {
+        foreach ($this->allCharges() as $charge) {
             if ($charge->id === $stripeId) {
                 return $charge;
             }
         }
 
         throw new InvalidArgumentException('Unknown Stripe charge '.$stripeId);
+    }
+
+    /**
+     * @return list<StripeCharge>
+     */
+    public function allCharges(): array
+    {
+        return [...$this->charges, ...$this->chargesFromFile()];
+    }
+
+    /**
+     * Dates are computed at read time from `created_days_ago` so they stay
+     * inside the current Galápagos month after a clock travel.
+     *
+     * @return list<StripeCharge>
+     */
+    public function chargesFromFile(): array
+    {
+        if (! $this->includeFileFixture) {
+            return [];
+        }
+
+        $path = self::fixturePath();
+
+        if (! is_file($path)) {
+            return [];
+        }
+
+        try {
+            /** @var mixed $decoded */
+            $decoded = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return [];
+        }
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $now = BusinessTime::now();
+        $charges = [];
+
+        foreach ($decoded as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $id = $row['id'] ?? null;
+            $intent = $row['payment_intent'] ?? null;
+            $amount = $row['amount'] ?? null;
+            $daysAgo = $row['created_days_ago'] ?? null;
+            $description = $row['description'] ?? '';
+
+            if (! is_string($id) || $id === '' || ! is_string($intent) || $intent === '' || ! is_int($amount)) {
+                continue;
+            }
+
+            if (! is_int($daysAgo) && ! is_numeric($daysAgo)) {
+                continue;
+            }
+
+            $charges[] = self::charge(
+                $id,
+                $intent,
+                $amount,
+                $now->subDays((int) $daysAgo),
+                is_string($description) ? $description : '',
+            );
+        }
+
+        return $charges;
     }
 
     public function verifyWebhook(string $payload, string $signature): VerifiedStripeEvent

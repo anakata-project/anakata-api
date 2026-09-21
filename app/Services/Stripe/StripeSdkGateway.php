@@ -17,11 +17,11 @@ use Stripe\Webhook;
 
 final class StripeSdkGateway implements StripeGateway
 {
-    private readonly StripeClient $client;
+    private ?StripeClient $client = null;
 
-    public function __construct()
+    private function client(): StripeClient
     {
-        $this->client = new StripeClient([
+        return $this->client ??= new StripeClient([
             'api_key' => (string) config('services.stripe.secret'),
             'stripe_version' => '2026-07-29.dahlia',
         ]);
@@ -36,7 +36,7 @@ final class StripeSdkGateway implements StripeGateway
             'kind' => $kind->value,
         ];
 
-        $link = $this->client->paymentLinks->create([
+        $link = $this->client()->paymentLinks->create([
             'line_items' => [[
                 'price_data' => [
                     'currency' => 'usd',
@@ -63,7 +63,7 @@ final class StripeSdkGateway implements StripeGateway
 
     public function deactivatePaymentLink(string $stripeId): void
     {
-        $this->client->paymentLinks->update($stripeId, [
+        $this->client()->paymentLinks->update($stripeId, [
             'active' => false,
         ]);
     }
@@ -79,7 +79,7 @@ final class StripeSdkGateway implements StripeGateway
             'limit' => 100,
         ];
 
-        foreach ($this->client->charges->all($params)->autoPagingIterator() as $charge) {
+        foreach ($this->client()->charges->all($params)->autoPagingIterator() as $charge) {
             $charges[] = $this->mapCharge($charge);
         }
 
@@ -88,7 +88,7 @@ final class StripeSdkGateway implements StripeGateway
 
     public function retrieveCharge(string $stripeId): StripeCharge
     {
-        return $this->mapCharge($this->client->charges->retrieve($stripeId));
+        return $this->mapCharge($this->client()->charges->retrieve($stripeId));
     }
 
     public function verifyWebhook(string $payload, string $signature): VerifiedStripeEvent

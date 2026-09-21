@@ -1,0 +1,16 @@
+[
+    {
+        "id": "ch_seed_0005_d01",
+        "payment_intent": "pi_38N9NNFXO",
+        "amount": 3791,
+        "created_days_ago": 2,
+        "description": "ANK-2026-0005-D01"
+    },
+    {
+        "id": "ch_unmatched",
+        "payment_intent": "pi_unmatched",
+        "amount": 2660,
+        "created_days_ago": 1,
+        "description": "Unmatched gateway charge"
+    }
+]
