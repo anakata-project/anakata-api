@@ -37,9 +37,10 @@ final class ApplyGuestFields
     /**
      * @param  array<string, mixed>  $data
      */
-    public function apply(Guest $guest, array $data, User $actor): void
+    public function apply(Guest $guest, array $data, ?User $actor): void
     {
-        $canViewSensitive = $actor->hasPermission(Permission::GuestsViewSensitive);
+        $canViewSensitive = $actor instanceof User
+            && $actor->hasPermission(Permission::GuestsViewSensitive);
 
         foreach (self::PLAIN as $field) {
             if (! array_key_exists($field, $data)) {
@@ -83,7 +84,7 @@ final class ApplyGuestFields
     /**
      * @param  array<string, mixed>  $data
      */
-    private function applyGuardian(Guest $guest, array $data, User $actor): void
+    private function applyGuardian(Guest $guest, array $data, ?User $actor): void
     {
         if (! Age::isMinorNow($guest->dob)) {
             $guest->guardian_name = null;
@@ -119,7 +120,7 @@ final class ApplyGuestFields
 
             if ($guest->guardian_consented_at === null) {
                 $guest->guardian_consented_at = Carbon::now();
-                $guest->guardian_recorded_by = $actor->id;
+                $guest->guardian_recorded_by = $actor?->id;
             }
 
             return;

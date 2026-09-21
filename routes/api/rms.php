@@ -12,6 +12,7 @@ use App\Http\Controllers\Rms\CalendarController;
 use App\Http\Controllers\Rms\CharterEnquiryController;
 use App\Http\Controllers\Rms\ClientDocumentController;
 use App\Http\Controllers\Rms\CommissionController;
+use App\Http\Controllers\Rms\CompleteLinkController;
 use App\Http\Controllers\Rms\ConsentController;
 use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\ContactsInController;
@@ -143,6 +144,7 @@ Route::get('bookings/{booking}/extras', [BookingExtraController::class, 'index']
 Route::post('bookings/{booking}/extras', [BookingExtraController::class, 'store'])->whereNumber('booking');
 Route::patch('bookings/{booking}/fees', [BookingFeesController::class, 'update'])->whereNumber('booking');
 Route::patch('bookings/{booking}/billing', [BookingBillingController::class, 'update'])->whereNumber('booking');
+Route::post('bookings/{booking}/complete-link', CompleteLinkController::class)->whereNumber('booking');
 Route::get('bookings/{booking}/documents', [DocumentController::class, 'index'])->whereNumber('booking');
 Route::get('bookings/{booking}/documents/plan', [DocumentController::class, 'plan'])->whereNumber('booking');
 Route::get('bookings/{booking}/documents/{kind}/html', [DocumentController::class, 'html'])->whereNumber('booking');

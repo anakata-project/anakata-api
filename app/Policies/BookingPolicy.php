@@ -143,6 +143,11 @@ final class BookingPolicy extends Policy
             : Response::deny('Blocked: own-records rule.');
     }
 
+    public function issueCompleteLink(User $actor, Booking $booking): Response
+    {
+        return $this->updateBilling($actor, $booking);
+    }
+
     public function issueDocument(User $actor, Booking $booking): Response
     {
         return $this->updateBilling($actor, $booking);

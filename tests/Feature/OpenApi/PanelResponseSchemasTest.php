@@ -94,6 +94,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'DocumentPlanRowResource',
         'CountryResource',
         'MaskedNoteResource',
+        'CompleteLinkResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Bookings;
 
 use App\Actions\Action;
+use App\Actions\Complete\RevokeCompleteAccessTokens;
 use App\Actions\Refunds\CreateRefundRequest;
 use App\Enums\BookingStatus;
 use App\Enums\ClaimKind;
@@ -32,6 +33,7 @@ final class TransitionBooking extends Action
         private ClaimService $claims,
         private ReferenceService $references,
         private CreateRefundRequest $refunds,
+        private RevokeCompleteAccessTokens $completeTokens,
     ) {}
 
     /**
@@ -171,6 +173,7 @@ final class TransitionBooking extends Action
                 $booking,
                 $to === BookingStatus::Released ? ReleaseReason::Released : ReleaseReason::Cancelled,
             );
+            $this->completeTokens->handle($booking);
 
             if (in_array($to, [BookingStatus::Cancelled, BookingStatus::CancelledPostpaid], true)) {
                 $this->refunds->handle($booking, $actor, $system);

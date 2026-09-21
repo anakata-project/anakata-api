@@ -45,6 +45,19 @@ test('no authenticated user is stored as System', function (): void {
     expect($entry->actor_label)->toBe('System');
 });
 
+test('an explicit actor label is stored without an actor id', function (): void {
+    $role = Role::factory()->create();
+
+    $entry = DB::transaction(fn () => History::record(
+        $role,
+        'guest.updated',
+        actorLabel: 'Guest (self-service)',
+    ));
+
+    expect($entry->actor_id)->toBeNull();
+    expect($entry->actor_label)->toBe('Guest (self-service)');
+});
+
 test('system: true is stored as System even when a user is authenticated', function (): void {
     $actor = User::factory()->create(['name' => 'Carolina']);
     $role = Role::factory()->create();

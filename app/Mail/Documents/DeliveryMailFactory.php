@@ -7,6 +7,8 @@ namespace App\Mail\Documents;
 use App\Enums\DeliveryKind;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
+use App\Models\Booking;
+use App\Models\BookingAccessToken;
 use App\Models\Delivery;
 use App\Models\PaymentLink;
 use App\Support\BusinessTime;
@@ -17,7 +19,7 @@ final class DeliveryMailFactory
 {
     public static function make(Delivery $delivery, ?string $pdfBytes): Mailable
     {
-        $delivery->loadMissing(['booking.departure', 'booking.paymentLinks', 'document']);
+        $delivery->loadMissing(['booking.departure', 'booking.paymentLinks', 'booking.accessTokens', 'document']);
 
         return match ($delivery->kind) {
             DeliveryKind::Reminder => new ReminderMail(
@@ -25,11 +27,13 @@ final class DeliveryMailFactory
                 $delivery->booking,
                 self::reminderDays($delivery),
                 self::openBalanceLink($delivery),
+                self::completePageUrl($delivery->booking),
             ),
             DeliveryKind::PaymentLink => new PaymentLinkMail(
                 $delivery,
                 $delivery->booking,
                 self::paymentLink($delivery),
+                self::completePageUrl($delivery->booking),
             ),
             default => self::documentMail($delivery, $pdfBytes),
         };
@@ -59,6 +63,19 @@ final class DeliveryMailFactory
         return $delivery->booking->paymentLinks
             ->first(fn (PaymentLink $link): bool => $link->kind === PaymentKind::Balance
                 && $link->status === PaymentLinkStatus::Open);
+    }
+
+    private static function completePageUrl(Booking $booking): string
+    {
+        $url = $booking->accessTokens->first(
+            fn (BookingAccessToken $token): bool => $token->isActive(),
+        )?->page_url;
+
+        if (! is_string($url) || $url === '') {
+            throw new InvalidArgumentException('A complete-reservation link is missing for this delivery.');
+        }
+
+        return $url;
     }
 
     private static function paymentLink(Delivery $delivery): PaymentLink

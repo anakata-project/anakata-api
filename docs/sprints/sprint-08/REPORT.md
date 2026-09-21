@@ -427,6 +427,110 @@ None for this task.
 ### Checks
 `composer check` passed (957 tests). Pint and Larastan clean.
 
+## Task 05 · The "Complete your reservation" page's API
+
+Public guest page API for billing, declarations and passenger details before a deposit or balance Stripe link. The engine page itself is task 10.
+
+### Token and lifetime
+`booking_access_tokens`: hashed SHA-256 lookup (`bin2hex(random_bytes(32))`), `purpose = COMPLETE`, `expires_at` = Galápagos end of the departure day (`BusinessTime::dayEndUtc`), `revoked_at`, audit columns. One active row per booking; issuing a new one revokes leftovers.
+
+`page_url` is stored so staff copy-link and payment emails can **return the same active URL** without a plaintext token column. It is a secret: never written to history or logs.
+
+Page URL: `{FRONTEND_ENGINE_URL}/complete/{token}` (`config('anakata.engine_url')`). Unknown, expired, revoked, cancelled, released and deleted bookings all 404 as `{ "message": "Not found." }`.
+
+Revoke runs in the same transaction as `TransitionBooking` (RELEASED / CANCELLED / CANCELLED_POSTPAID) and `DeleteBooking`.
+
+### Emails
+`SendPaymentRequest` issues or reuses the token. Payment-link “Pay securely” and reminder “Pay balance securely” now href the complete page. Stripe stays on `PaymentLink.url` and becomes GET `pay_url` when `can_pay`. DOC-07 E3 updated.
+
+### What the page reads and writes
+Unauthenticated `/api/engine/complete/{token}` with `throttle:engine-complete` (20/min/IP and 10/min/hashed-token) and `X-Robots-Tag: noindex`.
+
+- `GET` — booking(s) (the group when `group_id` is set), amount due + kind/label from the ledger or the open link (J10), billing, five declarations with current versions, guests, `can_pay`, `pay_url`, `countries`.
+- `PUT …/billing` — Sprint 7 billing fields on the token booking.
+- `PUT …/guests/{guest}` — Sprint 6 `UpdateGuest` rules (no medical notes). Guest may belong to a group sibling. History actor `Guest (self-service)`, field names only.
+- `POST …/declarations` `{ documents }` — `RecordConsent` source `PAYMENT_LINK` + IP + current versions.
+
+### Write-only passport
+Response has `passport_on_file` only. A non-empty `passport_no` replaces the encrypted value; empty leaves it (no `guests.view_sensitive` on this page).
+
+### Declarations and `can_pay`
+`can_pay` is true only when all four required documents have a current-version, non-withdrawn consent **and** an open Stripe link exists. PAY_LATER ENGINE privacy + insurance count; TERMS + CANCELLATION are accepted here. Billing and passenger details are **not** required (default).
+
+### Staff copy-link
+`POST /api/rms/bookings/{booking}/complete-link` — own-records (`issueCompleteLink` = same as billing). Issues or returns `{ url }`. 422 if cancelled/released/deleted.
+
+### Deviations
+`page_url` on the token row (required to return the active URL while keeping `token_hash` for lookup). Env key stays `FRONTEND_ENGINE_URL`, not `ENGINE_URL`.
+
+### Open questions
+None for this task.
+
+### Notes for later
+- Task 07: panel “copy link” on Payments.
+- Task 10: engine `/complete/{token}` page.
+- Task 11: WEB complete-page scenario if not already listed.
+
+### Checks
+`composer check` passed (969 tests). Pint and Larastan clean.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Bookings/DeleteBooking.php
+git add app/Actions/Bookings/TransitionBooking.php
+git add app/Actions/Bookings/UpdateBookingBilling.php
+git add app/Actions/Complete/IssueCompleteAccessToken.php
+git add app/Actions/Complete/ResolveCompleteAccessToken.php
+git add app/Actions/Complete/RevokeCompleteAccessTokens.php
+git add app/Actions/Consents/RecordConsent.php
+git add app/Actions/Documents/SendPaymentRequest.php
+git add app/Actions/Guests/ApplyGuestFields.php
+git add app/Actions/Guests/UpdateGuest.php
+git add app/Enums/BookingAccessTokenPurpose.php
+git add app/Http/Controllers/Engine/CompleteReservationController.php
+git add app/Http/Controllers/Rms/CompleteLinkController.php
+git add app/Http/Middleware/NoindexResponse.php
+git add app/Http/Requests/Engine/RecordCompleteDeclarationsRequest.php
+git add app/Http/Requests/Engine/UpdateCompleteBillingRequest.php
+git add app/Http/Requests/Engine/UpdateCompleteGuestRequest.php
+git add app/Http/Resources/Engine/CompleteBookingResource.php
+git add app/Http/Resources/Engine/CompleteGuestResource.php
+git add app/Http/Resources/Engine/CompleteReservationResource.php
+git add app/Http/Resources/Rms/CompleteLinkResource.php
+git add app/Mail/Documents/DeliveryMailFactory.php
+git add app/Mail/Documents/PaymentLinkMail.php
+git add app/Mail/Documents/ReminderMail.php
+git add app/Models/Booking.php
+git add app/Models/BookingAccessToken.php
+git add app/Policies/BookingPolicy.php
+git add app/Providers/AppServiceProvider.php
+git add app/Support/Complete/CompleteAccess.php
+git add app/Support/Complete/CompleteDue.php
+git add app/Support/Complete/CompletePayability.php
+git add app/Support/History/History.php
+git add bootstrap/app.php
+git add database/factories/BookingAccessTokenFactory.php
+git add database/migrations/2026_09_21_200074_create_booking_access_tokens_table.php
+git add resources/views/mail/documents/payment-link.blade.php
+git add routes/api/engine.php
+git add routes/api/rms.php
+git add tests/Feature/Bookings/CompleteLinkTest.php
+git add tests/Feature/Documents/DeliveryEndpointsTest.php
+git add tests/Feature/Documents/DocumentsDueCommandTest.php
+git add tests/Feature/Engine/EngineCompleteReservationTest.php
+git add tests/Feature/History/HistoryWriterTest.php
+git add tests/Feature/OpenApi/EngineResponseSchemasTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add tests/e2e/scenarios/documents/DOC-07-payment-link-email.md
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the Complete your reservation API, hashed access tokens and email links.
+
+EOF
+)"
+```
+
+
 ```bash
 cd /home/mohammad/Code/iconic/anakata/anakata-api
 git add .env.example

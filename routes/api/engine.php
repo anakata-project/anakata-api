@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Engine\CharterEnquiryController;
 use App\Http\Controllers\Engine\CheckoutController;
+use App\Http\Controllers\Engine\CompleteReservationController;
 use App\Http\Controllers\Engine\DepartureCabinController;
 use App\Http\Controllers\Engine\FeedController;
 use App\Http\Controllers\Engine\PromoCheckController;
@@ -23,3 +24,10 @@ Route::post('checkout/{token}/submit', [CheckoutController::class, 'submit'])->m
 
 Route::post('waitlist', WaitlistController::class)->middleware('throttle:engine-waitlist');
 Route::post('charter-enquiries', CharterEnquiryController::class)->middleware('throttle:engine-charter');
+
+Route::middleware(['throttle:engine-complete', 'noindex'])->group(function (): void {
+    Route::get('complete/{token}', [CompleteReservationController::class, 'show']);
+    Route::put('complete/{token}/billing', [CompleteReservationController::class, 'updateBilling']);
+    Route::put('complete/{token}/guests/{guest}', [CompleteReservationController::class, 'updateGuest'])->whereNumber('guest');
+    Route::post('complete/{token}/declarations', [CompleteReservationController::class, 'recordDeclarations']);
+});

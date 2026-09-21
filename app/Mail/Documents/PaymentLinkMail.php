@@ -25,6 +25,7 @@ final class PaymentLinkMail extends Mailable
         public Delivery $delivery,
         public Booking $booking,
         public PaymentLink $link,
+        public string $completeUrl,
     ) {}
 
     public function envelope(): Envelope
@@ -49,6 +50,7 @@ final class PaymentLinkMail extends Mailable
                 'delivery' => $this->delivery,
                 'booking' => $this->booking,
                 'link' => $this->link,
+                'completeUrl' => $this->completeUrl,
                 'amount' => Money::format($this->link->amount),
                 'purpose' => $this->link->kind->label(),
                 'dueDate' => $due,

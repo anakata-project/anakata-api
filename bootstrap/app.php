@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\GuardCrmSensitiveData;
+use App\Http\Middleware\NoindexResponse;
 use App\Http\Middleware\RequirePermission;
 use App\Support\SensitiveFields;
 use Illuminate\Foundation\Application;
@@ -55,6 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'crm.sensitive' => GuardCrmSensitiveData::class,
             'active' => EnsureUserIsActive::class,
             'permission' => RequirePermission::class,
+            'noindex' => NoindexResponse::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

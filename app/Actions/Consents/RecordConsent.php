@@ -29,6 +29,7 @@ final class RecordConsent extends Action
         ?CarbonInterface $acceptedAt = null,
         ?string $version = null,
         ?User $actor = null,
+        ?string $actorLabel = null,
     ): Consent {
         if ($source === ConsentSource::Staff && ($howObtained === null || $howObtained === '')) {
             throw ValidationException::withMessages([
@@ -47,6 +48,7 @@ final class RecordConsent extends Action
             $acceptedAt,
             $version,
             $actor,
+            $actorLabel,
         ): Consent {
             $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
@@ -86,7 +88,7 @@ final class RecordConsent extends Action
                 'source' => $source->value,
             ], reason: $source === ConsentSource::Staff ? $howObtained : null, actor: $actor, extraContext: [
                 'what' => 'Consent recorded — '.$document->label(),
-            ]);
+            ], actorLabel: $actorLabel);
 
             return $consent;
         });

@@ -23,9 +23,9 @@ final class UpdateGuest extends Action
     /**
      * @param  array<string, mixed>  $data
      */
-    public function handle(Guest $guest, array $data, User $actor): Guest
+    public function handle(Guest $guest, array $data, ?User $actor = null, ?string $actorLabel = null): Guest
     {
-        return $this->transaction(function () use ($guest, $data, $actor): Guest {
+        return $this->transaction(function () use ($guest, $data, $actor, $actorLabel): Guest {
             $guest->load('booking.departure');
             $booking = $guest->booking;
             $booking = BookingMutationLock::acquire($booking, (int) $booking->departure_id);
@@ -51,7 +51,7 @@ final class UpdateGuest extends Action
                 $after['what'] = 'Passenger updated — '.$guest->displayName().': '.implode(', ', $labels);
                 $after['guest_id'] = $guest->id;
 
-                History::record($booking, 'guest.updated', before: $before, after: $after, actor: $actor);
+                History::record($booking, 'guest.updated', before: $before, after: $after, actor: $actor, actorLabel: $actorLabel);
             }
 
             if ($consentChanged) {
@@ -65,7 +65,7 @@ final class UpdateGuest extends Action
                     'what' => $guest->guardian_consented_at === null
                         ? 'Guardian consent cleared — '.$guest->displayName()
                         : 'Guardian consent recorded — '.$guest->displayName(),
-                ], actor: $actor);
+                ], actor: $actor, actorLabel: $actorLabel);
             }
 
             if ($booking->png_collected && (int) $guest->png_fee !== $feeBefore) {

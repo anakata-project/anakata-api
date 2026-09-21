@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Bookings;
 
 use App\Actions\Action;
+use App\Actions\Complete\RevokeCompleteAccessTokens;
 use App\Enums\ReleaseReason;
 use App\Models\Booking;
 use App\Models\User;
@@ -14,7 +15,10 @@ use App\Support\History\History;
 
 final class DeleteBooking extends Action
 {
-    public function __construct(private ClaimService $claims) {}
+    public function __construct(
+        private ClaimService $claims,
+        private RevokeCompleteAccessTokens $completeTokens,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -29,6 +33,7 @@ final class DeleteBooking extends Action
             $reason = trim((string) ($data['reason'] ?? ''));
 
             $this->claims->release($booking, ReleaseReason::Cancelled);
+            $this->completeTokens->handle($booking);
 
             History::record($booking, 'booking.deleted', after: [
                 'client' => $booking->contact->name,

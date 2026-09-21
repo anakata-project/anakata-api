@@ -48,6 +48,7 @@ test('engine OpenAPI schemas have properties', function (): void {
         'CheckoutSubmittedResource',
         'EngineWaitlistResource',
         'EngineCharterEnquiryResource',
+        'CompleteReservationResource',
     ] as $name) {
         engineOpenApiSchema($spec, $name);
     }

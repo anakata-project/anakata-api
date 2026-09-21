@@ -101,6 +101,7 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $guests_count
  * @property-read int|null $guests_complete_count
  * @property-read Collection<int, PaymentLink> $paymentLinks
+ * @property-read Collection<int, BookingAccessToken> $accessTokens
  * @property-read BookingRequest|null $bookingRequest
  * @property-read RefundRequest|null $refundRequest
  * @property-read int|null $payments_paid_sum
@@ -324,6 +325,14 @@ class Booking extends Model
     public function paymentLinks(): HasMany
     {
         return $this->hasMany(PaymentLink::class)->orderByDesc('id');
+    }
+
+    /**
+     * @return HasMany<BookingAccessToken, $this>
+     */
+    public function accessTokens(): HasMany
+    {
+        return $this->hasMany(BookingAccessToken::class);
     }
 
     /**

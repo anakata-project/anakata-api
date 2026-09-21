@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Documents;
 
 use App\Actions\Action;
+use App\Actions\Complete\IssueCompleteAccessToken;
 use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
 use App\Enums\DeliveryTriggeredBy;
@@ -23,6 +24,7 @@ final class SendPaymentRequest extends Action
     public function __construct(
         private readonly Recipients $recipients,
         private readonly RecordDelivery $record,
+        private readonly IssueCompleteAccessToken $completeLinks,
     ) {}
 
     public function handle(
@@ -39,6 +41,7 @@ final class SendPaymentRequest extends Action
         }
 
         return $this->transaction(function () use ($booking, $kind, $link, $reminderDays, $actor, $system, $resend): Delivery {
+            $this->completeLinks->handle($booking);
             $recipients = $this->recipients->resolve($booking, $kind);
             $firstKey = $this->firstKey($booking, $kind, $link, $reminderDays);
             $triggeredBy = $system || ! $actor instanceof User

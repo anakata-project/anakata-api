@@ -12,6 +12,7 @@ use App\Enums\PaymentLinkStatus;
 use App\Mail\Documents\DocumentMail;
 use App\Mail\Documents\PaymentLinkMail;
 use App\Models\Booking;
+use App\Models\BookingAccessToken;
 use App\Models\Delivery;
 use App\Models\PaymentLink;
 use App\Support\Documents\WireWarning;
@@ -107,8 +108,17 @@ test('an open payment link can be emailed', function (): void {
         ->assertJsonPath('status', DeliveryStatus::Queued->value);
 
     Mail::assertSent(PaymentLinkMail::class, 1);
+    Mail::assertSent(PaymentLinkMail::class, function (PaymentLinkMail $mail) use ($booking): bool {
+        $token = BookingAccessToken::query()->where('booking_id', $booking->id)->first();
+        $html = $mail->render();
+
+        return $token instanceof BookingAccessToken
+            && str_contains($html, $token->page_url)
+            && ! str_contains($html, 'buy.stripe.com');
+    });
     expect(Delivery::query()->where('kind', DeliveryKind::PaymentLink)->first()?->status)
         ->toBe(DeliveryStatus::Sent);
+    expect(BookingAccessToken::query()->where('booking_id', $booking->id)->count())->toBe(1);
 });
 
 test('a cancelled payment link cannot be emailed', function (): void {

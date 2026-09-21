@@ -121,6 +121,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->ip() ?? 'unknown');
         });
 
+        RateLimiter::for('engine-complete', function (Request $request): array {
+            $token = (string) $request->route('token');
+
+            return [
+                Limit::perMinute(20)->by('ip:'.($request->ip() ?? 'unknown')),
+                Limit::perMinute(10)->by('token:'.hash('sha256', $token)),
+            ];
+        });
+
         RateLimiter::for('login', function (Request $request): Limit {
             $email = Str::lower((string) $request->input('email'));
 

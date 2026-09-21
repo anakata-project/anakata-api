@@ -10,6 +10,7 @@ use App\Enums\PaymentKind;
 use App\Enums\PaymentStatus;
 use App\Mail\Documents\ReminderMail;
 use App\Models\Booking;
+use App\Models\BookingAccessToken;
 use App\Models\Delivery;
 use App\Models\Document;
 use App\Models\Payment;
@@ -71,7 +72,17 @@ test('reminders fire at minus 21 and minus 7 and not on the days around them', f
     travelTo('2028-05-11');
     $this->artisan('anakata:documents-due')->assertSuccessful();
     expect(Delivery::query()->where('kind', DeliveryKind::Reminder)->count())->toBe(1);
-    Mail::assertSent(ReminderMail::class, fn (ReminderMail $mail): bool => $mail->days === 21);
+    Mail::assertSent(ReminderMail::class, function (ReminderMail $mail): bool {
+        if ($mail->days !== 21) {
+            return false;
+        }
+
+        $token = BookingAccessToken::query()->where('booking_id', $mail->booking->id)->first();
+
+        return $token instanceof BookingAccessToken
+            && str_contains($mail->render(), $token->page_url)
+            && ! str_contains($mail->render(), 'buy.stripe.com');
+    });
 
     $this->artisan('anakata:documents-due')->assertSuccessful();
     expect(Delivery::query()->where('kind', DeliveryKind::Reminder)->count())->toBe(1);

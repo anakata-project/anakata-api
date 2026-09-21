@@ -25,6 +25,7 @@ final class ReminderMail extends Mailable
         public Booking $booking,
         public int $days,
         public ?PaymentLink $payLink,
+        public string $completeUrl,
     ) {}
 
     public function envelope(): Envelope
@@ -47,7 +48,7 @@ final class ReminderMail extends Mailable
                 'days' => $this->days,
                 'dueDate' => $this->booking->balanceDueDate()->toDateString(),
                 'balance' => Money::format($this->booking->cruiseOutstanding()),
-                'payUrl' => $this->payLink?->url,
+                'payUrl' => $this->completeUrl,
                 'replyTo' => IssuerMail::replyTo(),
             ],
         );

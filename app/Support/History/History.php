@@ -48,14 +48,20 @@ final class History
         ?User $actor = null,
         array $extraContext = [],
         bool $system = false,
+        ?string $actorLabel = null,
     ): ChangeHistory {
         self::guardTransaction();
 
         if ($system) {
             $actor = null;
+            $label = 'System';
+        } elseif ($actorLabel !== null && $actorLabel !== '') {
+            $actor = null;
+            $label = $actorLabel;
         } else {
             $actor ??= Auth::user();
             $actor = $actor instanceof User ? $actor : null;
+            $label = $actor instanceof User ? $actor->name : 'System';
         }
 
         $entry = new ChangeHistory([
@@ -64,7 +70,7 @@ final class History
             'subject_label' => self::subjectLabel($subject),
             'event' => $event,
             'actor_id' => $actor instanceof User ? $actor->id : null,
-            'actor_label' => $actor instanceof User ? $actor->name : 'System',
+            'actor_label' => $label,
             'before' => self::redact($before),
             'after' => self::redact($after),
             'reason' => $reason,
