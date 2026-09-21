@@ -973,3 +973,203 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 08 · Extras tab, charges rows, catalogue editor
+
+### What was built
+The booking panel Extras tab is live. `BOOKING_TABS.extras` is enabled (`disabled: false`, `arrivesSprint: null`). Only Documents stays disabled. `BookingExtrasTab` mounts next to Guests, loads `GET /api/rms/bookings/{id}/extras` and `GET /api/rms/extras`, and emits `updated` through `onPaymentsUpdated` so Overview, the list, and History refresh after every write. Overview money rows come from `chargesRows(booking)` — labels and API amounts only. Rates & Promotions now hosts a second `useConfigEditor('extras')` (own versions, own publish bar) instead of the ADMIN / DIRECTOR placeholder.
+
+Types already existed on layer `v0.7.1` (`BookingExtra`, `ExtrasListSummary`, `ExtrasCatalogue`, `ExtrasDocument`, `ExtrasVersion`). Re-exported from `app/types/api.ts`. No API changes.
+
+### Tab structure
+
+1. Intro note (`bookings.extrasIntro` — prototype wording about §4.6 g / on-request spa, bar, boutique).
+2. Table (`list mini-t`): service + optional `.gmeta` note, qty, `rate_usd`, API `amount` (never `qty × rate` in the panel), remove. Empty: “No additional services contracted.” Footer: “Ancillary subtotal” = API `extras_total`.
+3. **Add a service** when `can_act` and status is not `CANCELLED` / `CANCELLED_POSTPAID` / `RELEASED`. Select is filtered to `active === true`. On pick / mount, `extraAddDefaults(item, booking.guests_summary.total)` prefills qty (`max(guestCount, 1)`) and rate (`price_usd`, empty when on request). `tct_count` is the TCT fee basis, not a headcount. POST `{ code, qty, rate_usd, note }`. On-request with no rate → 422 `rate_usd` via `applyApiFormError`.
+4. Remove: confirmation-only `UModal` titled **“Remove {name} × {qty}?”** — Cancel / Remove, no reason field. Not `ReasonModal` (DELETE takes no body). History already records the removal. Never `window.confirm`.
+5. After every write: reload extras + `emit('updated')`.
+
+### Galápagos fees
+
+Heading: “Galápagos fees — the guest chooses who collects them”.
+
+`feeLabel(kind, amounts)` builds the two `.chkline` sentences from extras-summary facts:
+
+| Kind | Sources | Sentence |
+|---|---|---|
+| PNG | `png_known_total`, `png_pending_count` | “Guest pays the PNG park entry fee to Anakata (USD {png_known_total} — by nationality, see Guests). Unchecked = paid directly at SCY airport on arrival.” + “{n} guests pending data” when pending > 0 |
+| TCT | `tct_pp`, `tct_count` | “Anakata manages the TCT transit card (USD {tct_pp} × {tct_count}). Unchecked = guest pre-registers or pays at the origin airport.” |
+
+Checked state = `png_collected` / `tct_collected`. Toggle → `PATCH /api/rms/bookings/{id}/fees` with that one boolean. Disabled when `!can_act` or terminal.
+
+Footnote uses API `extras_due_hours` (seed 72). **The prototype “re-issue an updated invoice” notice is not shown** — invoices are Sprint 7.
+
+### Overview charges rows
+
+`chargesRows` returns visibility + API values. `money()` stays in the template.
+
+| Row | Source |
+|---|---|
+| Cruise | `total` (was `kvCabinTotal`) |
+| Extras | `extras_total` |
+| Galápagos fees collected | `fees_collected_total`; suffix “pending data” when `png_pending_count > 0` |
+| rule | visual separator |
+| **Charges total** | `charges_total` |
+| Paid / pledged / Balance | unchanged; balance is already charges − paid from task 04 |
+| Deposit | `deposit_pct` + `deposit_amount`; label **“Deposit {pct}% of cruise charges”** |
+| Extras and fees due by {date} | only when `balance > 0` **and** (`extras_total > 0` or `fees_collected_total > 0`); date = `extras_due_at` |
+
+### What OVERDUE still means on screen
+
+The OVERDUE pill and OPS-007 block still read `booking.overdue`. Task 04 / I9 made that flag **cruise-outstanding only**. Adding extras or collected fees does not flip the pill. A FULLY_PAID booking that gains an extra shows `balance > 0` and keeps the FULLY PAID pill.
+
+### Catalogue editor
+
+`ConfigKindSlug` includes `'extras'`. Base path `/api/rms/${kind}` already hits `/api/rms/extras`. A second editor — separate document, own versions:
+
+- `extrasEditor = useConfigEditor('extras')`
+- `canPublishExtras = can('extras.manage')` (read is `panel.rms`)
+- `useUnsavedGuard(() => editor.dirty || extrasEditor.dirty)`
+- Own `ConfigPublishBar` (`approval-required`, 409 → “Load the latest version”) + `ConfigHistoryPanel`
+- Confirm note: “Existing booking extras keep the rate they were sold at.”
+- ADMIN / DIRECTOR pill kept
+
+`ExtrasCataloguePanel` + `extrasCatalogueHelpers` (`EXTRAS_DRAFT_KEY`, `extrasFieldLabels(draft)` for `items.{i}.*`). Table: code, name, unit, price (empty = “on request” → `null`), transfer voucher, active.
+
+- Code **read-only** when it exists on the published document; new draft rows can type a code.
+- **No client-side max-length or distinct checks** — publish validation reports those through `editor.errorsFor`.
+- No delete of published codes — deactivate. Unpublished draft-only rows may be dropped.
+- Add item appends `{ code: '', name: '', unit: '', price_usd: null, triggers_transfer_voucher: false, active: true }`.
+
+### Helpers (tested) and History
+
+- `feeLabel(kind, amounts)` — the two checkbox sentences, including pending-data.
+- `chargesRows(booking)` — row list / visibility only; no sums.
+- `extraAddDefaults(item, guestCount)` — qty + rate; caller passes `booking.guests_summary.total`.
+- `extrasWritable(status, canAct)` — hides the add form and fee toggles on terminal statuses.
+
+`describe.ts` maps `extra.added`, `extra.removed`, `booking.fees_changed` through `after.what` (same as guests).
+
+### Browser (after `tests/e2e/bin/reset.sh`, both themes)
+
+Carolina (Admin). Dark default and light.
+
+- **ANK-2026-0003** (CONFIRMED) + flights × 2: extras USD 840, charges USD 27,440, balance moved, deposit still USD 2,660. Qty defaulted to 2 (`guests_summary.total`, list was 0/2 complete).
+- On-request SPA with empty rate → 422 `rate_usd`. Inactive items are filtered out of the select (seed catalogue items are all active).
+- **ANK-2026-0005** (FULLY_PAID): PNG on → fees USD 500, charges USD 38,405, balance USD 500, pill still FULLY PAID. Then FLT × 3 → extras USD 1,260, charges USD 39,665, balance USD 1,760, deposit still USD 3,791, list still FULLY PAID.
+- **ANK-2026-0014** (PENDING PAYMENT): PNG sentence “USD 200 … 1 guests pending data”. Toggle on → Overview “Galápagos fees collected pending data USD 200”, charges USD 26,800, “Extras and fees due by 11 Nov 2027, 00:00”, deposit still USD 2,660.
+- Catalogue publish FLT 420 → 500 (V2, Carolina, confirm note shown). **0005 extra kept USD 420 / 1,260**. New add form on 0014 prefills 500.
+
+After a write the panel lands on Overview (same as Guests / Payments). Re-opening Extras shows the new rows.
+
+### Files touched
+
+**anakata-panel**
+- `app/components/extras/BookingExtrasTab.vue` (new)
+- `app/components/extras/ExtrasCataloguePanel.vue` (new)
+- `app/components/extras/extraHelpers.ts` (new)
+- `app/components/extras/extrasCatalogueHelpers.ts` (new)
+- `tests/unit/extraHelpers.test.ts` (new)
+- `tests/unit/extrasCatalogueHelpers.test.ts` (new)
+- `app/components/bookings/BookingPanel.vue`
+- `app/components/bookings/bookingHelpers.ts`
+- `app/composables/useConfigEditor.ts`
+- `app/pages/rms/commercial/rates.vue`
+- `app/components/history/describe.ts`
+- `app/types/api.ts`
+- `app/assets/css/bookings.css`
+- `app/assets/css/config.css`
+- `i18n/locales/en.json`
+- `eslint.config.mjs`
+- `tests/unit/bookingHelpers.test.ts` (disabled tabs: documents only)
+- `tests/unit/describe.test.ts`
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-06/REPORT.md`
+
+### Deviations
+- Task file still says fresh-clone against `v0.7.0`; this task uses **`v0.7.1`** (task 07 bump).
+- Extra remove is confirmation-only (approved plan). The task file still says “ReasonModal-style”; a typed reason would be discarded.
+- `rates.extrasNote` (placeholder copy) removed; the catalogue panel uses `rates.extrasHelp`.
+- After a write, `onPaymentsUpdated` reloads the booking and the panel lands on Overview (same as Guests).
+- Catalogue publish confirm listed the whole `items` array as one change (API validate `changes` path), not `items.0.price_usd`. Field labels still exist for the per-item paths.
+
+### Open questions
+None.
+
+### Notes for later
+- Invoice / re-issue notice (Sprint 7).
+- E2E scenarios `EXT-01` … `EXT-05` (task 10).
+
+### Quality
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (212), `build` — pass.
+
+### Fresh clone (two-step, git read-only)
+
+**Step 1 — overlay (agent, before push).** Sibling trees into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` from the working copies (no GitHub clone — `v0.7.1` is not on origin yet). Confirmed the ui tree is **0.7.1** and has **no** `app/types/nuxt.d.ts`.
+
+- ui: `pnpm typecheck` pass
+- panel / engine: `pnpm typecheck` + `pnpm build` pass
+- **OVERLAY CLONE OK**
+
+**Step 2 — real tag (user, or agent in a follow-up).** After `v0.7.1` is on origin and this panel work is pushed, repeat the clone checking out `anakata-ui` at `v0.7.1` with **no** overlay. Result not recorded yet.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/components/extras/BookingExtrasTab.vue \
+  app/components/extras/ExtrasCataloguePanel.vue \
+  app/components/extras/extraHelpers.ts \
+  app/components/extras/extrasCatalogueHelpers.ts \
+  tests/unit/extraHelpers.test.ts \
+  tests/unit/extrasCatalogueHelpers.test.ts \
+  app/components/bookings/BookingPanel.vue \
+  app/components/bookings/bookingHelpers.ts \
+  app/composables/useConfigEditor.ts \
+  app/pages/rms/commercial/rates.vue \
+  app/components/history/describe.ts \
+  app/types/api.ts \
+  app/assets/css/bookings.css \
+  app/assets/css/config.css \
+  i18n/locales/en.json \
+  eslint.config.mjs \
+  tests/unit/bookingHelpers.test.ts \
+  tests/unit/describe.test.ts
+git commit -m "$(cat <<'EOF'
+Enable the booking panel Extras tab and catalogue editor.
+
+Overview charges rows and fee sentences render API fields only;
+the extras catalogue reuses the existing config publish flow.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 2. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 6 task 08: extras tab, charges rows, catalogue editor.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 3. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.7.1
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+
