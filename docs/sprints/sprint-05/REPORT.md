@@ -1681,3 +1681,223 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 10 · New Reservation: agency, commission, deposit method
+
+### What was built
+The New Reservation modal now has the three Sprint 4 leftovers: **agency**, **commission %** (FIN-005 warning, Create not blocked), and **deposit method**. After create it stays on a success pane until **Done** (toast + panel open). Types ship as **anakata-ui `v0.6.4`**.
+
+Overview always shows `booking.agency` when present: `{name} · {pct}%`, or `{name} · {pct}% · awaiting Director approval` while the rate is unapproved. The browser check depends on that kv.
+
+### Trade branch
+`isTradeMain(main_channel, form-options.main)` (the API `trade` flag). When true:
+
+- **Agency** select from `GET /bookings/form-options` → `agencies` (APPROVED only). Label `agencyOptionLabel`: `{name} — {network}` and ` · >{cap}%` when the agency rate is over the cap. Required on trade. No second `GET /agencies`.
+- **Commission %** prefilled from the selected agency, else `commission.default_pct`. Editable, `min=0`, **no max**.
+- `#commwarn` (`.warnbox`) when `commissionWarning(rate, cap)` is non-null. Cap from `form-options.commission.cap_pct`, never a literal 12. Create stays enabled.
+
+When the channel leaves trade, the fields hide and `agency_id` / `commission_pct` are cleared (`watch(isTrade)` + `tradeCreateFields`). Same reset discipline as `back_to_back`.
+
+D2C and other non-trade channels never show the fields.
+
+### Pending-agency decision
+**APPROVED only.** Task 04’s 422 on a PENDING `agency_id` stands. There is no `＋ New agency…` and `RegisterAgencyModal` is not imported. Registration stays on B2B (`＋ Register agency`). A booking against a pending agency is not offered here.
+
+### Cap behaviour (FIN-005)
+Over-cap does not block Create. `CreateReservation` still writes the booking as `ON_HOLD_AGENCY`. The success pane shows `heldCreatedToast` (same wording as the API alert). Overview shows the hold notice from task 09 plus the agency kv with the pending suffix. Approving the commission is still task 07’s panel (or the commissions list); confirm still also needs the deposit.
+
+### Deposit method
+Select: **Card — payment link** / **Wire transfer ({hours}h · PENDING_PAYMENT)**. Hours from `form-options.payments.wire_window_hours`. The method is panel-only — it does not change the booking status (`PENDING_PAYMENT`, or `ON_HOLD_AGENCY` when over cap).
+
+| Method | After create |
+|---|---|
+| Card | If `can('payments.record')`: `POST /bookings/{id}/payment-link` `{ kind: DEPOSIT }`, show the URL + Copy, plus “sending it is manual until Sprint 7”. A 5xx/403 never undoes the booking — warn and retry from Payments. If the user lacks the permission: skip the POST and say finance creates the link from the Payments tab. |
+| Wire | No payment row. Success copy: instructions are issued manually this sprint + the window hours. |
+
+Neither path invents a ledger row. Wire is recorded later when finance marks it received.
+
+### `form-options` prelude
+`commission: { cap_pct, default_pct }` was already on the resource. This task adds **`payments: { wire_window_hours }`** (PHPDoc + Pest + OpenAPI keys only). `CreateReservation` is unchanged. The panel does not read the business-rules document.
+
+### Overview kv (required)
+`v-if="source.agency"`:
+
+- approved: `Agency {name} · {pct}%`
+- not approved: `Agency {name} · {pct}% · awaiting Director approval`
+
+`pct` is `commission_pct` falling back to the agency rate.
+
+### Helpers
+`commissionWarning(rate, cap)`, `heldCreatedToast(rate, cap)`, `depositMethodOptions(hours)`, `agencyOptionLabel(agency, cap)`, `tradeCreateFields(isTrade, agencyId, commissionPct)`.
+
+### Files touched
+**anakata-api (prelude + e2e wording)**
+- `app/Support/Bookings/BookingFormOptions.php`
+- `app/Http/Resources/Rms/BookingFormOptionsResource.php`
+- `tests/Feature/Bookings/BookingFormOptionsTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `tests/e2e/scenarios/bookings/BKG-02-create-one-cabin.md`
+- `tests/e2e/scenarios/bookings/BKG-03-create-three-cabin-group.md`
+- `tests/e2e/scenarios/bookings/BKG-04-festive-charter.md`
+
+**anakata-ui** (`v0.6.4`)
+- `app/types/api.d.ts`
+- `package.json`, `CHANGELOG.md`
+
+**anakata-panel**
+- `app/components/bookings/NewReservationModal.vue`
+- `app/components/bookings/newReservationHelpers.ts`
+- `tests/unit/newReservationHelpers.test.ts`
+- `app/components/bookings/BookingPanel.vue` (required agency kv)
+- `i18n/locales/en.json`
+- `README.md` (pin `v0.6.4`)
+
+**anakata-engine**
+- `README.md` (documentation pin `v0.6.4` only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-05/REPORT.md`
+
+### Deviations
+- No in-modal `＋ New agency…` / `RegisterAgencyModal` (plan correction). Task 04 APPROVED-only stays.
+- Card payment-link only when `can('payments.record')`. Admin tries; Sales Exec skips.
+- Commission input has `min=0` only — no HTML `max=30`.
+- Wire success copy states the window only, not `PENDING_PAYMENT` (an over-cap wire is `ON_HOLD_AGENCY`). The select option still says `{hours}h · PENDING_PAYMENT` as the task specified.
+- Success pane + Done before the toast / panel. BKG-02 / 03 / 04 updated so they click Done.
+
+### Open questions
+None for this task.
+
+### Notes for later
+- **Fresh-clone step 2:** after the user pushes `v0.6.4`, clone against the real tag with **no** overlay and record the result.
+- Task 11: PAY-* e2e. Optional agency-create cases (10 % accrue, 15 % hold + wire, Lucía skip-link). Do not write `INDEX.md` here.
+- Local Stripe `api_key` is empty — Carolina’s card path hits the link-failure warning. That is ENV, not a product bug.
+- Agent portal / sending the link by email: later sprints.
+
+### Quality
+- anakata-api prelude: Pest (`payments.wire_window_hours` = 72 + OpenAPI keys); Pint + Larastan on the prelude files (composer check 631 passed in-session).
+- anakata-ui: `pnpm lint`, `typecheck`, `test` (35), `build` — pass.
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (200), `build` — pass.
+- anakata-engine: `pnpm typecheck` — pass.
+
+### Fresh clone (two-step, git read-only)
+
+**Step 1 — overlay (agent, before push).** Sibling copy into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}`, working trees overlaid. Confirmed the ui clone has **no** `app/types/nuxt.d.ts`.
+
+- ui / panel / engine: `pnpm typecheck` pass
+- panel / engine: `pnpm build` pass
+- **OVERLAY CLONE OK**
+
+**Step 2 — real tag (user, or agent in a follow-up).** After `v0.6.4` is on origin, repeat the clone checking out `anakata-ui` at `v0.6.4` with **no** overlay. Result not recorded yet.
+
+### Browser (after `tests/e2e/bin/reset.sh`, `COMPOSE_PROJECT_NAME=anakata-api`)
+
+Dark (default) and light (`html.light`, `--ui-bg #FAF9F0`).
+
+**D2C:** no Agent / Agency, no Commission %. Wire option reads `72h · PENDING_PAYMENT` after form-options load.
+
+**B2B – Travel Advisor:** agencies `Blue Latitude Travel — Virtuoso` and `Meridian Voyages — ILTM · >12%`. No `＋ New agency…`. Switching back to D2C hides the fields.
+
+**Carolina · 10 % · card** — Elena Trade, Blue Latitude, ANAMARA 7 Nov 2027 Suite 03 → **ANK-2026-0022** `PENDING_PAYMENT`. Overview: `Agency Blue Latitude Travel · 10%`. Stripe link failed (`api_key cannot be the empty string`); warning shown; booking kept. Payments & Revenue: Blue Latitude **10% · USD 2,660 · ACCRUED**.
+
+**Carolina · 15 % · wire** — Meridian Hold, Meridian Voyages, Suite 04 → **ANK-2026-0023** `ON HOLD AGENCY`. Warning on the form; Create still worked. Success: held toast + 72h wire window. Overview: `Agency Meridian Voyages · 15% · awaiting Director approval`. Payments tab: **No payments yet.** Payments & Revenue: Meridian **15% · BLOCKED >12% · DIRECTOR APPROVAL (FIN-005)**.
+
+**Lucía** (Sales Exec, no `payments.record`) · D2C · card — Lucia Card Skip, ANATIVA 7 Nov Suite 01 → **ANK-2026-0024**. Success: `Finance creates the payment link from the booking's Payments tab.` No POST.
+
+### Git commands (listed, not run)
+
+```bash
+# 1. anakata-api prelude + e2e wording
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Bookings/BookingFormOptions.php \
+  app/Http/Resources/Rms/BookingFormOptionsResource.php \
+  tests/Feature/Bookings/BookingFormOptionsTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/e2e/scenarios/bookings/BKG-02-create-one-cabin.md \
+  tests/e2e/scenarios/bookings/BKG-03-create-three-cabin-group.md \
+  tests/e2e/scenarios/bookings/BKG-04-festive-charter.md
+git commit -m "$(cat <<'EOF'
+Expose the wire window on booking form-options.
+
+New Reservation reads hours from GET /bookings/form-options
+instead of the business-rules document.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  app/types/api.d.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the New Reservation wire window.
+
+BookingFormOptions.payments.wire_window_hours comes from
+Scramble; no new leftover overlays.
+EOF
+)"
+git tag v0.6.4
+git push origin HEAD
+git push origin v0.6.4
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/components/bookings/BookingPanel.vue \
+  app/components/bookings/NewReservationModal.vue \
+  app/components/bookings/newReservationHelpers.ts \
+  tests/unit/newReservationHelpers.test.ts \
+  i18n/locales/en.json
+git commit -m "$(cat <<'EOF'
+Finish New Reservation with agency, commission, and deposit method.
+
+Trade fields stay APPROVED-only; over-cap still creates the
+hold; card links require payments.record.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.6.4.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-05/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 5 task 10: New Reservation agency and deposit method.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.6.4
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+

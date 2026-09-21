@@ -317,6 +317,12 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         ?? $spec['paths']['/api/rms/bookings/form-options']['get']
         ?? null;
     expect($formOptions)->toBeArray();
+    $formOptionsSchema = openApiSchema($spec, 'BookingFormOptionsResource');
+    expect($formOptionsSchema['properties'])->toHaveKeys(['commission', 'payments']);
+    $formPayments = openApiProperties($formOptionsSchema['properties']['payments'] ?? []);
+    expect($formPayments)->toHaveKey('wire_window_hours');
+    $formCommission = openApiProperties($formOptionsSchema['properties']['commission'] ?? []);
+    expect($formCommission)->toHaveKeys(['cap_pct', 'default_pct']);
 
     $paymentOptions = openApiSchema($spec, 'PaymentOptionsResource');
     expect($paymentOptions['properties'])->toHaveKeys(['kinds', 'methods']);

@@ -21,6 +21,7 @@ final class BookingFormOptions
      *     preferred: list<array{value: string, label: string}>,
      *     guests: array{child_min_age: int, child_max_age: int, max_per_cabin: int},
      *     commission: array{cap_pct: int, default_pct: int},
+     *     payments: array{wire_window_hours: int},
      *     agencies: list<array{id: int, reference: string, name: string, network: string|null, commission_pct: int}>
      * }
      */
@@ -45,7 +46,8 @@ final class BookingFormOptions
         }
 
         $guests = $config->engineSettings()->guests;
-        $commission = $config->businessRules()->commission;
+        $rules = $config->businessRules();
+        $commission = $rules->commission;
 
         return [
             'main' => array_map(
@@ -72,6 +74,9 @@ final class BookingFormOptions
             'commission' => [
                 'cap_pct' => $commission->capPct,
                 'default_pct' => $commission->defaultPct,
+            ],
+            'payments' => [
+                'wire_window_hours' => $rules->payments->wireWindowHours,
             ],
             'agencies' => Agency::query()
                 ->where('status', AgencyStatus::Approved)

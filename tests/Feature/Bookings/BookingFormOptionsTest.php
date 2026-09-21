@@ -55,6 +55,7 @@ test('sales exec can read booking form options', function (): void {
         ->assertJsonPath('guests.max_per_cabin', 3)
         ->assertJsonPath('commission.cap_pct', 12)
         ->assertJsonPath('commission.default_pct', 10)
+        ->assertJsonPath('payments.wire_window_hours', 72)
         ->assertJsonPath('agencies', []);
 });
 
