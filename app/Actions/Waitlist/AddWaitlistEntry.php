@@ -6,6 +6,7 @@ namespace App\Actions\Waitlist;
 
 use App\Actions\Action;
 use App\Actions\Contacts\ResolveContact;
+use App\Actions\Contacts\StitchEngineIdentity;
 use App\Enums\CabinCategory;
 use App\Enums\WaitlistSource;
 use App\Models\User;
@@ -18,6 +19,7 @@ final class AddWaitlistEntry extends Action
 {
     public function __construct(
         private ResolveContact $contacts,
+        private StitchEngineIdentity $identity,
     ) {}
 
     /**
@@ -35,6 +37,11 @@ final class AddWaitlistEntry extends Action
             }
 
             $contact = $this->contacts->handle(is_array($data['client'] ?? null) ? $data['client'] : []);
+
+            $this->identity->handle(
+                $contact,
+                isset($data['session_id']) && is_string($data['session_id']) ? $data['session_id'] : null,
+            );
 
             $category = $data['cabin_category'] instanceof CabinCategory
                 ? $data['cabin_category']

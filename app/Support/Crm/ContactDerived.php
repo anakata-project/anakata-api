@@ -138,8 +138,7 @@ final class ContactDerived
                   AND ('.$return.') < \''.$today.'\'
             ) THEN \''.ContactLifecycle::PastGuest->value.'\'
             WHEN (
-                /* TODO(task 03) identified engine behaviour */
-                FALSE
+                contacts.engine_identified_at IS NOT NULL
                 OR ('.self::marketingConsentSql().') = 1
             ) THEN \''.ContactLifecycle::Mql->value.'\'
             ELSE \''.ContactLifecycle::Prospect->value.'\'

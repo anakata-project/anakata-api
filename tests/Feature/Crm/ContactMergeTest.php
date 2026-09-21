@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Actions\Contacts\ResolveContact;
+use App\Enums\BehaviouralEventName;
 use App\Enums\BookingStatus;
 use App\Enums\Permission;
+use App\Models\BehaviouralEvent;
 use App\Models\Booking;
 use App\Models\ChangeHistory;
 use App\Models\CharterEnquiry;
@@ -120,7 +122,34 @@ test('merge repoints every contact-bearing table, fills empty fields and keeps t
     expect(ChangeHistory::query()->where('event', 'contact.merged')->count())->toBe(2);
 
     $tables = array_column(ContactReferences::tables(), 'table');
-    expect($tables)->toBe(['bookings', 'groups', 'waitlist_entries', 'charter_enquiries']);
+    expect($tables)->toBe(['bookings', 'groups', 'waitlist_entries', 'charter_enquiries', 'behavioural_events']);
+});
+
+test('merge moves behavioural events and unmerge restores them', function (): void {
+    $fixture = mergeFixture();
+    $event = BehaviouralEvent::factory()->create([
+        'contact_id' => $fixture['loser']->id,
+        'name' => BehaviouralEventName::PageView,
+    ]);
+    $actor = managerUser();
+
+    $mergeId = $this->actingAs($actor)
+        ->postJson('/api/crm/contacts/'.$fixture['survivor']->id.'/merge', [
+            'contact_id' => $fixture['loser']->id,
+            'reason' => 'Same person',
+        ])
+        ->assertOk()
+        ->json('merge.id');
+
+    expect($event->fresh()?->contact_id)->toBe($fixture['survivor']->id);
+
+    $this->actingAs($actor)
+        ->postJson('/api/crm/contact-merges/'.$mergeId.'/undo', [
+            'reason' => 'Split them',
+        ])
+        ->assertOk();
+
+    expect($event->fresh()?->contact_id)->toBe($fixture['loser']->id);
 });
 
 test('merge does not overwrite a value the survivor already has', function (): void {

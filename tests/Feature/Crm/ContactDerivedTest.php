@@ -102,6 +102,11 @@ test('lifecycle covers each branch including date windows and precedence', funct
     crmBooking($completed, $today->subDays(40)->toDateString(), BookingStatus::Completed);
     expect(crmDerived($completed)->lifecycle)->toBe(ContactLifecycle::PastGuest->value);
 
+    $identified = Contact::factory()->create([
+        'engine_identified_at' => now(),
+    ]);
+    expect(crmDerived($identified)->lifecycle)->toBe(ContactLifecycle::Mql->value);
+
     $mql = Contact::factory()->create();
     $cancelled = crmBooking($mql, $today->addDays(14)->toDateString(), BookingStatus::Cancelled);
     Consent::factory()->create([

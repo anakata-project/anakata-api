@@ -7,6 +7,7 @@ namespace App\Actions\Checkout;
 use App\Actions\Action;
 use App\Actions\Consents\RecordConsent;
 use App\Actions\Contacts\ResolveContact;
+use App\Actions\Contacts\StitchEngineIdentity;
 use App\Enums\BookingStatus;
 use App\Enums\BookingType;
 use App\Enums\ChannelOfOrigin;
@@ -39,6 +40,7 @@ use App\Services\References\ReferenceService;
 use App\Support\Bookings\ChannelSeedMap;
 use App\Support\Bookings\SoldOn;
 use App\Support\BusinessHours;
+use App\Support\Crm\AttributionTouch;
 use App\Support\Engine\EngineBookingOwner;
 use App\Support\Guests\ApplyPng;
 use App\Support\History\History;
@@ -51,6 +53,7 @@ final class SubmitEngineCheckout extends Action
     public function __construct(
         private readonly ReservationQuoter $quoter,
         private readonly ResolveContact $contacts,
+        private readonly StitchEngineIdentity $identity,
         private readonly ReferenceService $references,
         private readonly ClaimService $claims,
         private readonly CurrentConfig $config,
@@ -106,6 +109,12 @@ final class SubmitEngineCheckout extends Action
                 'phone' => $data['phone'] ?? null,
                 'preferred_channel' => $channel,
             ]);
+
+            $this->identity->handle(
+                $contact,
+                isset($data['session_id']) && is_string($data['session_id']) ? $data['session_id'] : null,
+                is_array($data['attribution'] ?? null) ? $data['attribution'] : null,
+            );
 
             $group = $this->resolveGroup($quote, $contact, $departure);
             $owner = EngineBookingOwner::user();
@@ -178,6 +187,8 @@ final class SubmitEngineCheckout extends Action
                     'request_reference' => $booking->request_reference,
                     'status' => $booking->status->value,
                     'total' => $booking->total,
+                    'utm_first' => $booking->utm_first,
+                    'utm_last' => $booking->utm_last,
                     'what' => 'Booking requested via the booking engine',
                 ], system: true);
 
@@ -245,6 +256,12 @@ final class SubmitEngineCheckout extends Action
             'promo_code' => $this->promoCode($data),
             'online_deposit' => $path === CheckoutPath::PayDeposit,
             'sold_on' => SoldOn::today(),
+            'utm_first' => AttributionTouch::from(
+                is_array($data['attribution'] ?? null) ? ($data['attribution']['first_touch'] ?? null) : null,
+            ),
+            'utm_last' => AttributionTouch::from(
+                is_array($data['attribution'] ?? null) ? ($data['attribution']['last_touch'] ?? null) : null,
+            ),
             'checkout_session_id' => $session->id,
             'png_collected' => (bool) ($data['png_collected'] ?? false),
             'tct_collected' => $tctCollected,

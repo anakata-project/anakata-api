@@ -55,6 +55,8 @@ use Illuminate\Support\Facades\DB;
  * @property BookingStatus $status
  * @property MainChannel $main_channel
  * @property ChannelOfOrigin $channel_of_origin
+ * @property array<string, mixed>|null $utm_first
+ * @property array<string, mixed>|null $utm_last
  * @property int $adults
  * @property int $children
  * @property bool $back_to_back
@@ -127,6 +129,8 @@ use Illuminate\Support\Facades\DB;
     'status',
     'main_channel',
     'channel_of_origin',
+    'utm_first',
+    'utm_last',
     'adults',
     'children',
     'back_to_back',
@@ -164,6 +168,8 @@ class Booking extends Model
             'status' => BookingStatus::class,
             'main_channel' => MainChannel::class,
             'channel_of_origin' => ChannelOfOrigin::class,
+            'utm_first' => 'array',
+            'utm_last' => 'array',
             'commission_pct' => 'integer',
             'commission_approved' => 'boolean',
             'commission_approved_at' => 'datetime',

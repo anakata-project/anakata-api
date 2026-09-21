@@ -6,6 +6,7 @@ namespace App\Http\Requests\Engine;
 
 use App\Enums\PreferredChannel;
 use App\Services\Config\CurrentConfig;
+use App\Support\Engine\EngineSessionId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -50,6 +51,7 @@ class StoreEngineCharterEnquiryRequest extends FormRequest
             'contact.phone' => ['sometimes', 'nullable', 'string', 'max:64'],
             'contact.preferred_channel' => ['sometimes', Rule::enum(PreferredChannel::class)],
             'message' => ['required', 'string', 'max:4000'],
+            'session_id' => EngineSessionId::rules(),
         ];
     }
 

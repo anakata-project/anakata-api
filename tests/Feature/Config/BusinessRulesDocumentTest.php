@@ -47,6 +47,8 @@ test('rules reject ranges, default above cap, reminder order and band shape', fu
         'retention' => [
             'passport_months_after_cruise' => 0,
             'medical_days_after_cruise' => 3651,
+            'behavioural_raw_months' => 0,
+            'behavioural_unstitched_days' => 3651,
         ],
     ]);
     $invalid['cancellation']['bands'] = [];
@@ -75,6 +77,8 @@ test('rules reject ranges, default above cap, reminder order and band shape', fu
     expect($errors->has('alerts.low_occupancy_days_before'))->toBeTrue();
     expect($errors->has('retention.passport_months_after_cruise'))->toBeTrue();
     expect($errors->has('retention.medical_days_after_cruise'))->toBeTrue();
+    expect($errors->has('retention.behavioural_raw_months'))->toBeTrue();
+    expect($errors->has('retention.behavioural_unstitched_days'))->toBeTrue();
     expect($errors->has('cancellation.bands'))->toBeTrue();
 });
 

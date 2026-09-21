@@ -11,6 +11,7 @@ use App\Models\Cabin;
 use App\Models\CheckoutSession;
 use App\Support\Countries;
 use App\Support\Engine\CabinCodes;
+use App\Support\Engine\EngineSessionId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -47,6 +48,10 @@ class SubmitCheckoutRequest extends FormRequest
             'guests.*.cabin_code' => ['required', 'string', 'max:32'],
             'guests.*.nationality' => ['required', 'string', Rule::in(Countries::codes())],
             'guests.*.ecuador_resident' => ['required', 'boolean'],
+            'session_id' => EngineSessionId::rules(),
+            'attribution' => ['sometimes', 'nullable', 'array'],
+            'attribution.first_touch' => ['sometimes', 'nullable', 'array'],
+            'attribution.last_touch' => ['sometimes', 'nullable', 'array'],
         ];
     }
 

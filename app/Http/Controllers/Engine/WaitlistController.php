@@ -36,6 +36,7 @@ final class WaitlistController extends Controller
             'children' => $validated['children'],
             'notes' => $validated['notes'] ?? null,
             'source' => WaitlistSource::Engine,
+            'session_id' => $validated['session_id'] ?? null,
         ]);
 
         return (new EngineWaitlistResource($entry))->response()->setStatusCode(201);

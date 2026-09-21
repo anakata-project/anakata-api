@@ -7,11 +7,14 @@ use App\Http\Controllers\Engine\CheckoutController;
 use App\Http\Controllers\Engine\CompleteReservationController;
 use App\Http\Controllers\Engine\CountryController;
 use App\Http\Controllers\Engine\DepartureCabinController;
+use App\Http\Controllers\Engine\EngineEventsController;
 use App\Http\Controllers\Engine\FeedController;
 use App\Http\Controllers\Engine\PromoCheckController;
 use App\Http\Controllers\Engine\QuoteController;
 use App\Http\Controllers\Engine\WaitlistController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('events', EngineEventsController::class)->middleware('throttle:engine-events');
 
 Route::get('feed', FeedController::class);
 Route::get('countries', CountryController::class);

@@ -271,3 +271,135 @@ Normalise email and phone, merge duplicates into the oldest contact, keep the lo
 EOF
 )"
 ```
+
+## Task 03 · Attribution and behavioural events
+
+The engine can tell the API what a consenting visitor does (fixed vocabulary) and where they came from. Events sit anonymous until an identifying submit stitches them onto a contact. A booking made from the engine stores UTM first/last touch once; a trigger refuses any later change.
+
+Decisions: L6, L7, L8 (and K3, K8, I6, A4). Prototype `v-activity` “purge anonymous at 13 months” loses to L6 (30 days). Prototype `abandon_checkout` is `abandon_cart` (SPEC §8).
+
+### Vocabulary and whitelist (L6)
+`App\Enums\BehaviouralEventName`: SPEC §8 names plus `view_departure`, `page_view`, and server-only `identity.stitched`. `acceptedFromClient()` excludes `identity.stitched` — ingest 422s it.
+
+`App\Support\Engine\BehaviouralEventParams` keeps only the keys allowed for that name. Unknown **names** → 422; unknown **keys** → dropped; typed values that fail (including free text) → 422. Coupon codes only on `apply_promotion` / `remove_promotion` / `promo_invalid`. No IP, UA, email, name, or access tokens.
+
+`App\Support\Engine\PagePath` is the single redactor for every stored path (`page_path` and attribution `landing_path`):
+1. Strip query string and hash.
+2. Prefix whitelist of credential-bearing routes. Today: any path matching `^/complete/` is stored as the literal `/complete/[token]`. Further segments after the token are dropped.
+3. Other paths stay query-stripped, no host, max 200 after redaction.
+
+### Schema
+Migration `200080`:
+- `contacts.engine_identified_at` — nullable timestamp, set once on first stitch. Merge empty-field copy with `first_touch` / `last_touch`.
+- `behavioural_events` — `event_id` unique, `session_id`, nullable `contact_id` (nullOnDelete), `name`, `params`, `occurred_at`, `received_at`, standard audit columns (engine writes `created_by` null).
+- `behavioural_event_daily` — unique `(date, name, itinerary_code)`; empty string when itinerary is absent.
+- `bookings.utm_first` / `utm_last` JSON nullable. Trigger (H1 pattern B): any `UPDATE` that changes either column (`NOT (NEW.x <=> OLD.x)`) signals `45000`. Writable only on INSERT. Staff `CreateBooking` leaves them null.
+
+`ContactReferences` now includes `behavioural_events.contact_id`. Merge moves stitched events; unmerge restores them.
+
+MQL SQL is `contacts.engine_identified_at IS NOT NULL OR (marketing consent)`. A waitlist/charter stitch with no booking is MQL.
+
+### Ingest — `POST /api/engine/events`
+On top of `throttle:engine`, `throttle:engine-events`: **30/min per IP** and **20/min per `session_id`** (working values; the task gave none). Dual-`Limit` style as `engine-complete`.
+
+Payload `{ session_id, events: [{ event_id, name, occurred_at, params }] }`. `session_id` required, 16–64 `^[A-Za-z0-9_-]+$`, never derived from IP (IPv4/IPv6 rejected). Events min 1, max 25. `occurred_at` clamped to `[now-24h, now]`. Idempotency = unique `event_id` (`insertOrIgnore`). After a session has been stitched, new inserts set `contact_id` from the latest `identity.stitched` row for that session.
+
+Response `EngineEventsAcceptedResource`: `{ accepted, duplicate }`. No `change_history` on ingest.
+
+### Stitching (L7)
+`StitchEngineIdentity` runs inside the identifying transactions after `ResolveContact` (or the booking’s contact on complete): checkout submit, waitlist, charter enquiry, complete billing / guest / declarations.
+
+When `session_id` is present: back-fill only `contact_id IS NULL`; insert one `identity.stitched` (`params.count` = rows affected); set `engine_identified_at` if null; history `identity.stitched` on the contact (count only). Same contact + same session again is a no-op unless there were new nulls. A second **different** contact on the same session keeps existing rows on the first; later ingest follows the latest stitch.
+
+Attribution is only accepted on checkout submit. Waitlist / charter / complete stitch only.
+
+### Attribution (L8) and trade wins
+`App\Support\Crm\AttributionTouch`: `source`, `medium`, `campaign`, `content`, `term`, `landing_path`, `captured_at`. Unknown keys dropped. UTM strings capped at 100; `landing_path` 200 after `PagePath`. Empty object → null.
+
+Engine checkout writes `utm_first` / `utm_last` at INSERT and includes them on `booking.requested` history. Contact: `first_touch` set only when null; `last_touch` replaced every time.
+
+**Trade wins:** engine checkout stays `WEB_DIRECT` / `HotelBookingEngine` and does not set `agency_id` / `commission_*`. Staff `CreateBooking` sets agency + FIN-005 commission and leaves UTM null. Neither path writes the other’s columns. Commission follows the agency (Sprint 5 / FIN-005); marketing UTM is stored beside it; neither overwrites the other.
+
+### Retention (LEG-002)
+Shape change: `retention.behavioural_raw_months` = 24, `retention.behavioural_unstitched_days` = 30. PENDING CLIENT, source L6 / doc 07 §8. DML publish as System. Registry: two `here()` rows. Counts: all 69→71, here 44→46, differs_or_flagged 23→25. `anakata:config-verify` fails on a latest document missing the keys, then passes after `up()`.
+
+`anakata:events-retention {--dry-run}`: Galápagos today via `BusinessTime::now()`. Stitched raw older than 24 months, and unstitched older than 30 days, upsert `behavioural_event_daily` by `(date(occurred_at), name, itinerary_code)` then delete. No extra dimensions. `--dry-run` prints counts and writes nothing. Scheduled daily, `timezone(BusinessTime::zone())`, `withoutOverlapping()`, next to `anakata:retention`. Console counts only.
+
+### Deviations
+None from the plan. Limiter values (30/min IP, 20/min session) chosen because the task gave none.
+
+### Open questions
+Retention windows remain PENDING CLIENT (LEG-002).
+
+### Notes for later
+- Task 04: CRM timeline / activity reads these tables.
+- Task 08: engine `track()`, consent banner, UTM capture.
+- Task 09: E2E CRM-07.
+
+### Checks
+`composer check` passed (1050 tests). Pint and Larastan clean. `anakata:config-verify` covered by the shape-change migration test (fails before `up()`, passes after).
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Enums/BehaviouralEventName.php
+git add app/Support/Engine/PagePath.php
+git add app/Support/Engine/EngineSessionId.php
+git add app/Support/Engine/BehaviouralEventParams.php
+git add app/Support/Crm/AttributionTouch.php
+git add app/Support/Crm/ContactDerived.php
+git add app/Support/Crm/ContactReferences.php
+git add app/Support/Config/Documents/BusinessRulesDocument.php
+git add app/Support/Config/Documents/RetentionRules.php
+git add app/Support/BusinessRules/Registry.php
+git add app/Models/BehaviouralEvent.php
+git add app/Models/BehaviouralEventDaily.php
+git add app/Models/Booking.php
+git add app/Models/Contact.php
+git add app/Actions/Engine/IngestBehaviouralEvents.php
+git add app/Actions/Contacts/StitchEngineIdentity.php
+git add app/Actions/Contacts/MergeContacts.php
+git add app/Actions/Checkout/SubmitEngineCheckout.php
+git add app/Actions/Waitlist/AddWaitlistEntry.php
+git add app/Actions/Charter/CreateCharterEnquiry.php
+git add app/Console/Commands/EventsRetentionCommand.php
+git add app/Http/Controllers/Engine/EngineEventsController.php
+git add app/Http/Controllers/Engine/CompleteReservationController.php
+git add app/Http/Controllers/Engine/WaitlistController.php
+git add app/Http/Requests/Engine/StoreEngineEventsRequest.php
+git add app/Http/Requests/Engine/SubmitCheckoutRequest.php
+git add app/Http/Requests/Engine/StoreEngineWaitlistRequest.php
+git add app/Http/Requests/Engine/StoreEngineCharterEnquiryRequest.php
+git add app/Http/Requests/Engine/UpdateCompleteBillingRequest.php
+git add app/Http/Requests/Engine/UpdateCompleteGuestRequest.php
+git add app/Http/Requests/Engine/RecordCompleteDeclarationsRequest.php
+git add app/Http/Resources/Engine/EngineEventsAcceptedResource.php
+git add app/Http/Resources/Rms/BookingResource.php
+git add app/Providers/AppServiceProvider.php
+git add database/factories/BehaviouralEventFactory.php
+git add database/factories/ContactFactory.php
+git add database/migrations/2026_09_21_200080_add_attribution_and_behavioural_events.php
+git add database/migrations/2026_09_21_200081_add_behavioural_event_retention_to_business_rules.php
+git add routes/api/engine.php
+git add routes/console.php
+git add tests/Unit/Engine/PagePathTest.php
+git add tests/Feature/Engine/BehaviouralEventParamsTest.php
+git add tests/Feature/Engine/IngestEventsTest.php
+git add tests/Feature/Engine/EventStitchingTest.php
+git add tests/Feature/Engine/BookingAttributionTest.php
+git add tests/Feature/Retention/EventsRetentionCommandTest.php
+git add tests/Feature/Config/AddBehaviouralRetentionToBusinessRulesMigrationTest.php
+git add tests/Feature/Config/BusinessRulesDocumentTest.php
+git add tests/Feature/Config/BusinessRulesEndpointsTest.php
+git add tests/Feature/Config/BusinessRulesSeederTest.php
+git add tests/Feature/Crm/ContactDerivedTest.php
+git add tests/Feature/Crm/ContactMergeTest.php
+git add tests/Feature/OpenApi/EngineResponseSchemasTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add engine behavioural-event ingest, identity stitching and frozen UTM.
+
+Consenting visitors send a fixed event vocabulary; identifying submits stitch the session onto a contact, and booking UTM is written once and then refused by a trigger.
+EOF
+)"
+```

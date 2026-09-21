@@ -6,6 +6,7 @@ namespace App\Actions\Charter;
 
 use App\Actions\Action;
 use App\Actions\Contacts\ResolveContact;
+use App\Actions\Contacts\StitchEngineIdentity;
 use App\Enums\CharterEnquirySource;
 use App\Enums\CharterEnquiryStatus;
 use App\Enums\ContactType;
@@ -16,7 +17,10 @@ use Illuminate\Support\Facades\Mail;
 
 final class CreateCharterEnquiry extends Action
 {
-    public function __construct(private readonly ResolveContact $contacts) {}
+    public function __construct(
+        private readonly ResolveContact $contacts,
+        private readonly StitchEngineIdentity $identity,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -27,6 +31,11 @@ final class CreateCharterEnquiry extends Action
             $payload = is_array($data['contact'] ?? null) ? $data['contact'] : [];
             $payload['type'] = ContactType::CorporateCharter;
             $contact = $this->contacts->handle($payload);
+
+            $this->identity->handle(
+                $contact,
+                isset($data['session_id']) && is_string($data['session_id']) ? $data['session_id'] : null,
+            );
 
             $enquiry = CharterEnquiry::query()->create([
                 'preferred_from' => $data['preferred_from'] ?? null,

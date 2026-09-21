@@ -137,6 +137,7 @@ final class MergeContacts extends Action
             'phone_e164' => $contact->phone_e164,
             'first_touch' => $contact->first_touch,
             'last_touch' => $contact->last_touch,
+            'engine_identified_at' => $contact->engine_identified_at?->format('Y-m-d H:i:s'),
         ];
     }
 
@@ -146,7 +147,7 @@ final class MergeContacts extends Action
      */
     private function fillEmptyOwned(Contact $survivor, Contact $loser, User $actor, array $loserFields): array
     {
-        $fillable = ['email', 'phone', 'country', 'first_touch', 'last_touch'];
+        $fillable = ['email', 'phone', 'country', 'first_touch', 'last_touch', 'engine_identified_at'];
         $filled = [];
         $update = [];
 

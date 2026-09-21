@@ -1,0 +1,181 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Engine;
+
+use App\Enums\BehaviouralEventName;
+use App\Enums\CheckoutPath;
+use Illuminate\Validation\ValidationException;
+
+final class BehaviouralEventParams
+{
+    /** @var list<string> */
+    private const KEYS = [
+        'itinerary_code',
+        'departure_id',
+        'step',
+        'cabin_count',
+        'path',
+        'currency',
+        'value',
+        'coupon_code',
+        'page_path',
+        'count',
+    ];
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    public static function filter(BehaviouralEventName $name, array $params, int $index = 0): array
+    {
+        if (! $name->isClient()) {
+            throw ValidationException::withMessages([
+                'events.'.$index.'.name' => 'This event name is not accepted from the client.',
+            ]);
+        }
+
+        $allowed = self::allowedKeys($name);
+        $filtered = [];
+
+        foreach ($params as $key => $value) {
+            if (! in_array($key, self::KEYS, true)) {
+                continue;
+            }
+
+            if (! in_array($key, $allowed, true)) {
+                continue;
+            }
+
+            $filtered[$key] = self::cast($key, $value, $index);
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function allowedKeys(BehaviouralEventName $name): array
+    {
+        return match ($name) {
+            BehaviouralEventName::PageView => ['page_path'],
+            BehaviouralEventName::ViewItinerary,
+            BehaviouralEventName::ViewItineraryDetail,
+            BehaviouralEventName::ViewRouteMap,
+            BehaviouralEventName::SearchAvailability => ['itinerary_code'],
+            BehaviouralEventName::ViewDeparture,
+            BehaviouralEventName::SelectDeparture => ['itinerary_code', 'departure_id'],
+            BehaviouralEventName::BeginCheckout,
+            BehaviouralEventName::BeginBookingRequest => ['itinerary_code', 'departure_id', 'cabin_count'],
+            BehaviouralEventName::SelectPaymentPath => ['path'],
+            BehaviouralEventName::ApplyPromotion,
+            BehaviouralEventName::RemovePromotion,
+            BehaviouralEventName::PromoInvalid => ['coupon_code'],
+            BehaviouralEventName::BookingFormInvalid => ['step'],
+            BehaviouralEventName::SubmitBookingRequest => [
+                'itinerary_code',
+                'departure_id',
+                'cabin_count',
+                'path',
+                'currency',
+                'value',
+            ],
+            BehaviouralEventName::AbandonCart => ['itinerary_code', 'departure_id', 'step', 'cabin_count'],
+            BehaviouralEventName::CharterInquirySubmit => ['itinerary_code', 'departure_id', 'value', 'currency'],
+            BehaviouralEventName::IdentityStitched => ['count'],
+        };
+    }
+
+    private static function cast(string $key, mixed $value, int $index): mixed
+    {
+        $field = 'events.'.$index.'.params.'.$key;
+
+        return match ($key) {
+            'itinerary_code' => self::stringOf($value, $field, 32),
+            'departure_id' => self::intOf($value, $field, 1),
+            'step' => self::stringOf(is_int($value) ? (string) $value : $value, $field, 32),
+            'cabin_count' => self::intOf($value, $field, 0),
+            'path' => self::paymentPath($value, $field),
+            'currency' => self::currency($value, $field),
+            'value' => self::intOf($value, $field, 0),
+            'coupon_code' => self::coupon($value, $field),
+            'page_path' => self::pagePath($value, $field),
+            'count' => self::intOf($value, $field, 0),
+            default => throw ValidationException::withMessages([$field => 'This parameter is not accepted.']),
+        };
+    }
+
+    private static function stringOf(mixed $value, string $field, int $max): string
+    {
+        if (! is_string($value)) {
+            throw ValidationException::withMessages([$field => 'This value must be a string.']);
+        }
+
+        $trimmed = trim($value);
+
+        if ($trimmed === '' || strlen($trimmed) > $max) {
+            throw ValidationException::withMessages([$field => 'This value is not accepted.']);
+        }
+
+        return $trimmed;
+    }
+
+    private static function intOf(mixed $value, string $field, int $min): int
+    {
+        if (is_string($value) && preg_match('/^-?\d+$/', $value) === 1) {
+            $value = (int) $value;
+        }
+
+        if (! is_int($value) || $value < $min) {
+            throw ValidationException::withMessages([$field => 'This value must be an integer.']);
+        }
+
+        return $value;
+    }
+
+    private static function paymentPath(mixed $value, string $field): string
+    {
+        $path = is_string($value) ? CheckoutPath::tryFrom($value) : null;
+
+        if (! $path instanceof CheckoutPath) {
+            throw ValidationException::withMessages([$field => 'This value is not an accepted payment path.']);
+        }
+
+        return $path->value;
+    }
+
+    private static function currency(mixed $value, string $field): string
+    {
+        if (! is_string($value) || preg_match('/^[A-Z]{3}$/', strtoupper(trim($value))) !== 1) {
+            throw ValidationException::withMessages([$field => 'This value must be a three-letter currency code.']);
+        }
+
+        return strtoupper(trim($value));
+    }
+
+    private static function coupon(mixed $value, string $field): string
+    {
+        if (! is_string($value) || preg_match('/^[A-Za-z0-9_-]{1,32}$/', trim($value)) !== 1) {
+            throw ValidationException::withMessages([$field => 'This value is not an accepted coupon code.']);
+        }
+
+        return strtoupper(trim($value));
+    }
+
+    private static function pagePath(mixed $value, string $field): string
+    {
+        if (! is_string($value)) {
+            throw ValidationException::withMessages([$field => 'This value must be a string.']);
+        }
+
+        $redacted = PagePath::redact($value);
+
+        if ($redacted === null || ! str_starts_with($redacted, '/') || strlen($redacted) > 200) {
+            throw ValidationException::withMessages([$field => 'This value is not an accepted page path.']);
+        }
+
+        return $redacted;
+    }
+}

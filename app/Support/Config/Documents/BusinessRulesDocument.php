@@ -80,6 +80,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'retention' => [
                 'passport_months_after_cruise' => 24,
                 'medical_days_after_cruise' => 90,
+                'behavioural_raw_months' => 24,
+                'behavioural_unstitched_days' => 30,
             ],
             'legal' => [
                 'consent_versions' => [
@@ -213,6 +215,8 @@ final class BusinessRulesDocument extends ConfigDocument
             new RetentionRules(
                 (int) ($retention['passport_months_after_cruise'] ?? 0),
                 (int) ($retention['medical_days_after_cruise'] ?? 0),
+                (int) ($retention['behavioural_raw_months'] ?? 0),
+                (int) ($retention['behavioural_unstitched_days'] ?? 0),
             ),
             new ConsentVersions(
                 is_string($consentVersions['terms'] ?? null) ? $consentVersions['terms'] : '',
@@ -257,7 +261,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
      *     manifests: array{dpng_fit_days: int, dpng_charter_days: int},
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
-     *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int},
+     *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int, behavioural_raw_months: int, behavioural_unstitched_days: int},
      *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string}},
      *     legal_entity: array{name: string, address_lines: list<string>, email: string, website: string, ein: string, bank: array{bank_name: string, account_name: string, account_number: string, routing: string, swift: string}},
      *     documents: array{pretrip_days_before: int, voucher_days_before: int},
@@ -336,6 +340,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'retention' => ['required', 'array'],
             'retention.passport_months_after_cruise' => ['required', 'integer', 'min:1', 'max:120'],
             'retention.medical_days_after_cruise' => ['required', 'integer', 'min:1', 'max:3650'],
+            'retention.behavioural_raw_months' => ['required', 'integer', 'min:1', 'max:120'],
+            'retention.behavioural_unstitched_days' => ['required', 'integer', 'min:1', 'max:3650'],
             'legal' => ['required', 'array'],
             'legal.consent_versions' => ['required', 'array'],
             'legal.consent_versions.terms' => ['required', 'string', 'min:1', 'max:120'],
@@ -402,6 +408,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'alerts.low_occupancy_days_before' => '§10 · Low-occupancy alert',
             'retention.passport_months_after_cruise' => '§6.4 · Passport retention',
             'retention.medical_days_after_cruise' => 'LEG-002 · Medical notes retention',
+            'retention.behavioural_raw_months' => 'L6 · Behavioural events raw retention',
+            'retention.behavioural_unstitched_days' => 'L6 · Unstitched anonymous events retention',
             'legal.consent_versions.terms' => 'LEG-001 · Terms & Conditions version',
             'legal.consent_versions.cancellation' => 'LEG-001 · Cancellation policy version',
             'legal.consent_versions.privacy' => 'LEG-002 · Privacy policy version',
@@ -519,6 +527,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'alerts.low_occupancy_pct', 'alerts.low_occupancy_days_before' => '40% at 90 days',
             'retention.passport_months_after_cruise' => '24 months',
             'retention.medical_days_after_cruise' => '90 days',
+            'retention.behavioural_raw_months' => '24 months (PENDING CLIENT, L6 / doc 07 §8)',
+            'retention.behavioural_unstitched_days' => '30 days (PENDING CLIENT, L6)',
             'legal.consent_versions.terms' => 'v2026.1 (text pending LEG-001)',
             'legal.consent_versions.cancellation' => 'v2026.1 (pending LEG-001)',
             'legal.consent_versions.privacy' => 'v2026.1 (pending LEG-002)',

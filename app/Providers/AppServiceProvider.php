@@ -138,6 +138,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('engine-events', function (Request $request): array {
+            $session = (string) $request->input('session_id');
+
+            return [
+                Limit::perMinute(30)->by('ip:'.($request->ip() ?? 'unknown')),
+                Limit::perMinute(20)->by('session:'.$session),
+            ];
+        });
+
         RateLimiter::for('login', function (Request $request): Limit {
             $email = Str::lower((string) $request->input('email'));
 

@@ -7,6 +7,7 @@ namespace App\Http\Requests\Engine;
 use App\Models\Guest;
 use App\Support\BusinessTime;
 use App\Support\Countries;
+use App\Support\Engine\EngineSessionId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -47,6 +48,7 @@ class UpdateCompleteGuestRequest extends FormRequest
             'guardian_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'guardian_relationship' => ['sometimes', 'nullable', 'string', 'max:255'],
             'guardian_consented' => ['sometimes', 'boolean'],
+            'session_id' => EngineSessionId::rules(),
         ];
     }
 

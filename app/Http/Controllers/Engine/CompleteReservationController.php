@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Engine;
 use App\Actions\Bookings\UpdateBookingBilling;
 use App\Actions\Complete\ResolveCompleteAccessToken;
 use App\Actions\Consents\RecordConsent;
+use App\Actions\Contacts\StitchEngineIdentity;
 use App\Actions\Guests\UpdateGuest;
 use App\Enums\ConsentSource;
 use App\Http\Controllers\Controller;
@@ -21,7 +22,10 @@ use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 
 final class CompleteReservationController extends Controller
 {
-    public function __construct(private readonly ResolveCompleteAccessToken $resolve) {}
+    public function __construct(
+        private readonly ResolveCompleteAccessToken $resolve,
+        private readonly StitchEngineIdentity $identity,
+    ) {}
 
     #[DocumentedResponse(status: 200, type: CompleteReservationResource::class)]
     public function show(string $token): CompleteReservationResource
@@ -36,12 +40,15 @@ final class CompleteReservationController extends Controller
         UpdateBookingBilling $action,
     ): CompleteReservationResource {
         $booking = $this->booking($token);
-
-        return new CompleteReservationResource($action->handle(
+        $validated = $request->validated();
+        $updated = $action->handle(
             $booking,
-            $request->validated(),
+            $validated,
             actorLabel: CompleteAccess::ACTOR_LABEL,
-        ));
+        );
+        $this->stitch($updated, $validated['session_id'] ?? null);
+
+        return new CompleteReservationResource($updated);
     }
 
     #[DocumentedResponse(status: 200, type: CompleteReservationResource::class)]
@@ -53,14 +60,18 @@ final class CompleteReservationController extends Controller
     ): CompleteReservationResource {
         $booking = $this->booking($token);
         $model = $this->guestInScope($booking, $guest);
+        $validated = $request->validated();
 
         $action->handle(
             $model,
-            $request->validated(),
+            $validated,
             actorLabel: CompleteAccess::ACTOR_LABEL,
         );
 
-        return new CompleteReservationResource($booking->fresh() ?? $booking);
+        $fresh = $booking->fresh() ?? $booking;
+        $this->stitch($fresh, $validated['session_id'] ?? null);
+
+        return new CompleteReservationResource($fresh);
     }
 
     #[DocumentedResponse(status: 200, type: CompleteReservationResource::class)]
@@ -81,7 +92,21 @@ final class CompleteReservationController extends Controller
             );
         }
 
-        return new CompleteReservationResource($booking->fresh() ?? $booking);
+        $fresh = $booking->fresh() ?? $booking;
+        $this->stitch($fresh, $request->validated('session_id'));
+
+        return new CompleteReservationResource($fresh);
+    }
+
+    private function stitch(Booking $booking, mixed $sessionId): void
+    {
+        if (! is_string($sessionId) || $sessionId === '') {
+            return;
+        }
+
+        $contact = $booking->contact;
+
+        $this->identity->handle($contact, $sessionId);
     }
 
     private function booking(string $token): Booking

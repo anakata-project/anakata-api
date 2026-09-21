@@ -10,7 +10,6 @@ final class ContactReferences
 {
     /**
      * Every table that stores a contact foreign key and must move on merge.
-     * TODO(task 03) behavioural_events.contact_id
      *
      * @return list<array{table: string, column: string}>
      */
@@ -21,6 +20,7 @@ final class ContactReferences
             ['table' => 'groups', 'column' => 'coordinator_contact_id'],
             ['table' => 'waitlist_entries', 'column' => 'contact_id'],
             ['table' => 'charter_enquiries', 'column' => 'contact_id'],
+            ['table' => 'behavioural_events', 'column' => 'contact_id'],
         ];
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Engine;
 
+use App\Support\Engine\EngineSessionId;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCompleteBillingRequest extends FormRequest
@@ -23,6 +24,7 @@ class UpdateCompleteBillingRequest extends FormRequest
             'billing_address' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'billing_email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'billing_phone' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'session_id' => EngineSessionId::rules(),
         ];
     }
 }

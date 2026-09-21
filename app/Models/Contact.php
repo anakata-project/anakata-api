@@ -34,6 +34,7 @@ use Illuminate\Support\Collection;
  * @property string|null $phone_e164
  * @property array<string, mixed>|null $first_touch
  * @property array<string, mixed>|null $last_touch
+ * @property Carbon|null $engine_identified_at
  * @property int|null $merged_into_id
  * @property int|null $created_by
  * @property int|null $updated_by
@@ -53,6 +54,7 @@ use Illuminate\Support\Collection;
     'phone_e164',
     'first_touch',
     'last_touch',
+    'engine_identified_at',
     'merged_into_id',
 ])]
 class Contact extends Model
@@ -74,6 +76,7 @@ class Contact extends Model
             'type' => ContactType::class,
             'first_touch' => 'array',
             'last_touch' => 'array',
+            'engine_identified_at' => 'datetime',
         ];
     }
 

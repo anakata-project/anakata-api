@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Engine;
 
 use App\Enums\ConsentDocument;
+use App\Support\Engine\EngineSessionId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,6 +24,7 @@ class RecordCompleteDeclarationsRequest extends FormRequest
         return [
             'documents' => ['required', 'array', 'min:1'],
             'documents.*' => ['required', 'string', Rule::enum(ConsentDocument::class), 'distinct'],
+            'session_id' => EngineSessionId::rules(),
         ];
     }
 

@@ -6,6 +6,7 @@ namespace App\Http\Requests\Engine;
 
 use App\Enums\CabinCategory;
 use App\Enums\PreferredChannel;
+use App\Support\Engine\EngineSessionId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -32,6 +33,7 @@ class StoreEngineWaitlistRequest extends FormRequest
             'adults' => ['required', 'integer', 'min:1', 'max:36'],
             'children' => ['required', 'integer', 'min:0', 'max:36'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'session_id' => EngineSessionId::rules(),
         ];
     }
 }

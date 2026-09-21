@@ -43,6 +43,8 @@ test('the seeded business rules document matches seed-data.json plus the new fie
     expect($document['alerts']['low_occupancy_days_before'])->toBe(90);
     expect($document['retention']['passport_months_after_cruise'])->toBe(24);
     expect($document['retention']['medical_days_after_cruise'])->toBe(90);
+    expect($document['retention']['behavioural_raw_months'])->toBe(24);
+    expect($document['retention']['behavioural_unstitched_days'])->toBe(30);
     expect($document['legal_entity']['name'])->toBe('PONTOS LLC (a limited liability company)');
     expect($document['legal_entity']['address_lines'])->toBe([
         '430 Grand Bay Drive, Apt 1108',

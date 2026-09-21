@@ -30,6 +30,7 @@ class ContactFactory extends Factory
             'phone_e164' => null,
             'first_touch' => null,
             'last_touch' => null,
+            'engine_identified_at' => null,
         ];
     }
 
