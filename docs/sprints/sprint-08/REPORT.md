@@ -617,3 +617,260 @@ EOF
 )"
 ```
 
+## Task 06 · anakata-ui · Regenerate types, release `v0.9.0`
+
+### What was built
+PHPDoc / OpenAPI prelude on the API so Scramble `$ref`s nested engine resources and types the submit 409 quote, then types regenerated against `http://localhost:8000/docs/api.json`. Layer `0.8.1` → `0.9.0`. Types only: no composables, components, or frontend behaviour.
+
+Calendar dates stay `string` (`YYYY-MM-DD`). Instants stay ISO strings.
+
+`GET /api/engine/countries` and `GET /api/engine/checkout/{token}/status` were not added. Countries live on `CompleteReservation.countries`. DELETE checkout is 204 — no JSON alias.
+
+### API prelude
+
+| Target | What landed |
+|---|---|
+| `FeedResource` | `@return` lists `EngineItineraryResource` / `EngineDepartureResource` / `EngineRatesResource` / `EngineSettingsResource` / `EngineOfferResource`. Runtime payload stays resolved arrays; `@phpstan-return` matches that. Scramble emits Feed keys and `$ref`s. |
+| `CheckoutCreatedResource` | Returns `new EngineQuoteResource(...)` so `quote` `$ref`s the named schema (was `toArray()` / `array<string, mixed>`). |
+| `CompleteReservationResource` | `bookings` is `CompleteBookingResource::collection(...)` (was `->resolve()` → `{}`). `@phpstan-return` uses `AnonymousResourceCollection`. |
+| `CompleteBookingResource` | `guests` is `CompleteGuestResource::collection(...)`. |
+| `CompleteGuestResource` | `passportOnFile(): bool` so `passport_on_file` is boolean. Never `passport_no`. |
+| `CheckoutSubmittedResource` | PHPDoc `references: list<string>` and optional email / checkout URL. Scramble still emits `references: string`. |
+| `PriceChangedExceptionToResponseExtension` | 409 `quote` `$ref`s `#/components/schemas/EngineQuoteResource` (was a bare `ObjectType`). |
+| `EngineResponseSchemasTest` | Existing 10 wrappers kept. Added nested names (`EngineItineraryResource`, `EngineDepartureResource`, `EngineOfferResource`, `EngineRatesResource`, `EngineSettingsResource`, `CompleteBookingResource`, `CompleteGuestResource`). Asserts Feed keys + `$ref`s; complete keys including `can_pay` / `pay_url`; `passport_on_file` boolean only; checkout create `quote` `$ref`; submit 409 → `PriceChangedException` with typed `quote`. |
+| `PanelResponseSchemasTest` | `OfferResource` derived keys (`benefit_label`, `scope_label`, window labels, `engine_placement`, `live_departures_count`, `status`, `stored_status`). Named enums `OfferType`, `OfferChannel`, `CharterEnquiryStatus`. `CharterEnquiryResource` keys. `CompleteLinkResource.url`. |
+
+Named `OfferType` / `OfferChannel` come from FormRequests (`Rule::enum`). Resource `type` / `channel` stay `string`. No named `OfferStatus` — `EXPIRED` is `OfferStatus::DerivedExpired`, never stored.
+
+`Booking` keeps the Sprint 4 name. `promo_code`, `online_deposit`, `sold_on` already come through from `BookingResource`.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 8227 | 9886 |
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 428 | 430 |
+| `app/types/bookings.ts` | 208 | 208 |
+| `app/types/payments.ts` | 161 | 161 |
+| `app/types/index.ts` | 220 | 255 |
+| `app/types/anakata-augment.d.ts` | 17 | 17 |
+| `app/types/guests.ts` | 101 | 101 |
+| `app/types/extras.ts` | 24 | 24 |
+| `app/types/documents.ts` | 61 | 61 |
+| `app/types/offers.ts` | — | 37 |
+| `app/types/engine.ts` | — | 270 |
+
+`api.d.ts` was regenerated with `pnpm types:api` and never hand-edited.
+
+### Schema → alias (`app/types/offers.ts` — panel)
+
+| Alias | Source |
+|---|---|
+| `OfferType` | named `OfferType` (`CREDIT \| AMT \| PCT \| VALUE \| COMM`) |
+| `OfferChannel` | named `OfferChannel` (`D2C \| B2B \| ALL`) |
+| `OfferStatus` | leftover `DRAFT \| PENDING \| LIVE \| PAUSED \| EXPIRED` — mirrors `App\Enums\OfferStatus` plus `DerivedExpired` |
+| `Offer` | `OfferResource` + overlays on `type` / `channel` / `status` / `stored_status` |
+| `CharterEnquiryStatus` | named `CharterEnquiryStatus` (`NEW \| CONTACTED \| CLOSED`) |
+| `CharterEnquiry` | `CharterEnquiryResource` + `status` overlay |
+| `CompleteLink` | `CompleteLinkResource` |
+
+### Schema → alias (`app/types/engine.ts` — `/api/engine` only)
+
+No imports from `./bookings`, `./guests`, `./payments`, or any RMS `*Resource`.
+
+| Alias | Source |
+|---|---|
+| `EngineFeed` | `FeedResource` + nested `Engine*` arrays |
+| `EngineItinerary` | `EngineItineraryResource` + `card.hero_image: string \| null` |
+| `EngineDeparture` | leftover — generated `id` / festive / counts freeze as `string`. Mirrors `EngineDepartureResource` |
+| `EngineOfferType` | leftover `CREDIT \| AMT \| PCT \| VALUE \| COMM` (COMM never appears on the public feed) |
+| `EngineOffer` | `EngineOfferResource` + `type` overlay. Public fields only |
+| `EngineRates` | leftover year maps. Mirrors `EngineRatesResource` |
+| `EngineSettings` | leftover guests / locale / copy / fees. Mirrors `EngineSettingsResource` |
+| `EngineCabin` | `DepartureCabinResource` |
+| `PromoCheck` | `PromoCheckResource` |
+| `EngineQuote` | leftover — generated `cabins` is `unknown[]`. Mirrors `EngineQuoteResource` |
+| `CheckoutCreated` | `CheckoutCreatedResource` + `quote: EngineQuote` |
+| `CheckoutExtended` | `CheckoutExtendedResource` |
+| `CheckoutPath` | named `CheckoutPath` |
+| `CheckoutSubmitted` | leftover — generated `references` is `string`. Mirrors `CheckoutSubmittedResource` |
+| `EngineWaitlist` | `EngineWaitlistResource` + `cabin_category: CabinCategory` |
+| `EngineCharterEnquiry` | leftover status / source (`NEW` / `ENGINE`) |
+| `CompleteDeclaration` | leftover — generated `declarations` is `unknown[]` |
+| `EngineCountry` | leftover `{ code, name }` from `CompleteReservation.countries` — not RMS `Country` |
+| `CompleteGuest` | `CompleteGuestResource` (`passport_on_file: boolean`) |
+| `CompleteBooking` | `CompleteBookingResource` + `guests: Array<CompleteGuest>` |
+| `CompleteReservation` | `CompleteReservationResource` + bookings / declarations / countries overlays |
+| `PriceChangedError` | leftover `{ message, quote: EngineQuote }` — mirrors `PriceChangedException` |
+
+### Booking
+
+Same `Booking` alias. `promo_code`, `online_deposit`, `sold_on` come through from `BookingResource`. No new overlays.
+
+### Copy settings
+
+`CopySettings` leftover gains `online_deposit_advantage` and `online_deposit_perk` (mirrors `App\Support\Config\Documents\CopySettings`). `DiscountsRules` already has the discount rules.
+
+### Kept leftovers
+
+Inventory leftovers stay as they are. New leftovers listed above, each with a `Mirrors App\…` comment.
+
+No offer-type / status / label / country runtime list in the layer.
+
+### Pins
+
+Panel and engine README rows now say `` `extends: ['../anakata-ui']` (`v0.9.0`) ``. **Neither pin is enforced** — the apps resolve the sibling folder, so the version line is documentation only.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Http/Resources/Engine/FeedResource.php`
+- `app/Http/Resources/Engine/CheckoutCreatedResource.php`
+- `app/Http/Resources/Engine/CheckoutSubmittedResource.php`
+- `app/Http/Resources/Engine/CompleteReservationResource.php`
+- `app/Http/Resources/Engine/CompleteBookingResource.php`
+- `app/Http/Resources/Engine/CompleteGuestResource.php`
+- `app/Support/OpenApi/PriceChangedExceptionToResponseExtension.php`
+- `tests/Feature/OpenApi/EngineResponseSchemasTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/offers.ts` (new)
+- `app/types/engine.ts` (new)
+- `app/types/config.ts`
+- `app/types/index.ts`
+- `package.json` (`0.9.0`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel / anakata-engine**
+- `README.md` (documentation pin only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-08/REPORT.md`
+
+### Deviations
+- `EngineOfferType`, `EnginePriceLine`, `CheckoutPath` and `CompleteDeclaration` are extra aliases so `engine.ts` stays readable. Not in the task table.
+- `EngineDeparture` / `EngineRates` / `EngineSettings` / `EngineQuote` / `CheckoutSubmitted` / `EngineCountry` / `CompleteDeclaration` / `PriceChangedError` stay leftovers: Scramble still freezes numbers as `string` or emits `unknown[]` / `string` for lists.
+- `OfferResource.type` / `channel` stay generated `string`. The named enums exist; the alias overlays them.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 07: Offers page + Rates & Promotions from `Offer`; chips from `OfferStatus` / `OfferChannel`; charter panel from `CharterEnquiry`; Payments “Copy guest link” from `CompleteLink`; New Reservation already has `main_channel` on `BookingQuoteRequest`.
+- Task 08–10: consume `engine.ts` only. Step 5 needs a country list — today that shape exists only on `CompleteReservation.countries`. If checkout should load countries without a complete token, add `GET /api/engine/countries` in task 09 and reuse `EngineCountry`.
+- Task 09: `GET /api/engine/checkout/{token}/status` is still missing; add it there and regenerate in a patch if needed.
+- HTML/PDF document endpoints stay URL-only (Sprint 7).
+
+### Quality
+- anakata-api: `composer check` inside Docker — 969 tests (6822 assertions), Pint (989 files), Larastan level 6 (0 errors).
+- anakata-ui: lint, typecheck, test (35), build — pass.
+- anakata-panel / anakata-engine: typecheck and build — pass (real checks).
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout). Overlayed the working trees. Confirmed the ui clone is **0.9.0** and has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: typecheck pass
+  - panel / engine: build pass
+  - **OVERLAY CLONE OK**
+  - **Repeat this clone after the pushes below**, checking out `anakata-ui` at `v0.9.0` with **no** overlay.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude (OpenAPI typing — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Resources/Engine/FeedResource.php \
+  app/Http/Resources/Engine/CheckoutCreatedResource.php \
+  app/Http/Resources/Engine/CheckoutSubmittedResource.php \
+  app/Http/Resources/Engine/CompleteReservationResource.php \
+  app/Http/Resources/Engine/CompleteBookingResource.php \
+  app/Http/Resources/Engine/CompleteGuestResource.php \
+  app/Support/OpenApi/PriceChangedExceptionToResponseExtension.php \
+  tests/Feature/OpenApi/EngineResponseSchemasTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Type Sprint 8 engine feed, checkout and complete OpenAPI responses.
+
+Nested engine resources $ref named schemas; submit 409 quote is
+EngineQuoteResource so the layer can regenerate it.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/config.ts \
+  app/types/index.ts \
+  app/types/offers.ts \
+  app/types/engine.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for offers and the public engine.
+
+Sprint 8 aliases live in offers.ts (panel) and engine.ts
+(/api/engine only). Booking keeps the same name.
+EOF
+)"
+git tag v0.9.0
+git push origin HEAD
+git push origin v0.9.0
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.9.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.9.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 8 task 06: regenerated UI API types.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.9.0
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+

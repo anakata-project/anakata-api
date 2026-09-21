@@ -449,6 +449,9 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'DocumentKind',
         'DocumentPlanKind',
         'DocumentPlanStatus',
+        'OfferType',
+        'OfferChannel',
+        'CharterEnquiryStatus',
     ] as $enum) {
         $schema = $spec['components']['schemas'][$enum] ?? null;
         expect($schema)->toBeArray("schema {$enum} is missing");
@@ -731,4 +734,46 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     expect($file)->toBeArray();
     expect($file['responses']['200']['content'] ?? [])->toHaveKey('application/pdf');
     expect($file['responses']['200']['content'] ?? [])->not->toHaveKey('application/json');
+
+    $offer = openApiSchema($spec, 'OfferResource');
+    expect($offer['properties'])->toHaveKeys([
+        'benefit_label',
+        'scope_label',
+        'booking_window_label',
+        'travel_window_label',
+        'engine_placement',
+        'live_departures_count',
+        'status',
+        'stored_status',
+    ]);
+    $offerType = $offer['properties']['type']['$ref'] ?? $offer['properties']['type']['allOf'][0]['$ref'] ?? null;
+    $offerChannel = $offer['properties']['channel']['$ref'] ?? $offer['properties']['channel']['allOf'][0]['$ref'] ?? null;
+    if (is_string($offerType)) {
+        expect($offerType)->toContain('OfferType');
+    } else {
+        expect($offer['properties']['type']['type'] ?? null)->toBe('string');
+    }
+    if (is_string($offerChannel)) {
+        expect($offerChannel)->toContain('OfferChannel');
+    } else {
+        expect($offer['properties']['channel']['type'] ?? null)->toBe('string');
+    }
+
+    $enquiry = openApiSchema($spec, 'CharterEnquiryResource');
+    expect($enquiry['properties'])->toHaveKeys([
+        'id',
+        'preferred_from',
+        'preferred_to',
+        'departure',
+        'guests',
+        'contact',
+        'message',
+        'source',
+        'status',
+        'created_at',
+    ]);
+
+    $completeLink = openApiSchema($spec, 'CompleteLinkResource');
+    expect($completeLink['properties'])->toHaveKey('url');
+    expect($completeLink['properties']['url']['type'] ?? null)->toBe('string');
 });

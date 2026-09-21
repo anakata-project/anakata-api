@@ -28,6 +28,17 @@ function engineOpenApiSchema(array $spec, string $name): array
     return $schema;
 }
 
+/**
+ * @param  array<string, mixed>  $node
+ */
+function engineSchemaRef(array $node, string $name): void
+{
+    $ref = $node['$ref'] ?? $node['allOf'][0]['$ref'] ?? $node['items']['$ref'] ?? $node['items']['allOf'][0]['$ref'] ?? null;
+
+    expect($ref)->toBeString("{$name} is not a \$ref");
+    expect($ref)->toContain($name);
+}
+
 test('engine OpenAPI schemas have properties', function (): void {
     Gate::define('viewApiDocs', fn (): bool => true);
 
@@ -49,7 +60,68 @@ test('engine OpenAPI schemas have properties', function (): void {
         'EngineWaitlistResource',
         'EngineCharterEnquiryResource',
         'CompleteReservationResource',
+        'EngineItineraryResource',
+        'EngineDepartureResource',
+        'EngineOfferResource',
+        'EngineRatesResource',
+        'EngineSettingsResource',
+        'CompleteBookingResource',
+        'CompleteGuestResource',
     ] as $name) {
         engineOpenApiSchema($spec, $name);
     }
+
+    $feed = engineOpenApiSchema($spec, 'FeedResource');
+    expect($feed['properties'])->toHaveKeys([
+        'generated_at',
+        'itineraries',
+        'departures',
+        'rates',
+        'settings',
+        'offers',
+    ]);
+    engineSchemaRef($feed['properties']['itineraries'] ?? [], 'EngineItineraryResource');
+    engineSchemaRef($feed['properties']['departures'] ?? [], 'EngineDepartureResource');
+    engineSchemaRef($feed['properties']['rates'] ?? [], 'EngineRatesResource');
+    engineSchemaRef($feed['properties']['settings'] ?? [], 'EngineSettingsResource');
+    engineSchemaRef($feed['properties']['offers'] ?? [], 'EngineOfferResource');
+
+    $complete = engineOpenApiSchema($spec, 'CompleteReservationResource');
+    expect($complete['properties'])->toHaveKeys([
+        'bookings',
+        'billing',
+        'declarations',
+        'amount_due',
+        'amount_due_kind',
+        'amount_due_label',
+        'can_pay',
+        'pay_url',
+        'countries',
+    ]);
+    engineSchemaRef($complete['properties']['bookings'] ?? [], 'CompleteBookingResource');
+
+    $guest = engineOpenApiSchema($spec, 'CompleteGuestResource');
+    expect($guest['properties'])->toHaveKeys(['passport_on_file']);
+    expect($guest['properties'])->not->toHaveKey('passport_no');
+    expect($guest['properties']['passport_on_file']['type'] ?? null)->toBe('boolean');
+
+    $created = engineOpenApiSchema($spec, 'CheckoutCreatedResource');
+    engineSchemaRef($created['properties']['quote'] ?? [], 'EngineQuoteResource');
+
+    $submit = $spec['paths']['/engine/checkout/{token}/submit']['post']
+        ?? $spec['paths']['/api/engine/checkout/{token}/submit']['post']
+        ?? null;
+    expect($submit)->toBeArray();
+    $conflict = $submit['responses']['409'] ?? null;
+    expect($conflict)->toBeArray();
+    $conflictRef = $conflict['$ref'] ?? null;
+    expect($conflictRef)->toBeString();
+    expect($conflictRef)->toContain('PriceChangedException');
+
+    $priceChanged = $spec['components']['responses']['PriceChangedException'] ?? null;
+    expect($priceChanged)->toBeArray();
+    $quote = $priceChanged['content']['application/json']['schema']['properties']['quote'] ?? [];
+    $quoteRef = $quote['$ref'] ?? $quote['allOf'][0]['$ref'] ?? null;
+    expect($quoteRef)->toBeString();
+    expect($quoteRef)->toContain('EngineQuoteResource');
 });

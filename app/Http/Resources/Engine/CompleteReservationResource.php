@@ -12,6 +12,7 @@ use App\Support\Complete\CompleteDue;
 use App\Support\Complete\CompletePayability;
 use App\Support\Countries;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
 
@@ -24,7 +25,19 @@ class CompleteReservationResource extends JsonResource
 
     /**
      * @return array{
-     *     bookings: list<array<string, mixed>>,
+     *     bookings: list<CompleteBookingResource>,
+     *     billing: array{billing_name: string|null, billing_address: string|null, billing_email: string|null, billing_phone: string|null},
+     *     declarations: list<array{document: string, label: string, version: string, accepted: bool, required: bool}>,
+     *     amount_due: int,
+     *     amount_due_kind: string,
+     *     amount_due_label: string,
+     *     can_pay: bool,
+     *     pay_url: string|null,
+     *     countries: list<array{code: string, name: string}>
+     * }
+     *
+     * @phpstan-return array{
+     *     bookings: AnonymousResourceCollection,
      *     billing: array{billing_name: string|null, billing_address: string|null, billing_email: string|null, billing_phone: string|null},
      *     declarations: list<array{document: string, label: string, version: string, accepted: bool, required: bool}>,
      *     amount_due: int,
@@ -55,7 +68,7 @@ class CompleteReservationResource extends JsonResource
         $visible = $this->visibleBookings();
 
         return [
-            'bookings' => CompleteBookingResource::collection($visible)->resolve(),
+            'bookings' => CompleteBookingResource::collection($visible),
             'billing' => [
                 'billing_name' => $this->billing_name,
                 'billing_address' => $this->billing_address,

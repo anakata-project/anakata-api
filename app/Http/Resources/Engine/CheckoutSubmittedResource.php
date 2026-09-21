@@ -18,8 +18,8 @@ class CheckoutSubmittedResource extends JsonResource
      * @return array{
      *     path: string,
      *     references: list<string>,
-     *     email?: string,
-     *     checkout_url?: string
+     *     email: string|null,
+     *     checkout_url: string|null
      * }
      */
     public function toArray(Request $request): array

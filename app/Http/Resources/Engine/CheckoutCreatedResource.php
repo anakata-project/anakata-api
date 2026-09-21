@@ -23,7 +23,7 @@ class CheckoutCreatedResource extends JsonResource
      * @return array{
      *     token: string,
      *     expires_at: string,
-     *     quote: array<string, mixed>
+     *     quote: EngineQuoteResource
      * }
      */
     public function toArray(Request $request): array
@@ -34,7 +34,7 @@ class CheckoutCreatedResource extends JsonResource
         return [
             'token' => $payload['token'],
             'expires_at' => Iso::utc($payload['session']->expires_at),
-            'quote' => (new EngineQuoteResource($payload['quote']))->toArray($request),
+            'quote' => new EngineQuoteResource($payload['quote']),
         ];
     }
 }

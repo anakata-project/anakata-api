@@ -14,6 +14,15 @@ class FeedResource extends JsonResource
     /**
      * @return array{
      *     generated_at: string,
+     *     itineraries: list<EngineItineraryResource>,
+     *     departures: list<EngineDepartureResource>,
+     *     rates: EngineRatesResource,
+     *     settings: EngineSettingsResource,
+     *     offers: list<EngineOfferResource>
+     * }
+     *
+     * @phpstan-return array{
+     *     generated_at: string,
      *     itineraries: list<array<string, mixed>>,
      *     departures: list<array<string, mixed>>,
      *     rates: array<string, mixed>,

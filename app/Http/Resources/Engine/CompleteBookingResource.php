@@ -6,6 +6,7 @@ namespace App\Http\Resources\Engine;
 
 use App\Models\Booking;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -24,7 +25,18 @@ class CompleteBookingResource extends JsonResource
      *     return_date: string,
      *     itinerary_name: string,
      *     cabin_label: string,
-     *     guests: list<array<string, mixed>>
+     *     guests: list<CompleteGuestResource>
+     * }
+     *
+     * @phpstan-return array{
+     *     id: int,
+     *     reference: string|null,
+     *     yacht: string,
+     *     departure_date: string,
+     *     return_date: string,
+     *     itinerary_name: string,
+     *     cabin_label: string,
+     *     guests: AnonymousResourceCollection
      * }
      */
     public function toArray(Request $request): array
@@ -39,7 +51,7 @@ class CompleteBookingResource extends JsonResource
             'return_date' => $this->departure->returnDate()->toDateString(),
             'itinerary_name' => $this->departure->itinerary->name,
             'cabin_label' => $this->cabinLabel(),
-            'guests' => CompleteGuestResource::collection($this->guests)->resolve(),
+            'guests' => CompleteGuestResource::collection($this->guests),
         ];
     }
 }

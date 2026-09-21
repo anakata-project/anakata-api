@@ -44,7 +44,7 @@ class CompleteGuestResource extends JsonResource
             'dob' => $this->dob?->toDateString(),
             'nationality' => $this->nationality,
             'ecuador_resident' => $this->ecuador_resident,
-            'passport_on_file' => $this->passport_no !== null && $this->passport_no !== '',
+            'passport_on_file' => $this->passportOnFile(),
             'passport_expiry' => $this->passport_expiry?->toDateString(),
             'email' => $this->email,
             'insurance_declared' => $this->insurance_declared,
@@ -55,5 +55,10 @@ class CompleteGuestResource extends JsonResource
                 'consented' => $this->guardian_consented_at !== null,
             ] : null,
         ];
+    }
+
+    private function passportOnFile(): bool
+    {
+        return is_string($this->passport_no) && $this->passport_no !== '';
     }
 }
