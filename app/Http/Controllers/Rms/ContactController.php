@@ -28,6 +28,7 @@ final class ContactController extends Controller
         $like = '%'.$search.'%';
 
         $contacts = Contact::query()
+            ->notMerged()
             ->where(function (Builder $query) use ($like): void {
                 $query->where('name', 'like', $like)
                     ->orWhere('email', 'like', $like);

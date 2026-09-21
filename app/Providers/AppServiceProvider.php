@@ -27,6 +27,8 @@ use App\Models\CharterEnquiry;
 use App\Models\CheckoutSession;
 use App\Models\Consent;
 use App\Models\Contact;
+use App\Models\ContactAlias;
+use App\Models\ContactMerge;
 use App\Models\Departure;
 use App\Models\Document;
 use App\Models\EngineSettingsVersion;
@@ -180,6 +182,8 @@ class AppServiceProvider extends ServiceProvider
             'departure' => Departure::class,
             'internal_block' => InternalBlock::class,
             'contact' => Contact::class,
+            'contact_merge' => ContactMerge::class,
+            'contact_alias' => ContactAlias::class,
             'group' => Group::class,
             'agency' => Agency::class,
             'offer' => Offer::class,

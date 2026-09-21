@@ -128,3 +128,27 @@ test('resolve contact applies type on create and never downgrades', function ():
     ]);
     expect($charter->fresh()?->type)->toBe(ContactType::CorporateCharter);
 });
+
+test('without an email resolve matches the oldest phone_e164 and never name alone', function (): void {
+    $this->actingAs(managerUser());
+
+    $first = app(ResolveContact::class)->handle([
+        'name' => 'Ada Lovelace',
+        'phone' => '(650) 253-0000',
+        'country' => 'US',
+    ]);
+    $second = app(ResolveContact::class)->handle([
+        'name' => 'Someone Else',
+        'phone' => '6502530000',
+        'country' => 'US',
+    ]);
+
+    expect($second->id)->toBe($first->id);
+    expect($first->phone_e164)->toBe('+16502530000');
+    expect($first->name)->toBe('Ada Lovelace');
+
+    $namedA = app(ResolveContact::class)->handle(['name' => 'Same Name']);
+    $namedB = app(ResolveContact::class)->handle(['name' => 'Same Name']);
+
+    expect($namedB->id)->not->toBe($namedA->id);
+});

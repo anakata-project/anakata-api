@@ -10,6 +10,7 @@ use App\Enums\PreferredChannel;
 use App\Exceptions\ConflictException;
 use App\Models\Contact;
 use App\Models\User;
+use App\Support\Contacts\PhoneNumber;
 use App\Support\History\History;
 
 final class UpdateContact extends Action
@@ -43,8 +44,9 @@ final class UpdateContact extends Action
                         ->first();
 
                     if ($other instanceof Contact) {
+                        $named = $other->currentSurvivor();
                         throw new ConflictException(
-                            'That email belongs to contact #'.$other->id.' ('.$other->name.'). Merge the contacts to keep a single record.',
+                            'That email belongs to contact #'.$named->id.' ('.$named->name.'). Merge the contacts to keep a single record.',
                         );
                     }
                 }
@@ -56,6 +58,10 @@ final class UpdateContact extends Action
 
             if ($after === []) {
                 return $contact;
+            }
+
+            if (isset($after['phone']) || isset($after['country'])) {
+                $contact->phone_e164 = PhoneNumber::toE164($contact->phone, $contact->country);
             }
 
             $contact->save();

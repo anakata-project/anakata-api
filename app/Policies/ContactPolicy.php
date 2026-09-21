@@ -24,4 +24,9 @@ final class ContactPolicy extends Policy
     {
         return $actor->hasPermission(Permission::ContactsManage);
     }
+
+    public function merge(User $actor, Contact $contact): bool
+    {
+        return $actor->hasPermission(Permission::ContactsMerge);
+    }
 }

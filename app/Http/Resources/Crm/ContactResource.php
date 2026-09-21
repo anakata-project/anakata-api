@@ -36,6 +36,9 @@ class ContactResource extends JsonResource
      *     consent: array{marketing: bool, transactional: true},
      *     main_channel: string|null,
      *     channel_of_origin: string|null,
+     *     resolved_from_alias: bool,
+     *     alias_id: int|null,
+     *     merge_id: int|null,
      *     bookings?: list<array<string, mixed>>
      * }
      */
@@ -62,6 +65,9 @@ class ContactResource extends JsonResource
             'consent' => $consent,
             'main_channel' => $this->nullableString($this->getAttribute('first_main_channel')),
             'channel_of_origin' => $this->nullableString($this->getAttribute('first_channel_of_origin')),
+            'resolved_from_alias' => $this->resource->resolvedFromAliasId !== null,
+            'alias_id' => $this->resource->resolvedFromAliasId,
+            'merge_id' => $this->resource->resolvedMergeId,
         ];
 
         if ($this->relationLoaded('bookings')) {

@@ -4,20 +4,26 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Crm;
 
+use App\Actions\Contacts\MergeContacts;
 use App\Actions\Contacts\UpdateContact;
 use App\Enums\ContactConsentFilter;
 use App\Enums\ContactLifecycle;
 use App\Enums\ContactType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\IndexContactsRequest;
+use App\Http\Requests\Crm\MergeContactRequest;
 use App\Http\Requests\Crm\UpdateContactRequest;
+use App\Http\Resources\Crm\ContactDuplicateResource;
+use App\Http\Resources\Crm\ContactMergeResultResource;
 use App\Http\Resources\Crm\ContactResource;
 use App\Models\Contact;
 use App\Models\User;
 use App\Support\Crm\ContactDerived;
+use App\Support\Crm\DuplicateContacts;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 final class ContactController extends Controller
 {
@@ -33,6 +39,7 @@ final class ContactController extends Controller
         $search = trim((string) ($validated['q'] ?? ''));
 
         $contacts = Contact::query()
+            ->notMerged()
             ->withDerived()
             ->when(
                 isset($validated['type']),
@@ -96,7 +103,38 @@ final class ContactController extends Controller
             ->whereKey($contact->id)
             ->firstOrFail();
 
+        $loaded->resolvedFromAliasId = $contact->resolvedFromAliasId;
+        $loaded->resolvedMergeId = $contact->resolvedMergeId;
+
         return new ContactResource($loaded);
+    }
+
+    public function duplicates(): JsonResource
+    {
+        $this->authorize('viewAny', Contact::class);
+
+        return ContactDuplicateResource::collection(DuplicateContacts::pairs());
+    }
+
+    public function merge(MergeContactRequest $request, Contact $contact, MergeContacts $action): ContactMergeResultResource
+    {
+        $this->authorize('merge', $contact);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        $other = Contact::query()->findOrFail((int) $request->validated('contact_id'));
+        $result = $action->handle($contact, $other, (string) $request->validated('reason'), $actor);
+        $profile = $this->show($result['survivor']);
+
+        return new ContactMergeResultResource([
+            'swapped' => $result['swapped'],
+            'merge' => $result['merge'],
+            'contact' => $profile->resource,
+        ]);
     }
 
     public function update(UpdateContactRequest $request, Contact $contact, UpdateContact $action): ContactResource

@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\ContactType;
 use App\Enums\PreferredChannel;
 use App\Models\Contact;
+use App\Support\Contacts\PhoneNumber;
 use App\Support\History\History;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -49,19 +50,23 @@ final class ResolveContact extends Action
         $channel = $this->preferredChannel($data['preferred_channel'] ?? null);
         $type = $this->typeHint($data['type'] ?? null);
         $language = $this->language($data['language'] ?? null);
+        $phone = $this->nullableString($data['phone'] ?? null);
+        $country = $this->nullableCountry($data['country'] ?? null);
+        $phoneE164 = PhoneNumber::toE164($phone, $country);
 
         $affected = (int) DB::affectingStatement(
-            'insert into contacts (`name`, `email`, `phone`, `country`, `preferred_channel`, `type`, `language`, `created_at`, `updated_at`, `created_by`, `updated_by`)
-             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            'insert into contacts (`name`, `email`, `phone`, `country`, `preferred_channel`, `type`, `language`, `phone_e164`, `created_at`, `updated_at`, `created_by`, `updated_by`)
+             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              on duplicate key update `id` = `id`',
             [
                 $data['name'],
                 $email,
-                $this->nullableString($data['phone'] ?? null),
-                $this->nullableCountry($data['country'] ?? null),
+                $phone,
+                $country,
                 $channel->value,
                 $type->value,
                 $language,
+                $phoneE164,
                 $now,
                 $now,
                 $actorId,
@@ -74,6 +79,8 @@ final class ResolveContact extends Action
         if (! $contact instanceof Contact) {
             throw new RuntimeException('Contact upsert did not produce a row for '.$email.'.');
         }
+
+        $contact = $contact->currentSurvivor();
 
         if (self::createdFromInsertAffected($affected)) {
             History::record($contact, 'contact.created', after: $this->snapshot($contact));
@@ -89,14 +96,33 @@ final class ResolveContact extends Action
      */
     private function createWithoutEmail(array $data): Contact
     {
+        $phone = $this->nullableString($data['phone'] ?? null);
+        $country = $this->nullableCountry($data['country'] ?? null);
+        $phoneE164 = PhoneNumber::toE164($phone, $country);
+
+        if ($phoneE164 !== null) {
+            $existing = Contact::query()
+                ->notMerged()
+                ->where('phone_e164', $phoneE164)
+                ->orderBy('id')
+                ->first();
+
+            if ($existing instanceof Contact) {
+                $channel = $this->preferredChannel($data['preferred_channel'] ?? null);
+
+                return $this->applyTypeHint($this->fillEmptyFields($existing, $data, $channel), $this->typeHint($data['type'] ?? null));
+            }
+        }
+
         $contact = Contact::query()->create([
             'name' => $data['name'],
             'email' => null,
-            'phone' => $this->nullableString($data['phone'] ?? null),
-            'country' => $this->nullableCountry($data['country'] ?? null),
+            'phone' => $phone,
+            'country' => $country,
             'preferred_channel' => $this->preferredChannel($data['preferred_channel'] ?? null),
             'type' => $this->typeHint($data['type'] ?? null),
             'language' => $this->language($data['language'] ?? null),
+            'phone_e164' => $phoneE164,
         ]);
 
         History::record($contact, 'contact.created', after: $this->snapshot($contact));
@@ -142,6 +168,13 @@ final class ResolveContact extends Action
 
         if ($update === []) {
             return $contact;
+        }
+
+        if (isset($update['phone']) || isset($update['country'])) {
+            $update['phone_e164'] = PhoneNumber::toE164(
+                isset($update['phone']) ? (string) $update['phone'] : $contact->phone,
+                isset($update['country']) ? (string) $update['country'] : $contact->country,
+            );
         }
 
         Contact::query()->whereKey($contact->id)->update([
