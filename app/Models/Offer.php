@@ -408,7 +408,7 @@ class Offer extends Model
         return static::query()
             ->applicableTo($departure, $cabinType, $channel, $bookingDate, $code)
             ->get()
-            ->filter(fn (self $offer): bool => ! $offer->isDerivedExpired())
+            ->filter(fn (self $offer): bool => ! $offer->isDerivedExpired($bookingDate))
             ->values();
     }
 }

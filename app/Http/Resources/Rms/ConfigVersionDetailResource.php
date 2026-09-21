@@ -89,7 +89,9 @@ class ConfigVersionDetailResource extends JsonResource
      *             solo_and_triple: string,
      *             pay_today: string,
      *             details_note: string,
-     *             confirmation_steps: list<string>
+     *             confirmation_steps: list<string>,
+     *             online_deposit_advantage: string,
+     *             online_deposit_perk: string
      *         },
      *         charter: array{
      *             headline: string,

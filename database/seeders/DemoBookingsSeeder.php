@@ -28,6 +28,7 @@ use App\Services\Pricing\Quote;
 use App\Services\Pricing\QuoteInput;
 use App\Services\References\ReferenceService;
 use App\Support\Bookings\ChannelSeedMap;
+use App\Support\Bookings\SoldOn;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
 use App\Support\Payments\InsertLedgerRow;
@@ -168,6 +169,8 @@ final class DemoBookingsSeeder extends Seeder
                 'balance_days' => $type === BookingType::Charter
                     ? $terms->charterBalanceDays
                     : $terms->cabinBalanceDays,
+                'online_deposit' => false,
+                'sold_on' => SoldOn::today(),
             ],
         );
 

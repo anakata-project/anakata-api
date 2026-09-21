@@ -35,6 +35,8 @@ final class EngineSettingsDocument extends ConfigDocument
             'copy.pay_today',
             'copy.details_note',
             'copy.confirmation_steps',
+            'copy.online_deposit_advantage',
+            'copy.online_deposit_perk',
             'charter.headline',
             'charter.intro',
             'charter.itinerary_label',
@@ -101,6 +103,8 @@ final class EngineSettingsDocument extends ConfigDocument
                     'You receive your booking confirmation and deposit link (10%). Your cabins stay held while you decide, per our hold policy.',
                     'After the deposit, we gather guest details and preferences, and our concierge curates flights, stays and on-board touches.',
                 ],
+                'online_deposit_advantage' => 'Online deposit advantage',
+                'online_deposit_perk' => 'Complimentary spa access aboard',
             ],
             'charter' => [
                 'headline' => 'The yacht, entirely yours',
@@ -192,6 +196,8 @@ final class EngineSettingsDocument extends ConfigDocument
                 (string) ($copy['pay_today'] ?? ''),
                 (string) ($copy['details_note'] ?? ''),
                 $steps,
+                (string) ($copy['online_deposit_advantage'] ?? ''),
+                (string) ($copy['online_deposit_perk'] ?? ''),
             ),
             new CharterSettings(
                 (string) ($charter['headline'] ?? ''),
@@ -240,7 +246,9 @@ final class EngineSettingsDocument extends ConfigDocument
      *         solo_and_triple: string,
      *         pay_today: string,
      *         details_note: string,
-     *         confirmation_steps: list<string>
+     *         confirmation_steps: list<string>,
+     *         online_deposit_advantage: string,
+     *         online_deposit_perk: string
      *     },
      *     charter: array{
      *         headline: string,
@@ -307,6 +315,8 @@ final class EngineSettingsDocument extends ConfigDocument
             'copy.pay_today' => ['required', 'string', 'min:1', 'max:320'],
             'copy.details_note' => ['required', 'string', 'min:1', 'max:320'],
             'copy.confirmation_steps' => ['required', 'array', 'size:3'],
+            'copy.online_deposit_advantage' => ['required', 'string', 'min:1', 'max:80'],
+            'copy.online_deposit_perk' => ['required', 'string', 'min:1', 'max:120'],
             'copy.confirmation_steps.*' => ['required', 'string', 'min:1', 'max:320'],
             'charter' => ['required', 'array'],
             'charter.headline' => ['required', 'string', 'min:1', 'max:60'],
@@ -353,6 +363,8 @@ final class EngineSettingsDocument extends ConfigDocument
             'copy.pay_today' => 'Pay-today box',
             'copy.details_note' => 'Details-page note',
             'copy.confirmation_steps' => 'Confirmation steps',
+            'copy.online_deposit_advantage' => 'Online-deposit advantage label',
+            'copy.online_deposit_perk' => 'Online-deposit perk',
             'charter.headline' => 'Charter headline',
             'charter.intro' => 'Charter intro',
             'charter.itinerary_label' => 'Charter itinerary label',

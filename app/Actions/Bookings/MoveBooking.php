@@ -246,6 +246,10 @@ final class MoveBooking extends Action
             'departure_id' => $target->id,
             'type' => $booking->type->value,
             'back_to_back' => $booking->back_to_back,
+            'main_channel' => $booking->main_channel,
+            'promo_code' => $booking->promo_code,
+            'online_deposit' => $booking->online_deposit,
+            'booking_date' => $booking->sold_on->toDateString(),
             'cabins' => $booking->type === BookingType::Charter
                 ? [['adults' => $booking->adults, 'children' => $booking->children]]
                 : [['cabin_code' => $cabinCode, 'adults' => $booking->adults, 'children' => $booking->children]],

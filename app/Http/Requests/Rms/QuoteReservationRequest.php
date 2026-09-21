@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Rms;
 
 use App\Enums\BookingType;
+use App\Enums\MainChannel;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -29,6 +30,7 @@ class QuoteReservationRequest extends FormRequest
             'cabins.*.cabin_code' => ['nullable', 'string', 'max:16'],
             'cabins.*.adults' => ['required', 'integer', 'min:0', 'max:36'],
             'cabins.*.children' => ['required', 'integer', 'min:0', 'max:36'],
+            'main_channel' => ['sometimes', 'nullable', Rule::enum(MainChannel::class)],
         ];
     }
 

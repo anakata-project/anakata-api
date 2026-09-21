@@ -25,6 +25,7 @@ use App\Services\Pricing\QuotedParty;
 use App\Services\Pricing\ReservationQuoter;
 use App\Services\References\ReferenceService;
 use App\Support\Blocks\ConflictMessage;
+use App\Support\Bookings\SoldOn;
 use App\Support\BusinessHours;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
@@ -128,6 +129,9 @@ final class CreateBookingRequest extends Action
                 'total' => $priced->total,
                 'deposit_pct' => $priced->depositPct,
                 'balance_days' => $this->config->rates()->terms->cabinBalanceDays,
+                'promo_code' => $this->promoCode($data),
+                'online_deposit' => (bool) ($data['online_deposit'] ?? false),
+                'sold_on' => SoldOn::today(),
                 'internal_notes' => isset($data['internal_notes']) && is_string($data['internal_notes'])
                     ? $data['internal_notes']
                     : null,
@@ -186,5 +190,19 @@ final class CreateBookingRequest extends Action
                 'claims',
             ]);
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function promoCode(array $data): ?string
+    {
+        $code = $data['promo_code'] ?? null;
+
+        if (! is_string($code) || trim($code) === '') {
+            return null;
+        }
+
+        return strtoupper(trim($code));
     }
 }

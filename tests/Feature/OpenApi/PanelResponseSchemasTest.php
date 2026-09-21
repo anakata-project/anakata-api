@@ -187,6 +187,9 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'billing_address',
         'billing_email',
         'billing_phone',
+        'promo_code',
+        'online_deposit',
+        'sold_on',
     ]);
     $guestsSummary = openApiProperties($booking['properties']['guests_summary'] ?? []);
     expect($guestsSummary)->toHaveKeys(['complete', 'total']);

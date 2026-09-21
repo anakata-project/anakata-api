@@ -14,6 +14,7 @@ use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\RateVersion;
 use App\Models\User;
+use App\Support\Bookings\SoldOn;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use RuntimeException;
 
@@ -49,6 +50,9 @@ class BookingFactory extends Factory
             'total' => 26600,
             'deposit_pct' => 10,
             'balance_days' => 120,
+            'promo_code' => null,
+            'online_deposit' => false,
+            'sold_on' => SoldOn::today(),
             'internal_notes' => null,
             'png_collected' => false,
             'tct_collected' => false,

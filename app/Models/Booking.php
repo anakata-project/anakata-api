@@ -63,6 +63,9 @@ use Illuminate\Support\Facades\DB;
  * @property int $total
  * @property int $deposit_pct
  * @property int $balance_days
+ * @property string|null $promo_code
+ * @property bool $online_deposit
+ * @property CarbonImmutable $sold_on
  * @property CarbonImmutable|null $balance_due_date_override
  * @property string|null $internal_notes
  * @property string|null $billing_name
@@ -129,6 +132,9 @@ use Illuminate\Support\Facades\DB;
     'total',
     'deposit_pct',
     'balance_days',
+    'promo_code',
+    'online_deposit',
+    'sold_on',
     'balance_due_date_override',
     'internal_notes',
     'billing_name',
@@ -164,6 +170,8 @@ class Booking extends Model
             'total' => 'integer',
             'deposit_pct' => 'integer',
             'balance_days' => 'integer',
+            'online_deposit' => 'boolean',
+            'sold_on' => CalendarDate::class,
             'balance_due_date_override' => CalendarDate::class,
             'png_collected' => 'boolean',
             'tct_collected' => 'boolean',

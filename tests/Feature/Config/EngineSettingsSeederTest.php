@@ -36,6 +36,8 @@ test('the seeded engine settings document matches seed-data.json plus the FIN-00
         $source['step2'],
         $source['step3'],
     ]);
+    expect($document['copy']['online_deposit_advantage'])->toBe('Online deposit advantage');
+    expect($document['copy']['online_deposit_perk'])->toBe('Complimentary spa access aboard');
     expect($document['fees']['tct_pp'])->toBe($source['tct']);
     expect($document['fees']['png']['foreign_over_12'])->toBe($source['pngAd']);
     expect($document['fees']['png']['foreign_12_and_under'])->toBe($source['pngCh']);

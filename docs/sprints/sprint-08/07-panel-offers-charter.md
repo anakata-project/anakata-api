@@ -17,7 +17,8 @@ Staff manage offers and promo codes on the Offers page, a Director approves the 
 3. **Rates & Promotions.** Replace the prototype's promotions placeholder panel with the same offers list, compact (code, benefit, scope, windows, status, Pause/Manage), reading `GET /api/rms/offers` — one source, as the prototype's `renderRatesPromos` reads the same `OFFERS`. "Manage in Offers →" opens the Offers page.
 4. **Charter enquiries** on Booking Requests: a panel under the requests queue, from `GET /api/rms/charter-enquiries` — received, contact, dates or departure, guests, message, status — with a status change (`NEW → CONTACTED → CLOSED`) for `bookings.create`. Empty state in the prototype's tone.
 5. **"Complete your reservation" link** on the booking panel's Payments tab: "Copy guest link" (`can_act`) → `POST /api/rms/bookings/{id}/complete-link`, copied to the clipboard, with a line that the payment-link and reminder emails already contain it.
-6. **Helpers, tested:** `offerStatusPillClass(status)` (presentation only), `offerFormToPayload(form)` (shape only, no rules).
+6. **New Reservation sends its channel on every quote.** Since task 02, `POST /api/rms/bookings/quote` applies offers for the channel it is given and defaults to D2C when none is sent, while `CreateReservation` re-quotes with the form's real `main_channel`. Send `main_channel` with every quote request (and re-quote when it changes), so the total staff see in the modal is the total the booking stores. Test it with a trade channel and an applicable B2B price offer.
+7. **Helpers, tested:** `offerStatusPillClass(status)` (presentation only), `offerFormToPayload(form)` (shape only, no rules).
 
 ## Don't
 - Don't enforce offer guardrails in the panel.
@@ -25,7 +26,7 @@ Staff manage offers and promo codes on the Offers page, a Director approves the 
 
 ## Checks
 - `pnpm lint`, `typecheck`, `test`, `build`; fresh-clone typecheck and build against `v0.9.0`.
-- Browser, both themes, after `reset.sh`: create a PCT offer as Carolina (Manager rights) → PENDING DIRECTOR; approve as a Director with a reason → LIVE, and it appears on the engine within 30 seconds; pause → gone within 30 seconds; a festive itinerary cannot be ticked; a Sales Exec sees the form read-only; a charter enquiry from the engine appears and can be marked contacted; the guest link copies.
+- Browser, both themes, after `reset.sh`: a trade-channel New Reservation shows the same total in the modal as on the created booking; create a PCT offer as Carolina (Manager rights) → PENDING DIRECTOR; approve as a Director with a reason → LIVE, and it appears on the engine within 30 seconds; pause → gone within 30 seconds; a festive itinerary cannot be ticked; a Sales Exec sees the form read-only; a charter enquiry from the engine appears and can be marked contacted; the guest link copies.
 
 ## Report
-Append **Task 07**: the pages, the actions and their permissions, the single offers source for Rates & Promotions, charter enquiries, and the guest link. Git commands listed, not run.
+Append **Task 07**: the pages, the actions and their permissions, the single offers source for Rates & Promotions, charter enquiries, the guest link, and New Reservation sending `main_channel` on every quote. Git commands listed, not run.

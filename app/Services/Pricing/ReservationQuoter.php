@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Pricing;
 
+use App\Enums\BookingSegment;
 use App\Enums\BookingType;
 use App\Enums\CabinState;
+use App\Enums\MainChannel;
 use App\Models\Cabin;
 use App\Models\Departure;
 use App\Services\Config\CurrentConfig;
 use App\Services\Inventory\Availability;
+use App\Support\BusinessTime;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Inventory\DepartureSnapshot;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +23,7 @@ final class ReservationQuoter
         private CabinPricer $pricer,
         private CurrentConfig $config,
         private Availability $availability,
+        private BookingDiscounts $discounts,
     ) {}
 
     /**
@@ -51,9 +55,11 @@ final class ReservationQuoter
         $rates = $this->config->rates();
         $year = (int) $departure->date->format('Y');
 
+        $context = $this->context($input);
+
         $parties = $type === BookingType::Charter
             ? [$this->quoteCharter($departure, $rows[0], $snapshot, $backToBack, $year, $guests->maxPerYacht, $rates)]
-            : $this->quoteCabins($departure, $rows, $snapshot, $backToBack, $year, $guests->maxPerCabin, $rates);
+            : $this->quoteCabins($departure, $rows, $snapshot, $backToBack, $year, $guests->maxPerCabin, $rates, $context);
 
         $warnings = [];
 
@@ -143,6 +149,7 @@ final class ReservationQuoter
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @param  array{channel: BookingSegment, booking_date: string, online_deposit: bool, promo_code: string|null}  $context
      * @return list<QuotedParty>
      */
     private function quoteCabins(
@@ -153,6 +160,7 @@ final class ReservationQuoter
         int $year,
         int $maxPerCabin,
         RatesDocument $rates,
+        array $context,
     ): array {
         $used = [];
         $parties = [];
@@ -213,7 +221,7 @@ final class ReservationQuoter
                 ));
 
                 if ($priced instanceof Quote) {
-                    $quote = $priced;
+                    $quote = $this->withDiscounts($priced, $departure, $cabin, $context, $adults, $children, $warnings);
                 } else {
                     $errors[] = $priced->reason;
                 }
@@ -233,5 +241,74 @@ final class ReservationQuoter
         }
 
         return $parties;
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array{channel: BookingSegment, booking_date: string, online_deposit: bool, promo_code: string|null}
+     */
+    private function context(array $input): array
+    {
+        $channel = BookingSegment::D2C;
+
+        if (isset($input['channel']) && $input['channel'] instanceof BookingSegment) {
+            $channel = $input['channel'];
+        } elseif (isset($input['main_channel']) && $input['main_channel'] !== '') {
+            $main = $input['main_channel'] instanceof MainChannel
+                ? $input['main_channel']
+                : MainChannel::from((string) $input['main_channel']);
+            $channel = $main->segment();
+        }
+
+        $bookingDate = isset($input['booking_date']) && is_string($input['booking_date']) && $input['booking_date'] !== ''
+            ? $input['booking_date']
+            : BusinessTime::now()->toDateString();
+
+        $promo = $input['promo_code'] ?? null;
+
+        return [
+            'channel' => $channel,
+            'booking_date' => $bookingDate,
+            'online_deposit' => (bool) ($input['online_deposit'] ?? false),
+            'promo_code' => is_string($promo) && trim($promo) !== '' ? $promo : null,
+        ];
+    }
+
+    /**
+     * @param  array{channel: BookingSegment, booking_date: string, online_deposit: bool, promo_code: string|null}  $context
+     * @param  list<string>  $warnings
+     */
+    private function withDiscounts(
+        Quote $priced,
+        Departure $departure,
+        Cabin $cabin,
+        array $context,
+        int $adults,
+        int $children,
+        array &$warnings,
+    ): Quote {
+        if ($departure->festive) {
+            return $priced;
+        }
+
+        $applied = $this->discounts->apply(
+            $priced,
+            $departure,
+            $cabin->category,
+            $context['channel'],
+            $context['booking_date'],
+            $adults,
+            $children,
+            $context['online_deposit'],
+            $context['promo_code'],
+        );
+
+        foreach ($applied['warnings'] as $warning) {
+            if (! in_array($warning, $warnings, true)) {
+                $warnings[] = $warning;
+            }
+        }
+
+        return $applied['quote'];
     }
 }

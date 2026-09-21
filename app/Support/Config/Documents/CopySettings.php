@@ -16,6 +16,8 @@ final readonly class CopySettings
         public string $payToday,
         public string $detailsNote,
         public array $confirmationSteps,
+        public string $onlineDepositAdvantage,
+        public string $onlineDepositPerk,
     ) {}
 
     /**
@@ -25,7 +27,9 @@ final readonly class CopySettings
      *     solo_and_triple: string,
      *     pay_today: string,
      *     details_note: string,
-     *     confirmation_steps: list<string>
+     *     confirmation_steps: list<string>,
+     *     online_deposit_advantage: string,
+     *     online_deposit_perk: string
      * }
      */
     public function toArray(): array
@@ -37,6 +41,8 @@ final readonly class CopySettings
             'pay_today' => $this->payToday,
             'details_note' => $this->detailsNote,
             'confirmation_steps' => $this->confirmationSteps,
+            'online_deposit_advantage' => $this->onlineDepositAdvantage,
+            'online_deposit_perk' => $this->onlineDepositPerk,
         ];
     }
 }

@@ -9,9 +9,11 @@ use App\Actions\Contacts\ResolveContact;
 use App\Enums\AgencyStatus;
 use App\Enums\BookingStatus;
 use App\Enums\BookingType;
+use App\Enums\CabinCategory;
 use App\Enums\ClaimKind;
 use App\Enums\ConfigKind;
 use App\Enums\MainChannel;
+use App\Enums\OfferType;
 use App\Enums\ReferenceType;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Agency;
@@ -20,6 +22,7 @@ use App\Models\Cabin;
 use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\Group;
+use App\Models\Offer;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Services\Inventory\ClaimService;
@@ -29,6 +32,7 @@ use App\Services\Pricing\ReservationQuoter;
 use App\Services\References\ReferenceService;
 use App\Support\Blocks\ConflictMessage;
 use App\Support\Bookings\ReservationCreated;
+use App\Support\Bookings\SoldOn;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
 use App\Support\Money;
@@ -72,11 +76,15 @@ final class CreateReservation extends Action
                 ? $terms->charterBalanceDays
                 : $terms->cabinBalanceDays;
 
-            $commission = $this->resolveCommission($data);
-
             $bookings = new Collection;
 
             foreach ($quote->parties as $party) {
+                $commission = $this->resolveCommission(
+                    $data,
+                    $departure,
+                    $party->cabin?->category,
+                );
+
                 $booking = $this->createBooking(
                     $quote,
                     $party,
@@ -173,7 +181,7 @@ final class CreateReservation extends Action
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool}|null  $commission
+     * @param  array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool, offer_codes: list<string>}|null  $commission
      */
     private function createBooking(
         ReservationQuote $quote,
@@ -220,6 +228,9 @@ final class CreateReservation extends Action
             'total' => $priced->total,
             'deposit_pct' => $priced->depositPct,
             'balance_days' => $balanceDays,
+            'promo_code' => $this->promoCode($data),
+            'online_deposit' => (bool) ($data['online_deposit'] ?? false),
+            'sold_on' => SoldOn::today(),
             'internal_notes' => $notes,
         ]);
 
@@ -234,21 +245,32 @@ final class CreateReservation extends Action
             $what .= ' · group '.$group->reference;
         }
 
-        History::record($booking, 'booking.created', after: [
+        $createdAfter = [
             'reference' => $booking->reference,
             'status' => $booking->status->value,
             'total' => $booking->total,
             'what' => $what,
-        ]);
+        ];
+
+        if ($commission !== null && $commission['offer_codes'] !== []) {
+            $createdAfter['commission_pct'] = $commission['commission_pct'];
+            $createdAfter['commission_offers'] = $commission['offer_codes'];
+        }
+
+        History::record($booking, 'booking.created', after: $createdAfter);
 
         if ($commission !== null && $commission['over_cap']) {
             $cap = $this->config->businessRules()->commission->capPct;
             $pct = $commission['commission_pct'];
+            $named = $commission['offer_codes'] === []
+                ? ''
+                : ' · '.implode(', ', $commission['offer_codes']);
 
             History::record($booking, 'booking.commission_held', after: [
-                'what' => 'HELD — commission '.$pct.' % above '.$cap.' % cap · Director alert sent (FIN-005)',
+                'what' => 'HELD — commission '.$pct.' % above '.$cap.' % cap'.$named.' · Director alert sent (FIN-005)',
                 'commission_pct' => $pct,
                 'cap_pct' => $cap,
+                'commission_offers' => $commission['offer_codes'],
             ], system: true);
         }
 
@@ -257,9 +279,9 @@ final class CreateReservation extends Action
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool}|null
+     * @return array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool, offer_codes: list<string>}|null
      */
-    private function resolveCommission(array $data): ?array
+    private function resolveCommission(array $data, Departure $departure, ?CabinCategory $category): ?array
     {
         $agencyId = $data['agency_id'] ?? null;
 
@@ -294,6 +316,22 @@ final class CreateReservation extends Action
         $pct = isset($data['commission_pct']) && $data['commission_pct'] !== ''
             ? (int) $data['commission_pct']
             : $agency->commission_pct;
+        $offerCodes = [];
+
+        if ($category instanceof CabinCategory) {
+            $commOffers = Offer::applicableTo(
+                $departure,
+                $category,
+                $channel->segment(),
+                SoldOn::today(),
+            )->filter(fn (Offer $offer): bool => $offer->type === OfferType::Commission);
+
+            foreach ($commOffers as $offer) {
+                $pct += (int) $offer->value;
+                $offerCodes[] = $offer->code;
+            }
+        }
+
         $cap = $this->config->businessRules()->commission->capPct;
         $overCap = $pct > $cap;
 
@@ -302,7 +340,22 @@ final class CreateReservation extends Action
             'commission_pct' => $pct,
             'commission_approved' => ! $overCap,
             'over_cap' => $overCap,
+            'offer_codes' => $offerCodes,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function promoCode(array $data): ?string
+    {
+        $code = $data['promo_code'] ?? null;
+
+        if (! is_string($code) || trim($code) === '') {
+            return null;
+        }
+
+        return strtoupper(trim($code));
     }
 
     private function requireCabin(QuotedParty $party): Cabin

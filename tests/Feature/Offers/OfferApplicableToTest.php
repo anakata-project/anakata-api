@@ -10,6 +10,8 @@ use App\Enums\OfferType;
 use App\Models\Departure;
 use App\Models\Offer;
 use App\Models\Yacht;
+use App\Support\BusinessTime;
+use Carbon\CarbonImmutable;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
 use Tests\Support\Bookings\ReservationFixtures;
@@ -122,4 +124,25 @@ test('all-channel offers match both d2c and b2b', function (): void {
 
     expect(Offer::applicableTo($departure, CabinCategory::Suite, BookingSegment::D2C, '2027-06-15'))->toHaveCount(1);
     expect(Offer::applicableTo($departure, CabinCategory::Suite, BookingSegment::B2B, '2027-06-15'))->toHaveCount(1);
+});
+
+test('applicableTo judges derived expiry against the booking date, not today', function (): void {
+    $departure = ReservationFixtures::anamaraDeparture('2027-11-14');
+    $departure->itinerary()->associate(OfferFixtures::west());
+    $departure->save();
+
+    Offer::factory()->live()->create([
+        'code' => 'LASTDAY',
+        'channel' => OfferChannel::D2C,
+        'itinerary_codes' => ['WEST'],
+        'cabin_types' => [CabinCategory::Suite->value],
+        'booking_from' => '2026-09-20',
+        'booking_to' => '2026-09-20',
+    ]);
+
+    $this->travelTo(CarbonImmutable::parse('2026-09-21 12:00:00', BusinessTime::zone()));
+
+    expect(Offer::applicableTo($departure, CabinCategory::Suite, BookingSegment::D2C, '2026-09-21'))->toBeEmpty();
+    expect(Offer::applicableTo($departure, CabinCategory::Suite, BookingSegment::D2C, '2026-09-20')->pluck('code')->all())
+        ->toBe(['LASTDAY']);
 });
