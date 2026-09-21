@@ -30,6 +30,7 @@ use App\Models\Group;
 use App\Models\Guest;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
+use App\Models\Offer;
 use App\Models\Payment;
 use App\Models\PaymentLink;
 use App\Models\RateVersion;
@@ -145,6 +146,7 @@ class AppServiceProvider extends ServiceProvider
             'contact' => Contact::class,
             'group' => Group::class,
             'agency' => Agency::class,
+            'offer' => Offer::class,
             'booking' => Booking::class,
             'document' => Document::class,
             'guest' => Guest::class,

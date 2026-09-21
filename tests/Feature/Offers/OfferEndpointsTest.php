@@ -1,0 +1,114 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\Offer;
+use Database\Seeders\InventorySeeder;
+use Database\Seeders\RolesSeeder;
+use Tests\Support\Bookings\ReservationFixtures;
+use Tests\Support\Offers\OfferFixtures;
+
+beforeEach(function (): void {
+    $this->seed(RolesSeeder::class);
+    $this->seed(InventorySeeder::class);
+    OfferFixtures::west();
+    OfferFixtures::north();
+});
+
+test('a sales exec can read offers and cannot write', function (): void {
+    $offer = Offer::factory()->create(['itinerary_codes' => ['WEST']]);
+
+    $this->actingAs(salesExecUser())
+        ->getJson('/api/rms/offers')
+        ->assertOk()
+        ->assertJsonPath('data.0.code', $offer->code);
+
+    $this->actingAs(salesExecUser())
+        ->postJson('/api/rms/offers', OfferFixtures::payload())
+        ->assertForbidden();
+});
+
+test('index filters by channel query and date span', function (): void {
+    Offer::factory()->create([
+        'code' => 'OPENING-27',
+        'name' => 'Opening season credit',
+        'channel' => 'D2C',
+        'travel_from' => '2027-11-01',
+        'travel_to' => '2027-12-31',
+        'itinerary_codes' => ['WEST'],
+    ]);
+    Offer::factory()->create([
+        'code' => 'VIRTUOSO-EARLY',
+        'name' => 'Virtuoso early booking',
+        'channel' => 'B2B',
+        'booking_from' => '2027-01-01',
+        'booking_to' => '2027-03-31',
+        'itinerary_codes' => ['WEST'],
+    ]);
+
+    $byChannel = $this->actingAs(managerUser())
+        ->getJson('/api/rms/offers?channel=B2B')
+        ->assertOk()
+        ->json('data');
+
+    expect(collect($byChannel)->pluck('code')->all())->toBe(['VIRTUOSO-EARLY']);
+
+    $byQuery = $this->actingAs(managerUser())
+        ->getJson('/api/rms/offers?q=OPENING')
+        ->assertOk()
+        ->json('data');
+
+    expect(collect($byQuery)->pluck('code')->all())->toBe(['OPENING-27']);
+
+    $bySpan = $this->actingAs(managerUser())
+        ->getJson('/api/rms/offers?from=2027-11-01&to=2027-11-30')
+        ->assertOk()
+        ->json('data');
+
+    expect(collect($bySpan)->pluck('code')->all())->toBe(['OPENING-27']);
+});
+
+test('show returns prototype derived columns', function (): void {
+    $west = ReservationFixtures::anamaraDeparture('2027-11-14');
+    $west->itinerary()->associate(OfferFixtures::west());
+    $west->save();
+
+    $offer = Offer::factory()->live()->create([
+        'code' => 'OPENING-27',
+        'name' => 'Opening season credit',
+        'type' => 'CREDIT',
+        'value' => 500,
+        'cabin_types' => ['SUITE'],
+        'itinerary_codes' => ['WEST'],
+        'badge' => 'OPENING OFFER',
+        'show_on_card' => true,
+        'show_on_departures' => true,
+    ]);
+
+    $this->actingAs(managerUser())
+        ->getJson('/api/rms/offers/'.$offer->id)
+        ->assertOk()
+        ->assertJsonPath('benefit_label', 'USD 500 ancillary credit / cabin')
+        ->assertJsonPath('booking_window_label', 'Any')
+        ->assertJsonPath('engine_placement', 'badge')
+        ->assertJsonPath('live_departures_count', 1);
+});
+
+test('derived labels match the prototype wording', function (): void {
+    $offer = Offer::factory()->live()->create([
+        'type' => 'PCT',
+        'value' => 10,
+        'channel' => 'ALL',
+        'cabin_types' => ['SUITE', 'OWNER'],
+        'itinerary_codes' => ['WEST', 'NORTH'],
+        'booking_from' => '2027-01-01',
+        'booking_to' => '2027-03-31',
+    ]);
+
+    $this->actingAs(managerUser())
+        ->getJson('/api/rms/offers/'.$offer->id)
+        ->assertOk()
+        ->assertJsonPath('benefit_label', '10% off cabin rate')
+        ->assertJsonPath('scope_label', 'All channels · Suites + Owner\'s · All non-festive itineraries')
+        ->assertJsonPath('booking_window_label', '1 Jan 2027 → 31 Mar 2027');
+});

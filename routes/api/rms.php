@@ -25,6 +25,7 @@ use App\Http\Controllers\Rms\GuestController;
 use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
+use App\Http\Controllers\Rms\OfferController;
 use App\Http\Controllers\Rms\PaymentController;
 use App\Http\Controllers\Rms\PaymentLinkController;
 use App\Http\Controllers\Rms\PermissionController;
@@ -155,6 +156,15 @@ Route::post('documents/{document}/send', [DocumentController::class, 'send'])->w
 Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
 Route::patch('guests/{guest}', [GuestController::class, 'update'])->whereNumber('guest');
 Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->whereNumber('guest');
+
+Route::get('offers', [OfferController::class, 'index']);
+Route::post('offers', [OfferController::class, 'store']);
+Route::get('offers/{offer}', [OfferController::class, 'show'])->whereNumber('offer');
+Route::patch('offers/{offer}', [OfferController::class, 'update'])->whereNumber('offer');
+Route::post('offers/{offer}/approve', [OfferController::class, 'approve'])->whereNumber('offer');
+Route::post('offers/{offer}/reject', [OfferController::class, 'reject'])->whereNumber('offer');
+Route::post('offers/{offer}/pause', [OfferController::class, 'pause'])->whereNumber('offer');
+Route::post('offers/{offer}/resume', [OfferController::class, 'resume'])->whereNumber('offer');
 
 Route::get('agencies', [AgencyController::class, 'index']);
 Route::post('agencies', [AgencyController::class, 'store']);
