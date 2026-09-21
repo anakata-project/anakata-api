@@ -139,6 +139,66 @@ test('agency show returns net rates and no public suite owner or charter prices'
     expect($net['charter_week'])->toBe(Rounding::halfUp($rates->years[0]->charterWeek * 0.9));
 });
 
+test('agency index windowed stats and kpis count only bookings departing in from to', function (): void {
+    $agency = Agency::factory()->create(['commission_pct' => 10]);
+    $inside = ReservationFixtures::anamaraDeparture('2027-11-07');
+    $outside = ReservationFixtures::anamaraDeparture('2028-07-09');
+
+    $this->actingAs(managerUser())
+        ->postJson('/api/rms/bookings', ReservationFixtures::createPayload($inside, [
+            'cabins' => [['cabin_code' => 'S1', 'adults' => 2, 'children' => 0]],
+            'main_channel' => MainChannel::B2BTravelAdvisor->value,
+            'channel_of_origin' => 'Travel Advisor',
+            'agency_id' => $agency->id,
+            'commission_pct' => 10,
+        ]))
+        ->assertCreated();
+
+    $this->actingAs(managerUser())
+        ->postJson('/api/rms/bookings', ReservationFixtures::createPayload($outside, [
+            'cabins' => [['cabin_code' => 'S1', 'adults' => 2, 'children' => 0]],
+            'main_channel' => MainChannel::B2BTravelAdvisor->value,
+            'channel_of_origin' => 'Travel Advisor',
+            'agency_id' => $agency->id,
+            'commission_pct' => 10,
+        ]))
+        ->assertCreated();
+
+    $insideBooking = Booking::query()->where('agency_id', $agency->id)
+        ->whereHas('departure', fn ($query) => $query->whereDate('date', '2027-11-07'))
+        ->firstOrFail();
+    $outsideBooking = Booking::query()->where('agency_id', $agency->id)
+        ->whereHas('departure', fn ($query) => $query->whereDate('date', '2028-07-09'))
+        ->firstOrFail();
+    $allRevenue = $insideBooking->total + $outsideBooking->total;
+    $allAccrued = $insideBooking->commissionAmount() + $outsideBooking->commissionAmount();
+    $allTime = $this->actingAs(managerUser())
+        ->getJson('/api/rms/agencies')
+        ->assertOk();
+    $allRow = collect($allTime->json('data'))->firstWhere('id', $agency->id);
+
+    expect($allRow['bookings_count'])->toBe(2);
+    expect($allRow['revenue'])->toBe($allRevenue);
+    expect($allRow['commission_accrued'])->toBe($allAccrued);
+    expect($allTime->json('meta.kpis.agency_revenue'))->toBe($allRevenue);
+    expect($allTime->json('meta.kpis.commission_accrued'))->toBe($allAccrued);
+    expect($allTime->json('meta.kpis.agency_approval_business_days'))->toBe(2);
+    expect($allTime->json('meta.kpis.commission_default_pct'))->toBe(10);
+
+    $windowed = $this->actingAs(managerUser())
+        ->getJson('/api/rms/agencies?from=2027-11-01&to=2027-11-30')
+        ->assertOk();
+    $windowRow = collect($windowed->json('data'))->firstWhere('id', $agency->id);
+
+    expect($windowRow['bookings_count'])->toBe(1);
+    expect($windowRow['revenue'])->toBe($insideBooking->total);
+    expect($windowRow['commission_accrued'])->toBe($insideBooking->commissionAmount());
+    expect($windowRow['held_bookings_count'])->toBe(0);
+    expect($windowed->json('meta.kpis.agency_revenue'))->toBe($insideBooking->total);
+    expect($windowed->json('meta.kpis.commission_accrued'))->toBe($insideBooking->commissionAmount());
+    expect($windowed->json('meta.kpis.approved_agencies'))->toBe($allTime->json('meta.kpis.approved_agencies'));
+});
+
 test('form options list only approved agencies', function (): void {
     $approved = Agency::factory()->create(['name' => 'Blue Latitude']);
     Agency::factory()->pending()->create(['name' => 'Andes Pending']);

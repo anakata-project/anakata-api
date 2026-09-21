@@ -70,6 +70,7 @@ class BookingResource extends JsonResource
      *     commission_approved_by: array{id: int, name: string}|null,
      *     commission_approved_at: string|null,
      *     commission_reason: string|null,
+     *     commission_cap_pct: int,
      *     request: array{preferred_channel: string, travel_advisor: bool, notes: string|null, hold: array{expires_at: string|null, expired: bool, rule: string, remaining_business_minutes: int}, sla: array{due_at: string, remaining_minutes: int, breached: bool}}|null,
      *     payment_links: list<array{id: int, kind: string, amount: int, stripe_id: string, url: string, status: string, mode: string, created_at: string}>,
      *     refund: array{status: string, penalty_amount: int, refund_due: int, band_label: string, due_by: string}|null
@@ -171,6 +172,7 @@ class BookingResource extends JsonResource
             ],
             'commission_approved_at' => Iso::utc($this->commission_approved_at),
             'commission_reason' => $this->commission_reason,
+            'commission_cap_pct' => app(CurrentConfig::class)->businessRules()->commission->capPct,
             'request' => RequestSummary::for($this->resource),
             'payment_links' => $this->relationLoaded('paymentLinks')
                 ? PaymentLinkResource::collection($this->paymentLinks)->resolve()

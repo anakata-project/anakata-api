@@ -1415,3 +1415,269 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 09 · anakata-panel · Refund Approvals and B2B & Agent Portal
+
+### What was built
+Refund Approvals (`/rms/operations/refunds`) and B2B & Agent Portal (`/rms/commercial/b2b`). The booking panel Overview now shows the FIN-005 hold and, for `commissions.override_cap`, Approve / Reject with `ReasonModal`. Types ship as **anakata-ui `v0.6.3`**.
+
+H9 in the UI: **approve authorises only**; **execute** writes the negative `REFUNDED` ledger row. The refund itself is made in the payment platform and recorded here.
+
+### API prelude
+Needed so the panel never re-derives money or rule numbers.
+
+| Surface | What landed |
+|---|---|
+| `GET /api/rms/agencies?from&to` | Date-range on **booking departure**. No range = all-time. `AgencyBookingWindow` windows list `bookings_count` / `revenue` / `commission_accrued` / `held_bookings_count` and the revenue / accrued KPIs. Pending agencies stay visible when a window is set. |
+| `AgencyResource` | Always emits those four list stats (list and detailed). Detailed still adds `portal_preview`. |
+| `GET /api/rms/agencies` `meta.kpis` | Existing four totals plus `agency_approval_business_days`, `commission_payable_days`, `commission_cap_pct`, `commission_default_pct` from `CurrentConfig`. |
+| `GET /api/rms/refunds` `meta.rules` | `{ refund_business_days }` from `sla.refund_business_days`. |
+| `BookingResource` | `commission_cap_pct` from `commission.capPct` so the hold notice never hard-codes 12. |
+
+Window test: all-time revenue / accrued equal the sum of an in-window booking and an out-of-window booking; `?from=2027-11-01&to=2027-11-30` keeps only the in-window booking on both the row and the KPIs.
+
+### Types — `v0.6.3`
+`pnpm types:api` against `http://localhost:8000/docs/api.json`.
+
+- No new `AgencyListItem` overlays. The Agency / AgencyListItem split is `portal_preview`.
+- `AgenciesKpis` and `RefundsRules` from the generated operations.
+- `Booking.commission_cap_pct` overlayed as `number` (Scramble still emits `string` on the resource int).
+- Portal preview `net_rates` come from the API. No `netRate` helper in the panel.
+
+### Refund Approvals — columns and sources
+
+| Column | Source |
+|---|---|
+| Booking | `row.booking.display_reference` |
+| Cancelled | `cancelled_at` (calendar short) |
+| Days before departure | `days_before_departure` |
+| Policy band | `{band_label} → {penalty_pct}%` — label from the API (configured bands), never a hard-coded "≥120 days" |
+| Penalty | `penalty_amount` |
+| Refund due | `{refund_due} of {paid_at_cancellation} paid` |
+| SLA | `.slat` from `refundSlaDisplay(business_days_remaining, sla_breached)` — remaining / breached from the API, not a second date-math helper |
+
+`DateRangeFilter` is on **cancellation date**. Status chips: All · Pending · Approved · Executed · Rejected. Notice interpolates `meta.rules.refund_business_days` and states LEG-001 is unpublished.
+
+Row click opens `BookingPanel` on the **Payments** tab.
+
+### Approve / execute split
+- **Approve / Reject** (`refunds.approve`, `PENDING` only): `ReasonModal`, reason required both ways → `POST /refunds/{id}/decide`. Rejected rows stay visible with the reason.
+- **Execute** (`refunds.execute`, `APPROVED` only): modal with method, **amount locked to `refund_due`** (readonly; omitted on POST so the API defaults), optional external reference. Note: the refund is made in the payment platform; this records the negative ledger row.
+- Task 05: `amount` omitted = `refund_due`; any other value is 422. The panel therefore does not offer a partial amount.
+
+### B2B & Agent Portal
+Four `AnkKpi` cards: approved agencies ("portal access active"); registrations to review (warn when non-zero, "SLA: {days} business days (§10)" from the API); agency revenue; commission accrued ("payable {n} days post-cruise").
+
+**Registration requests** only when pending rows exist: agency / contact / email, network · country, requested date, SLA chip (`agencySlaDisplay(elapsed, limit, breached)` — coral `SLA BREACH`), commission asked, Approve / Reject for `agencies.manage`. Rejection needs a reason. Approval toast: **"Invite recorded — not sent. The agent portal and its emails are later sprints."**
+
+**Travel-trade partners:** agency, network, commission (`.p-over` + `>{cap}% BLOCKED` when over cap), payment terms, bookings, revenue, commission accrued, status. Row opens the agency slideover. Bookings in the drawer open the booking panel.
+
+**Portal preview** is a labelled preview of a portal that does not exist yet. It renders API `portal_preview.net_rates` and `commission_amount` only. Notice: agents never see public prices; the client of record is always the end guest.
+
+**＋ Register agency** (`agencies.manage`): prototype fields, commission prefilled from `commission_default_pct`, over-cap entry allowed with the FIN-005 hold warning.
+
+### FIN-005 on the booking Overview
+`commissionHold` = `ON_HOLD_AGENCY` && `!commission_approved`. Notice interpolates `commission_pct` and `commission_cap_pct`. Approve / Reject buttons only when `can('commissions.override_cap')`. `POST /bookings/{id}/commission-approval` `{ approve, reason }`.
+
+`ApplyPaymentEffects` confirms only when the commission is approved **and** the deposit has settled. Seed `ANK-2026-0021` has no deposit, so approve alone stays `ON_HOLD_AGENCY`.
+
+### Nav
+`itemAllowed` OR-of-list: refunds = `refunds.approve` \| `refunds.execute`; B2B = `agencies.manage` \| `bookings.view_all`. Guard tests cover hide / show / `pageDecision`.
+
+### Helpers
+`refundSlaDisplay(remaining, breached)` and `agencySlaDisplay(elapsed, limit, breached)` return the request-queue `SlaDisplay` shape. `commissionPillClass(rate, cap)`. No `netRate`.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Support/Agencies/AgencyBookingWindow.php` (new)
+- `app/Http/Controllers/Rms/AgencyController.php`
+- `app/Http/Controllers/Rms/RefundController.php`
+- `app/Http/Requests/Rms/IndexAgenciesRequest.php`
+- `app/Http/Resources/Rms/AgencyResource.php`
+- `app/Http/Resources/Rms/BookingResource.php`
+- `tests/Feature/Agencies/AgencyEndpointsTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `tests/Feature/Refunds/RefundQueueTest.php`
+
+**anakata-ui** (`v0.6.3`)
+- `app/types/api.d.ts`, `bookings.ts`, `payments.ts`, `index.ts`
+- `package.json`, `CHANGELOG.md`
+
+**anakata-panel**
+- `app/pages/rms/operations/refunds.vue` (new)
+- `app/pages/rms/commercial/b2b.vue` (new)
+- `app/components/refunds/ExecuteRefundModal.vue`, `refundHelpers.ts` (new)
+- `app/components/agencies/AgencyDrawer.vue`, `RegisterAgencyModal.vue`, `agencyHelpers.ts` (new)
+- `app/components/bookings/BookingPanel.vue` (FIN-005 Overview)
+- `app/navigation/rms.ts`, `tests/unit/guards.test.ts`
+- `tests/unit/refundHelpers.test.ts`, `tests/unit/agencyHelpers.test.ts` (new)
+- `app/types/api.ts` (re-exports `AgenciesKpis`, `RefundsRules`)
+- `i18n/locales/en.json`
+- `app/assets/css/config.css` (`.prevbox` / `.prevl`)
+- `README.md` (pin `v0.6.3`)
+
+**anakata-engine**
+- `README.md` (documentation pin `v0.6.3` only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-05/REPORT.md`
+
+### Deviations
+- Execute amount is **readonly `refund_due`**, not an optional lesser amount. Matches Task 05 (any other amount is 422).
+- `refundSlaDisplay` takes API remaining / breached, not `(dueBy, now)`. No second SLA clock.
+- No `netRate` helper — preview uses API `net_rates`.
+- Execute in the browser was Carolina (Admin). Admin bypasses the permission enum; `cfo@` was not signed in for execute.
+- After this session approved the pending registration, light-theme B2B no longer shows the coral SLA chip (review KPI = 0). The breach chip was seen on the same reset **before** that approve.
+
+### Open questions
+None for this task.
+
+### Notes for later
+- **Fresh-clone step 2:** after the user pushes `v0.6.3`, clone against the real tag with **no** overlay and record the result here (or in a follow-up). Overlay step 1 is below.
+- Task 11: `PAY-10` / `PAY-11` / `PAY-12`. Do not write `INDEX.md` in this task. `cfo@` execute on Refund Approvals.
+- Agent portal, its login and its emails: later sprints.
+
+### Quality
+- anakata-api prelude: Pest (agency window + refund `meta.rules` + OpenAPI keys); Pint + Larastan on the prelude files.
+- anakata-ui: `pnpm lint`, `typecheck`, `test`, `build` — pass.
+- anakata-panel: `pnpm lint`, `typecheck`, `test`, `build` — pass.
+- anakata-engine: `pnpm typecheck` — pass.
+
+### Fresh clone (two-step, git read-only)
+
+**Step 1 — overlay (agent, before push).** Sibling clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}`, working trees overlaid. Confirmed the ui clone has **no** `app/types/nuxt.d.ts`.
+
+- ui / panel / engine: `pnpm typecheck` pass
+- panel / engine: `pnpm build` pass
+- **OVERLAY CLONE OK**
+
+**Step 2 — real tag (user, or agent in a follow-up).** After `v0.6.3` is on origin, repeat the clone checking out `anakata-ui` at `v0.6.3` with **no** overlay. Result not recorded yet.
+
+### Browser (after `tests/e2e/bin/reset.sh`, `COMPOSE_PROJECT_NAME=anakata-api`)
+
+**Lucía** (`bookings.view_all`, no `refunds.*`, no `commissions.override_cap`): Refund Approvals nav hidden. `ANK-2026-0021` Overview shows the FIN-005 hold notice and **no** Approve / Reject buttons.
+
+**Carolina** (Admin, `commissions.override_cap`): Refund Approvals nav visible.
+
+`ANK-2026-0021` (seed: no deposit, `ON_HOLD_AGENCY`, 15 %):
+1. Approve with a reason → hold notice clears; header stays **ON HOLD AGENCY**.
+2. Payments tab: record deposit USD 2,660 `CARD_STRIPE` → **CONFIRMED**.
+
+B2B (dark, immediately after reset, then approve): pending row coral **SLA BREACH**; Meridian **>12% BLOCKED**; approve pending → approved 3 / review 0. Light theme: four KPIs (3 / 0 / USD 49,875 / USD 6,318), partners table, over-cap pill.
+
+Refunds: cancelled `ANK-2026-0007` — 420 days, API band `≥120 days → 5%`, penalty USD 1,164, `USD 1,164 of USD 2,328 paid`, `15 BUSINESS DAYS`. Carolina approve (reason) then Execute: amount locked USD 1,164, record-only note. After execute: row **EXECUTED**; Payments ledger `ANK-2026-0007-R01` **−USD 1,164 REFUNDED**; Overview **Paid USD 1,164** (was 2,328). Light theme: queue + booking panel readable.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Agencies/AgencyBookingWindow.php \
+  app/Http/Controllers/Rms/AgencyController.php \
+  app/Http/Controllers/Rms/RefundController.php \
+  app/Http/Requests/Rms/IndexAgenciesRequest.php \
+  app/Http/Resources/Rms/AgencyResource.php \
+  app/Http/Resources/Rms/BookingResource.php \
+  tests/Feature/Agencies/AgencyEndpointsTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Feature/Refunds/RefundQueueTest.php
+git commit -m "$(cat <<'EOF'
+Window agency list stats and expose refund SLA days.
+
+Task 09 needs from/to on GET /agencies and commission_cap_pct
+on the booking so the panel never hard-codes 12.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  app/types/api.d.ts \
+  app/types/bookings.ts \
+  app/types/payments.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the Refund Approvals / B2B prelude.
+
+Agency list stats come from Scramble; Agency vs AgencyListItem
+is portal_preview. commission_cap_pct is overlayed as number.
+EOF
+)"
+git tag v0.6.3
+git push origin HEAD
+git push origin v0.6.3
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/assets/css/config.css \
+  app/components/agencies/AgencyDrawer.vue \
+  app/components/agencies/RegisterAgencyModal.vue \
+  app/components/agencies/agencyHelpers.ts \
+  app/components/bookings/BookingPanel.vue \
+  app/components/refunds/ExecuteRefundModal.vue \
+  app/components/refunds/refundHelpers.ts \
+  app/navigation/rms.ts \
+  app/pages/rms/commercial/b2b.vue \
+  app/pages/rms/operations/refunds.vue \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  tests/unit/agencyHelpers.test.ts \
+  tests/unit/guards.test.ts \
+  tests/unit/refundHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Ship Refund Approvals, B2B, and the FIN-005 hold on Overview.
+
+Approve still only authorises; execute records the negative row.
+Portal preview renders API net rates only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.6.3.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-05/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 5 task 09: refunds, B2B, and the overlay clone.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.6.3
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+

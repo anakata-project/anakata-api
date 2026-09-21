@@ -14,12 +14,18 @@ use App\Http\Requests\Rms\IndexRefundsRequest;
 use App\Http\Resources\Rms\RefundRequestResource;
 use App\Models\RefundRequest;
 use App\Models\User;
+use App\Services\Config\CurrentConfig;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class RefundController extends Controller
 {
-    public function index(IndexRefundsRequest $request): AnonymousResourceCollection
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\RefundRequestResource>, meta: array{rules: array{refund_business_days: int}}}',
+    )]
+    public function index(IndexRefundsRequest $request, CurrentConfig $config): AnonymousResourceCollection
     {
         $this->authorize('viewAny', RefundRequest::class);
 
@@ -43,7 +49,13 @@ final class RefundController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        return RefundRequestResource::collection($refunds);
+        return RefundRequestResource::collection($refunds)->additional([
+            'meta' => [
+                'rules' => [
+                    'refund_business_days' => $config->businessRules()->sla->refundBusinessDays,
+                ],
+            ],
+        ]);
     }
 
     public function decide(

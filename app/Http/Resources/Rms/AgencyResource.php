@@ -7,6 +7,7 @@ namespace App\Http\Resources\Rms;
 use App\Models\Agency;
 use App\Models\Booking;
 use App\Services\Config\CurrentConfig;
+use App\Support\Agencies\AgencyBookingWindow;
 use App\Support\Agencies\AgencySla;
 use App\Support\Agencies\PortalPreview;
 use App\Support\BusinessHours;
@@ -41,7 +42,11 @@ class AgencyResource extends JsonResource
      *     decision_reason: string|null,
      *     sla_business_days_elapsed: int,
      *     sla_breached: bool,
-     *     users: list<array{id: int, name: string, email: string, status: string}>
+     *     users: list<array{id: int, name: string, email: string, status: string}>,
+     *     bookings_count: int,
+     *     revenue: int,
+     *     commission_accrued: int,
+     *     held_bookings_count: int
      * }|array{
      *     id: int,
      *     reference: string,
@@ -63,6 +68,7 @@ class AgencyResource extends JsonResource
      *     revenue: int,
      *     commission_accrued: int,
      *     bookings_count: int,
+     *     held_bookings_count: int,
      *     bookings: list<array{id: int, reference: string|null, status: string, total: int, commission_pct: int|null, commission_amount: int, commission_approved: bool, departure_date: string, client: string}>,
      *     portal_preview: array{commission_pct: int, net_rates: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>}
      * }
@@ -104,21 +110,21 @@ class AgencyResource extends JsonResource
             ])->values()->all(),
         ];
 
+        $this->resource->loadMissing(['bookings.departure']);
+        $from = is_string($request->query('from')) ? $request->query('from') : null;
+        $to = is_string($request->query('to')) ? $request->query('to') : null;
+        $forStats = $this->detailed
+            ? $this->bookings
+            : AgencyBookingWindow::inRange($this->bookings, $from, $to);
+        $payload = array_merge($payload, AgencyBookingWindow::stats($forStats));
+
         if (! $this->detailed) {
             return $payload;
         }
 
-        $this->resource->loadMissing(['bookings.departure', 'bookings.contact']);
+        $this->resource->loadMissing(['bookings.contact']);
 
         $bookings = $this->bookings;
-        $revenue = (int) $bookings->sum('total');
-        $accrued = (int) $bookings
-            ->filter(fn (Booking $booking): bool => $booking->commission_approved)
-            ->sum(fn (Booking $booking): int => $booking->commissionAmount());
-
-        $payload['revenue'] = $revenue;
-        $payload['commission_accrued'] = $accrued;
-        $payload['bookings_count'] = $bookings->count();
         $payload['bookings'] = $bookings->map(fn (Booking $booking): array => [
             'id' => $booking->id,
             'reference' => $booking->reference,

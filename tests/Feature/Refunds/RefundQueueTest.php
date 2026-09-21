@@ -44,7 +44,8 @@ test('the queue lists refunds for approve or execute and hides them from a manag
         ->assertJsonPath('data.0.band_label', '≥120 days')
         ->assertJsonPath('data.0.can_approve', true)
         ->assertJsonPath('data.0.can_execute', true)
-        ->assertJsonPath('data.0.sla_breached', false);
+        ->assertJsonPath('data.0.sla_breached', false)
+        ->assertJsonPath('meta.rules.refund_business_days', 15);
 
     $this->actingAs(externalFinanceUser())
         ->getJson('/api/rms/refunds')

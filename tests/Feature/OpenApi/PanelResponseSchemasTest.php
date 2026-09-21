@@ -159,6 +159,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'commission_pct',
         'commission_amount',
         'commission_approved',
+        'commission_cap_pct',
         'refund',
         'payment_links',
     ]);
@@ -214,6 +215,10 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'sla_business_days_elapsed',
         'sla_breached',
         'users',
+        'bookings_count',
+        'revenue',
+        'commission_accrued',
+        'held_bookings_count',
     ]);
 
     $agencies = $spec['paths']['/rms/agencies']['get']
@@ -231,7 +236,23 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'registrations_to_review',
         'agency_revenue',
         'commission_accrued',
+        'agency_approval_business_days',
+        'commission_payable_days',
+        'commission_cap_pct',
+        'commission_default_pct',
     ]);
+
+    $refunds = $spec['paths']['/rms/refunds']['get']
+        ?? $spec['paths']['/api/rms/refunds']['get']
+        ?? null;
+    expect($refunds)->toBeArray();
+    $refundsSchema = $refunds['responses']['200']['content']['application/json']['schema'] ?? [];
+    $refundRules = $refundsSchema['properties']['meta']['properties']['rules']['properties']
+        ?? $refundsSchema['properties']['meta']['properties']['rules']
+        ?? null;
+    expect($refundRules)->toBeArray();
+    $refundRuleFields = $refundRules['properties'] ?? $refundRules;
+    expect($refundRuleFields)->toHaveKeys(['refund_business_days']);
 
     $refund = openApiSchema($spec, 'RefundRequestResource');
     expect($refund['properties'])->toHaveKeys([

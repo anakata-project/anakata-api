@@ -23,6 +23,8 @@ class IndexAgenciesRequest extends FormRequest
         return [
             'status' => ['sometimes', Rule::enum(AgencyStatus::class)],
             'q' => ['sometimes', 'string', 'max:255'],
+            'from' => ['sometimes', 'date_format:Y-m-d'],
+            'to' => ['sometimes', 'date_format:Y-m-d'],
         ];
     }
 }
