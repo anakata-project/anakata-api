@@ -177,6 +177,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'wire_window_ends_at',
         'booking',
     ]);
+    $paymentBooking = $payment['properties']['booking']['properties'] ?? [];
+    expect($paymentBooking)->toHaveKeys(['id', 'display_reference', 'client']);
 
     $ledger = $spec['paths']['/rms/payments']['get']
         ?? $spec['paths']['/api/rms/payments']['get']
@@ -200,6 +202,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'charter_deposit_pct',
         'cabin_balance_days',
         'commission_payable_days',
+        'commission_cap_pct',
+        'wire_window_hours',
     ]);
 
     $agency = openApiSchema($spec, 'AgencyResource');
@@ -246,6 +250,14 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'counts',
         'meta',
         'note',
+    ]);
+    $reconCounts = $reconciliation['properties']['counts']['properties'] ?? [];
+    expect($reconCounts)->toHaveKeys([
+        'matched',
+        'in_gateway_not_rms',
+        'to_review',
+        'gateway',
+        'discrepancies',
     ]);
     $matchedItem = $reconciliation['properties']['matched']['items']['properties'] ?? [];
     expect($matchedItem)->toHaveKeys(['gateway', 'stripe_id', 'amount', 'date']);

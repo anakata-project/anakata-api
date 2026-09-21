@@ -73,6 +73,8 @@ test('reconciliation buckets a matched, unmatched and amount-mismatch charge', f
         ->assertJsonPath('counts.matched', 1)
         ->assertJsonPath('counts.in_gateway_not_rms', 1)
         ->assertJsonPath('counts.to_review', 1)
+        ->assertJsonPath('counts.gateway', 3)
+        ->assertJsonPath('counts.discrepancies', 2)
         ->assertJsonPath('matched.0.payment_intent', 'pi_matched')
         ->assertJsonPath('in_gateway_not_rms.0.stripe_id', 'ch_unmatched')
         ->assertJsonPath('to_review.0.payment_intent', 'pi_mismatch')

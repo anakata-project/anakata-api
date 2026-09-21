@@ -110,6 +110,7 @@ final class BookingController extends Controller
 
         $bookings = $query
             ->when($request->boolean('overdue'), fn (Builder $query) => $query->overdue())
+            ->when($request->boolean('pending_payment'), fn (Builder $query) => $query->pendingPayment())
             ->withLedgerAggregates()
             ->with([
                 'departure.yacht',

@@ -63,6 +63,7 @@ test('finance sees every payment and a sales exec only sees their own', function
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.reference', 'ANK-2026-0401-D01')
         ->assertJsonPath('data.0.booking.display_reference', 'ANK-2026-0401')
+        ->assertJsonPath('data.0.booking.client', $mine->contact->name)
         ->assertJsonPath('data.0.date', '2026-07-02');
 
     $this->actingAs(externalFinanceUser())
@@ -257,6 +258,21 @@ test('ledger kpis reuse paidValues overdue and Accrual and pending includes over
     expect($own->json('meta.kpis.commission_payable_days'))->toBe(
         $config->businessRules()->commission->payableDaysAfterCruise,
     );
+    expect($own->json('meta.kpis.commission_cap_pct'))->toBe($config->businessRules()->commission->capPct);
+    expect($own->json('meta.kpis.wire_window_hours'))->toBe($config->businessRules()->payments->wireWindowHours);
+
+    $pendingList = $this->actingAs($sales)
+        ->getJson('/api/rms/bookings?pending_payment=1')
+        ->assertOk();
+    expect($own->json('meta.kpis.pending_count'))->toBe($pendingList->json('meta.total'));
+
+    $pendingWindow = $this->actingAs($sales)
+        ->getJson('/api/rms/payments?from=2026-01-01&to=2029-12-31')
+        ->assertOk();
+    $pendingWindowList = $this->actingAs($sales)
+        ->getJson('/api/rms/bookings?pending_payment=1&from=2026-01-01&to=2029-12-31')
+        ->assertOk();
+    expect($pendingWindow->json('meta.kpis.pending_count'))->toBe($pendingWindowList->json('meta.total'));
 
     $finance = $this->actingAs(externalFinanceUser())
         ->getJson('/api/rms/payments')
@@ -266,6 +282,48 @@ test('ledger kpis reuse paidValues overdue and Accrual and pending includes over
         $own->json('meta.kpis.collected') + $theirs->depositAmount(),
     );
     expect($finance->json('meta.kpis.pending_count'))->toBe(4);
+
+    $financePending = $this->actingAs(externalFinanceUser())
+        ->getJson('/api/rms/bookings?pending_payment=1')
+        ->assertOk();
+    expect($finance->json('meta.kpis.pending_count'))->toBe($financePending->json('meta.total'));
+});
+
+test('pending_payment lists owing bookings and excludes requested and paid-off', function (): void {
+    $admin = adminUser();
+    $owing = pendingCabin(['reference' => 'ANK-2026-0610']);
+    $requested = Booking::factory()->create([
+        'departure_id' => ReservationFixtures::anamaraDeparture()->id,
+        'cabin_id' => ReservationFixtures::anamaraDeparture()->yacht->cabins->firstWhere('code', 'S2')?->id,
+        'owner_id' => $admin->id,
+        'status' => BookingStatus::Requested,
+        'reference' => 'ANK-2026-0611',
+        'total' => 26600,
+    ]);
+    $paid = Booking::factory()->create([
+        'departure_id' => ReservationFixtures::anamaraDeparture()->id,
+        'cabin_id' => ReservationFixtures::anamaraDeparture()->yacht->cabins->firstWhere('code', 'S3')?->id,
+        'owner_id' => $admin->id,
+        'status' => BookingStatus::FullyPaid,
+        'reference' => 'ANK-2026-0612',
+        'total' => 26600,
+        'deposit_pct' => 10,
+    ]);
+    Payment::factory()->create([
+        'booking_id' => $paid->id,
+        'kind' => PaymentKind::Deposit,
+        'status' => PaymentStatus::Settled,
+        'amount' => $paid->total,
+        'reference' => 'ANK-2026-0612-D01',
+    ]);
+
+    $index = $this->actingAs($admin)
+        ->getJson('/api/rms/bookings?pending_payment=1')
+        ->assertOk();
+
+    $ids = collect($index->json('data'))->pluck('id')->all();
+    expect($ids)->toContain($owing->id);
+    expect($ids)->not->toContain($requested->id, $paid->id);
 });
 
 test('a role without panel.rms cannot list payments', function (): void {

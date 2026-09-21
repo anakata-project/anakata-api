@@ -45,7 +45,9 @@ final class PaymentsKpis
      *     cabin_deposit_pct: int,
      *     charter_deposit_pct: int,
      *     cabin_balance_days: int,
-     *     commission_payable_days: int
+     *     commission_payable_days: int,
+     *     commission_cap_pct: int,
+     *     wire_window_hours: int
      * }
      */
     public static function for(User $actor, ?string $from, ?string $to): array
@@ -66,6 +68,8 @@ final class PaymentsKpis
             'charter_deposit_pct' => $terms->charterDepositPct,
             'cabin_balance_days' => $terms->cabinBalanceDays,
             'commission_payable_days' => $config->businessRules()->commission->payableDaysAfterCruise,
+            'commission_cap_pct' => $config->businessRules()->commission->capPct,
+            'wire_window_hours' => $config->businessRules()->payments->wireWindowHours,
         ];
     }
 

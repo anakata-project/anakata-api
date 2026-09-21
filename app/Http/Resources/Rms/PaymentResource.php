@@ -33,12 +33,12 @@ class PaymentResource extends JsonResource
      *     recorded_by: string|null,
      *     can_mark_wire: bool,
      *     wire_window_ends_at: string|null,
-     *     booking: array{id: int, display_reference: string|null}
+     *     booking: array{id: int, display_reference: string|null, client: string}
      * }
      */
     public function toArray(Request $request): array
     {
-        $this->resource->loadMissing(['booking', 'recordedBy']);
+        $this->resource->loadMissing(['booking.contact', 'recordedBy']);
 
         $actor = $request->user();
         $recordedBy = $this->recordedBy;
@@ -60,6 +60,7 @@ class PaymentResource extends JsonResource
             'booking' => [
                 'id' => $this->booking->id,
                 'display_reference' => $this->booking->displayReference(),
+                'client' => $this->booking->contact->name,
             ],
         ];
     }

@@ -15,6 +15,7 @@ use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
 use App\Support\BusinessTime;
 use App\Support\Payments\Ledger;
+use App\Support\Payments\PaymentsKpis;
 use App\Support\Payments\WireWindow;
 use App\Support\Rounding;
 use Carbon\CarbonImmutable;
@@ -382,6 +383,21 @@ class Booking extends Model
             ), 0)',
             $paid,
         ];
+    }
+
+    /**
+     * Owing bookings for the Payments & Revenue pending table.
+     * Same set as PaymentsKpis::owingStatuses() with a positive balance.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopePendingPayment(Builder $query): void
+    {
+        [$balanceSql, $paid] = self::balanceSql();
+
+        $query
+            ->whereIn('bookings.status', PaymentsKpis::owingStatuses())
+            ->whereRaw('('.$balanceSql.') > 0', $paid);
     }
 
     /**

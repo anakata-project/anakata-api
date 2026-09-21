@@ -31,6 +31,7 @@ class IndexBookingsRequest extends FormRequest
             'q' => ['sometimes', 'string', 'max:255'],
             'mine' => ['sometimes', 'boolean'],
             'overdue' => ['sometimes', 'boolean'],
+            'pending_payment' => ['sometimes', 'boolean'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];
     }

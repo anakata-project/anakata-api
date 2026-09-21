@@ -20,7 +20,7 @@ final class ReconciliationReport
      *     matched: list<array{gateway: string, stripe_id: string, payment_intent: string|null, date: string, amount: int, description: string, booking_id?: int, reference?: string, ledger_amount?: int}>,
      *     in_gateway_not_rms: list<array{gateway: string, stripe_id: string, payment_intent: string|null, date: string, amount: int, description: string}>,
      *     to_review: list<array{gateway: string, stripe_id: string, payment_intent: string|null, date: string, amount: int, description: string, booking_id?: int, reference?: string, ledger_amount?: int}>,
-     *     counts: array{matched: int, in_gateway_not_rms: int, to_review: int},
+     *     counts: array{matched: int, in_gateway_not_rms: int, to_review: int, gateway: int, discrepancies: int},
      *     meta: array{from: string, to: string, mode: string},
      *     note: string
      * }
@@ -72,6 +72,8 @@ final class ReconciliationReport
                 'matched' => count($matched),
                 'in_gateway_not_rms' => count($unmatched),
                 'to_review' => count($review),
+                'gateway' => count($matched) + count($unmatched) + count($review),
+                'discrepancies' => count($unmatched) + count($review),
             ],
             'meta' => [
                 'from' => $from,

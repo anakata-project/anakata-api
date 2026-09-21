@@ -1142,3 +1142,276 @@ EOF
 git push origin HEAD
 ```
 
+## Task 08 · anakata-panel · Payments & Revenue
+
+### What was built
+The Commercial Payments & Revenue page replaces the catch-all placeholder. One `DateRangeFilter` (noun: payments) drives every call. The panel never totals money.
+
+### API prelude (deviation)
+Task 08 is a panel task, but three things it said to use were never exposed. Adding them here is smaller than filtering money in the browser.
+
+| Target | What landed |
+|---|---|
+| `GET /bookings?pending_payment=1` | `Booking::scopePendingPayment()` = `PaymentsKpis::owingStatuses()` (`PENDING_PAYMENT` / `CONFIRMED` / `ON_HOLD_AGENCY`) + `balanceSql() > 0`. Same visibility as the bookings index. |
+| `PaymentResource.booking.client` | Contact name, eager-loaded. Never null (a booking always has a contact). |
+| `GET /payments` `meta.kpis` | `commission_cap_pct`, `wire_window_hours` from `CurrentConfig`. |
+| Reconciliation `counts` | `gateway` = matched + in_gateway_not_rms + to_review; `discrepancies` = in_gateway_not_rms + to_review. |
+
+**Contract:** for the same `from`/`to` (and for the unfiltered window) and the same viewer, `meta.kpis.pending_count` equals `GET /bookings?pending_payment=1` `meta.total`. Covered for `bookings.view_all` and own-records.
+
+### KPI sources
+All five cards come from `GET /api/rms/payments` `meta.kpis` via `paymentsKpiCards(meta)` (label / value / sub / tone only — no `+` / `min` / counts).
+
+| Card | API field | Sub-label |
+|---|---|---|
+| Collected to date | `collected` | `deposits + balances, all channels` |
+| Of which deposits | `deposits` | `{cabin_deposit_pct}% cabins · {charter_deposit_pct}% charter` |
+| Pending payments | `pending` | `{pending_count} payments · due at T−{cabin_balance_days} per booking` |
+| Overdue (coral) | `overdue_amount` | `OPS-007 manual review — never auto-cancel` |
+| Commission accrued | `commission_accrued` | `payable {commission_payable_days} days post-cruise` |
+
+`pending` is the superset of overdue (Task 06). `kind` / `method` / `status` / `q` / `booking_id` filter the ledger page only, not the KPIs.
+
+### Mixed `from` / `to` windows
+The same Galápagos `Y-m-d` pair is sent on every call when the filter is active. The API already windows different columns:
+
+| Surface | Column |
+|---|---|
+| Ledger + collected / deposits KPIs | `payments.paid_at` |
+| Pending bookings, commissions, pending / overdue / commission KPIs | `departures.date` |
+| Reconciliation | Stripe `created` (via `BusinessTime::dayStartUtc` / `dayEndUtc`) |
+
+When the filter is “all”, those four omit the params. Reconciliation is the exception (below).
+
+### Four panels
+
+1. **Pending payments** — `GET /bookings?pending_payment=1`. Columns: booking, client, segment pill, amount due (`balance`), due label, status + OVERDUE pill. `pendingDueLabel`: `PENDING_PAYMENT` → `{wire_window_hours}h wire window` from KPI meta; else `balance_due_date`. Row click opens `BookingPanel` with `initialTab="payments"`.
+2. **Commissions** — `GET /commissions`. Columns: partner, booking, rate, amount, payable date, status. `BLOCKED`: coral `BLOCKED >{commission_cap_pct}% · Director approval (FIN-005)`; commission/payable as `—`. Footnote interpolates cap + payable days from payments KPIs. **The blocked row links to the booking. Commission cap approval UI is task 09** (booking panel Overview, `commissions.override_cap`, ReasonModal → `POST /bookings/{id}/commission-approval`).
+3. **Ledger** — `GET /payments?per_page=50`, newest first. Kind/method labels from `GET /payments/options`. Refunds: `signedMoney` + coral. Awaiting-wire: **Mark received** when `can_mark_wire`, reusing Task 07 `MarkWireModal` (import, not copy) → refresh ledger + KPIs.
+4. **Reconciliation** — `GET /payments/reconciliation?from&to` (both required). Three KPIs from `counts.gateway` / `counts.matched` / `counts.discrepancies` (`reconciliationTone`: coral iff discrepancies ≠ 0). Table = unmatched + to-review. **Apply to booking** when `payments.record` (`ApplyGatewayModal`: search `GET /bookings?q=`, kind from recordable options, `POST /payments/reconciliation/apply`). Wire note = API `note`. Stripe line = “Stripe test mode” when `meta.mode === 'test'`.
+
+### Reconciliation: can / cannot
+
+**When the page filter is “all”, recon alone defaults to the current Galápagos calendar month** (`galapagosMonthRange(galapagosTodayIso)`) and says so: “Reconciling the current Galápagos month ({from} – {to}). Choose a date range to change the window.” The other four surfaces stay unfiltered. Never send `2000-01-01`.
+
+| Can | Cannot |
+|---|---|
+| List unmatched / to-review when Stripe (or the future fixture) has rows in the window | Imply live mode while `meta.mode === 'test'` |
+| Apply a charge to a booking (`payments.record`) | Reconcile wires against Stripe (wires vs OpCo bank statement only — LEG-004) |
+| Refresh ledger + recon after apply | Show an unmatched row after `reset.sh` until Task 11 lands the fixture |
+
+### Permission matrix
+
+| Actor | Nav | Mark received | Apply gateway |
+|---|---|---|---|
+| Carolina (Admin) | yes (`bookings.view_all`) | yes | yes |
+| cfo@ (External finance) | yes | yes (`payments.mark_wire_received`) | yes (seeded role includes `payments.record`) |
+| lucia@ (Sales Exec) | **yes** — seeded Sales Exec **has** `bookings.view_all` | no | no |
+| Custom test role (`panel.rms` only) | hidden; `pageDecision` redirects home + toast | — | — |
+
+The task’s “Lucía without `bookings.view_all`” is the custom unit-test role, not the seeded user. Mark received still follows `can_mark_wire` on the row.
+
+### Types — `v0.6.2`
+`pnpm types:api` against `http://localhost:8000/docs/api.json`. No hand-written overlays for `pending_payment`, `booking.client`, `commission_cap_pct`, `wire_window_hours`, or recon `counts.gateway` / `counts.discrepancies`. Panel `app/types/api.ts` only re-exports the generated aliases.
+
+### Decision (do not build) — unmatched charge after `reset.sh` · **PAY-07 / Task 11**
+
+`FakeStripeGateway::$charges` is in-memory. It is bound only in **`testing`**; local uses `StripeSdkGateway`. A Pest `seedCharge()` dies with that process. An artisan command like `inventory:expire-hold` works because it writes **MySQL**; there is no charges table, so a “register a fake charge” command would not survive the next HTTP request.
+
+**Choice for Task 11 / PAY-07:** a **local/testing fixture file** that `FakeStripeGateway` reads on `listCharges` / `retrieveCharge` (one matched charge, one unmatched). That is the only store that survives `reset.sh` and request boundaries. Also bind `FakeStripeGateway` in **local when Stripe keys are empty**, so the panel after reset sees the file rather than an empty live Stripe account.
+
+Rejected: a local/testing-only register command. It cannot persist a charge unless it writes the same fixture (or a new table) — at which point the file is the source of truth anyway. Do not add that command in Task 08. Do not invent a live-mode charge.
+
+This task still built the apply modal; the apply-until-zero browser check stays blocked until Task 11 lands the fixture.
+
+### Reports still owed (not in the prototype; later sprint)
+From `01-functional-spec.md` §5:
+
+- payments received daily
+- overdue daily
+- 30-day forecast weekly
+- monthly revenue
+- agent commissions payable
+- gateway reconciliation monthly
+
+### Helpers
+`paymentsKpiCards`, `reconciliationTone`, `pendingDueLabel`, `galapagosMonthRange` in `paymentHelpers.ts` + unit tests. No arithmetic.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Http/Controllers/Rms/BookingController.php`
+- `app/Http/Controllers/Rms/PaymentController.php`
+- `app/Http/Requests/Rms/IndexBookingsRequest.php`
+- `app/Http/Resources/Rms/PaymentResource.php`
+- `app/Http/Resources/Rms/ReconciliationResource.php`
+- `app/Models/Booking.php`
+- `app/Support/Payments/PaymentsKpis.php`
+- `app/Support/Payments/ReconciliationReport.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `tests/Feature/Payments/PaymentIndexTest.php`
+- `tests/Feature/Payments/ReconciliationTest.php`
+
+**anakata-ui** (`v0.6.2`)
+- `app/types/api.d.ts`
+- `package.json`, `CHANGELOG.md`
+
+**anakata-panel**
+- `app/pages/rms/commercial/payments.vue` (new)
+- `app/components/payments/ApplyGatewayModal.vue` (new)
+- `app/components/payments/paymentHelpers.ts`, `tests/unit/paymentHelpers.test.ts`
+- `app/components/bookings/BookingPanel.vue` (`initialTab`)
+- `app/navigation/rms.ts`, `tests/unit/guards.test.ts`
+- `app/types/api.ts` (re-exports only)
+- `i18n/locales/en.json`
+- `app/assets/css/bookings.css` (`.pay-kpi-coral`, `.pay-recon-note`, `button.lnk`)
+- `eslint.config.mjs`
+- `README.md` (pin `v0.6.2`)
+
+**anakata-engine**
+- `README.md` (documentation pin `v0.6.2` only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-05/REPORT.md`
+
+### Deviations
+- API prelude in a panel task (required; see above).
+- Seeded Lucía **has** `bookings.view_all`; the hidden-nav check is a custom test role.
+- Local DB was already mutated by Task 07 (0014 SETTLED). Browser pass used the running compose project + `DemoAgenciesSeeder` + `anakata:set-overdue-fixture`, not a fresh `reset.sh`.
+- Apply-until-zero not exercised: no unmatched Stripe charge in local (PAY-07 fixture not built).
+
+### Open questions
+None for this task.
+
+### Notes for later
+- **Task 09:** Commission cap approval UI is task 09 (booking panel Overview, `commissions.override_cap`, ReasonModal → `POST /bookings/{id}/commission-approval`). The blocked row here links to the booking.
+- Task 09: Refund Approvals + B2B consume `GET /refunds` and the agency index.
+- **Task 11 / PAY-07:** fixture-file FakeStripe + bind in local when keys are empty (decision above). Do not add a register command. Then re-check apply-until-zero.
+- Task 11: PAY-* e2e. cfo@ on this page (nav + Mark received). Custom role without `bookings.view_all` for the hidden nav. Do not add `set-overdue-fixture` to `reset.sh`.
+- Six reports listed above: later sprint.
+
+### Quality
+- anakata-api prelude: Pest for the new filter / `booking.client` / KPI keys / recon counts / `pending_count` === bookings `meta.total`; Pint + Larastan on the prelude files.
+- anakata-ui: `pnpm lint`, `typecheck`, `test`, `build` — pass.
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (189), `build` — pass.
+- anakata-engine: `pnpm typecheck` — pass.
+- Fresh clone against tagged `v0.6.2` is owed after the user pushes (tag is listed, not run).
+
+### Browser (Carolina, both themes)
+On the running API after `DemoAgenciesSeeder` + `anakata:set-overdue-fixture` (0014 already SETTLED from Task 07):
+
+- Five KPIs: Collected USD 106,153; deposits USD 72,039 (10 % / 20 %); pending USD 455,927 · 12 · T−120; overdue USD 23,940 coral; commission USD 2,328 · 30 days.
+- Pending: `ANK-2026-0020` `72h wire window`; `ANK-2026-0018` `CONFIRMED` + `OVERDUE`. Row click opened the drawer on the **Payments** tab.
+- Commissions: Blue Latitude `ANK-2026-0007` 10 % USD 2,328 accrued; Meridian `ANK-2026-0021` 15 % `BLOCKED >12% · Director approval (FIN-005)` — row is a booking link only.
+- Ledger: client names + options labels. Recorded a wire on 0020 (`ANK-2026-0020-D01` `AWAITING_WIRE`) then **Mark received** (`SWIFT-TASK08-VERIFY`) from the ledger; the button disappeared after settle.
+- Reconciliation (filter “all”): empty table, notice `Reconciling the current Galápagos month (2026-09-01 – 2026-09-30)`, Stripe test-mode copy. Apply-until-zero blocked (no unmatched charge).
+- Light and dark themes both rendered the five KPIs, four panels, and coral overdue card.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/BookingController.php \
+  app/Http/Controllers/Rms/PaymentController.php \
+  app/Http/Requests/Rms/IndexBookingsRequest.php \
+  app/Http/Resources/Rms/PaymentResource.php \
+  app/Http/Resources/Rms/ReconciliationResource.php \
+  app/Models/Booking.php \
+  app/Support/Payments/PaymentsKpis.php \
+  app/Support/Payments/ReconciliationReport.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Feature/Payments/PaymentIndexTest.php \
+  tests/Feature/Payments/ReconciliationTest.php
+git commit -m "$(cat <<'EOF'
+Expose pending_payment, ledger client, and recon count totals.
+
+Task 08 needs these on the wire so the panel never re-derives money.
+pending_count equals GET /bookings?pending_payment=1 meta.total.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  app/types/api.d.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the Payments & Revenue prelude.
+
+No hand-written overlays; PaymentsKpis and recon counts come from Scramble.
+EOF
+)"
+git tag v0.6.2
+git push origin HEAD
+git push origin v0.6.2
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/assets/css/bookings.css \
+  app/components/bookings/BookingPanel.vue \
+  app/components/payments/ApplyGatewayModal.vue \
+  app/components/payments/paymentHelpers.ts \
+  app/navigation/rms.ts \
+  app/pages/rms/commercial/payments.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/guards.test.ts \
+  tests/unit/paymentHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Replace the Payments & Revenue placeholder with API-driven KPIs and panels.
+
+Recon defaults to the current Galápagos month when the filter is all.
+Commission cap approval stays on the booking panel (task 09).
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.6.2.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-05/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 5 task 08: Payments & Revenue and the task 09 cap-approval handoff.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.6.2
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+
