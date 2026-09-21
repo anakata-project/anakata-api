@@ -182,6 +182,10 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'charges_total',
         'cruise_outstanding',
         'extras_due_at',
+        'billing_name',
+        'billing_address',
+        'billing_email',
+        'billing_phone',
     ]);
     $guestsSummary = openApiProperties($booking['properties']['guests_summary'] ?? []);
     expect($guestsSummary)->toHaveKeys(['complete', 'total']);
@@ -436,6 +440,9 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'CommissionAccrualStatus',
         'RefundRequestStatus',
         'ConsentDocument',
+        'DocumentKind',
+        'DocumentPlanKind',
+        'DocumentPlanStatus',
     ] as $enum) {
         $schema = $spec['components']['schemas'][$enum] ?? null;
         expect($schema)->toBeArray("schema {$enum} is missing");
@@ -600,4 +607,109 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     $countriesSchema = $countries['responses']['200']['content']['application/json']['schema'] ?? [];
     $countriesItems = $countriesSchema['items'] ?? $countriesSchema['properties']['data']['items'] ?? null;
     expect($countriesItems)->toBeArray();
+
+    $documentKind = $spec['components']['schemas']['DocumentKind'] ?? [];
+    expect($documentKind['enum'] ?? [])->toContain('WIRE_INSTRUCTIONS');
+
+    $document = openApiSchema($spec, 'DocumentResource');
+    expect($document['properties'])->toHaveKeys([
+        'id',
+        'booking_id',
+        'kind',
+        'kind_label',
+        'number',
+        'version',
+        'reason',
+        'payment_id',
+        'issued_at',
+        'file_sha256',
+        'issued_by',
+    ]);
+
+    $planRow = openApiSchema($spec, 'DocumentPlanRowResource');
+    expect($planRow['properties'])->toHaveKeys([
+        'booking_id',
+        'kind',
+        'name',
+        'recipient',
+        'trigger',
+        'date',
+        'status',
+        'document_id',
+        'version',
+        'delivery_id',
+        'error',
+        'payment_id',
+        'reminder_days',
+        'can_preview',
+        'can_issue',
+        'can_resend',
+    ]);
+    expect($planRow['properties']['can_preview']['type'] ?? null)->toBe('boolean');
+    expect($planRow['properties']['can_issue']['type'] ?? null)->toBe('boolean');
+    expect($planRow['properties']['can_resend']['type'] ?? null)->toBe('boolean');
+
+    $delivery = openApiSchema($spec, 'DeliveryResource');
+    expect($delivery['properties'])->toHaveKeys([
+        'id',
+        'booking_id',
+        'document_id',
+        'kind',
+        'kind_label',
+        'to',
+        'cc',
+        'subject',
+        'status',
+        'error',
+        'blocked_reason',
+        'sent_at',
+        'triggered_by',
+        'created_at',
+        'warning',
+    ]);
+    expect($delivery['properties']['warning']['type'] ?? null)->toBe(['string', 'null']);
+
+    $clientDocuments = $spec['paths']['/rms/documents']['get']
+        ?? $spec['paths']['/api/rms/documents']['get']
+        ?? null;
+    expect($clientDocuments)->toBeArray();
+    $clientDocumentParams = collect($clientDocuments['parameters'] ?? [])
+        ->mapWithKeys(fn (array $parameter): array => [($parameter['name'] ?? '') => $parameter]);
+    expect($clientDocumentParams->keys()->all())->toContain('from', 'to');
+
+    foreach ([
+        ['/rms/bookings/{booking}/documents/{kind}/issue', 'post', '201'],
+        ['/rms/documents/{document}/send', 'post', '201'],
+        ['/rms/payment-links/{paymentLink}/send', 'post', '201'],
+        ['/rms/bookings/{booking}/wire-instructions/send', 'post', '201'],
+    ] as [$path, $method, $status]) {
+        $operation = $spec['paths'][$path][$method]
+            ?? $spec['paths']['/api'.$path][$method]
+            ?? null;
+        expect($operation)->toBeArray("{$method} {$path} is missing");
+        expect($operation['responses'][$status] ?? null)->toBeArray("{$method} {$path} has no {$status}");
+        expect($operation['responses'][$status]['content']['application/json'] ?? null)
+            ->toBeArray("{$method} {$path} {$status} has no JSON body");
+    }
+
+    foreach ([
+        '/rms/bookings/{booking}/documents/{kind}/html',
+        '/rms/bookings/{booking}/receipts/{payment}/html',
+        '/rms/documents/{document}/html',
+    ] as $htmlPath) {
+        $html = $spec['paths'][$htmlPath]['get']
+            ?? $spec['paths']['/api'.$htmlPath]['get']
+            ?? null;
+        expect($html)->toBeArray("GET {$htmlPath} is missing");
+        $htmlContent = $html['responses']['200']['content'] ?? [];
+        expect($htmlContent)->toHaveKey('text/html; charset=UTF-8');
+        expect($htmlContent)->not->toHaveKey('application/json');
+    }
+
+    $file = $spec['paths']['/rms/documents/{document}/file']['get']
+        ?? $spec['paths']['/api/rms/documents/{document}/file']['get']
+        ?? null;
+    expect($file)->toBeArray();
+    expect($file['responses']['200']['content'] ?? [])->toHaveKey('application/pdf');
+    expect($file['responses']['200']['content'] ?? [])->not->toHaveKey('application/json');
 });

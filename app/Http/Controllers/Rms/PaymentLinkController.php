@@ -42,6 +42,7 @@ final class PaymentLinkController extends Controller
         return (new PaymentLinkResource($link))->response()->setStatusCode(201);
     }
 
+    #[DocumentedResponse(status: 201, type: DeliveryResource::class)]
     public function send(SendPaymentLinkRequest $request, PaymentLink $paymentLink, SendPaymentRequest $action): DeliveryResource
     {
         $this->authorize('recordPayment', $paymentLink->booking);

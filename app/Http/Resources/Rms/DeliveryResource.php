@@ -39,6 +39,9 @@ class DeliveryResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        /** @var string|null $warning */
+        $warning = $this->warning;
+
         return [
             'id' => $this->id,
             'booking_id' => $this->booking_id,
@@ -54,7 +57,8 @@ class DeliveryResource extends JsonResource
             'sent_at' => Iso::utc($this->sent_at),
             'triggered_by' => $this->triggered_by->value,
             'created_at' => Iso::utc($this->created_at),
-            'warning' => $this->warning,
+            // @var string|null
+            'warning' => $warning,
         ];
     }
 }

@@ -23,6 +23,7 @@ use App\Services\Documents\DocumentHtml;
 use App\Support\Documents\DeliveryKey;
 use App\Support\Documents\DocumentPlan;
 use App\Support\Documents\Snapshots\SnapshotFactory;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -87,6 +88,7 @@ final class DocumentController extends Controller
         ]);
     }
 
+    #[DocumentedResponse(status: 201, type: DocumentResource::class)]
     public function issue(
         IssueDocumentRequest $request,
         Booking $booking,
@@ -134,6 +136,7 @@ final class DocumentController extends Controller
         ]);
     }
 
+    #[DocumentedResponse(status: 201, type: DeliveryResource::class)]
     public function send(SendDocumentRequest $request, Document $document, SendDocument $action): DeliveryResource
     {
         $this->authorize('issueDocument', $document->booking);

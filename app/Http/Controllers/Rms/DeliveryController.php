@@ -17,6 +17,7 @@ use App\Models\Document;
 use App\Models\User;
 use App\Support\Documents\DeliveryKey;
 use App\Support\Documents\WireWarning;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class DeliveryController extends Controller
@@ -32,6 +33,7 @@ final class DeliveryController extends Controller
         return DeliveryResource::collection($deliveries);
     }
 
+    #[DocumentedResponse(status: 201, type: DeliveryResource::class)]
     public function sendWire(
         SendWireInstructionsRequest $request,
         Booking $booking,

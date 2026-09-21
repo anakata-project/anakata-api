@@ -478,3 +478,352 @@ Wire document triggers, the daily schedule, and computed document status.
 EOF
 )"
 ```
+
+## Task 05 · anakata-ui · Regenerate types, release `v0.8.0`
+
+### What was built
+PHPDoc / OpenAPI prelude on the API so Scramble emits the Sprint 7 document, delivery, plan, billing and send shapes, then types regenerated against `http://localhost:8000/docs/api.json`. Layer `0.7.1` → `0.8.0`. Types only: no composables, components, or panel behaviour.
+
+Calendar dates stay `string` (`YYYY-MM-DD`). Instants stay ISO strings.
+
+HTML preview (`GET …/html`) and PDF download (`GET …/file`) return `text/html` / `application/pdf`. They have no JSON body type — the panel uses the URL.
+
+### API prelude
+
+| Target | What landed |
+|---|---|
+| `DeliveryResource.warning` | Was `type: null` (public `?string $warning = null`). Local `@var string\|null` so Scramble emits `string \| null` (LEG-004). |
+| `document.issue` / `document.send` / `paymentLink.send` / `delivery.sendWire` | `#[DocumentedResponse(status: 201, …)]`. Runtime already 201 via `wasRecentlyCreated`. |
+| `PanelResponseSchemasTest` | `DocumentResource` keys; `DocumentPlanRowResource` keys + `can_*` booleans; `DeliveryResource` keys + `warning`; Booking billing keys; `GET /documents` `from`/`to`; named enums `DocumentKind` (includes `WIRE_INSTRUCTIONS`), `DocumentPlanKind`, `DocumentPlanStatus`; send/issue 201 JSON; HTML/PDF content types. |
+
+`DeliveryKind` and `DeliveryStatus` have no FormRequest schema. Resource fields for those stay `string`; the layer leftovers close the unions.
+
+`can_preview` / `can_issue` / `can_resend` already emit `boolean`. Billing scalars already emit `string \| null`. No extra PHPDoc on those.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 7492 | 8220 |
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 401 | 428 |
+| `app/types/bookings.ts` | 208 | 208 |
+| `app/types/payments.ts` | 161 | 161 |
+| `app/types/index.ts` | 204 | 219 |
+| `app/types/anakata-augment.d.ts` | 17 | 17 |
+| `app/types/guests.ts` | 101 | 101 |
+| `app/types/extras.ts` | 24 | 24 |
+| `app/types/documents.ts` | — | 59 |
+
+### Schema → alias (`app/types/documents.ts`)
+
+| Alias | Source |
+|---|---|
+| `DocumentKind` | named enum schema (includes `WIRE_INSTRUCTIONS`) |
+| `DocumentPlanKind` | named enum schema — extra alias: plan/client `kind` is not `DocumentKind` |
+| `DocumentStatus` | named `DocumentPlanStatus` schema |
+| `IssuedDocument` | `DocumentResource` + `kind: DocumentKind` |
+| `DocumentPlanRow` | `DocumentPlanRowResource` + `kind` / `status` overlays. `can_*` stay generated booleans |
+| `ClientDocumentRow` | same as `DocumentPlanRow` (`GET /documents` paginates that resource) |
+| `DeliveryKind` | leftover (`INVOICE` … `WIRE_INSTRUCTIONS`, plus `REMINDER` / `PAYMENT_LINK`) — mirrors `App\Enums\DeliveryKind` |
+| `DeliveryStatus` | leftover (`QUEUED` \| `SENT` \| `FAILED` \| `BLOCKED`) — mirrors `App\Enums\DeliveryStatus` |
+| `Delivery` | `DeliveryResource` + kind/status overlays. `warning: string \| null` comes through |
+
+### Booking
+
+Same `Booking` alias. Scalars `billing_name`, `billing_address`, `billing_email`, `billing_phone` come through from `BookingResource`. No new overlays.
+
+### Business rules
+
+`BusinessRulesDocument` leftover gains sibling `legal_entity` (`LegalEntity` / `BankDetails`) and `documents` (`DocumentsRules`). `legal.consent_versions` is unchanged. `RuleGroup` is unchanged (`documents.*` is `pricing_payments`; `legal_entity.*` is `legal`).
+
+### Kept leftovers
+
+No inventory leftovers retired. New leftovers listed above, each with a `Mirrors App\…` comment.
+
+No document-kind / status / label runtime list in the layer. Names and trigger wording come from the API.
+
+### Pins
+
+Panel and engine README rows now say `` `extends: ['../anakata-ui']` (`v0.8.0`) ``. **Neither pin is enforced** — the apps resolve the sibling folder, so the version line is documentation only.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Http/Resources/Rms/DeliveryResource.php`
+- `app/Http/Controllers/Rms/DocumentController.php`
+- `app/Http/Controllers/Rms/DeliveryController.php`
+- `app/Http/Controllers/Rms/PaymentLinkController.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/documents.ts` (new)
+- `app/types/config.ts`
+- `app/types/index.ts`
+- `package.json` (`0.8.0`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel / anakata-engine**
+- `README.md` (documentation pin only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-07/REPORT.md`
+
+### Deviations
+- `DocumentPlanKind` is an extra alias (not in the task list) because the plan and client-documents tables iterate `DocumentPlanKind` (`REMINDER`, `QUESTIONNAIRE`), not `DocumentKind`.
+- `ClientDocumentRow` is the same schema as `DocumentPlanRow`.
+- `LegalEntity` / `BankDetails` / `DocumentsRules` are extra leftovers so `BusinessRulesDocument` stays readable.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 06: Documents tab from `DocumentPlanRow`; preview URLs only (no JSON type); billing from `Booking`; payment-link / wire send from `Delivery.warning`.
+- Task 07: Client documents from `ClientDocumentRow` / `GET /documents`.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 869 tests (5944 assertions), Pint (851 files), Larastan level 6 (0 errors).
+- anakata-ui: lint, typecheck, test (35), build — pass.
+- anakata-panel / anakata-engine: typecheck — pass.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout). Overlayed the working trees. Confirmed the ui clone is **0.8.0** and has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: typecheck pass
+  - panel / engine: build pass
+  - **OVERLAY CLONE OK**
+  - **Repeat this clone after the pushes below**, checking out `anakata-ui` at `v0.8.0` with **no** overlay.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude (OpenAPI typing — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Resources/Rms/DeliveryResource.php \
+  app/Http/Controllers/Rms/DocumentController.php \
+  app/Http/Controllers/Rms/DeliveryController.php \
+  app/Http/Controllers/Rms/PaymentLinkController.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Type Sprint 7 document, delivery and billing OpenAPI responses.
+
+Send and issue emit 201 DeliveryResource / DocumentResource; wire
+send keeps warning as string|null so the layer can regenerate it.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/config.ts \
+  app/types/index.ts \
+  app/types/documents.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for documents, deliveries and billing.
+
+Sprint 7 aliases live in documents.ts; Booking keeps the same
+name. legal_entity and documents leftovers stay in config.ts.
+EOF
+)"
+git tag v0.8.0
+git push origin HEAD
+git push origin v0.8.0
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.8.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.8.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-07/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 7 task 05: regenerated UI API types.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.8.0
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+
+## Task 06 · anakata-panel · Booking panel Documents tab, receipts, payment-link email, billing details
+
+### Tab
+Documents is enabled (`disabled: false`, `arrivesSprint: null`). No booking tab is disabled. `BookingDocumentsTab` mounts on first visit (`v-else-if="tab === 'documents'"`) and emits `updated` into the existing `onPaymentsUpdated`, so Overview, the list, and History reload.
+
+On mount: `GET /api/rms/bookings/{id}/documents/plan` and `GET /api/rms/bookings/{id}/documents`. The note, columns, name, `to {recipient}`, trigger, date and status are the plan row as sent. Pill classes are presentation only (`documentStatusPillClass` / prototype `DSTC`; `FAILED` uses `p-canc`). Questionnaire stays WAITING with the API trigger “Arrives in Sprint 11” and no buttons.
+
+Helpers live in `app/components/documents/` so task 07 can import them: `documentStatusPillClass`, `documentRowActions` (`can_*` only), `versionLabel`, `invoiceHasBeenIssued`, `issuedVersionsFor`. Types re-exported from `app/types/api.ts`: `DocumentPlanRow`, `IssuedDocument`, `Delivery`, `DocumentKind`, `DocumentStatus`.
+
+### Actions and permissions
+Buttons only when the matching `can_*` is true.
+
+| Action | When | Request |
+|---|---|---|
+| Preview | `can_preview` | Issued: `GET /documents/{id}/html`. Live: `GET …/documents/{kind}/html`. Receipt with no `document_id`: `GET …/receipts/{payment_id}/html` (never the kind URL). |
+| Resend | `can_resend` | Confirm (“Send {name} to {recipient} again?” — plan facts), then `POST /documents/{id}/send`. |
+| Issue | `can_issue` and `version === null` | `POST …/documents/{kind}/issue` with no reason. |
+| Re-issue | `can_issue` and a version exists | `ReasonModal`, reason required, then the same POST with `{ reason }`. |
+
+FAILED: `error` under the row and Resend. BLOCKED: why plus “Edit billing details” (`emit('openBilling')` → Overview). After every write: reload plan + issued list and `emit('updated')`.
+
+Versions: more than one issued row for that kind (invoice: same `kind`; receipt: same `payment_id`) shows `versionLabel` and earlier versions that open snapshot HTML on that issued id.
+
+No `window.confirm`. `DocumentConfirmModal` is the shared confirm (same shape as `ConfirmRequestModal`). Payment-link and wire confirms stay neutral — they do not quote a panel-computed recipient.
+
+### Preview
+`DocumentPreviewModal`: HTML fetched as **text** with native `fetch` + `credentials: 'include'` against `runtimeConfig.public.apiBase` (`documentFetch.ts`). Layer `useApi()` / `$fetch` stay JSON. `<iframe srcdoc>` with `sandbox="allow-same-origin allow-modals"` (no scripts). **Print / save PDF** → `iframe.contentWindow.print()`. **Download PDF** only when an issued `document_id` exists: `GET /documents/{id}/file` as blob, filename from `Content-Disposition` (fallback `{kind}-v{version}.pdf`). No PDF library.
+
+### Payments tab
+- **Receipt** on each settled `amount > 0` row that has an issued `RECEIPT` for that `payment_id`. Same preview modal on `GET /documents/{id}/html`.
+- Sprint 7 copy removed (`payments.linkManual` / `bookings.linkManual`).
+- **Send by email** on each `OPEN` link when `payments.record`. Neutral confirm: “Email this payment link to the client?” Then `POST /payment-links/{id}/send`. The 201 `Delivery.to` is the recipient shown afterwards.
+- **Last payment-link email once, at tab level.** `GET …/deliveries`, latest `PAYMENT_LINK` row: `Last payment-link email: {status} to {to} · {date}`. Hidden until one exists. Deliveries have no `payment_link_id`.
+- **Send wire instructions** when `status === 'PENDING_PAYMENT'` and `payments.record`. Neutral confirm plus **Preview** (`GET …/documents/WIRE_INSTRUCTIONS/html`). Then `POST …/wire-instructions/send`. After send, show `Delivery.to`. If `Delivery.warning` is set, that exact string goes in a `.warnbox` and stays. Warning only from the send response — no LEG-004 logic, no `legal_entity.bank` read.
+
+### Billing
+Overview **Billing** block: name, address, email, phone. Empty billing fields show contact defaults muted (`contact.name` / `contact.email` / `contact.phone`; address stays muted empty). Edit when `can_act`. `PATCH /api/rms/bookings/{id}/billing` with `applyApiFormError`. Note: guests complete these themselves from Sprint 8.
+
+Lucía on Mateo’s booking: `can_act` false → read-only; plan `can_resend` / `can_issue` false → preview only (API flags; not re-derived).
+
+### Extras notice
+`GET …/documents/plan` on the extras tab. Notice only when an invoice row has `document_id`. Not from booking status.
+
+### History
+`document.issued`, `document.sent`, `document.send_failed`, `booking.billing_changed`, `payment_request.sent`, `payment_request.send_failed` go through `after.what` (same extras pattern), then `compactDiff`. Tests in `describe.test.ts`.
+
+### Files touched
+**anakata-panel**
+- `app/components/bookings/bookingHelpers.ts` / `tests/unit/bookingHelpers.test.ts`
+- `app/components/bookings/BookingPanel.vue`
+- `app/components/bookings/BookingBillingBlock.vue` (new)
+- `app/components/documents/BookingDocumentsTab.vue` (new)
+- `app/components/documents/DocumentPreviewModal.vue` (new)
+- `app/components/documents/DocumentConfirmModal.vue` (new)
+- `app/components/documents/documentHelpers.ts` (new)
+- `app/components/documents/documentFetch.ts` (new)
+- `tests/unit/documentHelpers.test.ts` (new)
+- `tests/unit/documentFetch.test.ts` (new)
+- `app/components/payments/BookingPaymentsTab.vue`
+- `app/components/extras/BookingExtrasTab.vue`
+- `app/components/history/describe.ts` / `tests/unit/describe.test.ts`
+- `app/types/api.ts`
+- `app/assets/css/bookings.css` / `eslint.config.mjs`
+- `i18n/locales/en.json`
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-07/REPORT.md`
+
+No anakata-ui change.
+
+### Deviations
+- HTML/PDF use native `fetch` in the panel (`documentFetch.ts`), not a layer `responseType` pass-through.
+- `invoiceHasBeenIssued` / `issuedVersionsFor` are extra helpers so the extras notice and version list stay out of the Vue files.
+- Local compose could not write `storage/app/documents/{id}` (`Unable to create a directory`). Issue from the panel returned 500 and the tab showed that error. Environment, not a panel bug.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 07: Documents & Manifests page — reuse `DocumentPreviewModal`, `documentHelpers`, `documentFetch`.
+- Task 08: E2E. This task did not add scenarios.
+- After `reset.sh` (e2e stack): seeded SENT invoice/summary/receipts, Mailpit for issue / payment-link / extras re-issue, Lucía preview-only, print A4, Download PDF, older-version snapshot. Not run here — no e2e `up.sh` / `reset.sh`.
+- Repeat the sibling fresh clone at tagged `v0.8.0` **after** the pushes, with **no** overlay (task 05 still lists that).
+
+### Quality
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (221), `build` — pass.
+- Overlay clone against sibling `v0.8.0` (working-tree overlay; no `app/types/nuxt.d.ts`) — typecheck + build OK from task 05 / this session.
+- Browser (Carolina, `ANK-2026-0003` Harrison & Whitfield, light theme; dark earlier in the same session). Local seed had no DemoDocuments SENT rows and no billing email:
+  - Documents tab: BLOCKED + billing links, then after PATCH billing → DUE / SCHEDULED / WAITING / NOT CONTRACTED; questionnaire WAITING, no buttons; Preview + Issue from `can_*`.
+  - Invoice preview: iframe HTML (PONTOS LLC / ANAMARA / vessel USD 26,600); Print enabled; no Download (unissued).
+  - Extras: no invoice-issued notice (no `document_id`).
+  - Payments: Sprint 7 copy gone; no receipt without an issued RECEIPT; no last-email line without a PAYMENT_LINK delivery; wire block hidden (not `PENDING_PAYMENT`).
+  - Overview billing edit + save (`harrison@example.test`).
+  - Issue POST reached the API; local disk permission failed (see Deviations). Print dialog, Download PDF, Mailpit, Lucía login, and `reset.sh` seeded SENT plan were not walked.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`).
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/components/bookings/bookingHelpers.ts \
+  tests/unit/bookingHelpers.test.ts \
+  app/components/bookings/BookingPanel.vue \
+  app/components/bookings/BookingBillingBlock.vue \
+  app/components/documents/BookingDocumentsTab.vue \
+  app/components/documents/DocumentPreviewModal.vue \
+  app/components/documents/DocumentConfirmModal.vue \
+  app/components/documents/documentHelpers.ts \
+  app/components/documents/documentFetch.ts \
+  tests/unit/documentHelpers.test.ts \
+  tests/unit/documentFetch.test.ts \
+  app/components/payments/BookingPaymentsTab.vue \
+  app/components/extras/BookingExtrasTab.vue \
+  app/components/history/describe.ts \
+  tests/unit/describe.test.ts \
+  app/types/api.ts \
+  app/assets/css/bookings.css \
+  eslint.config.mjs \
+  i18n/locales/en.json
+git commit -m "$(cat <<'EOF'
+Open the booking Documents tab and wire plan, preview and send.
+
+Receipts, payment-link email and billing sit on the existing
+Payments and Overview tabs; statuses stay API facts.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-07/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 7 task 06: booking panel Documents tab.
+EOF
+)"
+git push origin HEAD
+```
