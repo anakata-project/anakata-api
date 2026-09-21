@@ -1339,3 +1339,164 @@ EOF
 git push origin HEAD
 ```
 
+## Task 10 · Charter, waitlist, complete page, analytics
+
+The engine’s remaining guest surfaces. APIs and types already exist from tasks 04–06. **No API / panel / type-layer work.** Design from the prototype (`#st-charter`, RMS `guestForm`); rules from K9/K10 and the 12 Sep decisions.
+
+### Private charter — `/charter`
+
+Replaced `PlaceholderPage` with the prototype form. Header already links here; `useFlowStep` hides crumbs/hero.
+
+**Copy and side panel from the feed, never literals:** headline / intro / thank-you / group-context options / SLA hours / capacity → `settings.charter`. Rate year, week rate, deposit %, deposit business days, balance days, festive supplement → `rates.charter_week`, `rates.terms`, `rates.rules`.
+
+`POST /api/engine/charter-enquiries`: contact name + email (phone optional); guests rejected client-side when `guests > settings.charter.capacity` (`charterGuestsOk`; API 422s too); **dates or a departure** (`preferred_from` / `preferred_to`, or a select from `feed.departures`). Prototype free-text “Preferred dates” became real dates because the API requires one of those two. Group context is prepended into `message` (`charterMessage`) — the API has no separate field.
+
+Success shows `settings.charter.thank_you`. `track('charter_inquiry_submit', { num_passengers, dates_range | departure_id })`.
+
+Browser: Maya Chen / 12 guests / 2028-07-02 → 2028-07-16 / Family → `charter_enquiries.id` 2, `source = ENGINE`, message `Family\n\nFamily week in July.`
+
+### Waitlist form
+
+`WaitlistStub.vue` kept its name (already imported from itineraries index + slug). Mask/overlay unchanged. Body is the real form, shown only when `rowAction` is waitlist (`departures[].waitlist`).
+
+`POST /api/engine/waitlist`: departure label read-only; cabin `SUITE` | `OWNER`; name, email, adults, children, notes. Adults/children (and name/email when present) prefill from `useBookingFlow()`. Success is confirmation in the overlay — no `alert()`.
+
+Live seed rows are all `AVAILABLE`, so the overlay CTA only appears when the party does not fit. A direct POST (same payload as the form) returned 201 `{ source: "ENGINE" }` — `waitlist_entries.id` 3, contact Waitlist Maya.
+
+### “Complete your reservation” — `/complete/{token}`
+
+New SSR page. `useHead` / `useSeoMeta` `robots: noindex`. Outside the six steps. `GET /api/engine/complete/{token}` via `useAsyncData`.
+
+**Non-cacheable:** `nuxt.config.ts` `routeRules['/complete/**']` sets `Cache-Control: no-store, private`. Curl of `/complete/not-a-real-token` returns that header. A future CDN must not serve one guest’s billing/passenger payload to another visitor of the same URL pattern.
+
+Invalid / expired / revoked (API 404): one neutral heading — “This link is no longer available” — plus the reservations address. The public feed has no reservations-email field, so the address is the one already on the engine (`search.contactEmail` / `info@anakata.co`, same as `legal_entity.email`). Never says why (K9). Verified in the browser.
+
+| Section | Endpoint | Notes |
+|---|---|---|
+| Bookings + amount due | GET only | `amount_due` + `amount_due_label` |
+| Billing | `PUT …/billing` | name, address, email, phone |
+| Declarations | `POST …/declarations` `{ documents }` | `declarationControl({ accepted, version })` → `{ kind: 'locked', version }` when already accepted (checked, read-only, version shown — PAY_LATER already has PRIVACY + INSURANCE); `{ kind: 'live', version }` otherwise. POST only newly ticked ids. Source stays server-side `PAYMENT_LINK`. |
+| Passengers | `PUT …/guests/{id}` | RMS `guestForm` minus medical notes. Nationality from the complete payload’s `countries`. Guardian when `is_minor_now` / `isMinorToday`: `guardian_name`, `guardian_relationship`, `guardian_consented`. |
+
+**Write-only passport:** `passportFieldState` always returns `value: ''`. If `passport_on_file`, label “Passport number on file” and an empty replace field. Empty submit leaves the stored number.
+
+Continue to payment: `completePayReady(can_pay, pay_url)` — enabled only when both are set; navigates to `pay_url`. No open link → the team will send it. No invented Stripe session.
+
+### Consent-gated analytics
+
+`NUXT_PUBLIC_GA_MEASUREMENT_ID` → `runtimeConfig.public.gaMeasurementId` (empty default). `.env.example` documents it.
+
+`analyticsAllowed(consent, measurementId)` is true only when consent is `accepted` **and** the id is non-empty. Choice in `localStorage` key `anakata-engine-analytics`.
+
+- Empty id → no banner, no script (`ConsentBanner` destructures `showBanner` so the computed unwraps; a nested ref on a plain object is always truthy).
+- Before consent or if refused: do not inject gtag; `track()` returns immediately.
+- After accept: load `https://www.googletagmanager.com/gtag/js?id=…`, `gtag('config', id)`, then `gtag('event', name, params)`.
+- Events that fired before consent are not replayed.
+
+Homepage HTML contains no `googletagmanager` / `gtag/js` with the empty id.
+
+Banner wording and a cookie policy are **LEG-002** — placeholder copy in i18n, flagged here. No legal policy page.
+
+### Errors and hold lost
+
+`engineErrorMessage`: 429 → “Please try again in a moment”; no status → network-failure copy; else the API `message`. Used on charter, waitlist, complete section saves, and checkout submit (so 429 is not “Request failed.”).
+
+Hold lost: cabins now shows the same `cabwarn` as details (`hold.releasedMessage`) and sends the guest back to trip details when `hold.expired`.
+
+### Types, i18n, CSS
+
+Re-exports from `#anakata-ui/app/types`: `CompleteReservation`, `CompleteGuest`, `CompleteBooking`, `CompleteDeclaration`, `EngineCharterEnquiry`, `EngineWaitlist`. No hand-written overlays.
+
+Waitlist stub strings replaced; charter / complete / consent / error keys added. Published charter copy stays in the feed.
+
+CSS: reuse `.wgrid`, `.field`, `.cols2`, `.side`, `.waitlist-mask`. Added complete-page, consent-bar, duebox, locked, guardian. Eslint ignore list extended.
+
+### Tests and checks
+
+Vitest helpers (17 in the four new/rewritten files):
+
+- `charterGuestsOk` — over capacity rejected
+- `analyticsAllowed` / `track` no-op without consent or id; event after accept + id
+- complete: accepted declaration → locked + version; unaccepted → live; `can_pay` without `pay_url` stays disabled; passport never prefills; invalid token is one neutral state
+
+Quality gate in anakata-engine: `pnpm lint`, `typecheck`, `test` (52), `build` — passed.
+
+Fresh-clone typecheck/build against `github:anakata-project/anakata-ui#v0.9.0` still fails on task-09 leftovers that are not in that tag (`CheckoutStatus`, `settings.legal`, `extras_due_hours`) plus a layer `useApi` hook typing error. The alias finder now matches any non-root layer that has `app/types/engine.ts` (GitHub extract path is `.c12/github_anakata_project_*`, not `anakata-ui`). Local sibling typecheck/build pass. No ui release (out of scope).
+
+### Browser (e2e seed)
+
+- Charter enquiry appears in RMS (`source = ENGINE`).
+- Waitlist row `source = ENGINE` (API POST; overlay not clicked — live labels are all `AVAILABLE`, and later GUI automation was blocked).
+- `/complete/not-a-real-token`: neutral copy + `info@anakata.co`; `Cache-Control: no-store, private`.
+- gtag absent with empty measurement id; banner hidden after the computed unwrap fix.
+- Mailpit payment-link walk (save billing / declarations / passport-on-file / Continue only when `can_pay`) was not run — no open complete token in this seed session. E2E files are task 11.
+- Light theme seen on the complete page (colour-mode toggle). Phone width not separately resized.
+
+### Deviations
+
+- Reservations email is i18n `search.contactEmail` / `info@anakata.co`, not a feed field (none exists).
+- Prototype free-text preferred dates → `preferred_from` / `preferred_to` or `departure_id`.
+- Group context prepended into `message`.
+- `WaitlistStub.vue` filename kept to avoid import churn.
+- Fresh-clone vs tagged `v0.9.0` leftover types inherited from task 09 — not a ui bump.
+
+### Open questions
+
+- **LEG-002** — consent-banner wording and a cookie policy. Placeholder copy only.
+
+### Notes for later
+
+- Task 11: e2e scenarios (`WEB-*`). Walk Mailpit complete-link, waitlist overlay from a FULL · WAITLIST / party-fit row, and Network-panel gtag after consent.
+- Cabins/details `useState` vs `sessionStorage` race on hard refresh is unchanged from task 09.
+
+### Git (listed, not run)
+
+```bash
+# 1. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add .env.example
+git add nuxt.config.ts
+git add eslint.config.mjs
+git add i18n/locales/en.json
+git add app/assets/css/engine.css
+git add app/types/api.ts
+git add app/layouts/default.vue
+git add app/pages/charter.vue
+git add app/pages/complete
+git add app/pages/book/cabins.vue
+git add app/components/waitlist/WaitlistStub.vue
+git add app/components/complete
+git add app/components/shell/ConsentBanner.vue
+git add app/composables/useTrack.ts
+git add app/composables/useAnalyticsConsent.ts
+git add app/composables/useCheckout.ts
+git add app/utils/charterGuests.ts
+git add app/utils/completeState.ts
+git add app/utils/engineError.ts
+git add app/utils/analyticsConsent.ts
+git add tests/unit/charterGuests.test.ts
+git add tests/unit/completeState.test.ts
+git add tests/unit/engineError.test.ts
+git add tests/unit/track.test.ts
+git commit -m "$(cat <<'EOF'
+Add charter, waitlist, complete page and consent-gated analytics.
+
+Feed-driven charter and waitlist post to the public engine API.
+The complete page is no-store, write-only for passports, and
+locks already-accepted declarations. gtag loads only after consent.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 2. anakata-api (report only)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 8 task 10: engine charter, waitlist, complete, analytics.
+EOF
+)"
+git push origin HEAD
+```
+
