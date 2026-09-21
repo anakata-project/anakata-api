@@ -44,6 +44,7 @@ enum SystemRole: string
                 Permission::AgenciesManage,
                 Permission::EngineCopyManage,
                 Permission::PipelineMoveStage,
+                Permission::ContactsManage,
                 Permission::GuestsViewSensitive,
             ]),
             self::SalesExec => collect([
@@ -56,6 +57,7 @@ enum SystemRole: string
                 Permission::RequestsConfirm,
                 Permission::RequestsRelease,
                 Permission::PipelineMoveStage,
+                Permission::ContactsManage,
             ]),
         };
     }

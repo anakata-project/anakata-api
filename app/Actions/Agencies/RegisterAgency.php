@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Agencies;
 
 use App\Actions\Action;
+use App\Actions\Contacts\ResolveContact;
 use App\Enums\AgencyStatus;
 use App\Enums\AgencyUserStatus;
+use App\Enums\ContactType;
 use App\Enums\ReferenceType;
 use App\Models\Agency;
 use App\Models\AgencyUser;
@@ -20,6 +22,7 @@ final class RegisterAgency extends Action
     public function __construct(
         private readonly ReferenceService $references,
         private readonly CurrentConfig $config,
+        private readonly ResolveContact $contacts,
     ) {}
 
     /**
@@ -49,11 +52,20 @@ final class RegisterAgency extends Action
                 'requested_at' => now(),
             ]);
 
+            $contactName = ($data['contact'] ?? '') !== '' ? (string) $data['contact'] : (string) $data['name'];
+
             AgencyUser::query()->create([
                 'agency_id' => $agency->id,
-                'name' => ($data['contact'] ?? '') !== '' ? (string) $data['contact'] : (string) $data['name'],
+                'name' => $contactName,
                 'email' => $data['email'],
                 'status' => AgencyUserStatus::Pending,
+            ]);
+
+            $this->contacts->handle([
+                'name' => $contactName,
+                'email' => $data['email'],
+                'country' => isset($data['country']) ? (string) $data['country'] : null,
+                'type' => ContactType::TravelAgent,
             ]);
 
             History::record($agency, 'agency.registered', after: [

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Contacts\ResolveContact;
+use App\Enums\ContactType;
 use App\Models\ChangeHistory;
 use App\Models\Contact;
 use Database\Seeders\RolesSeeder;
@@ -86,4 +87,44 @@ test('a second upsert of the same new email does not 500', function (): void {
     expect($b->id)->toBe($a->id);
     expect(Contact::query()->where('email', 'same@anakata.test')->count())->toBe(1);
     expect(ChangeHistory::query()->where('event', 'contact.updated')->count())->toBe(0);
+});
+
+test('resolve contact applies type on create and never downgrades', function (): void {
+    $this->actingAs(managerUser());
+
+    $passenger = app(ResolveContact::class)->handle([
+        'name' => 'Passenger',
+        'email' => 'type@anakata.test',
+    ]);
+    expect($passenger->type)->toBe(ContactType::DirectPassenger);
+    expect($passenger->language)->toBe('en');
+
+    $upgraded = app(ResolveContact::class)->handle([
+        'name' => 'Passenger',
+        'email' => 'type@anakata.test',
+        'type' => ContactType::TravelAgent,
+    ]);
+    expect($upgraded->id)->toBe($passenger->id);
+    expect($upgraded->fresh()?->type)->toBe(ContactType::TravelAgent);
+
+    $unchanged = app(ResolveContact::class)->handle([
+        'name' => 'Passenger',
+        'email' => 'type@anakata.test',
+        'type' => ContactType::CorporateCharter,
+    ]);
+    expect($unchanged->fresh()?->type)->toBe(ContactType::TravelAgent);
+
+    $charter = app(ResolveContact::class)->handle([
+        'name' => 'Charter',
+        'email' => 'charter-type@anakata.test',
+        'type' => ContactType::CorporateCharter,
+    ]);
+    expect($charter->type)->toBe(ContactType::CorporateCharter);
+
+    app(ResolveContact::class)->handle([
+        'name' => 'Charter',
+        'email' => 'charter-type@anakata.test',
+        'type' => ContactType::DirectPassenger,
+    ]);
+    expect($charter->fresh()?->type)->toBe(ContactType::CorporateCharter);
 });

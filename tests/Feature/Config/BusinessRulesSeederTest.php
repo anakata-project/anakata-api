@@ -60,6 +60,8 @@ test('the seeded business rules document matches seed-data.json plus the new fie
     ]);
     expect($document['documents']['pretrip_days_before'])->toBe(45);
     expect($document['documents']['voucher_days_before'])->toBe(7);
+    expect($document['crm']['segment_high_ltv'])->toBe(20000);
+    expect($document['crm']['segment_mid_ltv'])->toBe(8000);
 
     $bands = array_map(
         fn (array $band): array => ['min_days' => $band['min'], 'penalty_pct' => $band['pct']],

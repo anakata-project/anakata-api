@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Enums\AgencyStatus;
 use App\Enums\AgencyUserStatus;
+use App\Enums\ContactType;
 use App\Enums\MainChannel;
 use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\ChangeHistory;
+use App\Models\Contact;
 use App\Services\Config\CurrentConfig;
 use App\Support\Rounding;
 use Carbon\CarbonImmutable;
@@ -46,6 +48,11 @@ test('a manager can register an agency and a sales exec cannot', function (): vo
         ->assertJsonPath('sla_breached', false);
 
     expect(ChangeHistory::query()->where('event', 'agency.registered')->count())->toBe(1);
+
+    $agencyContact = Contact::query()->where('email', 'p.ibanez@andes.test')->first();
+    expect($agencyContact)->not->toBeNull();
+    expect($agencyContact?->type)->toBe(ContactType::TravelAgent);
+    expect($agencyContact?->name)->toBe('P. Ibanez');
 });
 
 test('agency sla is breached at three business days and two is the boundary', function (): void {

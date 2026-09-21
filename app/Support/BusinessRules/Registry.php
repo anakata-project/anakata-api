@@ -69,6 +69,7 @@ final class Registry
                 'Guests tab, retention jobs',
             ),
             ...self::legalRows($initial),
+            ...self::crmRows($initial),
             ...self::lockedRows(),
         ];
     }
@@ -281,6 +282,8 @@ final class Registry
             'legal-entity-routing' => (string) data_get($document, 'legal_entity.bank.routing'),
             'legal-entity-swift' => (string) data_get($document, 'legal_entity.bank.swift'),
             'cancellation-bands' => self::bandDisplay(data_get($document, 'cancellation.bands') ?? []),
+            'crm-segment-high-ltv' => Money::format((int) data_get($document, 'crm.segment_high_ltv')),
+            'crm-segment-mid-ltv' => Money::format((int) data_get($document, 'crm.segment_mid_ltv')),
             default => $definition->sourceDisplay,
         };
     }
@@ -1192,6 +1195,40 @@ final class Registry
                 BusinessRulesDocument::sourceDisplay('legal.consent_versions.marketing'),
                 data_get($initial, 'legal.consent_versions.marketing'),
                 'Guests tab, consent log',
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $initial
+     * @return list<RuleDefinition>
+     */
+    private static function crmRows(array $initial): array
+    {
+        $g = RuleGroup::Crm;
+
+        return [
+            self::here(
+                'crm-segment-high-ltv',
+                $g,
+                'L2',
+                'CRM segment HIGH — lifetime-value threshold',
+                RuleStatus::PendingClient,
+                ['crm.segment_high_ltv'],
+                BusinessRulesDocument::sourceDisplay('crm.segment_high_ltv'),
+                data_get($initial, 'crm.segment_high_ltv'),
+                'CRM Contacts list and profile',
+            ),
+            self::here(
+                'crm-segment-mid-ltv',
+                $g,
+                'L2',
+                'CRM segment MID — lifetime-value threshold',
+                RuleStatus::PendingClient,
+                ['crm.segment_mid_ltv'],
+                BusinessRulesDocument::sourceDisplay('crm.segment_mid_ltv'),
+                data_get($initial, 'crm.segment_mid_ltv'),
+                'CRM Contacts list and profile',
             ),
         ];
     }

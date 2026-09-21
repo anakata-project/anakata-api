@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\ContactType;
 use App\Enums\PreferredChannel;
 use App\Models\Contact;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -24,6 +25,11 @@ class ContactFactory extends Factory
             'phone' => null,
             'country' => null,
             'preferred_channel' => PreferredChannel::Email,
+            'type' => ContactType::DirectPassenger,
+            'language' => 'en',
+            'phone_e164' => null,
+            'first_touch' => null,
+            'last_touch' => null,
         ];
     }
 

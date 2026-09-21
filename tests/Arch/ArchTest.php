@@ -28,6 +28,8 @@ arch('crm controllers do not use money or booking write paths')
         'App\Actions\Commissions',
         'App\Actions\Agencies',
         'App\Actions\Documents',
+        'App\Actions\Guests',
+        'App\Actions\Extras',
         'App\Services\Pricing',
     ]);
 

@@ -11,6 +11,7 @@ use App\Enums\BookingStatus;
 use App\Enums\BookingType;
 use App\Enums\ClaimKind;
 use App\Enums\ConfigKind;
+use App\Enums\ContactType;
 use App\Enums\ReferenceType;
 use App\Models\Agency;
 use App\Models\AgencyUser;
@@ -107,6 +108,13 @@ final class DemoAgenciesSeeder extends Seeder
                 ],
             );
         }
+
+        app(ResolveContact::class)->handle([
+            'name' => $agency->contact !== '' ? $agency->contact : $agency->name,
+            'email' => $agency->email,
+            'country' => $agency->country,
+            'type' => ContactType::TravelAgent,
+        ]);
     }
 
     private function userStatus(string $status): AgencyUserStatus

@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Actions\Contacts\ResolveContact;
 use App\Enums\CharterEnquirySource;
 use App\Enums\CharterEnquiryStatus;
+use App\Enums\ContactType;
 use App\Mail\CharterEnquiryMail;
 use App\Models\CharterEnquiry;
 use App\Support\History\History;
@@ -23,7 +24,9 @@ final class CreateCharterEnquiry extends Action
     public function handle(array $data): CharterEnquiry
     {
         $enquiry = $this->transaction(function () use ($data): CharterEnquiry {
-            $contact = $this->contacts->handle(is_array($data['contact'] ?? null) ? $data['contact'] : []);
+            $payload = is_array($data['contact'] ?? null) ? $data['contact'] : [];
+            $payload['type'] = ContactType::CorporateCharter;
+            $contact = $this->contacts->handle($payload);
 
             $enquiry = CharterEnquiry::query()->create([
                 'preferred_from' => $data['preferred_from'] ?? null,

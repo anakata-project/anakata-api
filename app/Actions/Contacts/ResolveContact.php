@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Contacts;
 
 use App\Actions\Action;
+use App\Enums\ContactType;
 use App\Enums\PreferredChannel;
 use App\Models\Contact;
 use App\Support\History\History;
@@ -25,7 +26,7 @@ final class ResolveContact extends Action
     }
 
     /**
-     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null}  $data
+     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null, type?: string|ContactType|null, language?: string|null}  $data
      */
     public function handle(array $data): Contact
     {
@@ -33,7 +34,7 @@ final class ResolveContact extends Action
     }
 
     /**
-     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null}  $data
+     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null, type?: string|ContactType|null, language?: string|null}  $data
      */
     private function resolve(array $data): Contact
     {
@@ -46,10 +47,12 @@ final class ResolveContact extends Action
         $now = now()->format('Y-m-d H:i:s');
         $actorId = Auth::id();
         $channel = $this->preferredChannel($data['preferred_channel'] ?? null);
+        $type = $this->typeHint($data['type'] ?? null);
+        $language = $this->language($data['language'] ?? null);
 
         $affected = (int) DB::affectingStatement(
-            'insert into contacts (`name`, `email`, `phone`, `country`, `preferred_channel`, `created_at`, `updated_at`, `created_by`, `updated_by`)
-             values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            'insert into contacts (`name`, `email`, `phone`, `country`, `preferred_channel`, `type`, `language`, `created_at`, `updated_at`, `created_by`, `updated_by`)
+             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              on duplicate key update `id` = `id`',
             [
                 $data['name'],
@@ -57,6 +60,8 @@ final class ResolveContact extends Action
                 $this->nullableString($data['phone'] ?? null),
                 $this->nullableCountry($data['country'] ?? null),
                 $channel->value,
+                $type->value,
+                $language,
                 $now,
                 $now,
                 $actorId,
@@ -76,11 +81,11 @@ final class ResolveContact extends Action
             return $contact;
         }
 
-        return $this->fillEmptyFields($contact, $data, $channel);
+        return $this->applyTypeHint($this->fillEmptyFields($contact, $data, $channel), $type);
     }
 
     /**
-     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null}  $data
+     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null, type?: string|ContactType|null, language?: string|null}  $data
      */
     private function createWithoutEmail(array $data): Contact
     {
@@ -90,6 +95,8 @@ final class ResolveContact extends Action
             'phone' => $this->nullableString($data['phone'] ?? null),
             'country' => $this->nullableCountry($data['country'] ?? null),
             'preferred_channel' => $this->preferredChannel($data['preferred_channel'] ?? null),
+            'type' => $this->typeHint($data['type'] ?? null),
+            'language' => $this->language($data['language'] ?? null),
         ]);
 
         History::record($contact, 'contact.created', after: $this->snapshot($contact));
@@ -98,7 +105,7 @@ final class ResolveContact extends Action
     }
 
     /**
-     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null}  $data
+     * @param  array{name: string, email?: string|null, phone?: string|null, country?: string|null, preferred_channel?: string|PreferredChannel|null, type?: string|ContactType|null, language?: string|null}  $data
      */
     private function fillEmptyFields(Contact $contact, array $data, PreferredChannel $channel): Contact
     {
@@ -150,8 +157,34 @@ final class ResolveContact extends Action
         return $contact;
     }
 
+    private function applyTypeHint(Contact $contact, ContactType $hint): Contact
+    {
+        if ($hint === ContactType::DirectPassenger) {
+            return $contact;
+        }
+
+        if ($contact->type !== ContactType::DirectPassenger) {
+            return $contact;
+        }
+
+        $before = ['type' => $contact->type->value];
+        $after = ['type' => $hint->value];
+
+        Contact::query()->whereKey($contact->id)->update([
+            'type' => $hint->value,
+            'updated_at' => now(),
+            'updated_by' => Auth::id(),
+        ]);
+
+        $contact->refresh();
+
+        History::record($contact, 'contact.updated', before: $before, after: $after);
+
+        return $contact;
+    }
+
     /**
-     * @return array{name: string, email: string|null, phone: string|null, country: string|null, preferred_channel: string}
+     * @return array{name: string, email: string|null, phone: string|null, country: string|null, preferred_channel: string, type: string, language: string}
      */
     private function snapshot(Contact $contact): array
     {
@@ -161,7 +194,33 @@ final class ResolveContact extends Action
             'phone' => $contact->phone,
             'country' => $contact->country,
             'preferred_channel' => $contact->preferred_channel->value,
+            'type' => $contact->type->value,
+            'language' => $contact->language,
         ];
+    }
+
+    private function typeHint(mixed $value): ContactType
+    {
+        if ($value instanceof ContactType) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            return ContactType::from($value);
+        }
+
+        return ContactType::DirectPassenger;
+    }
+
+    private function language(mixed $value): string
+    {
+        if (! is_string($value) || $value === '') {
+            return 'en';
+        }
+
+        $language = strtolower(trim($value));
+
+        return preg_match('/^[a-z]{2}$/', $language) === 1 ? $language : 'en';
     }
 
     private function preferredChannel(mixed $value): PreferredChannel

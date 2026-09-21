@@ -28,6 +28,7 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly ConsentVersions $consentVersions,
         public readonly LegalEntityRules $legalEntity,
         public readonly DocumentsRules $documents,
+        public readonly CrmRules $crm,
         public readonly array $bands,
     ) {}
 
@@ -110,6 +111,10 @@ final class BusinessRulesDocument extends ConfigDocument
                 'pretrip_days_before' => 45,
                 'voucher_days_before' => 7,
             ],
+            'crm' => [
+                'segment_high_ltv' => 20000,
+                'segment_mid_ltv' => 8000,
+            ],
             'cancellation' => [
                 'bands' => [
                     ['min_days' => 120, 'penalty_pct' => 5],
@@ -138,6 +143,7 @@ final class BusinessRulesDocument extends ConfigDocument
         $legalEntity = is_array($data['legal_entity'] ?? null) ? $data['legal_entity'] : [];
         $bank = is_array($legalEntity['bank'] ?? null) ? $legalEntity['bank'] : [];
         $documents = is_array($data['documents'] ?? null) ? $data['documents'] : [];
+        $crm = is_array($data['crm'] ?? null) ? $data['crm'] : [];
         $cancellation = is_array($data['cancellation'] ?? null) ? $data['cancellation'] : [];
 
         $reminders = [];
@@ -233,6 +239,10 @@ final class BusinessRulesDocument extends ConfigDocument
                 (int) ($documents['pretrip_days_before'] ?? 0),
                 (int) ($documents['voucher_days_before'] ?? 0),
             ),
+            new CrmRules(
+                (int) ($crm['segment_high_ltv'] ?? 0),
+                (int) ($crm['segment_mid_ltv'] ?? 0),
+            ),
             $bands,
         );
     }
@@ -251,6 +261,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string}},
      *     legal_entity: array{name: string, address_lines: list<string>, email: string, website: string, ein: string, bank: array{bank_name: string, account_name: string, account_number: string, routing: string, swift: string}},
      *     documents: array{pretrip_days_before: int, voucher_days_before: int},
+     *     crm: array{segment_high_ltv: int, segment_mid_ltv: int},
      *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
      * }
      */
@@ -271,6 +282,7 @@ final class BusinessRulesDocument extends ConfigDocument
             ],
             'legal_entity' => $this->legalEntity->toArray(),
             'documents' => $this->documents->toArray(),
+            'crm' => $this->crm->toArray(),
             'cancellation' => [
                 'bands' => array_map(
                     fn (CancellationBand $band): array => $band->toArray(),
@@ -347,6 +359,9 @@ final class BusinessRulesDocument extends ConfigDocument
             'documents' => ['required', 'array'],
             'documents.pretrip_days_before' => ['required', 'integer', 'min:1', 'max:120'],
             'documents.voucher_days_before' => ['required', 'integer', 'min:1', 'max:60'],
+            'crm' => ['required', 'array'],
+            'crm.segment_high_ltv' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'crm.segment_mid_ltv' => ['required', 'integer', 'min:0', 'max:1000000'],
             'cancellation' => ['required', 'array'],
             'cancellation.bands' => ['required', 'array', 'min:1', 'max:6', new BusinessRulesConstraint('bands')],
             'cancellation.bands.*.min_days' => ['required', 'integer', 'min:0', 'max:999'],
@@ -404,6 +419,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal_entity.bank.swift' => 'LEG-004 · SWIFT',
             'documents.pretrip_days_before' => 'J7 · Pre-trip itinerary days before departure',
             'documents.voucher_days_before' => 'J7 · Transfer voucher days before departure',
+            'crm.segment_high_ltv' => 'L2 · CRM segment HIGH lifetime-value threshold',
+            'crm.segment_mid_ltv' => 'L2 · CRM segment MID lifetime-value threshold',
             'cancellation.bands' => '§4.1.5 · Cabin cancellation penalty bands',
         ];
     }
@@ -519,6 +536,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal_entity.bank.swift' => '[TBD] (LEG-004 pending client)',
             'documents.pretrip_days_before' => '45 days (J7 / prototype T−45)',
             'documents.voucher_days_before' => '7 days (J7 / prototype T−7)',
+            'crm.segment_high_ltv' => 'USD 20,000 (PENDING CLIENT, prototype segOf)',
+            'crm.segment_mid_ltv' => 'USD 8,000 (PENDING CLIENT, prototype segOf)',
             'cancellation.bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100%',
             default => $path,
         };

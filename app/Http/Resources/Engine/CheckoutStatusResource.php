@@ -32,7 +32,7 @@ class CheckoutStatusResource extends JsonResource
         $this->resource->loadMissing(['bookings.contact']);
 
         $email = $this->bookings
-            ->map(fn (Booking $booking): ?string => $booking->contact?->email)
+            ->map(fn (Booking $booking): ?string => $booking->contact->email)
             ->first(fn (?string $value): bool => is_string($value) && $value !== '');
 
         return [

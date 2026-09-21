@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CabinCategory;
 use App\Enums\CharterEnquiryStatus;
+use App\Enums\ContactType;
 use App\Enums\DepartureStatus;
 use App\Enums\Permission;
 use App\Enums\WaitlistSource;
@@ -103,6 +104,7 @@ test('a charter enquiry is stored and mailed to the reservations mailbox', funct
     expect($enquiry->guests)->toBe(12);
     expect($enquiry->departure_id)->toBe($departure->id);
     expect($enquiry->contact->name)->toBe('Charter Guest');
+    expect($enquiry->contact->type)->toBe(ContactType::CorporateCharter);
 
     Mail::assertSent(CharterEnquiryMail::class, function (CharterEnquiryMail $mail): bool {
         return $mail->hasTo((string) config('mail.reservations'));
