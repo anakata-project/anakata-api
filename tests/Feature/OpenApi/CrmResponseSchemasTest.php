@@ -28,6 +28,17 @@ function crmOpenApiSchema(array $spec, string $name): array
     return $schema;
 }
 
+/**
+ * @param  array<string, mixed>  $node
+ */
+function crmSchemaRef(array $node, string $name): void
+{
+    $ref = $node['$ref'] ?? $node['allOf'][0]['$ref'] ?? $node['items']['$ref'] ?? $node['items']['allOf'][0]['$ref'] ?? null;
+
+    expect($ref)->toBeString("{$name} is not a \$ref");
+    expect($ref)->toContain($name);
+}
+
 test('crm OpenAPI schemas have properties', function (): void {
     Gate::define('viewApiDocs', fn (): bool => true);
 
@@ -41,6 +52,8 @@ test('crm OpenAPI schemas have properties', function (): void {
     $names = array_keys($spec['components']['schemas'] ?? []);
 
     $expected = [
+        'CrmContactResource',
+        'ContactBookingResource',
         'ContactDuplicateResource',
         'ContactMergeResource',
         'ContactMergeResultResource',
@@ -60,14 +73,106 @@ test('crm OpenAPI schemas have properties', function (): void {
         crmOpenApiSchema($spec, $name);
     }
 
-    $contactNames = array_values(array_filter(
-        $names,
-        fn (string $name): bool => str_contains($name, 'ContactResource'),
-    ));
-
-    expect($contactNames)->not->toBeEmpty();
-
-    foreach ($contactNames as $name) {
-        crmOpenApiSchema($spec, $name);
+    foreach (['ContactType', 'ContactLifecycle'] as $enum) {
+        expect($names)->toContain($enum);
+        expect($spec['components']['schemas'][$enum]['enum'] ?? null)->toBeArray();
+        expect($spec['components']['schemas'][$enum]['enum'])->not->toBeEmpty();
     }
+
+    $contact = crmOpenApiSchema($spec, 'CrmContactResource');
+    expect($contact['properties'])->toHaveKeys([
+        'id',
+        'name',
+        'email',
+        'phone',
+        'phone_e164',
+        'country',
+        'language',
+        'preferred_channel',
+        'type',
+        'first_touch',
+        'last_touch',
+        'lifetime_value',
+        'segment',
+        'lifecycle',
+        'nps',
+        'consent',
+        'main_channel',
+        'channel_of_origin',
+        'resolved_from_alias',
+        'alias_id',
+        'merge_id',
+        'bookings',
+    ]);
+    foreach ([
+        'passport_no',
+        'dob',
+        'nationality',
+        'medical_note',
+        'dietary_note',
+        'accessibility_note',
+    ] as $sensitive) {
+        expect($contact['properties'])->not->toHaveKey($sensitive);
+    }
+    crmSchemaRef($contact['properties']['bookings'] ?? [], 'ContactBookingResource');
+
+    $touch = $contact['properties']['first_touch']['properties']
+        ?? $contact['properties']['first_touch']['anyOf'][0]['properties']
+        ?? [];
+    expect($touch)->toHaveKeys([
+        'source',
+        'medium',
+        'campaign',
+        'content',
+        'term',
+        'landing_path',
+        'captured_at',
+    ]);
+
+    $duplicate = crmOpenApiSchema($spec, 'ContactDuplicateResource');
+    crmSchemaRef($duplicate['properties']['a'] ?? [], 'CrmContactResource');
+    crmSchemaRef($duplicate['properties']['b'] ?? [], 'CrmContactResource');
+
+    $merged = crmOpenApiSchema($spec, 'ContactMergeResultResource');
+    crmSchemaRef($merged['properties']['merge'] ?? [], 'ContactMergeResource');
+    crmSchemaRef($merged['properties']['contact'] ?? [], 'CrmContactResource');
+
+    $unmerged = crmOpenApiSchema($spec, 'ContactUnmergeResultResource');
+    crmSchemaRef($unmerged['properties']['merge'] ?? [], 'ContactMergeResource');
+
+    $contacts = $spec['paths']['/crm/contacts']['get']
+        ?? $spec['paths']['/api/crm/contacts']['get']
+        ?? null;
+    expect($contacts)->toBeArray();
+    $contactsSchema = $contacts['responses']['200']['content']['application/json']['schema'] ?? [];
+    $filters = $contactsSchema['properties']['meta']['properties']['filters']['properties'] ?? [];
+    expect($filters)->toHaveKeys(['type', 'lifecycle']);
+
+    $activity = $spec['paths']['/crm/activity']['get']
+        ?? $spec['paths']['/api/crm/activity']['get']
+        ?? null;
+    expect($activity)->toBeArray();
+    $kpis = $activity['responses']['200']['content']['application/json']['schema']['properties']['meta']['properties']['kpis']['properties'] ?? [];
+    expect($kpis)->toHaveKeys([
+        'events_today',
+        'identified',
+        'anonymous',
+        'inventory_touching',
+        'web_hold_minutes',
+        'web_hold_extension_minutes',
+    ]);
+
+    $jobs = $spec['paths']['/crm/sync/jobs']['get']
+        ?? $spec['paths']['/api/crm/sync/jobs']['get']
+        ?? null;
+    expect($jobs)->toBeArray();
+    $jobKpis = $jobs['responses']['200']['content']['application/json']['schema']['properties']['meta']['properties']['kpis']['properties'] ?? [];
+    expect($jobKpis)->toHaveKeys(['jobs_failing', 'failures_open', 'merges_this_month']);
+
+    $events = $spec['paths']['/crm/sync/events']['get']
+        ?? $spec['paths']['/api/crm/sync/events']['get']
+        ?? null;
+    expect($events)->toBeArray();
+    $note = $events['responses']['200']['content']['application/json']['schema']['properties']['meta']['properties']['note'] ?? [];
+    expect($note['type'] ?? null)->toBe('string');
 });

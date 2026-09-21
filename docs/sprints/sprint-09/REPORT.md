@@ -506,3 +506,258 @@ The panel can now read a contact timeline, the engine event stream, and the owne
 EOF
 )"
 ```
+
+## Task 05 · anakata-ui · Regenerate types, release `v0.10.0`
+
+### What was built
+PHPDoc / OpenAPI prelude on the API so Scramble names the CRM contact schema and `$ref`s nested CRM resources, then types regenerated against `http://localhost:8000/docs/api.json`. Layer `0.9.0` → `0.10.0`. Types only: no composables, components, or frontend behaviour.
+
+Calendar dates stay `string` (`YYYY-MM-DD`). Instants stay ISO strings.
+
+RMS `Contact` stays the search row. The CRM people row is `CrmContact` on the barrel.
+
+### API prelude
+
+| Target | What landed |
+|---|---|
+| `Crm\ContactResource` | `#[SchemaName('CrmContactResource')]`. `bookings` is `ContactBookingResource::collection(...)` (was `->resolve()` → `{}`). `first_touch` / `last_touch` go through `AttributionTouch::from()` so the optional UTM keys `$ref` a typed object. `@phpstan-return` matches the resolved array. |
+| `AttributionTouch::from()` | `@return` lists the optional keys (`source`, `medium`, `campaign`, `content`, `term`, `landing_path`, `captured_at`). |
+| `ContactDuplicateResource` | `a` / `b` return `new ContactResource` (was `toArray()`). |
+| `ContactMergeResultResource` | `merge` / `contact` return the resource classes. |
+| `ContactUnmergeResultResource` | `merge` returns `ContactMergeResource`. |
+| `ContactController::duplicates` | Return type `AnonymousResourceCollection`. |
+| `SyncController::ownership` / `failures` | Return type `AnonymousResourceCollection`. |
+| `CrmResponseSchemasTest` | Asserts `CrmContactResource` derived keys and no sensitive fields; `$ref`s for bookings / duplicate / merge; named `ContactType` / `ContactLifecycle`; contacts `meta.filters`; activity `meta.kpis`; jobs `meta.kpis`; events `meta.note`. |
+| `PanelResponseSchemasTest` | `ContactResource` stays the RMS search row and has no `lifetime_value`. |
+| `EngineResponseSchemasTest` | `StoreEngineEventsRequest` exists; client event-name enum does not include `identity.stitched`. |
+
+`meta.filters`, activity `meta.kpis`, jobs `meta.kpis` and events `meta.note` were already on the `#[DocumentedResponse]` attributes. No re-type.
+
+Engine event `params` and checkout `attribution` stay loose in the generated request bodies (Laravel `array` rules). Leftovers in `engine.ts` type them for the frontends. No new rejecting validation.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 9886 | 11120 |
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 430 | 430 |
+| `app/types/bookings.ts` | 208 | 208 |
+| `app/types/payments.ts` | 161 | 161 |
+| `app/types/index.ts` | 256 | 286 |
+| `app/types/anakata-augment.d.ts` | 17 | 17 |
+| `app/types/guests.ts` | 101 | 101 |
+| `app/types/extras.ts` | 24 | 24 |
+| `app/types/documents.ts` | 61 | 61 |
+| `app/types/offers.ts` | 37 | 37 |
+| `app/types/engine.ts` | 296 | 354 |
+| `app/types/crm.ts` | — | 105 |
+
+`api.d.ts` was regenerated with `pnpm types:api` and never hand-edited.
+
+### Schema → alias (`app/types/crm.ts` — `/api/crm` only)
+
+No imports from `./bookings`, `./guests`, `./payments`, or any RMS `*Resource`.
+
+| Alias | Source |
+|---|---|
+| `ContactType` | named `ContactType` |
+| `Lifecycle` | named `ContactLifecycle` |
+| `Segment` | leftover `HIGH \| MID \| NEW` — mirrors `App\Enums\ContactSegment` |
+| `Contact` | `CrmContactResource` + overlays on `type` / `lifecycle` / `segment` / `consent`; `bookings` omitted (list row) |
+| `ContactBooking` | leftover `can_act: boolean` — generated freezes as `string` |
+| `ContactProfile` | `Contact` + `bookings: Array<ContactBooking>` |
+| `ContactFilters` | pick `meta.filters` from `crm.contact.index` |
+| `ContactDuplicate` | leftover `a` / `b: Contact` and `reasons: Array<string>` — generated `reasons` is `string` |
+| `ContactMerge` | `ContactMergeResource` |
+| `ContactMergeResult` | leftover `swapped: boolean` and `contact: ContactProfile` — generated `swapped` is `string` |
+| `ContactUnmergeResult` | leftover `skipped_rows` — generated is `string` |
+| `TimelineItem` | `ContactTimelineItemResource` |
+| `ActivityEvent` | `EngineActivityItemResource` + `name` overlay (`BehaviouralEventName`) |
+| `ActivityKpis` | activity operation `meta.kpis` |
+| `OwnershipRow` | `FieldOwnershipResource` |
+| `ScheduledJobRun` | `ScheduledJobResource` |
+| `SyncFailure` | `SyncFailureResource` |
+| `EventCatalogueRow` | `EventCatalogueResource` |
+| `SyncIdentityRow` | `SyncIdentityResource` |
+| `RetrySyncFailure` | `RetrySyncFailureResource` |
+| `SyncKpis` | jobs operation `meta.kpis` |
+
+`preferred_channel`, `main_channel` and `channel_of_origin` stay the CRM schema's `string`.
+
+### Schema → alias (`app/types/engine.ts` — `/api/engine` only)
+
+| Alias | Source |
+|---|---|
+| `EngineEventsAccepted` | `EngineEventsAcceptedResource` |
+| `EngineEventName` | `StoreEngineEventsRequest.events[].name` (client names; no `identity.stitched`) |
+| `EngineEventParams` | leftover optional whitelist keys — mirrors `App\Support\Engine\BehaviouralEventParams`. Generated `params` is `string[] \| null` |
+| `EngineEventsInput` | leftover over `StoreEngineEventsRequest` (`session_id: string`, typed `events`) |
+| `AttributionTouch` | leftover — mirrors `App\Support\Crm\AttributionTouch`. Generated checkout touches are `string[]` |
+| `AttributionInput` | leftover `{ first_touch?, last_touch? }` |
+
+### Barrel
+
+`Contact` from `bookings.ts` is unchanged (RMS search). CRM `Contact` is re-exported as `CrmContact`.
+
+### Kept leftovers
+
+Inventory leftovers stay as they are. New leftovers listed above, each with a `Mirrors App\…` comment.
+
+No lifecycle / type / segment / event-name runtime list in the layer.
+
+### Pins
+
+Panel and engine README rows now say `` `extends: ['../anakata-ui']` (`v0.10.0`) ``. The Netlify fallback in each `nuxt.config.ts` is `github:anakata-project/anakata-ui#v0.10.0`. **Neither pin is enforced** — the apps resolve the sibling folder, so the version line is documentation only.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Http/Resources/Crm/ContactResource.php`
+- `app/Http/Resources/Crm/ContactDuplicateResource.php`
+- `app/Http/Resources/Crm/ContactMergeResultResource.php`
+- `app/Http/Resources/Crm/ContactUnmergeResultResource.php`
+- `app/Support/Crm/AttributionTouch.php`
+- `app/Http/Controllers/Crm/ContactController.php`
+- `app/Http/Controllers/Crm/SyncController.php`
+- `tests/Feature/OpenApi/CrmResponseSchemasTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+- `tests/Feature/OpenApi/EngineResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/crm.ts` (new)
+- `app/types/engine.ts`
+- `app/types/index.ts`
+- `package.json` (`0.10.0`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel / anakata-engine**
+- `README.md` (documentation pin only)
+- `nuxt.config.ts` (Netlify fallback tag)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-09/REPORT.md`
+
+### Deviations
+- Extra aliases (`ContactBooking`, `ContactFilters`, `ContactMergeResult`, `ContactUnmergeResult`, `SyncIdentityRow`, `RetrySyncFailure`, `SyncKpis`) so `crm.ts` stays readable. Same pattern as Sprint 8's extra engine aliases.
+- `consent.marketing` is overlayed as `boolean` — Scramble still emits `string | boolean`.
+- `AttributionTouch::from()` PHPDoc change is shared with checkout submit and stitch. Runtime filter is unchanged.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 06: Contacts list / profile / merge consume `CrmContact`, `ContactProfile`, `ContactDuplicate`, `ContactMerge`, `TimelineItem`. Filters from `ContactFilters`.
+- Task 07: Activity from `ActivityEvent` + `ActivityKpis`; Sync from `OwnershipRow`, `ScheduledJobRun`, `SyncFailure`, `EventCatalogueRow`. Do not count KPIs in the panel.
+- Task 08: emit `EngineEventsInput`; send `AttributionInput` on checkout submit. `EngineEventName` is the client whitelist.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 1066 tests (7681 assertions), Pint (1099 files), Larastan level 6 (0 errors).
+- anakata-ui: lint, typecheck, test (35), build — pass.
+- anakata-panel / anakata-engine: typecheck and build — pass (real checks).
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout). Overlayed the working trees. Confirmed the ui clone is **0.10.0** and has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: typecheck pass
+  - panel / engine: build pass
+  - **OVERLAY CLONE OK**
+  - **Repeat this clone after the pushes below**, checking out `anakata-ui` at `v0.10.0` with **no** overlay.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude (OpenAPI typing — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Resources/Crm/ContactResource.php \
+  app/Http/Resources/Crm/ContactDuplicateResource.php \
+  app/Http/Resources/Crm/ContactMergeResultResource.php \
+  app/Http/Resources/Crm/ContactUnmergeResultResource.php \
+  app/Support/Crm/AttributionTouch.php \
+  app/Http/Controllers/Crm/ContactController.php \
+  app/Http/Controllers/Crm/SyncController.php \
+  tests/Feature/OpenApi/CrmResponseSchemasTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Feature/OpenApi/EngineResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Type Sprint 9 CRM and engine event OpenAPI responses.
+
+CrmContactResource is a stable schema name; nested merge and
+duplicate contacts $ref named resources so the layer can regenerate.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/index.ts \
+  app/types/crm.ts \
+  app/types/engine.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for CRM contacts and engine events.
+
+Sprint 9 aliases live in crm.ts (/api/crm only). The barrel exports
+the people row as CrmContact. RMS Contact stays the search row.
+EOF
+)"
+git tag v0.10.0
+git push origin HEAD
+git push origin v0.10.0
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add README.md nuxt.config.ts
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.10.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md nuxt.config.ts
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.10.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 9 task 05: regenerated UI API types.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.10.0
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```

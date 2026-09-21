@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 
 final class SyncController extends Controller
 {
-    public function ownership(): JsonResource
+    public function ownership(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', CrmSync::class);
 
@@ -53,7 +53,7 @@ final class SyncController extends Controller
         ]);
     }
 
-    public function failures(): JsonResource
+    public function failures(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', CrmSync::class);
 

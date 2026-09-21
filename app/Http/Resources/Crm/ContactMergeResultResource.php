@@ -19,7 +19,7 @@ class ContactMergeResultResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array{swapped: bool, merge: array<string, mixed>, contact: array<string, mixed>}
+     * @return array{swapped: bool, merge: ContactMergeResource, contact: ContactResource}
      */
     public function toArray(Request $request): array
     {
@@ -28,8 +28,8 @@ class ContactMergeResultResource extends JsonResource
 
         return [
             'swapped' => $result['swapped'],
-            'merge' => (new ContactMergeResource($result['merge']))->toArray($request),
-            'contact' => (new ContactResource($result['contact']))->toArray($request),
+            'merge' => new ContactMergeResource($result['merge']),
+            'contact' => new ContactResource($result['contact']),
         ];
     }
 }

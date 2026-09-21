@@ -99,6 +99,10 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         openApiSchema($spec, $name);
     }
 
+    $rmsContact = openApiSchema($spec, 'ContactResource');
+    expect($rmsContact['properties'])->toHaveKeys(['id', 'name', 'email', 'phone', 'country', 'preferred_channel']);
+    expect($rmsContact['properties'])->not->toHaveKey('lifetime_value');
+
     $departure = openApiSchema($spec, 'DepartureResource');
     $availability = openApiProperties($departure['properties']['availability'] ?? []);
     $cabins = $availability['cabins']['items'] ?? $availability['cabins'] ?? null;

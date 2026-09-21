@@ -21,7 +21,7 @@ final class AttributionTouch
     ];
 
     /**
-     * @return array<string, string>|null
+     * @return array{source?: string, medium?: string, campaign?: string, content?: string, term?: string, landing_path?: string, captured_at?: string}|null
      */
     public static function from(mixed $input): ?array
     {

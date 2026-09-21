@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Resources\Crm;
 
 use App\Models\Contact;
+use App\Support\Crm\AttributionTouch;
 use App\Support\Crm\ContactConsentSummary;
+use Dedoc\Scramble\Attributes\SchemaName;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @mixin Contact
  */
+#[SchemaName('CrmContactResource')]
 class ContactResource extends JsonResource
 {
     public static $wrap = null;
@@ -27,8 +31,8 @@ class ContactResource extends JsonResource
      *     language: string,
      *     preferred_channel: string,
      *     type: string,
-     *     first_touch: array<string, mixed>|null,
-     *     last_touch: array<string, mixed>|null,
+     *     first_touch: array{source?: string, medium?: string, campaign?: string, content?: string, term?: string, landing_path?: string, captured_at?: string}|null,
+     *     last_touch: array{source?: string, medium?: string, campaign?: string, content?: string, term?: string, landing_path?: string, captured_at?: string}|null,
      *     lifetime_value: int,
      *     segment: string,
      *     lifecycle: string,
@@ -39,7 +43,32 @@ class ContactResource extends JsonResource
      *     resolved_from_alias: bool,
      *     alias_id: int|null,
      *     merge_id: int|null,
-     *     bookings?: list<array<string, mixed>>
+     *     bookings?: list<ContactBookingResource>
+     * }
+     *
+     * @phpstan-return array{
+     *     id: int,
+     *     name: string,
+     *     email: string|null,
+     *     phone: string|null,
+     *     phone_e164: string|null,
+     *     country: string|null,
+     *     language: string,
+     *     preferred_channel: string,
+     *     type: string,
+     *     first_touch: array<string, string>|null,
+     *     last_touch: array<string, string>|null,
+     *     lifetime_value: int,
+     *     segment: string,
+     *     lifecycle: string,
+     *     nps: null,
+     *     consent: array{marketing: bool, transactional: true},
+     *     main_channel: string|null,
+     *     channel_of_origin: string|null,
+     *     resolved_from_alias: bool,
+     *     alias_id: int|null,
+     *     merge_id: int|null,
+     *     bookings?: AnonymousResourceCollection
      * }
      */
     public function toArray(Request $request): array
@@ -56,8 +85,8 @@ class ContactResource extends JsonResource
             'language' => $this->language,
             'preferred_channel' => $this->preferred_channel->value,
             'type' => $this->type->value,
-            'first_touch' => $this->first_touch,
-            'last_touch' => $this->last_touch,
+            'first_touch' => AttributionTouch::from($this->first_touch),
+            'last_touch' => AttributionTouch::from($this->last_touch),
             'lifetime_value' => (int) $this->getAttribute('lifetime_value'),
             'segment' => (string) $this->getAttribute('segment'),
             'lifecycle' => (string) $this->getAttribute('lifecycle'),
@@ -71,7 +100,7 @@ class ContactResource extends JsonResource
         ];
 
         if ($this->relationLoaded('bookings')) {
-            $payload['bookings'] = ContactBookingResource::collection($this->bookings)->resolve();
+            $payload['bookings'] = ContactBookingResource::collection($this->bookings);
         }
 
         return $payload;

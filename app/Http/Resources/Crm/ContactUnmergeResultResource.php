@@ -17,7 +17,7 @@ class ContactUnmergeResultResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array{skipped_rows: list<array{table: string, id: int}>, merge: array<string, mixed>}
+     * @return array{skipped_rows: list<array{table: string, id: int}>, merge: ContactMergeResource}
      */
     public function toArray(Request $request): array
     {
@@ -26,7 +26,7 @@ class ContactUnmergeResultResource extends JsonResource
 
         return [
             'skipped_rows' => $result['skipped_rows'],
-            'merge' => (new ContactMergeResource($result['merge']))->toArray($request),
+            'merge' => new ContactMergeResource($result['merge']),
         ];
     }
 }

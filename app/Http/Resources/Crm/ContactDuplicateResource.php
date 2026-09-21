@@ -18,7 +18,7 @@ class ContactDuplicateResource extends JsonResource
     public static $wrap = null;
 
     /**
-     * @return array{a: array<string, mixed>, b: array<string, mixed>, reasons: list<string>}
+     * @return array{a: ContactResource, b: ContactResource, reasons: list<string>}
      */
     public function toArray(Request $request): array
     {
@@ -26,8 +26,8 @@ class ContactDuplicateResource extends JsonResource
         $pair = $this->resource;
 
         return [
-            'a' => (new ContactResource($pair['a']))->toArray($request),
-            'b' => (new ContactResource($pair['b']))->toArray($request),
+            'a' => new ContactResource($pair['a']),
+            'b' => new ContactResource($pair['b']),
             'reasons' => $pair['reasons'],
         ];
     }

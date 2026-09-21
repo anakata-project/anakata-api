@@ -146,4 +146,11 @@ test('engine OpenAPI schemas have properties', function (): void {
     $quoteRef = $quote['$ref'] ?? $quote['allOf'][0]['$ref'] ?? null;
     expect($quoteRef)->toBeString();
     expect($quoteRef)->toContain('EngineQuoteResource');
+
+    $storeEvents = $spec['components']['schemas']['StoreEngineEventsRequest'] ?? null;
+    expect($storeEvents)->toBeArray();
+    expect($storeEvents['properties'] ?? null)->toHaveKeys(['session_id', 'events']);
+    $eventName = $storeEvents['properties']['events']['items']['properties']['name']['enum'] ?? [];
+    expect($eventName)->not->toBeEmpty();
+    expect($eventName)->not->toContain('identity.stitched');
 });

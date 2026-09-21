@@ -23,7 +23,6 @@ use App\Support\Crm\DuplicateContacts;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Resources\Json\JsonResource;
 
 final class ContactController extends Controller
 {
@@ -109,7 +108,7 @@ final class ContactController extends Controller
         return new ContactResource($loaded);
     }
 
-    public function duplicates(): JsonResource
+    public function duplicates(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Contact::class);
 
