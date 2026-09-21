@@ -34,6 +34,17 @@ enum BookingStatus: string
         ], true);
     }
 
+    public function isConfirmedOrLater(): bool
+    {
+        return in_array($this, [
+            self::Confirmed,
+            self::FullyPaid,
+            self::OnBoard,
+            self::Completed,
+            self::Overdue,
+        ], true);
+    }
+
     /**
      * @return list<self>
      */

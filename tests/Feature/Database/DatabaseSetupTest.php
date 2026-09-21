@@ -33,6 +33,7 @@ test('core tables exist after migration', function (): void {
     );
     expect(Schema::hasTable('cabin_claims'))->toBeTrue('cabin_claims table missing after migration.');
     expect(Schema::hasTable('guests'))->toBeTrue('guests table missing after migration.');
+    expect(Schema::hasTable('consents'))->toBeTrue('consents table missing after migration.');
     expect(Schema::hasTable('internal_blocks'))->toBeTrue('internal_blocks table missing after migration.');
     expect(Schema::hasTable('claim_holders'))->toBeTrue(
         'claim_holders missing — tests/database/migrations must be registered for the whole suite.',

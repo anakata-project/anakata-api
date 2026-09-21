@@ -77,6 +77,7 @@ use Illuminate\Support\Collection;
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
  * @property-read Collection<int, Guest> $guests
+ * @property-read Collection<int, Consent> $consents
  * @property-read Collection<int, Payment> $payments
  * @property-read int|null $guests_count
  * @property-read int|null $guests_complete_count
@@ -232,6 +233,14 @@ class Booking extends Model
     public function guests(): HasMany
     {
         return $this->hasMany(Guest::class)->orderBy('position');
+    }
+
+    /**
+     * @return HasMany<Consent, $this>
+     */
+    public function consents(): HasMany
+    {
+        return $this->hasMany(Consent::class);
     }
 
     /**

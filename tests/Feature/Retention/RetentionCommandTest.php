@@ -1,0 +1,179 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\BookingStatus;
+use App\Models\Booking;
+use App\Models\ChangeHistory;
+use App\Models\Guest;
+use App\Support\BusinessTime;
+use App\Support\Retention\RetentionWindow;
+use Carbon\CarbonImmutable;
+use Database\Seeders\ConfigSeeder;
+use Database\Seeders\InventorySeeder;
+use Database\Seeders\RolesSeeder;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Artisan;
+use Tests\Support\Bookings\ReservationFixtures;
+
+beforeEach(function (): void {
+    $this->seed(RolesSeeder::class);
+    $this->seed(InventorySeeder::class);
+    $this->seed(ConfigSeeder::class);
+});
+
+function retentionCabin(string $departureDate): Booking
+{
+    $departure = ReservationFixtures::anamaraDeparture($departureDate);
+
+    return Booking::factory()->create([
+        'departure_id' => $departure->id,
+        'cabin_id' => $departure->yacht->cabins->firstWhere('code', 'S1')?->id,
+        'owner_id' => managerUser()->id,
+        'status' => BookingStatus::Completed,
+    ]);
+}
+
+function retentionGuest(Booking $booking, array $fields = []): Guest
+{
+    return Guest::factory()->create([
+        'booking_id' => $booking->id,
+        'position' => 1,
+        'is_lead' => true,
+        'first_name' => 'Ada',
+        'last_name' => 'Lovelace',
+        'passport_no' => 'C4F7K2L9M',
+        'passport_expiry' => '2035-05-01',
+        'medical_note' => 'penicillin',
+        'dietary_note' => 'no shellfish',
+        'accessibility_note' => 'needs rail',
+        ...$fields,
+    ]);
+}
+
+test('29 February 2028 plus 24 months no-overflow is 28 February 2030', function (): void {
+    $return = CarbonImmutable::parse('2028-02-29');
+
+    expect(RetentionWindow::passportEndsOn($return, 24)->toDateString())->toBe('2030-02-28');
+    expect($return->addMonths(24)->toDateString())->toBe('2030-03-01');
+});
+
+test('passports are purged the day after the 29 February overflow boundary', function (): void {
+    $booking = retentionCabin('2028-02-22');
+    expect($booking->departure->returnDate()->toDateString())->toBe('2028-02-29');
+
+    $guest = retentionGuest($booking, [
+        'medical_note' => null,
+        'dietary_note' => null,
+        'accessibility_note' => null,
+    ]);
+
+    $this->travelTo(CarbonImmutable::parse('2030-02-27 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    $guest->refresh();
+    expect($guest->passport_no)->toBe('C4F7K2L9M');
+
+    $this->travelTo(CarbonImmutable::parse('2030-02-28 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    $guest->refresh();
+    expect($guest->passport_no)->toBe('C4F7K2L9M');
+
+    $this->travelTo(CarbonImmutable::parse('2030-03-01 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    $guest->refresh();
+    expect($guest->passport_no)->toBeNull();
+    expect($guest->passport_expiry)->toBeNull();
+
+    $entry = ChangeHistory::query()->where('event', 'retention.applied')->where('subject_id', $booking->id)->first();
+    expect($entry)->not->toBeNull();
+    expect($entry?->actor_label)->toBe('System');
+    expect($entry?->after['passports_anonymised'] ?? null)->toBe(1);
+    expect(json_encode($entry?->after))->not->toContain('C4F7K2L9M');
+    expect(json_encode($entry?->context))->not->toContain('C4F7K2L9M');
+    expect($entry?->context['what'] ?? null)->toBe(
+        'Retention — passport data anonymised for 1 guests (24 months after the cruise, B4)',
+    );
+});
+
+test('notes are purged the day after the 90-day boundary', function (): void {
+    $booking = retentionCabin('2028-02-22');
+    $guest = retentionGuest($booking, [
+        'passport_no' => null,
+        'passport_expiry' => null,
+    ]);
+
+    $this->travelTo(CarbonImmutable::parse('2028-05-28 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    $guest->refresh();
+    expect($guest->medical_note)->toBe('penicillin');
+
+    $this->travelTo(CarbonImmutable::parse('2028-05-29 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    $guest->refresh();
+    expect($guest->medical_note)->toBe('penicillin');
+
+    $this->travelTo(CarbonImmutable::parse('2028-05-30 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    $guest->refresh();
+    expect($guest->medical_note)->toBeNull();
+    expect($guest->dietary_note)->toBeNull();
+    expect($guest->accessibility_note)->toBeNull();
+
+    $entry = ChangeHistory::query()->where('event', 'retention.applied')->where('subject_id', $booking->id)->first();
+    expect($entry?->after['notes_purged'] ?? null)->toBe(1);
+    expect(json_encode($entry?->after))->not->toContain('penicillin');
+    expect($entry?->context['what'] ?? null)->toBe(
+        'Retention — medical notes purged for 1 guests (90 days after the cruise, B4)',
+    );
+});
+
+test('a second run the same day writes nothing', function (): void {
+    $booking = retentionCabin('2028-02-22');
+    retentionGuest($booking);
+
+    $this->travelTo(CarbonImmutable::parse('2030-03-01 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+    Artisan::call('anakata:retention');
+
+    expect(ChangeHistory::query()->where('event', 'retention.applied')->where('subject_id', $booking->id)->count())->toBe(1);
+});
+
+test('dry-run prints counts and writes nothing', function (): void {
+    $booking = retentionCabin('2028-02-22');
+    $guest = retentionGuest($booking);
+
+    $this->travelTo(CarbonImmutable::parse('2030-03-01 12:00:00', BusinessTime::zone()));
+    $this->artisan('anakata:retention', ['--dry-run' => true])
+        ->assertSuccessful()
+        ->expectsOutputToContain('Would change');
+
+    $guest->refresh();
+    expect($guest->passport_no)->toBe('C4F7K2L9M');
+    expect($guest->medical_note)->toBe('penicillin');
+    expect(ChangeHistory::query()->where('event', 'retention.applied')->count())->toBe(0);
+});
+
+test('a soft-deleted booking is still purged', function (): void {
+    $booking = retentionCabin('2028-02-22');
+    $guest = retentionGuest($booking);
+    $booking->delete();
+
+    $this->travelTo(CarbonImmutable::parse('2030-03-01 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+
+    $guest->refresh();
+    expect($guest->passport_no)->toBeNull();
+    expect(ChangeHistory::query()->where('event', 'retention.applied')->where('subject_id', $booking->id)->exists())->toBeTrue();
+});
+
+test('the retention command is scheduled daily in Galapagos time', function (): void {
+    $events = collect(app(Schedule::class)->events());
+    $event = $events->first(
+        fn ($scheduled): bool => str_contains((string) ($scheduled->command ?? ''), 'anakata:retention'),
+    );
+
+    expect($event)->not->toBeNull();
+    expect($event?->expression)->toBe('0 0 * * *');
+    expect($event?->timezone)->toBe(BusinessTime::zone());
+    expect($event?->withoutOverlapping)->toBeTrue();
+});

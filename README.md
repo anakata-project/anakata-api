@@ -85,6 +85,8 @@ docker compose exec app sh -c "composer require package/name"
 
 Do not run `docker compose exec app sh` on its own (an interactive shell). Composer may print a `safe.directory` warning for `/app`; it is harmless and the command still runs.
 
+`anakata:retention` anonymises passport data and purges medical, dietary and accessibility notes on the published schedule (B4). **Do not run it in production until the client confirms those periods** (sprint 6 README, client question 1). `--dry-run` prints the counts and writes nothing.
+
 ## Tests, lint, static analysis
 
 ```bash

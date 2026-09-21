@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Actions\Consents\RecordConsent;
 use App\Enums\BookingStatus;
 use App\Enums\BookingType;
+use App\Enums\ConsentDocument;
+use App\Enums\ConsentSource;
 use App\Models\Booking;
 use App\Support\Dates\Format;
 use Carbon\CarbonImmutable;
@@ -70,7 +73,7 @@ test('each guest issue is returned with prototype wording', function (): void {
     expect($codes)->toContain('passport_expired');
     expect($codes)->toContain('insurance_undeclared');
     expect($codes)->toContain('children_mismatch');
-    expect($codes)->not->toContain('consents_missing');
+    expect($codes)->toContain('consents_missing');
 
     $messages = collect($response->json('issues'))->pluck('message')->all();
     expect($messages)->toContain('Tiny One is 3 on departure — minimum age is 6 (OPS-004).');
@@ -78,6 +81,9 @@ test('each guest issue is returned with prototype wording', function (): void {
     expect($messages)->toContain("Tiny One's passport expires before the return date ({$return}).");
     expect($messages)->toContain('Tiny One has no travel-insurance declaration (OPS-005).');
     expect($messages)->toContain('Guests aged 6–17: 1 · priced as children: 0 — check the quote.');
+    expect($messages)->toContain(
+        'Missing consent records: Terms & Conditions, Cancellation policy, Privacy policy, Travel insurance declaration.',
+    );
 });
 
 test('a minor today who turns 18 before departure still needs guardian consent', function (): void {
@@ -126,6 +132,7 @@ test('insurance is not warned on a pending payment booking', function (): void {
         ->json('issues'))->pluck('code');
 
     expect($codes)->not->toContain('insurance_undeclared');
+    expect($codes)->not->toContain('consents_missing');
 });
 
 test('children mismatch is not raised on a charter', function (): void {
@@ -155,4 +162,30 @@ test('children mismatch is not raised on a charter', function (): void {
         ->json('issues'))->pluck('code');
 
     expect($codes)->not->toContain('children_mismatch');
+});
+
+test('missing marketing is never a consent warning and an outdated version still counts', function (): void {
+    $booking = issuesCabin();
+    $actor = $booking->owner;
+
+    foreach ([
+        ConsentDocument::Terms,
+        ConsentDocument::Cancellation,
+        ConsentDocument::Privacy,
+        ConsentDocument::Insurance,
+    ] as $document) {
+        app(RecordConsent::class)->handle(
+            $booking,
+            $document,
+            ConsentSource::PaymentLink,
+            ip: '73.1.41.9',
+            version: 'old',
+        );
+    }
+
+    $codes = collect($this->actingAs($actor)
+        ->getJson('/api/rms/bookings/'.$booking->id.'/guests')
+        ->json('issues'))->pluck('code');
+
+    expect($codes)->not->toContain('consents_missing');
 });

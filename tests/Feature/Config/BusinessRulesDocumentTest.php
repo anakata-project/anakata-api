@@ -78,6 +78,32 @@ test('rules reject ranges, default above cap, reminder order and band shape', fu
     expect($errors->has('cancellation.bands'))->toBeTrue();
 });
 
+test('rules reject empty consent version labels', function (): void {
+    $document = businessRulesDocument([
+        'legal' => [
+            'consent_versions' => [
+                'terms' => '',
+                'marketing' => '',
+            ],
+        ],
+    ]);
+
+    $errors = Validator::make($document, BusinessRulesDocument::rules())->errors();
+
+    expect($errors->has('legal.consent_versions.terms'))->toBeTrue();
+    expect($errors->has('legal.consent_versions.marketing'))->toBeTrue();
+});
+
+test('fromArray fills missing consent versions as empty strings', function (): void {
+    $missing = BusinessRulesDocument::initial();
+    unset($missing['legal']);
+
+    $lenient = BusinessRulesDocument::fromArray($missing);
+
+    expect($lenient->consentVersions->terms)->toBe('');
+    expect($lenient->consentVersions->marketing)->toBe('');
+});
+
 test('rules reject duplicate band days and a missing zero band', function (): void {
     $document = businessRulesDocument();
     $document['cancellation']['bands'] = [

@@ -7,6 +7,7 @@ use App\Http\Controllers\Rms\BookingController;
 use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\CalendarController;
 use App\Http\Controllers\Rms\CommissionController;
+use App\Http\Controllers\Rms\ConsentController;
 use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
@@ -117,6 +118,8 @@ Route::post('bookings/{booking}/payments', [PaymentController::class, 'store'])-
 Route::post('bookings/{booking}/payment-link', [PaymentLinkController::class, 'store'])->whereNumber('booking');
 Route::get('bookings/{booking}/guests', [GuestController::class, 'index'])->whereNumber('booking');
 Route::post('bookings/{booking}/guests', [GuestController::class, 'store'])->whereNumber('booking');
+Route::get('bookings/{booking}/consents', [ConsentController::class, 'index'])->whereNumber('booking');
+Route::post('bookings/{booking}/consents', [ConsentController::class, 'store'])->whereNumber('booking');
 Route::patch('guests/{guest}', [GuestController::class, 'update'])->whereNumber('guest');
 Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->whereNumber('guest');
 

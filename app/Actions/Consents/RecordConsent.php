@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Consents;
+
+use App\Actions\Action;
+use App\Enums\ConsentDocument;
+use App\Enums\ConsentSource;
+use App\Models\Booking;
+use App\Models\Consent;
+use App\Models\User;
+use App\Services\Config\CurrentConfig;
+use App\Support\History\History;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
+
+final class RecordConsent extends Action
+{
+    public function __construct(private readonly CurrentConfig $config) {}
+
+    public function handle(
+        Booking $booking,
+        ConsentDocument $document,
+        ConsentSource $source,
+        ?string $howObtained = null,
+        ?string $ip = null,
+        ?CarbonInterface $acceptedAt = null,
+        ?string $version = null,
+        ?User $actor = null,
+    ): Consent {
+        if ($source === ConsentSource::Staff && ($howObtained === null || $howObtained === '')) {
+            throw ValidationException::withMessages([
+                'how_obtained' => ['How the consent was obtained is required when recording it as staff.'],
+            ]);
+        }
+
+        $version ??= $this->config->businessRules()->consentVersions->for($document);
+
+        return $this->transaction(function () use (
+            $booking,
+            $document,
+            $source,
+            $howObtained,
+            $ip,
+            $acceptedAt,
+            $version,
+            $actor,
+        ): Consent {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+            $latest = Consent::query()
+                ->where('booking_id', $locked->id)
+                ->where('document', $document)
+                ->orderByDesc('id')
+                ->first();
+
+            if (
+                $latest instanceof Consent
+                && ! $latest->withdrawn
+                && $latest->version === $version
+            ) {
+                return $latest;
+            }
+
+            $consent = new Consent;
+            $consent->booking_id = $locked->id;
+            $consent->document = $document;
+            $consent->version = $version;
+            $consent->accepted_at = $acceptedAt instanceof CarbonInterface
+                ? Carbon::parse($acceptedAt)
+                : now();
+            $consent->ip = $source === ConsentSource::Staff ? null : $ip;
+            $consent->source = $source;
+            $consent->recorded_by = $source === ConsentSource::Staff && $actor instanceof User
+                ? $actor->id
+                : null;
+            $consent->how_obtained = $source === ConsentSource::Staff ? $howObtained : null;
+            $consent->withdrawn = false;
+            $consent->save();
+
+            History::record($locked, 'consent.recorded', after: [
+                'document' => $document->value,
+                'version' => $version,
+                'source' => $source->value,
+            ], reason: $source === ConsentSource::Staff ? $howObtained : null, actor: $actor, extraContext: [
+                'what' => 'Consent recorded — '.$document->label(),
+            ]);
+
+            return $consent;
+        });
+    }
+}

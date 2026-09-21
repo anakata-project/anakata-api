@@ -14,6 +14,7 @@ use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
+use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\EngineSettingsVersion;
@@ -136,6 +137,7 @@ class AppServiceProvider extends ServiceProvider
             'agency' => Agency::class,
             'booking' => Booking::class,
             'guest' => Guest::class,
+            'consent' => Consent::class,
             'booking_request' => BookingRequest::class,
             'waitlist_entry' => WaitlistEntry::class,
             'payment' => Payment::class,

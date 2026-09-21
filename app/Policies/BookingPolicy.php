@@ -117,6 +117,13 @@ final class BookingPolicy extends Policy
         return $actor->hasPermission(Permission::BookingsViewAll);
     }
 
+    public function recordConsent(User $actor, Booking $booking): Response
+    {
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
     public function updateGuests(User $actor, Booking $booking): Response
     {
         if (! $this->ownsOrMayActOnAny($actor, $booking)) {

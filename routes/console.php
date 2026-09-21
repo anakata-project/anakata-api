@@ -17,3 +17,8 @@ Schedule::command('anakata:flag-overdue')
     ->daily()
     ->timezone(BusinessTime::zone())
     ->withoutOverlapping();
+
+Schedule::command('anakata:retention')
+    ->daily()
+    ->timezone(BusinessTime::zone())
+    ->withoutOverlapping();

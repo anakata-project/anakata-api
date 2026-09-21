@@ -25,6 +25,7 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly ManifestsRules $manifests,
         public readonly AlertsRules $alerts,
         public readonly RetentionRules $retention,
+        public readonly ConsentVersions $consentVersions,
         public readonly array $bands,
     ) {}
 
@@ -77,6 +78,15 @@ final class BusinessRulesDocument extends ConfigDocument
                 'passport_months_after_cruise' => 24,
                 'medical_days_after_cruise' => 90,
             ],
+            'legal' => [
+                'consent_versions' => [
+                    'terms' => 'v2026.1 (text pending LEG-001)',
+                    'cancellation' => 'v2026.1 (pending LEG-001)',
+                    'privacy' => 'v2026.1 (pending LEG-002)',
+                    'insurance' => 'OPS-005 v1',
+                    'marketing' => 'v1',
+                ],
+            ],
             'cancellation' => [
                 'bands' => [
                     ['min_days' => 120, 'penalty_pct' => 5],
@@ -100,6 +110,8 @@ final class BusinessRulesDocument extends ConfigDocument
         $manifests = is_array($data['manifests'] ?? null) ? $data['manifests'] : [];
         $alerts = is_array($data['alerts'] ?? null) ? $data['alerts'] : [];
         $retention = is_array($data['retention'] ?? null) ? $data['retention'] : [];
+        $legal = is_array($data['legal'] ?? null) ? $data['legal'] : [];
+        $consentVersions = is_array($legal['consent_versions'] ?? null) ? $legal['consent_versions'] : [];
         $cancellation = is_array($data['cancellation'] ?? null) ? $data['cancellation'] : [];
 
         $reminders = [];
@@ -170,6 +182,13 @@ final class BusinessRulesDocument extends ConfigDocument
                 (int) ($retention['passport_months_after_cruise'] ?? 0),
                 (int) ($retention['medical_days_after_cruise'] ?? 0),
             ),
+            new ConsentVersions(
+                is_string($consentVersions['terms'] ?? null) ? $consentVersions['terms'] : '',
+                is_string($consentVersions['cancellation'] ?? null) ? $consentVersions['cancellation'] : '',
+                is_string($consentVersions['privacy'] ?? null) ? $consentVersions['privacy'] : '',
+                is_string($consentVersions['insurance'] ?? null) ? $consentVersions['insurance'] : '',
+                is_string($consentVersions['marketing'] ?? null) ? $consentVersions['marketing'] : '',
+            ),
             $bands,
         );
     }
@@ -185,6 +204,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     manifests: array{dpng_fit_days: int, dpng_charter_days: int},
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
      *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int},
+     *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string}},
      *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
      * }
      */
@@ -200,6 +220,9 @@ final class BusinessRulesDocument extends ConfigDocument
             'manifests' => $this->manifests->toArray(),
             'alerts' => $this->alerts->toArray(),
             'retention' => $this->retention->toArray(),
+            'legal' => [
+                'consent_versions' => $this->consentVersions->toArray(),
+            ],
             'cancellation' => [
                 'bands' => array_map(
                     fn (CancellationBand $band): array => $band->toArray(),
@@ -253,6 +276,13 @@ final class BusinessRulesDocument extends ConfigDocument
             'retention' => ['required', 'array'],
             'retention.passport_months_after_cruise' => ['required', 'integer', 'min:1', 'max:120'],
             'retention.medical_days_after_cruise' => ['required', 'integer', 'min:1', 'max:3650'],
+            'legal' => ['required', 'array'],
+            'legal.consent_versions' => ['required', 'array'],
+            'legal.consent_versions.terms' => ['required', 'string', 'min:1', 'max:120'],
+            'legal.consent_versions.cancellation' => ['required', 'string', 'min:1', 'max:120'],
+            'legal.consent_versions.privacy' => ['required', 'string', 'min:1', 'max:120'],
+            'legal.consent_versions.insurance' => ['required', 'string', 'min:1', 'max:120'],
+            'legal.consent_versions.marketing' => ['required', 'string', 'min:1', 'max:120'],
             'cancellation' => ['required', 'array'],
             'cancellation.bands' => ['required', 'array', 'min:1', 'max:6', new BusinessRulesConstraint('bands')],
             'cancellation.bands.*.min_days' => ['required', 'integer', 'min:0', 'max:999'],
@@ -293,6 +323,11 @@ final class BusinessRulesDocument extends ConfigDocument
             'alerts.low_occupancy_days_before' => '§10 · Low-occupancy alert',
             'retention.passport_months_after_cruise' => '§6.4 · Passport retention',
             'retention.medical_days_after_cruise' => 'LEG-002 · Medical notes retention',
+            'legal.consent_versions.terms' => 'LEG-001 · Terms & Conditions version',
+            'legal.consent_versions.cancellation' => 'LEG-001 · Cancellation policy version',
+            'legal.consent_versions.privacy' => 'LEG-002 · Privacy policy version',
+            'legal.consent_versions.insurance' => 'OPS-005 · Travel insurance declaration version',
+            'legal.consent_versions.marketing' => 'LEG-002 · Marketing consent version',
             'cancellation.bands' => '§4.1.5 · Cabin cancellation penalty bands',
         ];
     }
@@ -391,6 +426,11 @@ final class BusinessRulesDocument extends ConfigDocument
             'alerts.low_occupancy_pct', 'alerts.low_occupancy_days_before' => '40% at 90 days',
             'retention.passport_months_after_cruise' => '24 months',
             'retention.medical_days_after_cruise' => '90 days',
+            'legal.consent_versions.terms' => 'v2026.1 (text pending LEG-001)',
+            'legal.consent_versions.cancellation' => 'v2026.1 (pending LEG-001)',
+            'legal.consent_versions.privacy' => 'v2026.1 (pending LEG-002)',
+            'legal.consent_versions.insurance' => 'OPS-005 v1',
+            'legal.consent_versions.marketing' => 'v1',
             'cancellation.bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100%',
             default => $path,
         };

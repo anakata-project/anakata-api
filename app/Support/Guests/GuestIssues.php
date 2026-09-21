@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Support\Guests;
 
-use App\Enums\BookingStatus;
 use App\Enums\BookingType;
+use App\Enums\ConsentDocument;
 use App\Enums\PngCategory;
 use App\Models\Booking;
+use App\Models\Consent;
 use App\Models\Guest;
 use App\Services\Config\CurrentConfig;
 use App\Support\Dates\Format;
@@ -21,7 +22,7 @@ final class GuestIssues
      */
     public function for(Booking $booking): array
     {
-        $booking->loadMissing(['departure', 'guests']);
+        $booking->loadMissing(['departure', 'guests', 'consents']);
         $settings = $this->config->engineSettings()->guests;
         $departure = $booking->departure->date;
         $returnDate = $booking->departure->returnDate();
@@ -58,7 +59,7 @@ final class GuestIssues
                 );
             }
 
-            if ($guest->first_name !== '' && ! $guest->insurance_declared && $this->isConfirmedOrLater($booking)) {
+            if ($guest->first_name !== '' && ! $guest->insurance_declared && $booking->status->isConfirmedOrLater()) {
                 $issues[] = $this->issue(
                     'warning',
                     'insurance_undeclared',
@@ -93,6 +94,34 @@ final class GuestIssues
             }
         }
 
+        if ($booking->status->isConfirmedOrLater()) {
+            $accepted = $booking->consents
+                ->filter(fn (Consent $consent): bool => ! $consent->withdrawn)
+                ->groupBy(fn (Consent $consent): string => $consent->document->value)
+                ->map(fn ($rows): ?Consent => $rows->sortByDesc('id')->first());
+
+            $missing = [];
+
+            foreach (ConsentDocument::cases() as $document) {
+                if (! $document->required()) {
+                    continue;
+                }
+
+                if (! $accepted->get($document->value) instanceof Consent) {
+                    $missing[] = $document->label();
+                }
+            }
+
+            if ($missing !== []) {
+                $issues[] = $this->issue(
+                    'warning',
+                    'consents_missing',
+                    null,
+                    'Missing consent records: '.implode(', ', $missing).'.',
+                );
+            }
+        }
+
         return $issues;
     }
 
@@ -112,17 +141,6 @@ final class GuestIssues
                 ->filter(fn (Guest $guest): bool => $guest->png_category === PngCategory::Pending)
                 ->count(),
         ];
-    }
-
-    private function isConfirmedOrLater(Booking $booking): bool
-    {
-        return in_array($booking->status, [
-            BookingStatus::Confirmed,
-            BookingStatus::FullyPaid,
-            BookingStatus::OnBoard,
-            BookingStatus::Completed,
-            BookingStatus::Overdue,
-        ], true);
     }
 
     /**

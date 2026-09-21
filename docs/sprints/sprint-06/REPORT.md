@@ -185,3 +185,97 @@ Add booking guests with PNG categories, issues, and guardian consent.
 EOF
 )"
 ```
+
+## Task 03 · The consent log and the retention jobs
+
+### Shape change and registry counts
+`legal.consent_versions` is on the business-rules document: `terms`, `cancellation`, `privacy`, `insurance`, `marketing`. Defaults are the prototype `CONSENT_VER` labels (text still PENDING CLIENT — LEG-001 / LEG-002 / OPS-005). `fromArray()` fills a missing key as `""`.
+
+DML-only migration `2026_09_21_200035_add_consent_versions_to_business_rules` publishes v2 as System when any of the five keys is missing, merging only those keys. Approval reference: `Sprint 6: legal.consent_versions added (defaults from prototype CONSENT_VER, sources LEG-001 / LEG-002 / OPS-005)`. Fresh installs stay on v1 via `initial()`. `anakata:config-verify` fails on a pre-change document and passes after.
+
+Registry: five new `here` rows in group **Legal documents**, status `PENDING CLIENT`. Fresh-seed totals:
+
+- all **55** · here **30** · other_pages **15** · locked **10** · differs_or_flagged **16**
+- Flagged: 15 pending-status rows + OPS-006
+
+BR-01 and `tests/e2e/fixtures/reference-values.md` moved with those numbers.
+
+### Consent table — append-only
+`consents`: `booking_id` (restrict), `document` (`TERMS · CANCELLATION · PRIVACY · INSURANCE · MARKETING`), `version`, `accepted_at`, `ip` (nullable), `source` (`ENGINE · PAYMENT_LINK · STAFF`), `recorded_by`, `how_obtained`, `withdrawn` (default false, for Sprint 9), timestamps + audit.
+
+Triggers refuse every `UPDATE` and `DELETE` (`consents is append-only`), same discipline as `change_history`. There is **no unique key**. A unique accepted `(booking, document, version)` would permanently block accept → withdraw → re-accept of v1, and the table cannot be patched later.
+
+“Already consented” is the latest row: `RecordConsent` `lockForUpdate`s **only the booking** (no departure, no H10 conflict), reads the latest consent for `(booking, document)`, and no-ops if that row is a non-withdrawn accept of the same version. Otherwise it inserts. Accept → same version again is a no-op. Accept → withdrawal (inserted in the test) → re-accept of v1 inserts a new row. Two concurrent staff posts produce one row (1205, never 1213).
+
+Consents are outside the retention job (seven years, I6). Morph alias `consent`.
+
+### `outdated` and LEG-002
+`GET /api/rms/bookings/{booking}/consents` returns one row per document: current version from the published rules, latest **accepted** consent (withdrawn rows ignored) or `null`, `required`, `outdated`.
+
+`outdated: true` when an accepted row’s version is not the current label. It still **counts** as present — missing-consents does not fire. Whether staff must re-capture an outdated version is a legal question for **LEG-002**, not decided here.
+
+### `RecordConsent` is the only write
+Staff `POST /api/rms/bookings/{booking}/consents` `{ document, how_obtained }` — own-records, current version, `source = STAFF`, `ip` null, history `consent.recorded` (`Consent recorded — {label}`, reason = how obtained). Sprints 7 and 8 call the same action with `PAYMENT_LINK` / `ENGINE` and an IP. Nothing is pre-checked.
+
+### Missing-consents issue
+On CONFIRMED or later, one warning: `Missing consent records: Privacy policy, ….` Marketing is never required. Pending-payment / requested stay silent. Task 02’s placeholder is filled (`consents_missing`).
+
+### Retention
+`anakata:retention`, `daily()` in `Pacific/Galapagos`, `withoutOverlapping()`. Chunks `Booking::withTrashed()` whose guests still have a non-null `passport_no`, `passport_expiry`, or note — not every booking.
+
+Values from the published rules only. Calendar math on Galápagos dates vs `Departure::returnDate()`:
+
+- Passports when today is **after** `returnDate->addMonthsNoOverflow(months)`. 29 February 2028 + 24 months → purge boundary **28 February 2030** (`addMonths` would give 1 March 2030). Day before / on the boundary: no; day after: yes.
+- Notes when today is after `returnDate + days`.
+
+One System history entry per booking that actually changed: counts only, no values. `--dry-run` prints the counts and writes nothing. A second run the same day writes nothing. Soft-deleted bookings are included.
+
+**B4 must be confirmed before this runs in production** (sprint README client question 1). The API README now says so.
+
+### Seed
+`DemoConsentsSeeder` (local/testing) calls `RecordConsent`. Confirmed demo bookings get the four required docs from the payment-link seed (02 Jul 2026, 14:05 GALT, a stable IP). Marketing too, except ANK-2026-0007. PENDING_PAYMENT / REQUESTED get none. Versions come from the published document.
+
+### Checks
+`composer check` inside Docker — 718 Pest tests (4753 assertions), Pint (715 files), Larastan level 6 (0 errors).
+
+### Git (do not run)
+
+```bash
+git add README.md
+git add app/Enums/BookingStatus.php app/Enums/RuleGroup.php
+git add app/Enums/ConsentDocument.php app/Enums/ConsentSource.php
+git add app/Models/Booking.php app/Models/Consent.php
+git add app/Policies/BookingPolicy.php
+git add app/Providers/AppServiceProvider.php
+git add app/Support/BusinessRules/Registry.php
+git add app/Support/Config/Documents/BusinessRulesDocument.php
+git add app/Support/Config/Documents/ConsentVersions.php
+git add app/Support/Guests/GuestIssues.php
+git add app/Support/Consents app/Support/Retention
+git add app/Actions/Consents
+git add app/Console/Commands/RetentionCommand.php
+git add app/Http/Controllers/Rms/ConsentController.php
+git add app/Http/Requests/Rms/RecordConsentRequest.php
+git add app/Http/Resources/Rms/BookingConsentResource.php
+git add app/Http/Resources/Rms/ConsentResource.php
+git add database/factories/ConsentFactory.php
+git add database/migrations/2026_09_21_200035_add_consent_versions_to_business_rules.php
+git add database/migrations/2026_09_21_200036_create_consents_table.php
+git add database/seeders/DemoConsentsSeeder.php database/seeders/DatabaseSeeder.php
+git add routes/api/rms.php routes/console.php
+git add tests/Feature/Config/AddConsentVersionsMigrationTest.php
+git add tests/Feature/Config/BusinessRulesDocumentTest.php
+git add tests/Feature/Config/BusinessRulesEndpointsTest.php
+git add tests/Feature/Database/DatabaseSetupTest.php
+git add tests/Feature/Guests/GuestIssuesTest.php
+git add tests/Feature/Consents tests/Feature/Retention
+git add tests/Concurrency/ConsentWriteConcurrencyTest.php
+git add tests/e2e/fixtures/reference-values.md
+git add tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the append-only consent log and guest-data retention jobs.
+
+EOF
+)"
+```

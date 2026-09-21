@@ -68,6 +68,7 @@ final class Registry
                 data_get($initial, 'retention.medical_days_after_cruise'),
                 'Guests tab, retention jobs',
             ),
+            ...self::legalRows($initial),
             ...self::lockedRows(),
         ];
     }
@@ -262,6 +263,11 @@ final class Registry
             'low-occupancy-alert' => data_get($document, 'alerts.low_occupancy_pct').'% / '.data_get($document, 'alerts.low_occupancy_days_before').' days',
             'retention-passport' => data_get($document, 'retention.passport_months_after_cruise').' months',
             'retention-medical' => data_get($document, 'retention.medical_days_after_cruise').' days',
+            'consent-terms' => (string) data_get($document, 'legal.consent_versions.terms'),
+            'consent-cancellation' => (string) data_get($document, 'legal.consent_versions.cancellation'),
+            'consent-privacy' => (string) data_get($document, 'legal.consent_versions.privacy'),
+            'consent-insurance' => (string) data_get($document, 'legal.consent_versions.insurance'),
+            'consent-marketing' => (string) data_get($document, 'legal.consent_versions.marketing'),
             'cancellation-bands' => self::bandDisplay(data_get($document, 'cancellation.bands') ?? []),
             default => $definition->sourceDisplay,
         };
@@ -975,6 +981,73 @@ final class Registry
                 'Engine calendar',
                 note: 'Anakata 12 Sep 2026: keep OPS-006 — sales open 1 Nov 2026, first cruise 7 Nov 2027. The rest of the 2027 itinerary calendar is still pending (PRO-001).',
                 link: self::LINK_DEPARTURES,
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $initial
+     * @return list<RuleDefinition>
+     */
+    private static function legalRows(array $initial): array
+    {
+        $group = RuleGroup::Legal;
+
+        return [
+            self::here(
+                'consent-terms',
+                $group,
+                'LEG-001',
+                'Terms & Conditions version',
+                RuleStatus::PendingClient,
+                ['legal.consent_versions.terms'],
+                BusinessRulesDocument::sourceDisplay('legal.consent_versions.terms'),
+                data_get($initial, 'legal.consent_versions.terms'),
+                'Guests tab, consent log',
+            ),
+            self::here(
+                'consent-cancellation',
+                $group,
+                'LEG-001',
+                'Cancellation policy version',
+                RuleStatus::PendingClient,
+                ['legal.consent_versions.cancellation'],
+                BusinessRulesDocument::sourceDisplay('legal.consent_versions.cancellation'),
+                data_get($initial, 'legal.consent_versions.cancellation'),
+                'Guests tab, consent log',
+            ),
+            self::here(
+                'consent-privacy',
+                $group,
+                'LEG-002',
+                'Privacy policy version',
+                RuleStatus::PendingClient,
+                ['legal.consent_versions.privacy'],
+                BusinessRulesDocument::sourceDisplay('legal.consent_versions.privacy'),
+                data_get($initial, 'legal.consent_versions.privacy'),
+                'Guests tab, consent log',
+            ),
+            self::here(
+                'consent-insurance',
+                $group,
+                'OPS-005',
+                'Travel insurance declaration version',
+                RuleStatus::PendingClient,
+                ['legal.consent_versions.insurance'],
+                BusinessRulesDocument::sourceDisplay('legal.consent_versions.insurance'),
+                data_get($initial, 'legal.consent_versions.insurance'),
+                'Guests tab, consent log',
+            ),
+            self::here(
+                'consent-marketing',
+                $group,
+                'LEG-002',
+                'Marketing consent version',
+                RuleStatus::PendingClient,
+                ['legal.consent_versions.marketing'],
+                BusinessRulesDocument::sourceDisplay('legal.consent_versions.marketing'),
+                data_get($initial, 'legal.consent_versions.marketing'),
+                'Guests tab, consent log',
             ),
         ];
     }
