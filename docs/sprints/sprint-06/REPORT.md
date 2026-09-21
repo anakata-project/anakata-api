@@ -1173,3 +1173,100 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 09 · Contacts In
+
+### What was built
+The Contacts In placeholder at `/rms/commercial/contacts-in` is a real RMS page. One `DateRangeFilter` on the booking departure date (noun: contacts) drives both fetches. The prototype CRM notice sits above two stacked `.panel`s. Row click loads `GET /api/rms/bookings/{id}` and opens the existing `BookingPanel`. `@updated` refreshes both sources.
+
+Types already existed on layer `v0.7.1` (`ContactInRow`, `NationalityRow`, `NationalitiesSummary`). Re-exported from `app/types/api.ts`. No API changes.
+
+### The two sources
+`GET /api/rms/contacts-in?from&to&page&per_page=50` — paginated `ContactInRow`. Columns: contact + TRAVEL ADVISOR pill when `travel_advisor`, segment pill, source (`channel_of_origin` only), booking `display_reference`, status pill, **Value = `charges_total`** (not the cruise `total`), owner + 🔒 when `can_act` is false.
+
+`GET /api/rms/contacts-in/nationalities?from&to` — `NationalitiesSummary`. Country name from the API, guests, bookings, and a proportional bar. `nationalityBarWidth(count, max)` is presentation only (`Math.round(count / max * 100)`, `0` when `max <= 0`).
+
+### `slots_not_filled`
+`NationalitiesSummary` is `{ nationalities, unknown, total_guests }` only. There is **no** `slots_not_filled`. Task 05 dropped unnamed padded slots (`Guest::scopeNamed`); they are not in `unknown` or `total_guests`. The footnote is the unknown-nationality line only.
+
+### Navigation
+The nav item already existed (`sprint: 6`). Gated on `panel.rms` (explicit RMS view, not `bookings.view_all`). Guards test: visible with `panel.rms`; without it, `pageDecision` sends the user to the RMS home.
+
+### Browser (both themes, after `reset.sh` on `anakata-api`)
+Carolina on `/rms/commercial/contacts-in`, All dates: **14 contacts**. Seeded mix includes Harrison & Whitfield (`ANK-2026-0003`), Brandt (`ANK-2026-0005`), L. Moreau with the TRAVEL ADVISOR pill (`ANK-R-2026-0042`), Vandermeer Charter (`ANK-2026-0012`). Nationalities: AR 4 / US 4 / FR 3 / DE 3 / EC 2 / SE 2 / GB 2 / CO 1 / NL 1; bars 100 · 100 · 75 · 75 · 50 · 50 · 50 · 25 · 25; “0 guests without nationality yet.” Year 2026 empties **both** panels; Year 2027 restores the 14. A row opens the booking panel (`ANK-2026-0003`). Light theme matches dark. Seeded Lucía still has `bookings.view_all`, so 🔒 was not visible on her rows as Admin.
+
+### Deviations
+- Task file still says fresh-clone against `v0.7.0`; this task uses **`v0.7.1`** (task 07 bump).
+- Source cell is `channel_of_origin` only. Prototype ` · VIA {preferred_channel}` is omitted — `ContactInResource` does not send it.
+- Prototype `CAN` / `NATIONAL` pills omitted (would hard-code PNG nationality sets).
+
+### Open questions
+None.
+
+### Notes for later
+- E2E Contacts In coverage (task 10, if a scenario is added).
+- Sprint 9 CRM profiles.
+
+### Quality
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (215), `build` — pass.
+
+### Fresh clone (two-step, git read-only)
+
+**Step 1 — overlay (agent, before push).** Sibling trees into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` from the working copies. Confirmed the ui tree is **0.7.1** and has **no** `app/types/nuxt.d.ts`.
+
+- ui: `pnpm typecheck` pass
+- panel / engine: `pnpm typecheck` + `pnpm build` pass
+- **OVERLAY CLONE OK**
+
+**Step 2 — real tag (user, or agent in a follow-up).** After this panel work is pushed, repeat the clone checking out `anakata-ui` at `v0.7.1` with **no** overlay. Result not recorded yet.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/rms/commercial/contacts-in.vue \
+  app/components/contacts/contactHelpers.ts \
+  tests/unit/contactHelpers.test.ts \
+  tests/unit/guards.test.ts \
+  app/navigation/rms.ts \
+  app/types/api.ts \
+  app/assets/css/lists.css \
+  i18n/locales/en.json \
+  eslint.config.mjs
+git commit -m "$(cat <<'EOF'
+Add the RMS Contacts In list and nationality bars.
+
+The page reads the two Contacts In endpoints and draws bar
+widths in the panel only; empty guest slots stay dropped.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 2. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 6 task 09: panel Contacts In.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 3. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.7.1
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+
