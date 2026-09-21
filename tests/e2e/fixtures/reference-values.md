@@ -220,8 +220,52 @@ Conflict when a cabin already has a booking claim: `{cabin} on {j M Y} · {YACHT
 | ANK-2026-0017 | 28 Nov 2027 ANAMARA | Suite 06 | CONFIRMED | 26,600 | Mateo | D2C | S. & T. Ruiz · GRP-007 |
 | ANK-2026-0019 | 28 Nov 2027 ANAMARA | Suite 07 | CONFIRMED | 26,600 | Mateo | D2C | D. & A. Pereyra · GRP-007 |
 | ANK-2026-0018 | 12 Dec 2027 ANAMARA | Suite 02 | CONFIRMED (seed OVERDUE) | 26,600 | Lucía | D2C | A. Fontaine |
+| ANK-2026-0021 | 14 Nov 2027 ANAMARA (DEP-003) | Suite 01 | ON_HOLD_AGENCY | 26,600 | Carolina | B2B | Meridian Voyages hold |
 
-GRP-007: `Alvear family & friends`, coordinator Lorena Alvear, 28 Nov 2027 ANAMARA. Next draws after a fresh seed (`ensureAtLeast` + Pest): `ANK-2026-0020`, `GRP-008`, `ANK-R-2026-0043`.
+GRP-007: `Alvear family & friends`, coordinator Lorena Alvear, 28 Nov 2027 ANAMARA. Next draws after a fresh seed (`ensureAtLeast` after agencies + Pest): `ANK-2026-0022`, `GRP-008`, `ANK-R-2026-0043`.
+
+### Seeded money (Sprint 5)
+
+Read on the Bookings list and Payments & Revenue after `reset.sh` on 2026-09-21 (Galápagos month 2026-09). Every deposit is `Rounding::halfUp(total × frozen deposit_pct)` — cabin 10 %, charter 20 %. Balance on the list is `total − settled` (H2). AWAITING_WIRE does not count as paid (H6).
+
+| Reference | Status on list | Total | Deposit | Settled | Pledged | Balance | Ledger rows (Payments & Revenue) |
+|---|---|---|---|---|---|---|---|
+| ANK-2026-0003 | CONFIRMED | USD 26,600 | 2,660 (10 %) | 2,660 | 0 | USD 23,940 | `ANK-2026-0003-D01` Card (Stripe) SETTLED 2 Jul 2026 |
+| ANK-2026-0005 | FULLY PAID | USD 37,905 | 3,791 (10 %) | 37,905 | 0 | USD 0 | `…-D01` 3,791 + `…-B01` 34,114 Card (Stripe) SETTLED |
+| ANK-2026-0007 | CONFIRMED | USD 23,275 | **2,328** (10 % of 23,275, not the seed-data literal 2,327) | 2,328 | 0 | USD 20,947 | `ANK-2026-0007-D01` Wire transfer SETTLED |
+| ANK-2026-0009 | CONFIRMED | USD 50,000 | 5,000 (10 %) | 5,000 | 0 | USD 45,000 | `ANK-2026-0009-D01` Stripe payment link SETTLED |
+| ANK-2026-0011 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `ANK-2026-0011-D01` Card (Stripe) SETTLED |
+| ANK-2026-0012 | CONFIRMED | USD 211,500 | 42,300 (20 %) | 42,300 | 0 | USD 169,200 | `ANK-2026-0012-D01` Wire transfer SETTLED |
+| ANK-2026-0014 | PENDING PAYMENT | USD 26,600 | 2,660 | **0** | **2,660** awaiting wire | USD 26,600 | `ANK-2026-0014-D01` Wire transfer · Mark received |
+| ANK-2026-0016 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `…-D01` Wire transfer SETTLED · GRP-007 |
+| ANK-2026-0017 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `…-D01` Wire transfer SETTLED · GRP-007 |
+| ANK-2026-0019 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `…-D01` Wire transfer SETTLED · GRP-007 |
+| ANK-2026-0018 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `…-D01` Card (Stripe) SETTLED. **Not OVERDUE after reset.** Due 14 Aug 2027. Run `php artisan anakata:set-overdue-fixture` (not in `reset.sh`) for PAY-08. |
+| ANK-2026-0021 | ON HOLD AGENCY | USD 26,600 | 2,660 (no row) | 0 | 0 | USD 26,600 | No ledger. Meridian Voyages 15 % above the 12 % cap. |
+| ANK-R-2026-0041 | REQUESTED | USD 26,600 | — | 0 | 0 | USD 26,600 | No ledger |
+| ANK-R-2026-0042 | REQUESTED | USD 37,905 | — | 0 | 0 | USD 37,905 | No ledger |
+
+GRP-007 panel after reset: `Alvear family & friends` · `coordinator Lorena Alvear` · `3 cabins · 6 guests` · Total USD 79,800 · Balance USD 71,820 · CONFIRMED.
+
+Payments & Revenue KPIs after reset (All dates): Collected USD 103,493 · Of which deposits USD 69,379 (`10% cabins · 20% charter`) · Pending USD 431,987 (`11 payments · due at T−120 per booking`) · Overdue USD 0 · Commission accrued USD 2,328 (`payable 30 days post-cruise`). Date-range line `12 payments · all dates`.
+
+Pending row for 0014: due column `72h wire window` (not a T−120 date). Other pending rows show the balance due date.
+
+Reconciliation after reset, current Galápagos month (`2026-09-01 – 2026-09-30`): Gateway 2 · Matched 1 (`ch_seed_0005_d01` / ANK-2026-0005-D01) · Discrepancies 1. Unmatched row: `CH_UNMATCHED` · 19 Sep 2026 · USD 2,660 · description `Unmatched gateway charge` · **Apply to booking**. Stripe line: `Stripe test mode`. Fixture dates are `created_days_ago` (matched 2, unmatched 1) computed at read time.
+
+### Seeded agencies (Sprint 5)
+
+Read on B2B & Agent Portal after the same reset. Date-range line `2 partners · all dates`.
+
+| Id | Screen | Network · country | Commission | Status | Bookings / revenue / accrued |
+|---|---|---|---|---|---|
+| AG-001 | Blue Latitude Travel — S. Ferreira | Virtuoso | 10 % | APPROVED | 1 · USD 23,275 · USD 2,328 (ANK-2026-0007) |
+| AG-002 | Meridian Voyages — T. Nakamura | ILTM | 15 % `>12% BLOCKED` | APPROVED | `0 + 1 held` · USD 26,600 · `Blocked pending Director approval (FIN-005)` (ANK-2026-0021) |
+| AG-003 | Andes Luxe Travel · P. Ibáñez · `p.ibanez@andesluxe.—` | Signature · Chile | 10 % | PENDING · **SLA BREACH** (requested 11 Sep 2026) | — |
+
+B2B KPIs: Approved agencies **2** · Registrations to review **1** (`SLA: 2 business days (§10)`) · Agency revenue USD 49,875 · Commission accrued USD 2,328.
+
+Refund Approvals after reset: `0 refunds · all dates` · `No refund requests in this date range.`
 
 ### Requests
 
@@ -244,6 +288,6 @@ Both on 19 Dec 2027 ANAMARA festive (DEP-013). Position is FIFO per departure + 
 
 ### Bookings list count
 
-Default list range is All dates (`from`/`to` null). Index has no default status filter, so REQUESTED rows should appear: **13** (11 + 0041 + 0042). Date-range line `13 bookings · all dates`. ⚠ UNVERIFIED — query shape; task 07 browser said 11.
+Default list range is All dates (`from`/`to` null). Index has no default status filter. After the Sprint 5 agency seed the list is **14** (12 bookings including `ANK-2026-0021` + 0041 + 0042). Date-range line `14 bookings · all dates` (screen 2026-09-21 after `reset.sh`).
 
 Group-move 409: `This booking belongs to GRP-007 — moving a group to another departure isn't supported yet.` (`MoveBooking`, Pest).

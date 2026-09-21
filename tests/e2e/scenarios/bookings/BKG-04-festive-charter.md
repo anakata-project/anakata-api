@@ -19,7 +19,7 @@ A festive week charter must take all nine cabins at the festive charter total. A
 - [ ] E1 · After step 1 all nine ANATIVA cells on 19 Dec are `·`. Do not continue if they are not.
 - [ ] E2 · Departure option includes ` · FESTIVE (+supplement, discounts blocked)`. ⚠ UNVERIFIED — `newReservationHelpers` festive suffix.
 - [ ] E3 · Total `USD 211,500`. Deposit `USD 42,300` (20%). Notice includes `Deposit 20% within 5 business days of written confirmation; balance 80% at 120 days; DPNG manifest 30 days pre-departure.` Amounts from the fixture (Pest). Notice wording ⚠ UNVERIFIED — `charterNoticeText()` / task 08.
-- [ ] E4 · After `Done`: toast `Reservation ANK-2026-0020 created.` ⚠ UNVERIFIED — next ref from Pest; toast from `createdToast()` on Done.
+- [ ] E4 · After `Done`: toast `Reservation ANK-2026-0022 created.` ⚠ UNVERIFIED — next ref from Pest; toast from `createdToast()` on Done.
 - [ ] E5 · Calendar Year 2027: all nine ANATIVA cabins on 19 Dec show `CHARTER`. ⚠ UNVERIFIED — task 10 state table.
 
 ## Notes

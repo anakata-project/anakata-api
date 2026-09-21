@@ -17,7 +17,7 @@ The unique active-claim index is the last word. A second Create on a taken cabin
 
 ## Expected
 - [ ] E1 · After step 1 the ANATIVA Suite 01 / 28 Nov cell is `·`. Do not continue if it is not.
-- [ ] E2 · Context B toast `Reservation ANK-2026-0020 created.` ⚠ UNVERIFIED — next ref from Pest.
+- [ ] E2 · Context B toast `Reservation ANK-2026-0022 created.` ⚠ UNVERIFIED — next ref from Pest.
 - [ ] E3 · Context A modal stays open. `.warnbox` shows `Suite 01 on 28 Nov 2027 · ANATIVA is sold.` (API `ConflictMessage`; Pest). Cabin then reads `Suite 01 · Not available`. ⚠ UNVERIFIED — taken-cabin suffix i18n `bookings.cabinTaken`.
 - [ ] E4 · `db-check` prints `1`.
 

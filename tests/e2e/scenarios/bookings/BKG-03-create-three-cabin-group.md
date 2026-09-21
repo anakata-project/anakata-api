@@ -19,7 +19,7 @@ Several cabins on one departure must create one GRP and one booking per cabin, w
 - [ ] E1 · After step 1 those three ANATIVA cells on 21 Nov are `·`. Do not continue if they are not.
 - [ ] E2 · Group notice `Group booking (OPS-008): same rates and conditions as FIT. Each cabin gets its own booking ID under one group; the lead guest is the group coordinator and single point of contact.` ⚠ UNVERIFIED — i18n `bookings.ops008`.
 - [ ] E3 · Group total `USD 79,800` (3 × 26,600). Each cabin line `USD 26,600`. ⚠ UNVERIFIED — composed from fixture Suite · 2 adults; not a reset screen.
-- [ ] E4 · After `Done`: toast `3 cabins created under GRP-008 (ANK-2026-0020, ANK-2026-0021, ANK-2026-0022). The coordinator receives all communications.` ⚠ UNVERIFIED — `createdToast()` on Done + next refs from Pest.
+- [ ] E4 · After `Done`: toast `3 cabins created under GRP-008 (ANK-2026-0022, ANK-2026-0023, ANK-2026-0024). The coordinator receives all communications.` ⚠ UNVERIFIED — `createdToast()` on Done + next refs from Pest (0021 is already seeded).
 - [ ] E5 · Groups panel shows GRP-008 `E2E three cabin` with coordinator Mira Lead. Three `PENDING PAYMENT` rows. ⚠ UNVERIFIED — status label and coordinator wording.
 
 ## Notes

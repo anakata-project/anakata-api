@@ -2,7 +2,7 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
-Sprint 4 `BKG-01`…`BKG-12` were read on the 2026-09-20 full run. BR-01 / BR-02 / INV-01 still have a few unverified markers from the Task 11 rewrite.
+Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. P1 grew by PAY-01, 02, 03, 05, 06, 08, 10. BKG-01 / 02 / 06 / 09 (and next-ref on BKG-03 / 04 / 05) were updated for the money seed (`ANK-2026-0021`, next ANK `0022`, Balance ≠ Total). BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
 
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|
@@ -67,3 +67,15 @@ Sprint 4 `BKG-01`…`BKG-12` were read on the 2026-09-20 full run. BR-01 / BR-02
 | BKG-10 | Expired request hold | sprint-4, bookings | P2 | Carolina | [bookings/BKG-10-expired-request-hold.md](bookings/BKG-10-expired-request-hold.md) |
 | BKG-11 | Waitlist | sprint-4, bookings | P2 | Carolina | [bookings/BKG-11-waitlist.md](bookings/BKG-11-waitlist.md) |
 | BKG-12 | Own-records | sprint-4, bookings | P2 | Lucía | [bookings/BKG-12-own-records.md](bookings/BKG-12-own-records.md) |
+| PAY-01 | Seeded ledger on a CONFIRMED booking | sprint-5, payments | P1 | Carolina | [payments/PAY-01-seeded-ledger.md](payments/PAY-01-seeded-ledger.md) |
+| PAY-02 | Record the balance → FULLY PAID | sprint-5, payments | P1 | Carolina | [payments/PAY-02-record-balance.md](payments/PAY-02-record-balance.md) |
+| PAY-03 | Awaiting wire, then mark received | sprint-5, payments | P1 | Carolina then CFO | [payments/PAY-03-mark-wire.md](payments/PAY-03-mark-wire.md) |
+| PAY-04 | Create, copy, cancel a deposit link | sprint-5, payments | P2 | Carolina | [payments/PAY-04-payment-link-lifecycle.md](payments/PAY-04-payment-link-lifecycle.md) |
+| PAY-05 | Stripe test-mode or fake-webhook replay | sprint-5, payments | P1 | Carolina | [payments/PAY-05-stripe-or-replay.md](payments/PAY-05-stripe-or-replay.md) |
+| PAY-06 | Payments & Revenue KPIs and pending | sprint-5, payments | P1 | Carolina | [payments/PAY-06-payments-revenue.md](payments/PAY-06-payments-revenue.md) |
+| PAY-07 | Apply the unmatched gateway charge | sprint-5, payments | P2 | Carolina | [payments/PAY-07-reconciliation.md](payments/PAY-07-reconciliation.md) |
+| PAY-08 | OVERDUE flag and OPS-007 extension | sprint-5, payments | P1 | Carolina | [payments/PAY-08-overdue-extension.md](payments/PAY-08-overdue-extension.md) |
+| PAY-09 | OPS-007 cancel per policy | sprint-5, payments | P2 | Carolina | [payments/PAY-09-overdue-cancel.md](payments/PAY-09-overdue-cancel.md) |
+| PAY-10 | Refund Approvals approve and execute | sprint-5, payments | P1 | Carolina then CFO | [payments/PAY-10-refund-approvals.md](payments/PAY-10-refund-approvals.md) |
+| PAY-11 | Trade 15 % hold then commission approval | sprint-5, payments | P2 | Carolina | [payments/PAY-11-on-hold-agency.md](payments/PAY-11-on-hold-agency.md) |
+| PAY-12 | B2B breached registration and partners | sprint-5, payments | P2 | Carolina | [payments/PAY-12-b2b-agencies.md](payments/PAY-12-b2b-agencies.md) |

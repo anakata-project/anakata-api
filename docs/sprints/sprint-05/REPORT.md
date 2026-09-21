@@ -1901,3 +1901,131 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+---
+
+## Task 11 · E2E scenarios for Sprint 5; P1 run
+
+### What was built
+Twelve PAY scripts under `tests/e2e/scenarios/payments/`, written from a `reset.sh` screen on 2026-09-21 (running `anakata-api` stack, Galápagos month September 2026). Sprint 4 files that the money seed contradicts were updated. FakeStripe file fixture + bind rule landed earlier on this branch (`29a690e`).
+
+Cloud Task launch failed (`environment: cloud requires exactly one known git remote; found 4`). Work stayed on `e2e/sprint-05`.
+
+### Fixtures
+`tests/e2e/fixtures/reference-values.md` now has Seeded money (per-booking deposit / settled / pledged / balance + ledger refs), Payments & Revenue KPIs after reset, reconciliation unmatched `CH_UNMATCHED`, seeded agencies AG-001 / 002 / 003, next ANK `0022`. List count is **14** (was 13). `ANK-2026-0018` is not OVERDUE after reset.
+
+### Sprint 4 files revisited
+- `BKG-01`: 14 bookings, 0021, Balance ≠ Total, Groups `3 cabins · 6 guests` / `USD 79,800` / `USD 71,820`. Four UNVERIFIED markers cleared.
+- `BKG-02` / `03` / `04` / `05` / `09`: next ANK is `0022` (0021 is the Meridian hold).
+- `BKG-06`: cancel of 0003 now expects a refund request (`≥120 days → 5%`, penalty / due `USD 1,330`).
+
+### Twelve scenarios
+`PAY-01`…`PAY-12` in INDEX. P1 grew by 01, 02, 03, 05, 06, 08, 10. PAY-05 creates a fresh D2C reservation (ANATIVA Suite 01 · 7 Nov 2027), then Stripe test-mode or `replay-stripe-checkout.sh`. PAY-08 / PAY-09 run `anakata:set-overdue-fixture` as a step — not in `reset.sh`.
+
+### Marker counts
+
+| | Count |
+|---|---|
+| Sprint 4 leftovers at start of this task | **63** |
+| Cleared this task (list / next-ref / 0003 Overview that we read) | **8** |
+| Sprint 4 leftovers remaining | **55** |
+| New `⚠ UNVERIFIED` in PAY scripts | **0** |
+| After this task | **55** |
+
+### The run
+- `up.sh` was **not** started (8000 / 3001 already bound). Reset: `E2E_ALLOW_RESET=1 COMPOSE_PROJECT_NAME=anakata-api tests/e2e/bin/reset.sh`.
+- Sprint 5 P1: [runs/2026-09-21-0400-sprint5-p1.md](../../../tests/e2e/runs/2026-09-21-0400-sprint5-p1.md) — PAY-01, 02, 03 (Carolina, not CFO), 06 and BKG-01 **PASS**. PAY-05, 08, 10 and BKG-02 / 06 / 09 **NOT RUN**.
+- Full P1 1–5: [runs/2026-09-21-0415-sprints-1-5-full.md](../../../tests/e2e/runs/2026-09-21-0415-sprints-1-5-full.md) — not a cloud `ALL UP` proof. Sprints 1–4 P1 not re-walked.
+
+### (i) Scenario / fixture fixes vs (ii) bugs
+(i) PAY-02 History uses `SETTLED`; KPI numbers from this reset (not Task 08’s dirty DB); next refs 0022. (ii) No application bugs opened. No product code changed to make a scenario pass.
+
+### Files touched
+- `app/Support/Stripe/StripeGatewayBinding.php` (earlier commit)
+- `app/Providers/AppServiceProvider.php`
+- `app/Services/Stripe/FakeStripeGateway.php`, `StripeSdkGateway.php`
+- `app/Console/Commands/ReplayStripeCheckoutCommand.php`
+- `database/fixtures/stripe-charges.json`
+- `tests/Feature/Stripe/*`, `tests/e2e/bin/replay-stripe-checkout.sh`, `tests/e2e/README.md`, env examples
+- `tests/e2e/fixtures/reference-values.md`
+- `tests/e2e/scenarios/INDEX.md`
+- `tests/e2e/scenarios/bookings/BKG-01` … `BKG-06`, `BKG-09`
+- `tests/e2e/scenarios/payments/PAY-01` … `PAY-12` (new)
+- `tests/e2e/runs/2026-09-21-0400-sprint5-p1.md`, `2026-09-21-0415-sprints-1-5-full.md`
+- `docs/sprints/sprint-05/REPORT.md`
+
+### Deviations
+- Cloud machine not used (four remotes).
+- `up.sh` skipped.
+- PAY-03 mark-received walked as Carolina; account-menu sign-out was blocked by the browser tool.
+- Full P1 and PAY-05 / 08 / 10 still owed.
+
+### Open questions
+- Stripe test/live keys and webhook secrets still owed (Task 03). This stack’s secret is empty; PAY-05 must use `replay-stripe-checkout.sh`.
+- Split refunds and Stripe auto-refund (Task 05) still unanswered.
+- LEG-001 / LEG-004 still block customer-facing cancel text and bank details.
+- Cursor cloud + four remotes: how should Task 11 spawn a cloud e2e agent?
+
+### Notes for later
+- Finish PAY-05 / 08 / 10 and BKG-02 / 06 / 09 on a fresh reset.
+- Full P1 after `up.sh` → `ALL UP`.
+- Do not add `set-overdue-fixture` to `reset.sh`.
+
+### Merge steps for the user
+
+The agent committed and pushed **`e2e/sprint-05` only**. Do **not** push `dev`. Review, then merge:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git fetch origin
+git checkout dev
+git merge --ff-only origin/e2e/sprint-05
+# or open a PR: origin/e2e/sprint-05 → dev
+git push origin dev
+```
+
+---
+
+## Sprint 5 · summary
+
+### What’s done
+Money is real. API: append-only ledger, payment-driven transitions, wires, OVERDUE + OPS-007, Stripe links / webhooks / reconciliation, agencies + FIN-005 hold, cancellation penalties and refund execution. `anakata-ui` shipped payment types (`v0.6.0`–`v0.6.4`). Panel: Payments tab, Payments & Revenue, Refund Approvals, B2B, New Reservation agency / commission / deposit method. E2E: FakeStripe file fixture (relative `created_days_ago`, bind only local/testing + empty keys), twelve PAY scripts, Sprint 4 money-seed updates. Cloud P1 and several PAY P1 walks are still open.
+
+### Open questions from tasks 01–11
+
+Compiled from each task’s REPORT (Open questions **and** leftover Notes that are still open). Do not read a heading that said “None” as closed.
+
+| Task | Still open |
+|---|---|
+| 01 | Open-questions heading was empty. EXTRAS writer waits for Sprint 6. |
+| 02 | Open-questions heading was empty. `set-overdue-fixture` stays a scenario step. |
+| 03 | **Stripe keys** (test and live, webhook signing secrets) owed by the client. |
+| 04 | Open-questions heading was empty. Agent portal is later sprints. |
+| 05 | **Split refunds** (one request / one `refund_due` this sprint). **Stripe auto-refund** still the README client question. **LEG-001** still blocks customer-facing cancel text. |
+| 06 | Open-questions heading was empty. |
+| 07 | Open-questions heading was empty. Lucía-on-0005 and cfo@-no-transitions still e2e notes. |
+| 08 | Open-questions heading was empty. LEG-004 bank details still a placeholder. |
+| 09 | Open-questions heading was empty. Fresh-clone step 2 against pushed `v0.6.3` not recorded. Agent portal / emails later. |
+| 10 | Open-questions heading was empty. Fresh-clone step 2 against pushed `v0.6.4` not recorded. Empty Stripe key → link-failure warning is ENV. |
+| 11 | **55** leftover Sprint 4 `⚠ UNVERIFIED` markers. Cloud spawn failed (4 remotes). `up.sh` / full P1 not run. PAY-05, 08, 10 and BKG-02 / 06 / 09 not walked after reset. |
+
+### Still open outside the sprint
+- Go-live date
+- Production domains
+- LEG-001 (cancellation policy customer-facing text)
+- LEG-002 (LOPDP / GDPR architecture)
+- LEG-004 (PONTOS LLC bank details)
+- Stripe account / keys
+- B2 pricing items (PENDING CLIENT)
+- TEC-004 client questions
+- Group-move 409 (BKG-07)
+- Documents and emails (Sprint 7)
+- Extras and Galápagos fees (Sprint 6)
+
+### Merge per repo
+
+The agent pushed **`origin/e2e/sprint-05`** on anakata-api only. Tasks 01–10 on the other repos are already on their own branches / `dev` as each task listed. This task does not merge `dev`.
+
+1. **anakata-api** — review `e2e/sprint-05`, then merge into `dev` (commands in Task 11 above).
+2. **anakata-ui** — already tagged `v0.6.0`–`v0.6.4` in earlier tasks; nothing new here.
+3. **anakata-panel** / **anakata-engine** — no Task 11 commits.
+

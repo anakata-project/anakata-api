@@ -13,14 +13,14 @@ A Suite · 2 adults quote must match the rates price-check total, freeze at sale
 3. Type **CABIN (FIT / Group)**. Guest `E2E One Cabin`, email `e2e.bkg02@anakata.test`, phone `+1 555 0202`, preferred **EMAIL**. Main channel **D2C**, origin **Hotel Booking Engine**.
 4. Departure `7 Nov 2027` · ANATIVA. Adults `2`, children `0`. Cabin **Suite 01**. Payment method for deposit stays **Card — payment link** (default). D2C must not show Agent / Agency or Commission %.
 5. Read the price box. Click `Create reservation`.
-6. Success pane: `Reservation ANK-2026-0020 created.` Carolina has `payments.record`, so the pane then shows a copyable deposit link or the warning that the link failed (booking stays). Click `Done` — the toast fires here, then the panel opens.
+6. Success pane: `Reservation ANK-2026-0022 created.` Carolina has `payments.record`, so the pane then shows a copyable deposit link or the warning that the link failed (booking stays). Click `Done` — the toast fires here, then the panel opens.
 7. When the booking panel opens, note the reference. Open `/rms/reservations/calendar`, Year 2027, ANATIVA Suite 01 on 7 Nov.
 
 ## Expected
 - [ ] E1 · After step 1 the ANATIVA Suite 01 / 7 Nov cell is `·`. Do not continue if it is not.
 - [ ] E2 · Price box header `Price · from Rates & Promotions · availability checked live`. Total `USD 26,600`. Deposit line `Deposit 10% · USD 2,660 · balance at T−120`. ⚠ UNVERIFIED — i18n + `depositLineText` / `useMoney`; amounts from the fixture (Pest).
-- [ ] E3 · After `Done`: toast `Reservation ANK-2026-0020 created.` Panel opens on ANK-2026-0020, status `PENDING PAYMENT`, owner Carolina. No Agency kv (D2C). ⚠ UNVERIFIED — toast from `createdToast()` on Done; next ref from Pest.
-- [ ] E4 · Calendar Year 2027: ANATIVA Suite 01 on 7 Nov shows `0020` (`PEND` if the cell uses the pending label). ⚠ UNVERIFIED — task 10 uses `PEND` for PENDING_PAYMENT, last-4 for CONFIRMED.
+- [ ] E3 · After `Done`: toast `Reservation ANK-2026-0022 created.` Panel opens on ANK-2026-0022, status `PENDING PAYMENT`, owner Carolina. No Agency kv (D2C). Next ANK after the Sprint 5 agency seed is 0022 (0021 is Meridian hold).
+- [ ] E4 · Calendar Year 2027: ANATIVA Suite 01 on 7 Nov shows `0022` (`PEND` if the cell uses the pending label). ⚠ UNVERIFIED — task 10 uses `PEND` for PENDING_PAYMENT, last-4 for CONFIRMED.
 
 ## Notes
 Target cabin is **7 Nov 2027 ANATIVA Suite 01** (DEP-002) so this scenario does not collide with ANAMARA seed claims. Amounts: `fixtures/reference-values.md` (Suite · 2 adults).
