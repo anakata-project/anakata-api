@@ -2,7 +2,7 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
-Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. P1 grew by PAY-01, 02, 03, 05, 06, 08, 10. BKG-01 / 02 / 06 / 09 (and next-ref on BKG-03 / 04 / 05) were updated for the money seed (`ANK-2026-0021`, next ANK `0022`, Balance ≠ Total). BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
+Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
 
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|
@@ -79,3 +79,16 @@ Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21
 | PAY-10 | Refund Approvals approve and execute | sprint-5, payments | P1 | Carolina then CFO | [payments/PAY-10-refund-approvals.md](payments/PAY-10-refund-approvals.md) |
 | PAY-11 | Trade 15 % hold then commission approval | sprint-5, payments | P2 | Carolina | [payments/PAY-11-on-hold-agency.md](payments/PAY-11-on-hold-agency.md) |
 | PAY-12 | B2B breached registration and partners | sprint-5, payments | P2 | Carolina | [payments/PAY-12-b2b-agencies.md](payments/PAY-12-b2b-agencies.md) |
+| GST-01 | Guests tab on ANK-2026-0005 | sprint-6, guests | P1 | Carolina | [guests/GST-01-brandt-guests-tab.md](guests/GST-01-brandt-guests-tab.md) |
+| GST-02 | Lucía: passports masked; enter to replace | sprint-6, guests | P1 | Lucía | [guests/GST-02-lucia-passport-mask.md](guests/GST-02-lucia-passport-mask.md) |
+| GST-03 | Fill an incomplete guest | sprint-6, guests | P1 | Carolina | [guests/GST-03-fill-incomplete-guest.md](guests/GST-03-fill-incomplete-guest.md) |
+| GST-04 | Minor today: guardian block and consent | sprint-6, guests | P2 | Carolina | [guests/GST-04-minor-guardian-block.md](guests/GST-04-minor-guardian-block.md) |
+| GST-05 | Passport expiring before the return date | sprint-6, guests | P2 | Carolina | [guests/GST-05-passport-expiry-before-return.md](guests/GST-05-passport-expiry-before-return.md) |
+| GST-06 | Record a missing consent; row is append-only | sprint-6, guests | P1 | Carolina | [guests/GST-06-record-missing-consent.md](guests/GST-06-record-missing-consent.md) |
+| GST-07 | Add up to the cabin limit; remove an empty non-lead | sprint-6, guests | P2 | Carolina | [guests/GST-07-cabin-limit-remove-empty.md](guests/GST-07-cabin-limit-remove-empty.md) |
+| GST-08 | Contacts In list, nationality top ten, date range | sprint-6, guests | P2 | Carolina | [guests/GST-08-contacts-in.md](guests/GST-08-contacts-in.md) |
+| EXT-01 | Add flights × 2 on a CONFIRMED booking | sprint-6, extras | P1 | Carolina | [extras/EXT-01-add-flights-confirmed.md](extras/EXT-01-add-flights-confirmed.md) |
+| EXT-02 | Switch PNG collection on; pending guest shows pending data | sprint-6, extras | P1 | Carolina | [extras/EXT-02-png-collection-pending.md](extras/EXT-02-png-collection-pending.md) |
+| EXT-03 | FULLY PAID booking gains an extra | sprint-6, extras | P2 | Carolina | [extras/EXT-03-fully-paid-gains-extra.md](extras/EXT-03-fully-paid-gains-extra.md) |
+| EXT-04 | Catalogue price change; existing extra keeps its rate | sprint-6, extras | P2 | Carolina | [extras/EXT-04-catalogue-publish-frozen-rate.md](extras/EXT-04-catalogue-publish-frozen-rate.md) |
+| EXT-05 | Cruise paid, extra unpaid past T−120: not OVERDUE | sprint-6, extras | P2 | Carolina | [extras/EXT-05-extra-unpaid-not-overdue.md](extras/EXT-05-extra-unpaid-not-overdue.md) |

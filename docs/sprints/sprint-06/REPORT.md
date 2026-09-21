@@ -1270,3 +1270,83 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 10 · E2E scenarios for Sprint 6; P1 run
+
+### ENV — stopped
+
+Cloud spawn failed before `up.sh`. The parent workspace has **four git remotes** (api, ui, panel, engine). Cursor Cloud requires exactly one:
+
+```
+environment: "cloud" requires exactly one known git remote for the parent workspace; found 4.
+```
+
+Same class as Sprint 5 Task 11. The README “Before task 01” remotes fix (`.cursor/environment.json` `context: ".."`) is still outstanding. This task does not guess screen values and does not fall back to a local run.
+
+Run file: [`tests/e2e/runs/2026-09-21-1050-sprint6-env.md`](../../../tests/e2e/runs/2026-09-21-1050-sprint6-env.md).
+
+### Scenarios defined (not walked)
+
+Thirteen scripts were written from seeders, i18n, and tasks 07–09 browser notes. They were **not** read off a cloud `reset.sh` screen. Lines that still need that screen are marked `⚠ UNVERIFIED`.
+
+| ID | File |
+|---|---|
+| GST-01 | `tests/e2e/scenarios/guests/GST-01-brandt-guests-tab.md` |
+| GST-02 | `tests/e2e/scenarios/guests/GST-02-lucia-passport-mask.md` (db-check ciphertext + history) |
+| GST-03 | `tests/e2e/scenarios/guests/GST-03-fill-incomplete-guest.md` |
+| GST-04 | `tests/e2e/scenarios/guests/GST-04-minor-guardian-block.md` |
+| GST-05 | `tests/e2e/scenarios/guests/GST-05-passport-expiry-before-return.md` |
+| GST-06 | `tests/e2e/scenarios/guests/GST-06-record-missing-consent.md` |
+| GST-07 | `tests/e2e/scenarios/guests/GST-07-cabin-limit-remove-empty.md` |
+| GST-08 | `tests/e2e/scenarios/guests/GST-08-contacts-in.md` |
+| EXT-01 | `tests/e2e/scenarios/extras/EXT-01-add-flights-confirmed.md` |
+| EXT-02 | `tests/e2e/scenarios/extras/EXT-02-png-collection-pending.md` |
+| EXT-03 | `tests/e2e/scenarios/extras/EXT-03-fully-paid-gains-extra.md` |
+| EXT-04 | `tests/e2e/scenarios/extras/EXT-04-catalogue-publish-frozen-rate.md` |
+| EXT-05 | `tests/e2e/scenarios/extras/EXT-05-extra-unpaid-not-overdue.md` |
+
+INDEX P1 grew by GST-01, 02, 03, 06 and EXT-01, 02.
+
+### What was not built
+
+- No fixture confirmations; `reference-values.md` money/registry lines still wait on a reset screen.
+- BKG-01 E5, PAY-01/02/06, BKG-06, BR-01/02 not rewritten.
+- No `sprint6-p1` or `sprints-1-6-full` walk.
+
+### Marker counts
+
+| | Count |
+|---|---|
+| Sprint 4 leftovers at start of Sprint 5 Task 11 | 63 |
+| After Sprint 5 Task 11 | **55** |
+| Cleared this task | **0** (no screen) |
+| New `⚠ UNVERIFIED` this task | **0** |
+| After this task | **55** leftovers, plus any new guest/extras lines still unwritten |
+
+### Open questions
+
+- Cursor cloud + four remotes: launch the agent from **anakata-api alone**, or fix `.cursor/environment.json` so `context` is this repo (not `..`). Until one of those happens, Task 10 cannot run.
+- Everything listed under tasks 01–09 that is still PENDING CLIENT (LEG-001 / LEG-002 / B4 retention, PNG/TCT default, extras catalogue prices, consent texts) stays open.
+
+### Notes for later
+
+Re-run Task 10 on a Cloud Agent attached only to `anakata-api`: `up.sh` → `ALL UP`, then the approved plan (fixtures, revisit, thirteen scenarios, both P1 runs, sprint summary, push `e2e/sprint-06`).
+
+### Merge steps for the user
+
+Do **not** merge this ENV note as if the sprint P1 ran. After a successful cloud run, merge `e2e/sprint-06` into `dev`.
+
+If you want this ENV report on a branch now:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git checkout -B e2e/sprint-06
+git add tests/e2e/runs/2026-09-21-1050-sprint6-env.md
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record Sprint 6 Task 10 ENV stop: cloud spawn saw four remotes.
+
+EOF
+)"
+git push -u origin e2e/sprint-06
+```
+
