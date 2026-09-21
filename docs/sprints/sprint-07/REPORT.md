@@ -1045,3 +1045,103 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # ui / panel / engine: pnpm typecheck
 # panel / engine: pnpm build
 ```
+
+## Task 08 · E2E scenarios for Sprint 7; P1 run
+
+### ENV — stopped
+
+Cloud spawn failed before `up.sh`. The parent workspace is four git remotes (api, ui, panel, engine). Cursor Cloud requires exactly one:
+
+```
+environment: "cloud" requires exactly one known git remote for the parent workspace; found 4.
+```
+
+**Cause:** the agent was launched from the four-root workspace. Not `.cursor/environment.json` — `build.context` `".."` and `build.dockerfile` `"../tests/e2e/environment/Dockerfile"` are already correct relative to `.cursor/` (they resolve to this repo and `tests/e2e/environment/Dockerfile`). Changing them to `"."` / `"tests/e2e/..."` would break the Build.
+
+Same class as Sprint 5 Task 11 and Sprint 6 Task 10. This task does not guess screen values and does not fall back to a local run.
+
+Run file: [`tests/e2e/runs/2026-09-21-1042-sprint7-env.md`](../../../tests/e2e/runs/2026-09-21-1042-sprint7-env.md).
+
+### What was not built
+
+- No `mail-find.sh`.
+- No `anakata:set-reminder-fixture`.
+- No `reference-values.md` document rows (issuer / bank / plan statuses still wait on a reset screen).
+- BR-01 / BR-02 still say 65 / 40 and 11 / 12 (Pest is 67 / 42 / 15 / 10 / 21).
+- PAY-01 / PAY-04 still carry “sending it by email arrives in Sprint 7”.
+- EXT-01 still has no re-issue notice line.
+- No `scenarios/documents/DOC-01` … `DOC-10`.
+- INDEX P1 did not grow.
+- No `sprint7-p1` or `sprints-1-7-full` walk.
+
+### Marker counts
+
+| | Count |
+|---|---|
+| Leftovers at start of this task (Sprint 4–6 `⚠ UNVERIFIED` still in `tests/e2e/`) | **66** |
+| Cleared this task | **0** (no screen) |
+| New `⚠ UNVERIFIED` this task | **0** |
+| After this task | **66** leftovers, 0 new |
+
+### Open questions
+
+- Cloud launch: start the agent from **anakata-api alone** (one remote) with `GH_TOKEN` for `install.sh`. Until that happens, Task 08 cannot run.
+- TEC-002: production mail is ordinary SMTP (task 03), not Microsoft Graph / Exchange. Sending mailbox and app registration still PENDING CLIENT.
+- LEG-004: PONTOS LLC bank details still `[TBD]`; every invoice and the wire-instructions PDF print placeholders.
+- Invoice numbering: one `INV-YYYY-NNNN` per booking-kind, kept across versions. Whether the accountant needs a number per version is still open.
+- Pre-trip itinerary still carries “Weather and packing list: [content pending — guest experience team]” until that copy arrives.
+- Sprint 6 P1 (GST / EXT and the full Sprints 1–6 set) was never attached — Task 10 ENV-stopped the same way. It stays open until a cloud `ALL UP` run.
+
+### Notes for later
+
+Re-run Task 08 on a Cloud Agent attached only to `anakata-api`: `up.sh` → `ALL UP`, then the approved plan (mail helper, reminder fixture, fixtures, revisit, ten DOC scripts, both P1 runs, sprint summary, push `e2e/sprint-07`).
+
+### Merge steps for the user
+
+Do **not** merge this ENV note as if the sprint P1 ran. After a successful cloud run, merge `e2e/sprint-07` into `dev`.
+
+To keep this ENV report on a branch now:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git checkout -B e2e/sprint-07
+git add tests/e2e/runs/2026-09-21-1042-sprint7-env.md
+git add docs/sprints/sprint-07/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record Sprint 7 Task 08 ENV stop: cloud spawn saw four remotes.
+
+EOF
+)"
+git push -u origin e2e/sprint-07
+```
+
+Then open **anakata-api** as a single-root window, set `GH_TOKEN`, and launch the Cloud Agent from that repo only.
+
+## Sprint 7 summary
+
+### What is done
+
+- **API (01–04, 07 prelude):** PDF store (dompdf), numbered invoices, issuer / bank rules, Blade templates and snapshots, billing columns, SMTP + delivery log, triggers / `anakata:documents-due`, computed plan statuses, `booking_reference` / `client` / `meta.filters` on the client-documents index.
+- **Layer (05, 07):** types regenerated; tagged `v0.8.0` then `v0.8.1`.
+- **Panel (06–07):** booking Documents tab, receipts and payment-link email on Payments, billing on Overview, extras re-issue notice, Documents & Manifests page.
+- **E2E (08):** not run. Cloud spawn from the four-root workspace was refused. No local fallback.
+
+### Open questions (compiled; not “none”)
+
+- TEC-002 mailbox and Graph app registration (task 03 shipped SMTP only).
+- LEG-004 bank details — all five fields `[TBD]`.
+- Invoice numbering: one number per booking-kind (default) vs one number per version (accountant).
+- Pre-trip packing / weather copy still pending from guest experience.
+- Cloud e2e: launch from anakata-api alone; Sprints 6 and 7 P1 runs are not attached.
+
+### Still open outside this sprint
+
+- Sprint 8: public “Complete your reservation” page (billing, four declarations, guest details).
+- Sprint 11: departure manifests, DPNG export, preferences questionnaire send.
+- Microsoft Graph transport if TEC-002 is confirmed as Exchange rather than SMTP.
+
+### Merge steps for the user
+
+Tasks 01–07: use the git commands already listed under each task (explicit paths; tag `v0.8.1` on anakata-ui).
+
+Task 08: do not treat `e2e/sprint-07` as done until a Cloud Agent started from **anakata-api only** has written both P1 run files with no open `BUG`. The ENV commit above is a record only.

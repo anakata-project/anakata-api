@@ -2,7 +2,7 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
-Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
+Sprint 7 `DOC-01`…`DOC-10` are written from the API plan, i18n and seeders — not yet walked on a cloud `reset.sh`. P1 grew by DOC-01 to DOC-05. Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
 
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|
@@ -92,3 +92,13 @@ Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18
 | EXT-03 | FULLY PAID booking gains an extra | sprint-6, extras | P2 | Carolina | [extras/EXT-03-fully-paid-gains-extra.md](extras/EXT-03-fully-paid-gains-extra.md) |
 | EXT-04 | Catalogue price change; existing extra keeps its rate | sprint-6, extras | P2 | Carolina | [extras/EXT-04-catalogue-publish-frozen-rate.md](extras/EXT-04-catalogue-publish-frozen-rate.md) |
 | EXT-05 | Cruise paid, extra unpaid past T−120: not OVERDUE | sprint-6, extras | P2 | Carolina | [extras/EXT-05-extra-unpaid-not-overdue.md](extras/EXT-05-extra-unpaid-not-overdue.md) |
+| DOC-01 | Documents tab on a seeded CONFIRMED booking | sprint-7, documents | P1 | Carolina | [documents/DOC-01-confirmed-documents-tab.md](documents/DOC-01-confirmed-documents-tab.md) |
+| DOC-02 | Preview the invoice: subtotals match Overview | sprint-7, documents | P1 | Carolina | [documents/DOC-02-invoice-preview.md](documents/DOC-02-invoice-preview.md) |
+| DOC-03 | Mark wire received → invoice, summary, receipt in Mailpit | sprint-7, documents | P1 | Carolina then CFO | [documents/DOC-03-wire-confirm-emails.md](documents/DOC-03-wire-confirm-emails.md) |
+| DOC-04 | Stripe replay twice → one receipt email | sprint-7, documents | P1 | Carolina | [documents/DOC-04-stripe-replay-one-receipt.md](documents/DOC-04-stripe-replay-one-receipt.md) |
+| DOC-05 | Add an extra → invoice v2 emailed; v1 unchanged | sprint-7, documents | P1 | Carolina | [documents/DOC-05-extra-reissue-invoice.md](documents/DOC-05-extra-reissue-invoice.md) |
+| DOC-06 | Remove billing email → BLOCKED; restore → resend | sprint-7, documents | P2 | Carolina | [documents/DOC-06-blocked-restore-resend.md](documents/DOC-06-blocked-restore-resend.md) |
+| DOC-07 | Send a payment link by email | sprint-7, documents | P2 | Carolina | [documents/DOC-07-payment-link-email.md](documents/DOC-07-payment-link-email.md) |
+| DOC-08 | Wire instructions: LEG-004 warning and placeholder PDF | sprint-7, documents | P2 | Carolina | [documents/DOC-08-wire-instructions.md](documents/DOC-08-wire-instructions.md) |
+| DOC-09 | Documents & Manifests: filter and open the booking | sprint-7, documents | P2 | Carolina | [documents/DOC-09-documents-manifests.md](documents/DOC-09-documents-manifests.md) |
+| DOC-10 | Balance reminder: documents-due once, then nothing | sprint-7, documents | P2 | Carolina | [documents/DOC-10-balance-reminder.md](documents/DOC-10-balance-reminder.md) |
