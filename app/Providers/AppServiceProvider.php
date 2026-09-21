@@ -69,6 +69,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Telescope\TelescopeServiceProvider as TelescopePackageServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -94,6 +95,11 @@ class AppServiceProvider extends ServiceProvider
 
             return $app->make(StripeSdkGateway::class);
         });
+
+        if ($this->app->environment('local') && class_exists(TelescopePackageServiceProvider::class)) {
+            $this->app->register(TelescopePackageServiceProvider::class);
+            $this->app->register(TelescopeServiceProvider::class);
+        }
     }
 
     /**

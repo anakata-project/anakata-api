@@ -214,6 +214,7 @@ test('source is rms crm engine auth or system from the request path', function (
     ['/api/auth/reset-password', 'auth'],
     ['/api/health', 'system'],
     ['/horizon', 'system'],
+    ['/telescope', 'system'],
 ]);
 
 test('request id comes from the X-Request-Id header', function (): void {

@@ -36,7 +36,7 @@
         <env name="FRONTEND_PANEL_URL" value="http://localhost:3001"/>
         <env name="SANCTUM_STATEFUL_DOMAINS" value="localhost:3000,localhost:3001"/>
         <env name="PULSE_ENABLED" value="false"/>
-        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="STRIPE_SECRET" value=""/>
         <env name="STRIPE_PUBLISHABLE" value=""/>

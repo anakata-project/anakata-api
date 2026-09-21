@@ -4,6 +4,7 @@ use App\Support\BusinessTime;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use Laravel\Telescope\Console\PruneCommand;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -31,3 +32,7 @@ Schedule::command('anakata:documents-due')
     ->daily()
     ->timezone(BusinessTime::zone())
     ->withoutOverlapping();
+
+if (class_exists(PruneCommand::class)) {
+    Schedule::command('telescope:prune --hours=48')->daily();
+}

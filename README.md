@@ -111,9 +111,10 @@ Tests use the `anakata_test` database (pinned in `phpunit.xml`). Credentials com
 | Health | http://localhost:8000/api/health |
 | OpenAPI (Scramble, local only) | http://localhost:8000/docs/api |
 | Horizon (local only) | http://localhost:8000/horizon |
+| Telescope (local only) | http://localhost:8000/telescope |
 | Mailpit | http://localhost:8025 |
 
-Horizon runs inside the `app` container (supervisor). Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`, `/api/auth/*`, `/api/stripe/webhook` (signed, no session).
+Horizon runs inside the `app` container (supervisor). Telescope records requests, queries, jobs and exceptions locally only (`TELESCOPE_ENABLED`); it is off in tests and pruned after 48 hours. Route sections: `/api/rms/*`, `/api/crm/*`, `/api/engine/*`, `/api/auth/*`, `/api/stripe/webhook` (signed, no session).
 
 ## Stripe
 
