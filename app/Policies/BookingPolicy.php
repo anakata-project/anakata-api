@@ -124,6 +124,18 @@ final class BookingPolicy extends Policy
             : Response::deny('Blocked: own-records rule.');
     }
 
+    public function updateExtras(User $actor, Booking $booking): Response
+    {
+        return $this->ownsOrMayActOnAny($actor, $booking)
+            ? Response::allow()
+            : Response::deny('Blocked: own-records rule.');
+    }
+
+    public function updateFees(User $actor, Booking $booking): Response
+    {
+        return $this->updateExtras($actor, $booking);
+    }
+
     public function updateGuests(User $actor, Booking $booking): Response
     {
         if (! $this->ownsOrMayActOnAny($actor, $booking)) {

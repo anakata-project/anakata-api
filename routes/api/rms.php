@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Rms\AgencyController;
 use App\Http\Controllers\Rms\BookingController;
+use App\Http\Controllers\Rms\BookingExtraController;
+use App\Http\Controllers\Rms\BookingFeesController;
 use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\CalendarController;
 use App\Http\Controllers\Rms\CommissionController;
@@ -11,6 +13,7 @@ use App\Http\Controllers\Rms\ConsentController;
 use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
+use App\Http\Controllers\Rms\ExtrasController;
 use App\Http\Controllers\Rms\GroupController;
 use App\Http\Controllers\Rms\GuestController;
 use App\Http\Controllers\Rms\HoldController;
@@ -69,6 +72,13 @@ Route::get('business-rules/versions', [BusinessRulesController::class, 'index'])
 Route::get('business-rules/versions/{version}', [BusinessRulesController::class, 'show'])
     ->whereNumber('version');
 
+Route::get('extras', [ExtrasController::class, 'current']);
+Route::post('extras/validate', [ExtrasController::class, 'validateDocument']);
+Route::post('extras/versions', [ExtrasController::class, 'store']);
+Route::get('extras/versions', [ExtrasController::class, 'index']);
+Route::get('extras/versions/{version}', [ExtrasController::class, 'show'])
+    ->whereNumber('version');
+
 Route::get('yachts', [YachtController::class, 'index']);
 
 Route::get('itineraries', [ItineraryController::class, 'index']);
@@ -120,6 +130,10 @@ Route::get('bookings/{booking}/guests', [GuestController::class, 'index'])->wher
 Route::post('bookings/{booking}/guests', [GuestController::class, 'store'])->whereNumber('booking');
 Route::get('bookings/{booking}/consents', [ConsentController::class, 'index'])->whereNumber('booking');
 Route::post('bookings/{booking}/consents', [ConsentController::class, 'store'])->whereNumber('booking');
+Route::get('bookings/{booking}/extras', [BookingExtraController::class, 'index'])->whereNumber('booking');
+Route::post('bookings/{booking}/extras', [BookingExtraController::class, 'store'])->whereNumber('booking');
+Route::patch('bookings/{booking}/fees', [BookingFeesController::class, 'update'])->whereNumber('booking');
+Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
 Route::patch('guests/{guest}', [GuestController::class, 'update'])->whereNumber('guest');
 Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->whereNumber('guest');
 

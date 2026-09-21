@@ -13,7 +13,8 @@ test('anakata config-verify accepts the seeded current documents', function (): 
         ->assertSuccessful()
         ->expectsOutputToContain('rates v1: valid')
         ->expectsOutputToContain('business_rules v1: valid')
-        ->expectsOutputToContain('engine_settings v1: valid');
+        ->expectsOutputToContain('engine_settings v1: valid')
+        ->expectsOutputToContain('extras v1: valid');
 });
 
 test('anakata config-verify fails naming kind, version and path when a required field is missing', function (): void {
@@ -42,5 +43,6 @@ test('anakata config-verify fails when a kind has no published version', functio
         ->assertFailed()
         ->expectsOutputToContain('rates: No published rates — run the seeders')
         ->expectsOutputToContain('business_rules: No published business rules — run the seeders')
-        ->expectsOutputToContain('engine_settings: No published engine settings — run the seeders');
+        ->expectsOutputToContain('engine_settings: No published engine settings — run the seeders')
+        ->expectsOutputToContain('extras: No published extras — run the seeders');
 });

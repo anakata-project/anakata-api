@@ -77,6 +77,7 @@ final class PaymentsKpis
     {
         $viewAll = $actor->hasPermission(Permission::BookingsViewAll);
         [$balanceSql, $paid] = Booking::balanceSql();
+        [$cruiseSql, $cruisePaid] = Booking::cruiseOutstandingSql();
         $owing = self::owingStatuses();
         $overdueStatuses = [
             BookingStatus::Confirmed->value,
@@ -96,7 +97,7 @@ final class PaymentsKpis
         $cancelledIn = implode(', ', array_fill(0, count($cancelled), '?'));
 
         $pendingWhen = 'bookings.status IN ('.$owingIn.') AND ('.$balanceSql.') > 0';
-        $overdueWhen = 'bookings.status IN ('.$overdueIn.') AND ('.$balanceSql.') > 0 AND ? > '.$dueSql;
+        $overdueWhen = 'bookings.status IN ('.$overdueIn.') AND ('.$cruiseSql.') > 0 AND ? > '.$dueSql;
 
         $collected = self::paidSumQuery($actor, $viewAll, $from, $to, depositsOnly: false);
         $deposits = self::paidSumQuery($actor, $viewAll, $from, $to, depositsOnly: true);
@@ -109,7 +110,7 @@ final class PaymentsKpis
                 'COALESCE(SUM(CASE WHEN '.$pendingWhen.' THEN ('.$balanceSql.') ELSE 0 END), 0) as pending, '.
                 'COALESCE(SUM(CASE WHEN '.$pendingWhen.' THEN 1 ELSE 0 END), 0) as pending_count, '.
                 'COALESCE(SUM(CASE WHEN '.$overdueWhen.' THEN 1 ELSE 0 END), 0) as overdue_count, '.
-                'COALESCE(SUM(CASE WHEN '.$overdueWhen.' THEN ('.$balanceSql.') ELSE 0 END), 0) as overdue_amount, '.
+                'COALESCE(SUM(CASE WHEN '.$overdueWhen.' THEN ('.$cruiseSql.') ELSE 0 END), 0) as overdue_amount, '.
                 'COALESCE(SUM(CASE WHEN bookings.commission_approved = 1 AND bookings.commission_pct IS NOT NULL '.
                 'AND bookings.status NOT IN ('.$cancelledIn.') '.
                 'THEN ROUND(bookings.total * bookings.commission_pct / 100) ELSE 0 END), 0) as commission_accrued',
@@ -122,12 +123,12 @@ final class PaymentsKpis
                     ...$owing,
                     ...$paid,
                     ...$overdueStatuses,
-                    ...$paid,
+                    ...$cruisePaid,
                     $today,
                     ...$overdueStatuses,
-                    ...$paid,
+                    ...$cruisePaid,
                     $today,
-                    ...$paid,
+                    ...$cruisePaid,
                     ...$cancelled,
                 ],
             )

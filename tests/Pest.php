@@ -17,6 +17,7 @@ use App\Services\Inventory\ClaimService;
 use App\Support\BusinessTime;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
+use App\Support\Config\Documents\ExtrasDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\SensitiveFields;
 use Illuminate\Testing\TestResponse;
@@ -166,6 +167,18 @@ function businessRulesDocument(array $overrides = []): array
 {
     /** @var array<string, mixed> $document */
     $document = array_replace_recursive(BusinessRulesDocument::initial(), $overrides);
+
+    return $document;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function extrasDocument(array $overrides = []): array
+{
+    /** @var array<string, mixed> $document */
+    $document = array_replace_recursive(ExtrasDocument::initial(), $overrides);
 
     return $document;
 }

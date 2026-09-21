@@ -162,6 +162,35 @@ test('an overpayment is recorded and warned', function (): void {
         ->assertJsonPath('warnings.0', 'This takes the booking above its total by USD 3,400');
 });
 
+test('an overpayment warning compares against charges not the cruise total', function (): void {
+    $booking = pendingCabin(['status' => BookingStatus::Confirmed]);
+
+    $this->actingAs(adminUser())
+        ->postJson('/api/rms/bookings/'.$booking->id.'/extras', [
+            'code' => 'FLT',
+            'qty' => 1,
+        ])
+        ->assertCreated();
+
+    $this->actingAs(adminUser())
+        ->postJson('/api/rms/bookings/'.$booking->id.'/payments', [
+            'kind' => PaymentKind::Balance->value,
+            'method' => PaymentMethod::CardStripe->value,
+            'amount' => 27020,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('warnings', []);
+
+    $this->actingAs(adminUser())
+        ->postJson('/api/rms/bookings/'.$booking->id.'/payments', [
+            'kind' => PaymentKind::Balance->value,
+            'method' => PaymentMethod::CardStripe->value,
+            'amount' => 100,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('warnings.0', 'This takes the booking above its total by USD 100');
+});
+
 test('an explicit status is only accepted for a wire and refunds are refused', function (): void {
     $booking = pendingCabin();
 

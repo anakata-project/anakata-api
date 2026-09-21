@@ -50,6 +50,9 @@ class BookingFactory extends Factory
             'deposit_pct' => 10,
             'balance_days' => 120,
             'internal_notes' => null,
+            'png_collected' => false,
+            'tct_collected' => false,
+            'tct_rate_usd' => null,
         ];
     }
 

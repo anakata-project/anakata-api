@@ -279,3 +279,151 @@ Add the append-only consent log and guest-data retention jobs.
 EOF
 )"
 ```
+
+## Task 04 · Extras catalogue, booking extras, fees, charges
+
+### Catalogue = `ConfigKind::Extras`
+Fourth config document, same Sprint 2 path. `extra_versions` is append-only. `CurrentConfig::extras()`. `ConfigSeeder` publishes `initial()` when the table is empty — no DML migration.
+
+`initial()` is the prototype ANC six items (all `active: true`): FLT 420 / HPRE 320 / HPOST 320 / SPA · BAR · BTQ on request.
+
+**Immutable once published: codes only.** Names, units, prices and flags may change. Retire with `active: false`. `ConfigDocument::publishErrors()` (default `[]`) is applied in `ConfigPublisher` the same way as rate-year errors — 422 keyed `document.items.{i}.code`. Endpoints `/api/rms/extras` (GET / validate / versions). View `panel.rms`, publish `extras.manage`. Approval reference required.
+
+### Frozen booking extras
+`booking_extras`: snapshotted `name` / `unit` / `rate_usd`. Add only active catalogue items; on-request `rate_usd` required; optional override allowed. Remove deletes the row; history keeps before-state. Terminal statuses 422. Lock order departure → booking → extra row. History uses prototype wording + `Money::format`. A later catalogue publish never rewrites rows (G4).
+
+`GET /api/rms/bookings/{booking}/extras` returns rows + `extras_total` and the fee-display facts the panel checkboxes need (`png_known_total`, `png_pending_count`, `tct_pp`, `tct_count`, `extras_due_hours`).
+
+### Fee collection — default false; TCT = guest records
+`png_collected` / `tct_collected` default **false** (PENDING CLIENT). `tct_rate_usd` snapshotted from `fees.tct_pp` on switch-on. TCT basis is **guest records**, not the priced party (prototype `paxCount`). PNG = Σ stored `guests.png_fee` when collected; pending category contributes 0. PNG switch-on calls `ApplyPng::toBooking()`. Switch-off leaves stored amounts in place but they drop out of the balance.
+
+`PATCH /api/rms/bookings/{booking}/fees` — own-records, same lock, same terminal 422. History `booking.fees_changed` with prototype `setFee` wording.
+
+### Charges model — one formula
+`charges_total` = `total` + extras + collected fees. `balance()` / `balanceSql()` = charges − `Ledger::paid`. `cruise_outstanding` = `GREATEST(0, total − paid)`. `depositAmount()` unchanged (share of `total`). OVERDUE is CONFIRMED / ON_HOLD_AGENCY + cruise outstanding > 0 + Galápagos date after due date. `extras_due_at` is shown only (Sprint 11 alerts).
+
+Writers use `balanceFresh()` / `chargesTotalFresh()` so a loaded list aggregate cannot hide a just-inserted extra or fee:
+
+- `ApplyPaymentEffects` FULLY_PAID — `balanceFresh() <= 0` from CONFIRMED only
+- `RecordPayment` overpayment — `paidFresh + amount` vs `chargesTotalFresh()`
+- `CreatePaymentLink` default / cap / empty-balance — `balanceFresh()`
+
+FULLY_PAID never regresses: an extra on a fully paid booking re-opens `balance` and does not move status back. Paying that extra to zero writes no second FULLY_PAID transition. Penalties stay on cruise `total`. Extras and collected fees are treated as refunded in full minus nothing until the client says otherwise.
+
+### Grep of `->total` / `bookings.total` in `app/` — three buckets
+
+Pricing-engine `Quote::$total` and paginator `meta.total` omitted.
+
+**Stays cruise** (deposit, penalties, commission, repricing, the `total` field itself):
+
+- `Booking::depositAmount()` — `$this->total * deposit_pct`
+- `Booking::commissionAmount()` — `$this->total * commission_pct`
+- `PaymentsKpis` `commission_accrued` — `ROUND(bookings.total * commission_pct / 100)`
+- `CreateRefundRequest` — `CancellationPenalty::penalty($booking->total, …)`
+- `MoveBooking` — writes / confirms `$booking->total` as the cruise reprice (`current_total`, `new_total`, `difference`)
+- `CreateReservation` / `CreateBookingRequest` — persist the quoted cruise total
+- `BookingResource` `total`, `AgencyResource` booking `total`, `AgencyBookingWindow` `sum('total')` (agency revenue)
+- `GroupResource` `total` (sum of cruise totals)
+- `BookingRequestResource` `estimated_value`
+
+**Becomes charges** (anything meaning “what is owed”):
+
+- `Booking::balance()` / `balanceSql()` — `charges_total − paid`
+- `RecordPayment` overpayment — compare `paidFresh + amount` to `chargesTotalFresh()`; warning wording stays “above its total by …”
+- `ApplyPaymentEffects` FULLY_PAID — `balanceFresh() <= 0` from CONFIRMED only
+- `CreatePaymentLink` default / cap / empty-balance guard — `balanceFresh()`
+- `TransitionBooking` manual FULLY_PAID note — already `balance()` (charges after this change)
+- `scopePendingPayment`, `PaymentsKpis` `pending` / `pending_count` — keep `balanceSql()` (now charges)
+- `GroupResource` `balance` — already sums `balance()`
+- `FlagOverdueCommand` history key `balance` — **not** this bucket; see next
+
+**Becomes cruise outstanding** (OVERDUE):
+
+- `Booking::isOverdue()` — `cruiseOutstanding() > 0`
+- `Booking::scopeOverdue()` — `cruiseOutstandingSql() > 0`
+- `PaymentsKpis` `overdue_count` / `overdue_amount` — `cruiseOutstandingSql()`
+- `BookingController::overdueKpis()` — `SUM(cruiseOutstandingSql())`
+- `FlagOverdueCommand` history `balance` value — store `cruiseOutstanding()` so extras never inflate the overdue flag
+
+### Seed
+`DemoExtrasSeeder` after guests (PNG already stored). Amounts from the published catalogue / engine settings. Not on `ANK-2026-0003` or `ANK-2026-0005`.
+
+- `ANK-2026-0011` — FLT × 2 → extras 840
+- `ANK-2026-0007` — HPRE × 1 → extras 320
+- `ANK-2026-0009` — `png_collected` (two DE/SE adults → 200 × 2 = 400)
+
+Deposit / commission / AG-001 revenue stay cruise. `reference-values.md` updated in this task.
+
+### e2e lines this seed invalidates (for task 10)
+
+Expected new balances: 0007 **21,267**; 0009 **45,400**; 0011 **24,780**. Pending KPI **433,547**. Deposit, settled, pledged, commission **2,328**, AG-001 revenue **23,275** stay.
+
+| File | Line / check | Today | After seed |
+|---|---|---|---|
+| `tests/e2e/fixtures/reference-values.md` § Seeded money intro | “Balance on the list is `total − settled` (H2)” | cruise-only formula | charges − settled |
+| same, money table 0007 | Balance `USD 20,947` | 20,947 | 21,267 |
+| same, money table 0009 | Balance `USD 45,000` | 45,000 | 45,400 |
+| same, money table 0011 | Balance `USD 23,940` | 23,940 | 24,780 |
+| same, KPI paragraph | Pending `USD 431,987` | 431,987 | 433,547 |
+| `tests/e2e/scenarios/bookings/BKG-01-seeded-bookings-segments.md` E5 | `0007 USD 20,947` · `0009 USD 45,000` | those two figures | 21,267 / 45,400 |
+| `tests/e2e/scenarios/payments/PAY-06-payments-revenue.md` E1 pending | `USD 431,987` | 431,987 | 433,547 |
+
+**Not invalidated** (cruise / not money): BKG-01 E3 (segment filter), BKG-12 E1 (locks), INV-01 E5 (calendar `0007`), PAY-06 E3 commission `USD 2,328` on 0007, AG-001 revenue `USD 23,275`.
+
+`reference-values.md` was updated here. Do **not** rewrite the BKG-01 / PAY-06 scenario files in this task.
+
+### Checks
+`composer check` inside Docker — 748 Pest tests (4934 assertions), Pint (742 files), Larastan level 6 (0 errors). `anakata:config-verify` — extras v1 valid.
+
+### Git (do not run)
+
+```bash
+git add app/Enums/ConfigKind.php
+git add app/Support/Config/ConfigDocument.php
+git add app/Support/Config/Documents/ExtraItem.php
+git add app/Support/Config/Documents/ExtrasDocument.php
+git add app/Services/Config/ConfigPublisher.php
+git add app/Services/Config/ConfigRegistry.php
+git add app/Services/Config/CurrentConfig.php
+git add app/Providers/AppServiceProvider.php
+git add app/Models/ExtraVersion.php app/Models/BookingExtra.php app/Models/Booking.php
+git add app/Policies/ExtraVersionPolicy.php app/Policies/BookingExtraPolicy.php app/Policies/BookingPolicy.php
+git add app/Actions/Extras
+git add app/Actions/Payments/RecordPayment.php app/Actions/Payments/CreatePaymentLink.php
+git add app/Support/Bookings/BookingCharges.php
+git add app/Support/Payments/ApplyPaymentEffects.php
+git add app/Support/Payments/PaymentsKpis.php
+git add app/Console/Commands/FlagOverdueCommand.php
+git add app/Http/Controllers/Rms/ExtrasController.php
+git add app/Http/Controllers/Rms/BookingExtraController.php
+git add app/Http/Controllers/Rms/BookingFeesController.php
+git add app/Http/Controllers/Rms/BookingController.php
+git add app/Http/Requests/Rms/AddBookingExtraRequest.php
+git add app/Http/Requests/Rms/UpdateBookingFeesRequest.php
+git add app/Http/Resources/Rms/BookingExtraResource.php
+git add app/Http/Resources/Rms/BookingResource.php
+git add database/migrations/2026_09_21_200037_create_extra_versions_table.php
+git add database/migrations/2026_09_21_200038_create_booking_extras_and_fee_columns.php
+git add database/factories/BookingExtraFactory.php database/factories/BookingFactory.php
+git add database/seeders/DemoExtrasSeeder.php database/seeders/DatabaseSeeder.php
+git add routes/api/rms.php
+git add tests/Pest.php
+git add tests/Feature/Config/ExtrasDocumentTest.php
+git add tests/Feature/Config/ExtrasEndpointsTest.php
+git add tests/Feature/Config/ConfigVerifyCommandTest.php
+git add tests/Feature/Database/DatabaseSetupTest.php
+git add tests/Feature/Bookings/BookingListQueryCountTest.php
+git add tests/Feature/Payments/RecordPaymentTest.php
+git add tests/Feature/Extras
+git add tests/Concurrency/ExtraVsPaymentConcurrencyTest.php
+git add tests/e2e/fixtures/reference-values.md
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the extras catalogue, frozen booking extras, and charges balance.
+
+EOF
+)"
+```
+
+### Notes for later (do not build)
+Invoice lines (Sprint 7); extras overdue alerts (Sprint 11); on-board extras status (08 C / B6); Contacts In (task 05); panel Extras tab (task 08); rewrite the BKG-01 / PAY-06 lines listed above (task 10). Open refund question: extras and collected fees refunded in full minus nothing until the client says otherwise.

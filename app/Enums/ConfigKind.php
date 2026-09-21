@@ -13,6 +13,7 @@ enum ConfigKind: string
     case Rates = 'rates';
     case BusinessRules = 'business_rules';
     case EngineSettings = 'engine_settings';
+    case Extras = 'extras';
 
     public function slug(): string
     {
@@ -20,6 +21,7 @@ enum ConfigKind: string
             self::Rates => 'rates',
             self::BusinessRules => 'business-rules',
             self::EngineSettings => 'engine-settings',
+            self::Extras => 'extras',
         };
     }
 
@@ -39,6 +41,7 @@ enum ConfigKind: string
             self::Rates => 'rates',
             self::BusinessRules => 'business rules',
             self::EngineSettings => 'engine settings',
+            self::Extras => 'extras',
         };
     }
 

@@ -18,6 +18,7 @@ use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\EngineSettingsVersion;
+use App\Models\ExtraVersion;
 use App\Models\Group;
 use App\Models\Guest;
 use App\Models\InternalBlock;
@@ -36,6 +37,7 @@ use App\Services\Stripe\StripeGateway;
 use App\Services\Stripe\StripeSdkGateway;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
+use App\Support\Config\Documents\ExtrasDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Iso;
 use App\Support\Stripe\StripeGatewayBinding;
@@ -129,6 +131,7 @@ class AppServiceProvider extends ServiceProvider
             'rate_version' => RateVersion::class,
             'business_rule_version' => BusinessRuleVersion::class,
             'engine_settings_version' => EngineSettingsVersion::class,
+            'extra_version' => ExtraVersion::class,
             'itinerary' => Itinerary::class,
             'departure' => Departure::class,
             'internal_block' => InternalBlock::class,
@@ -164,6 +167,13 @@ class AppServiceProvider extends ServiceProvider
             BusinessRuleVersion::class,
             BusinessRulesDocument::class,
             BusinessRulesDocument::initial(),
+        );
+
+        $this->app->make(ConfigRegistry::class)->register(
+            ConfigKind::Extras,
+            ExtraVersion::class,
+            ExtrasDocument::class,
+            ExtrasDocument::initial(),
         );
 
         foreach (Permission::cases() as $permission) {

@@ -63,4 +63,14 @@ abstract class ConfigDocument
     {
         return true;
     }
+
+    /**
+     * Blocking checks against the published document (e.g. immutable codes).
+     *
+     * @return array<string, list<string>>
+     */
+    public function publishErrors(?self $published): array
+    {
+        return [];
+    }
 }

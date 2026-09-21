@@ -46,9 +46,11 @@ final class RecordPayment extends Action
             $paid = Ledger::paidFresh($booking);
             $warnings = [];
 
-            if ($status->countsAsPaid() && ($paid + $amount) > $booking->total) {
+            $charges = $booking->chargesTotalFresh();
+
+            if ($status->countsAsPaid() && ($paid + $amount) > $charges) {
                 $warnings[] = 'This takes the booking above its total by '
-                    .Money::format($paid + $amount - $booking->total);
+                    .Money::format($paid + $amount - $charges);
             }
 
             $payment = $this->insert->handle($booking, [

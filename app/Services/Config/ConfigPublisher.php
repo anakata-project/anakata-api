@@ -94,6 +94,18 @@ final class ConfigPublisher extends Action
             }
         }
 
+        $publishErrors = $typed->publishErrors($published);
+
+        if ($publishErrors !== []) {
+            $prefixed = [];
+
+            foreach ($publishErrors as $path => $messages) {
+                $prefixed['document.'.$path] = $messages;
+            }
+
+            throw ValidationException::withMessages($prefixed);
+        }
+
         $changes = $typed->changesAgainst($published);
 
         if ($changes === []) {

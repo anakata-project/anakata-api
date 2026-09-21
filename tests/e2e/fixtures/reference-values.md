@@ -236,15 +236,15 @@ GRP-007: `Alvear family & friends`, coordinator Lorena Alvear, 28 Nov 2027 ANAMA
 
 ### Seeded money (Sprint 5)
 
-Read on the Bookings list and Payments & Revenue after `reset.sh` on 2026-09-21 (Galápagos month 2026-09). Every deposit is `Rounding::halfUp(total × frozen deposit_pct)` — cabin 10 %, charter 20 %. Balance on the list is `total − settled` (H2). AWAITING_WIRE does not count as paid (H6).
+Read on the Bookings list and Payments & Revenue after `reset.sh` on 2026-09-21 (Galápagos month 2026-09). Every deposit is `Rounding::halfUp(total × frozen deposit_pct)` — cabin 10 %, charter 20 %. Balance on the list is `charges_total − settled` (cruise + extras + collected fees − paid; I9). AWAITING_WIRE does not count as paid (H6).
 
 | Reference | Status on list | Total | Deposit | Settled | Pledged | Balance | Ledger rows (Payments & Revenue) |
 |---|---|---|---|---|---|---|---|
 | ANK-2026-0003 | CONFIRMED | USD 26,600 | 2,660 (10 %) | 2,660 | 0 | USD 23,940 | `ANK-2026-0003-D01` Card (Stripe) SETTLED 2 Jul 2026 |
 | ANK-2026-0005 | FULLY PAID | USD 37,905 | 3,791 (10 %) | 37,905 | 0 | USD 0 | `…-D01` 3,791 + `…-B01` 34,114 Card (Stripe) SETTLED |
-| ANK-2026-0007 | CONFIRMED | USD 23,275 | **2,328** (10 % of 23,275, not the seed-data literal 2,327) | 2,328 | 0 | USD 20,947 | `ANK-2026-0007-D01` Wire transfer SETTLED |
-| ANK-2026-0009 | CONFIRMED | USD 50,000 | 5,000 (10 %) | 5,000 | 0 | USD 45,000 | `ANK-2026-0009-D01` Stripe payment link SETTLED |
-| ANK-2026-0011 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `ANK-2026-0011-D01` Card (Stripe) SETTLED |
+| ANK-2026-0007 | CONFIRMED | USD 23,275 | **2,328** (10 % of 23,275, not the seed-data literal 2,327) | 2,328 | 0 | USD 21,267 (20,947 cruise + 320 HPRE) | `ANK-2026-0007-D01` Wire transfer SETTLED · `HPRE × 1` |
+| ANK-2026-0009 | CONFIRMED | USD 50,000 | 5,000 (10 %) | 5,000 | 0 | USD 45,400 (45,000 cruise + 400 PNG collected) | `ANK-2026-0009-D01` Stripe payment link SETTLED · `png_collected` |
+| ANK-2026-0011 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 24,780 (23,940 cruise + 840 FLT × 2) | `ANK-2026-0011-D01` Card (Stripe) SETTLED · `FLT × 2` |
 | ANK-2026-0012 | CONFIRMED | USD 211,500 | 42,300 (20 %) | 42,300 | 0 | USD 169,200 | `ANK-2026-0012-D01` Wire transfer SETTLED |
 | ANK-2026-0014 | PENDING PAYMENT | USD 26,600 | 2,660 | **0** | **2,660** awaiting wire | USD 26,600 | `ANK-2026-0014-D01` Wire transfer · Mark received |
 | ANK-2026-0016 | CONFIRMED | USD 26,600 | 2,660 | 2,660 | 0 | USD 23,940 | `…-D01` Wire transfer SETTLED · GRP-007 |
@@ -257,7 +257,7 @@ Read on the Bookings list and Payments & Revenue after `reset.sh` on 2026-09-21 
 
 GRP-007 panel after reset: `Alvear family & friends` · `coordinator Lorena Alvear` · `3 cabins · 6 guests` · Total USD 79,800 · Balance USD 71,820 · CONFIRMED.
 
-Payments & Revenue KPIs after reset (All dates): Collected USD 103,493 · Of which deposits USD 69,379 (`10% cabins · 20% charter`) · Pending USD 431,987 (`11 payments · due at T−120 per booking`) · Overdue USD 0 · Commission accrued USD 2,328 (`payable 30 days post-cruise`). Date-range line `12 payments · all dates`.
+Payments & Revenue KPIs after reset (All dates): Collected USD 103,493 · Of which deposits USD 69,379 (`10% cabins · 20% charter`) · Pending USD 433,547 (`11 payments · due at T−120 per booking` · includes extras 1,160 + collected PNG 400) · Overdue USD 0 · Commission accrued USD 2,328 (`payable 30 days post-cruise`). Date-range line `12 payments · all dates`.
 
 Pending row for 0014: due column `72h wire window` (not a T−120 date). Other pending rows show the balance due date.
 

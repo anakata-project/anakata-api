@@ -11,8 +11,10 @@ use App\Enums\BookingType;
 use App\Enums\ChannelOfOrigin;
 use App\Enums\MainChannel;
 use App\Enums\PaymentStatus;
+use App\Enums\PngCategory;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
 use App\Support\Payments\Ledger;
 use App\Support\Payments\PaymentsKpis;
@@ -31,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -61,6 +64,9 @@ use Illuminate\Support\Collection;
  * @property int $balance_days
  * @property CarbonImmutable|null $balance_due_date_override
  * @property string|null $internal_notes
+ * @property bool $png_collected
+ * @property bool $tct_collected
+ * @property int|null $tct_rate_usd
  * @property Carbon|null $deleted_at
  * @property int|null $created_by
  * @property int|null $updated_by
@@ -77,6 +83,7 @@ use Illuminate\Support\Collection;
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
  * @property-read Collection<int, Guest> $guests
+ * @property-read Collection<int, BookingExtra> $extras
  * @property-read Collection<int, Consent> $consents
  * @property-read Collection<int, Payment> $payments
  * @property-read int|null $guests_count
@@ -117,6 +124,9 @@ use Illuminate\Support\Collection;
     'balance_days',
     'balance_due_date_override',
     'internal_notes',
+    'png_collected',
+    'tct_collected',
+    'tct_rate_usd',
 ])]
 class Booking extends Model
 {
@@ -144,6 +154,9 @@ class Booking extends Model
             'deposit_pct' => 'integer',
             'balance_days' => 'integer',
             'balance_due_date_override' => CalendarDate::class,
+            'png_collected' => 'boolean',
+            'tct_collected' => 'boolean',
+            'tct_rate_usd' => 'integer',
         ];
     }
 
@@ -236,6 +249,14 @@ class Booking extends Model
     }
 
     /**
+     * @return HasMany<BookingExtra, $this>
+     */
+    public function extras(): HasMany
+    {
+        return $this->hasMany(BookingExtra::class);
+    }
+
+    /**
      * @return HasMany<Consent, $this>
      */
     public function consents(): HasMany
@@ -308,9 +329,128 @@ class Booking extends Model
         return $this->main_channel->segment();
     }
 
+    public function extrasTotal(): int
+    {
+        if (array_key_exists('extras_amount_sum', $this->getAttributes())) {
+            return (int) $this->getAttribute('extras_amount_sum');
+        }
+
+        if ($this->relationLoaded('extras')) {
+            return (int) $this->extras->sum(fn (BookingExtra $extra): int => $extra->amount());
+        }
+
+        return $this->extrasTotalFresh();
+    }
+
+    public function extrasTotalFresh(): int
+    {
+        return (int) $this->extras()->sum(DB::raw('qty * rate_usd'));
+    }
+
+    public function feesCollectedTotal(): int
+    {
+        if (array_key_exists('fees_collected_sum', $this->getAttributes())) {
+            return (int) $this->getAttribute('fees_collected_sum');
+        }
+
+        return $this->pngCollectedTotal() + $this->tctCollectedTotal();
+    }
+
+    public function feesCollectedFresh(): int
+    {
+        return $this->pngCollectedFresh() + $this->tctCollectedFresh();
+    }
+
+    public function chargesTotal(): int
+    {
+        return $this->total + $this->extrasTotal() + $this->feesCollectedTotal();
+    }
+
+    public function chargesTotalFresh(): int
+    {
+        return $this->total + $this->extrasTotalFresh() + $this->feesCollectedFresh();
+    }
+
     public function balance(): int
     {
-        return $this->total - Ledger::paid($this);
+        return $this->chargesTotal() - Ledger::paid($this);
+    }
+
+    public function balanceFresh(): int
+    {
+        return $this->chargesTotalFresh() - Ledger::paidFresh($this);
+    }
+
+    public function cruiseOutstanding(): int
+    {
+        return max(0, $this->total - Ledger::paid($this));
+    }
+
+    public function cruiseOutstandingFresh(): int
+    {
+        return max(0, $this->total - Ledger::paidFresh($this));
+    }
+
+    public function pngPendingCount(): int
+    {
+        if (array_key_exists('png_pending_count_agg', $this->getAttributes())) {
+            return (int) $this->getAttribute('png_pending_count_agg');
+        }
+
+        $this->loadMissing('guests');
+
+        return $this->guests
+            ->filter(fn (Guest $guest): bool => $guest->png_category === PngCategory::Pending)
+            ->count();
+    }
+
+    public function extrasDueAt(): CarbonImmutable
+    {
+        $this->loadMissing('departure');
+
+        $hours = app(CurrentConfig::class)->businessRules()->payments->extrasDueHours;
+
+        return BusinessTime::calendarDay($this->departure->date->toDateString())->subHours($hours);
+    }
+
+    private function pngCollectedTotal(): int
+    {
+        if (! $this->png_collected) {
+            return 0;
+        }
+
+        $this->loadMissing('guests');
+
+        return (int) $this->guests->sum(fn (Guest $guest): int => $guest->png_fee ?? 0);
+    }
+
+    private function tctCollectedTotal(): int
+    {
+        if (! $this->tct_collected) {
+            return 0;
+        }
+
+        $this->loadMissing('guests');
+
+        return (int) ($this->tct_rate_usd ?? 0) * $this->guests->count();
+    }
+
+    private function pngCollectedFresh(): int
+    {
+        if (! $this->png_collected) {
+            return 0;
+        }
+
+        return (int) $this->guests()->whereNotNull('png_fee')->sum('png_fee');
+    }
+
+    private function tctCollectedFresh(): int
+    {
+        if (! $this->tct_collected) {
+            return 0;
+        }
+
+        return (int) ($this->tct_rate_usd ?? 0) * $this->guests()->count();
     }
 
     public function balanceDueDate(): CarbonImmutable
@@ -330,7 +470,7 @@ class Booking extends Model
             return false;
         }
 
-        if ($this->balance() <= 0) {
+        if ($this->cruiseOutstanding() <= 0) {
             return false;
         }
 
@@ -386,21 +526,84 @@ class Booking extends Model
     }
 
     /**
-     * SQL fragment: total minus payments that count as paid (paidValues()).
-     *
      * @return array{0: string, 1: list<string>}
      */
-    public static function balanceSql(): array
+    public static function paidSql(): array
     {
         $paid = PaymentStatus::paidValues();
         $placeholders = implode(', ', array_fill(0, count($paid), '?'));
 
         return [
-            'bookings.total - COALESCE((
+            'COALESCE((
                 SELECT SUM(payments.amount) FROM payments
                 WHERE payments.booking_id = bookings.id
                   AND payments.status IN ('.$placeholders.')
             ), 0)',
+            $paid,
+        ];
+    }
+
+    public static function extrasTotalSql(): string
+    {
+        return 'COALESCE((
+            SELECT SUM(booking_extras.qty * booking_extras.rate_usd)
+            FROM booking_extras
+            WHERE booking_extras.booking_id = bookings.id
+        ), 0)';
+    }
+
+    public static function feesCollectedSql(): string
+    {
+        return '(CASE WHEN bookings.png_collected = 1 THEN COALESCE((
+            SELECT SUM(guests.png_fee) FROM guests
+            WHERE guests.booking_id = bookings.id
+              AND guests.png_fee IS NOT NULL
+        ), 0) ELSE 0 END)
+        + (CASE WHEN bookings.tct_collected = 1 THEN
+            COALESCE(bookings.tct_rate_usd, 0) * COALESCE((
+                SELECT COUNT(*) FROM guests WHERE guests.booking_id = bookings.id
+            ), 0)
+        ELSE 0 END)';
+    }
+
+    public static function chargesTotalSql(): string
+    {
+        return 'bookings.total + ('.self::extrasTotalSql().') + ('.self::feesCollectedSql().')';
+    }
+
+    public static function pngPendingCountSql(): string
+    {
+        return 'COALESCE((
+            SELECT COUNT(*) FROM guests
+            WHERE guests.booking_id = bookings.id
+              AND guests.png_category = \''.PngCategory::Pending->value.'\'
+        ), 0)';
+    }
+
+    /**
+     * SQL fragment: charges total minus payments that count as paid.
+     *
+     * @return array{0: string, 1: list<string>}
+     */
+    public static function balanceSql(): array
+    {
+        [$paidSql, $paid] = self::paidSql();
+
+        return [
+            '('.self::chargesTotalSql().') - ('.$paidSql.')',
+            $paid,
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: list<string>}
+     */
+    public static function cruiseOutstandingSql(): array
+    {
+        [$paidSql, $paid] = self::paidSql();
+
+        return [
+            'GREATEST(0, bookings.total - ('.$paidSql.'))',
             $paid,
         ];
     }
@@ -426,14 +629,14 @@ class Booking extends Model
     public function scopeOverdue(Builder $query): void
     {
         $today = BusinessTime::now()->toDateString();
-        [$balanceSql, $paid] = self::balanceSql();
+        [$cruiseSql, $paid] = self::cruiseOutstandingSql();
 
         $query
             ->whereIn('bookings.status', [
                 BookingStatus::Confirmed->value,
                 BookingStatus::OnHoldAgency->value,
             ])
-            ->whereRaw('('.$balanceSql.') > 0', $paid)
+            ->whereRaw('('.$cruiseSql.') > 0', $paid)
             ->whereRaw(
                 '? > COALESCE(bookings.balance_due_date_override, DATE_SUB((
                     SELECT departures.date FROM departures WHERE departures.id = bookings.departure_id
@@ -506,14 +709,26 @@ class Booking extends Model
     /**
      * @param  Builder<self>  $query
      */
-    /**
-     * @param  Builder<self>  $query
-     */
     public function scopeWithGuestSummary(Builder $query): void
     {
         $query
             ->withCount('guests')
             ->withCount(['guests as guests_complete_count' => fn ($guests) => $guests->complete()]);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    public function scopeWithChargesSummary(Builder $query): void
+    {
+        if ($query->getQuery()->columns === null) {
+            $query->select('bookings.*');
+        }
+
+        $query
+            ->selectRaw('('.self::extrasTotalSql().') as extras_amount_sum')
+            ->selectRaw('('.self::feesCollectedSql().') as fees_collected_sum')
+            ->selectRaw('('.self::pngPendingCountSql().') as png_pending_count_agg');
     }
 
     /**

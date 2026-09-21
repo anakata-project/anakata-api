@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             $this->call(DemoRequestsSeeder::class);
             $this->call(DemoGuestsSeeder::class);
             $this->call(DemoConsentsSeeder::class);
+            $this->call(DemoExtrasSeeder::class);
         }
     }
 }

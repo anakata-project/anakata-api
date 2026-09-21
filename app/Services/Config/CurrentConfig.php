@@ -9,6 +9,7 @@ use App\Models\ConfigVersion;
 use App\Support\Config\ConfigDocument;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
+use App\Support\Config\Documents\ExtrasDocument;
 use App\Support\Config\Documents\RatesDocument;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
@@ -107,6 +108,17 @@ final class CurrentConfig
 
         if (! $document instanceof EngineSettingsDocument) {
             throw new RuntimeException('Published engine settings are not an EngineSettingsDocument.');
+        }
+
+        return $document;
+    }
+
+    public function extras(): ExtrasDocument
+    {
+        $document = $this->document(ConfigKind::Extras);
+
+        if (! $document instanceof ExtrasDocument) {
+            throw new RuntimeException('Published extras are not an ExtrasDocument.');
         }
 
         return $document;

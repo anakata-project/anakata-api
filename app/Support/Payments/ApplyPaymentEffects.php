@@ -52,7 +52,7 @@ final class ApplyPaymentEffects
 
         $paid = Ledger::paidFresh($booking);
 
-        if ($booking->total - $paid <= 0 && $booking->status === BookingStatus::Confirmed) {
+        if ($booking->balanceFresh() <= 0 && $booking->status === BookingStatus::Confirmed) {
             $booking = $this->transitions->handle($booking, [
                 'to' => BookingStatus::FullyPaid,
                 'reason' => $reason,

@@ -113,6 +113,7 @@ final class BookingController extends Controller
             ->when($request->boolean('pending_payment'), fn (Builder $query) => $query->pendingPayment())
             ->withLedgerAggregates()
             ->withGuestSummary()
+            ->withChargesSummary()
             ->with([
                 'departure.yacht',
                 'departure.itinerary',
@@ -178,6 +179,7 @@ final class BookingController extends Controller
         $booking = Booking::query()
             ->withLedgerAggregates()
             ->withGuestSummary()
+            ->withChargesSummary()
             ->with([
                 'departure.yacht',
                 'departure.itinerary',
@@ -351,13 +353,13 @@ final class BookingController extends Controller
      */
     private function overdueKpis(Builder $query): array
     {
-        [$balanceSql, $paid] = Booking::balanceSql();
+        [$cruiseSql, $paid] = Booking::cruiseOutstandingSql();
 
         $row = $query
             ->overdue()
             ->toBase()
             ->select([])
-            ->selectRaw('COUNT(*) as overdue_count, COALESCE(SUM('.$balanceSql.'), 0) as overdue_amount', $paid)
+            ->selectRaw('COUNT(*) as overdue_count, COALESCE(SUM('.$cruiseSql.'), 0) as overdue_amount', $paid)
             ->first();
 
         return [

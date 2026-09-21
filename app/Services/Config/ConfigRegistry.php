@@ -67,6 +67,7 @@ final class ConfigRegistry
             ConfigKind::Rates => 'RateVersion is added in sprint 2 task 02.',
             ConfigKind::BusinessRules => 'BusinessRuleVersion is added in sprint 2 task 04.',
             ConfigKind::EngineSettings => 'EngineSettingsVersion is added in sprint 2 task 03.',
+            ConfigKind::Extras => 'ExtraVersion is added in sprint 6 task 04.',
         });
     }
 
@@ -79,6 +80,7 @@ final class ConfigRegistry
             ConfigKind::Rates => 'RatesDocument is added in sprint 2 task 02.',
             ConfigKind::BusinessRules => 'BusinessRulesDocument is added in sprint 2 task 04.',
             ConfigKind::EngineSettings => 'EngineSettingsDocument is added in sprint 2 task 03.',
+            ConfigKind::Extras => 'ExtrasDocument is added in sprint 6 task 04.',
         });
     }
 

@@ -61,7 +61,7 @@ final class CreatePaymentLink extends Action
     {
         return $kind === PaymentKind::Deposit
             ? $booking->depositAmount()
-            : $booking->balance();
+            : $booking->balanceFresh();
     }
 
     private function guardBooking(Booking $booking): void
@@ -76,7 +76,7 @@ final class CreatePaymentLink extends Action
             ]);
         }
 
-        if ($booking->balance() <= 0) {
+        if ($booking->balanceFresh() <= 0) {
             throw ValidationException::withMessages([
                 'amount' => ['This booking has no outstanding balance.'],
             ]);
@@ -85,7 +85,7 @@ final class CreatePaymentLink extends Action
 
     private function guardAmount(Booking $booking, int $amount): void
     {
-        if ($amount < 1 || $amount > $booking->balance()) {
+        if ($amount < 1 || $amount > $booking->balanceFresh()) {
             throw ValidationException::withMessages([
                 'amount' => ['The amount must be at least 1 and not more than the outstanding balance.'],
             ]);
