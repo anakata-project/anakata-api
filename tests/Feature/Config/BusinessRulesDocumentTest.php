@@ -104,6 +104,18 @@ test('fromArray fills missing consent versions as empty strings', function (): v
     expect($lenient->consentVersions->marketing)->toBe('');
 });
 
+test('fromArray fills missing legal_entity bank fields as TBD', function (): void {
+    $missing = BusinessRulesDocument::initial();
+    unset($missing['legal_entity']);
+
+    $lenient = BusinessRulesDocument::fromArray($missing);
+
+    expect($lenient->legalEntity->name)->toBe('');
+    expect($lenient->legalEntity->addressLines)->toBe([]);
+    expect($lenient->legalEntity->bank->bankName)->toBe('[TBD]');
+    expect($lenient->legalEntity->bank->swift)->toBe('[TBD]');
+});
+
 test('rules reject duplicate band days and a missing zero band', function (): void {
     $document = businessRulesDocument();
     $document['cancellation']['bands'] = [

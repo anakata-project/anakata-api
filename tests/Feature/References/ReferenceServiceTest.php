@@ -25,6 +25,7 @@ test('every reference type uses its format', function (): void {
     expect(draw($service, ReferenceType::Group))->toBe('GRP-001');
     expect(draw($service, ReferenceType::Offer))->toBe('OF-001');
     expect(draw($service, ReferenceType::Agency))->toBe('AG-001');
+    expect(draw($service, ReferenceType::Invoice, $at))->toBe('INV-2026-0001');
 });
 
 test('numbers grow past the pad width and never wrap', function (): void {
@@ -43,6 +44,23 @@ test('the first booking of a new year is 0001', function (): void {
         ->toBe('ANK-2026-0001');
     expect(draw($service, ReferenceType::Booking, CarbonImmutable::parse('2027-01-04', 'Pacific/Galapagos')))
         ->toBe('ANK-2027-0001');
+});
+
+test('the first invoice of a new year is 0001', function (): void {
+    $service = app(ReferenceService::class);
+
+    expect(draw($service, ReferenceType::Invoice, CarbonImmutable::parse('2026-06-15', 'Pacific/Galapagos')))
+        ->toBe('INV-2026-0001');
+    expect(draw($service, ReferenceType::Invoice, CarbonImmutable::parse('2027-01-04', 'Pacific/Galapagos')))
+        ->toBe('INV-2027-0001');
+});
+
+test('an invoice at 2026-12-31 23:30 Galapagos is a 2026 invoice', function (): void {
+    $service = app(ReferenceService::class);
+    $at = CarbonImmutable::parse('2026-12-31 23:30:00', 'Pacific/Galapagos');
+
+    expect($at->utc()->year)->toBe(2027);
+    expect(draw($service, ReferenceType::Invoice, $at))->toBe('INV-2026-0001');
 });
 
 test('bookings and requests have separate counters', function (): void {

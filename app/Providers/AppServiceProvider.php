@@ -17,6 +17,7 @@ use App\Models\BusinessRuleVersion;
 use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\Departure;
+use App\Models\Document;
 use App\Models\EngineSettingsVersion;
 use App\Models\ExtraVersion;
 use App\Models\Group;
@@ -139,6 +140,7 @@ class AppServiceProvider extends ServiceProvider
             'group' => Group::class,
             'agency' => Agency::class,
             'booking' => Booking::class,
+            'document' => Document::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
             'booking_request' => BookingRequest::class,

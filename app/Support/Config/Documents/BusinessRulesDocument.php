@@ -26,6 +26,7 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly AlertsRules $alerts,
         public readonly RetentionRules $retention,
         public readonly ConsentVersions $consentVersions,
+        public readonly LegalEntityRules $legalEntity,
         public readonly array $bands,
     ) {}
 
@@ -87,6 +88,23 @@ final class BusinessRulesDocument extends ConfigDocument
                     'marketing' => 'v1',
                 ],
             ],
+            'legal_entity' => [
+                'name' => 'PONTOS LLC (a limited liability company)',
+                'address_lines' => [
+                    '430 Grand Bay Drive, Apt 1108',
+                    'Key Biscayne, FL 33149, United States',
+                ],
+                'email' => 'info@anakata.co',
+                'website' => 'anakata.co',
+                'ein' => '42-4742064',
+                'bank' => [
+                    'bank_name' => '[TBD]',
+                    'account_name' => '[TBD]',
+                    'account_number' => '[TBD]',
+                    'routing' => '[TBD]',
+                    'swift' => '[TBD]',
+                ],
+            ],
             'cancellation' => [
                 'bands' => [
                     ['min_days' => 120, 'penalty_pct' => 5],
@@ -112,6 +130,8 @@ final class BusinessRulesDocument extends ConfigDocument
         $retention = is_array($data['retention'] ?? null) ? $data['retention'] : [];
         $legal = is_array($data['legal'] ?? null) ? $data['legal'] : [];
         $consentVersions = is_array($legal['consent_versions'] ?? null) ? $legal['consent_versions'] : [];
+        $legalEntity = is_array($data['legal_entity'] ?? null) ? $data['legal_entity'] : [];
+        $bank = is_array($legalEntity['bank'] ?? null) ? $legalEntity['bank'] : [];
         $cancellation = is_array($data['cancellation'] ?? null) ? $data['cancellation'] : [];
 
         $reminders = [];
@@ -189,6 +209,20 @@ final class BusinessRulesDocument extends ConfigDocument
                 is_string($consentVersions['insurance'] ?? null) ? $consentVersions['insurance'] : '',
                 is_string($consentVersions['marketing'] ?? null) ? $consentVersions['marketing'] : '',
             ),
+            new LegalEntityRules(
+                is_string($legalEntity['name'] ?? null) ? $legalEntity['name'] : '',
+                self::stringList($legalEntity['address_lines'] ?? []),
+                is_string($legalEntity['email'] ?? null) ? $legalEntity['email'] : '',
+                is_string($legalEntity['website'] ?? null) ? $legalEntity['website'] : '',
+                is_string($legalEntity['ein'] ?? null) ? $legalEntity['ein'] : '',
+                new BankRules(
+                    self::bankValue($bank['bank_name'] ?? null),
+                    self::bankValue($bank['account_name'] ?? null),
+                    self::bankValue($bank['account_number'] ?? null),
+                    self::bankValue($bank['routing'] ?? null),
+                    self::bankValue($bank['swift'] ?? null),
+                ),
+            ),
             $bands,
         );
     }
@@ -205,6 +239,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
      *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int},
      *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string}},
+     *     legal_entity: array{name: string, address_lines: list<string>, email: string, website: string, ein: string, bank: array{bank_name: string, account_name: string, account_number: string, routing: string, swift: string}},
      *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
      * }
      */
@@ -223,6 +258,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal' => [
                 'consent_versions' => $this->consentVersions->toArray(),
             ],
+            'legal_entity' => $this->legalEntity->toArray(),
             'cancellation' => [
                 'bands' => array_map(
                     fn (CancellationBand $band): array => $band->toArray(),
@@ -283,6 +319,19 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal.consent_versions.privacy' => ['required', 'string', 'min:1', 'max:120'],
             'legal.consent_versions.insurance' => ['required', 'string', 'min:1', 'max:120'],
             'legal.consent_versions.marketing' => ['required', 'string', 'min:1', 'max:120'],
+            'legal_entity' => ['required', 'array'],
+            'legal_entity.name' => ['required', 'string', 'min:1', 'max:180'],
+            'legal_entity.address_lines' => ['required', 'array', 'min:1', 'max:6'],
+            'legal_entity.address_lines.*' => ['required', 'string', 'min:1', 'max:180'],
+            'legal_entity.email' => ['required', 'string', 'min:1', 'max:120'],
+            'legal_entity.website' => ['required', 'string', 'min:1', 'max:120'],
+            'legal_entity.ein' => ['required', 'string', 'min:1', 'max:32'],
+            'legal_entity.bank' => ['required', 'array'],
+            'legal_entity.bank.bank_name' => ['required', 'string', 'min:1', 'max:120'],
+            'legal_entity.bank.account_name' => ['required', 'string', 'min:1', 'max:120'],
+            'legal_entity.bank.account_number' => ['required', 'string', 'min:1', 'max:120'],
+            'legal_entity.bank.routing' => ['required', 'string', 'min:1', 'max:64'],
+            'legal_entity.bank.swift' => ['required', 'string', 'min:1', 'max:32'],
             'cancellation' => ['required', 'array'],
             'cancellation.bands' => ['required', 'array', 'min:1', 'max:6', new BusinessRulesConstraint('bands')],
             'cancellation.bands.*.min_days' => ['required', 'integer', 'min:0', 'max:999'],
@@ -328,6 +377,16 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal.consent_versions.privacy' => 'LEG-002 · Privacy policy version',
             'legal.consent_versions.insurance' => 'OPS-005 · Travel insurance declaration version',
             'legal.consent_versions.marketing' => 'LEG-002 · Marketing consent version',
+            'legal_entity.name' => 'Decision 8 · Invoicing entity',
+            'legal_entity.address_lines' => 'Decision 8 · Invoicing entity address',
+            'legal_entity.email' => 'Decision 8 · Invoicing entity email',
+            'legal_entity.website' => 'Decision 8 · Invoicing entity website',
+            'legal_entity.ein' => 'Decision 8 · EIN',
+            'legal_entity.bank.bank_name' => 'LEG-004 · Bank name',
+            'legal_entity.bank.account_name' => 'LEG-004 · Account name',
+            'legal_entity.bank.account_number' => 'LEG-004 · Account number',
+            'legal_entity.bank.routing' => 'LEG-004 · Routing number',
+            'legal_entity.bank.swift' => 'LEG-004 · SWIFT',
             'cancellation.bands' => '§4.1.5 · Cabin cancellation penalty bands',
         ];
     }
@@ -431,6 +490,16 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal.consent_versions.privacy' => 'v2026.1 (pending LEG-002)',
             'legal.consent_versions.insurance' => 'OPS-005 v1',
             'legal.consent_versions.marketing' => 'v1',
+            'legal_entity.name' => 'PONTOS LLC (a limited liability company)',
+            'legal_entity.address_lines' => '430 Grand Bay Drive, Apt 1108 · Key Biscayne, FL 33149, United States',
+            'legal_entity.email' => 'info@anakata.co',
+            'legal_entity.website' => 'anakata.co',
+            'legal_entity.ein' => '42-4742064',
+            'legal_entity.bank.bank_name',
+            'legal_entity.bank.account_name',
+            'legal_entity.bank.account_number',
+            'legal_entity.bank.routing',
+            'legal_entity.bank.swift' => '[TBD] (LEG-004 pending client)',
             'cancellation.bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100%',
             default => $path,
         };
@@ -480,5 +549,30 @@ final class BusinessRulesDocument extends ConfigDocument
         sort($dates);
 
         return $dates;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $lines = [];
+
+        foreach ($value as $item) {
+            if (is_string($item) && $item !== '') {
+                $lines[] = $item;
+            }
+        }
+
+        return $lines;
+    }
+
+    private static function bankValue(mixed $value): string
+    {
+        return is_string($value) && $value !== '' ? $value : '[TBD]';
     }
 }

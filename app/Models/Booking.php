@@ -87,6 +87,7 @@ use Illuminate\Support\Facades\DB;
  * @property-read Collection<int, BookingExtra> $extras
  * @property-read Collection<int, Consent> $consents
  * @property-read Collection<int, Payment> $payments
+ * @property-read Collection<int, Document> $documents
  * @property-read int|null $guests_count
  * @property-read int|null $guests_complete_count
  * @property-read Collection<int, PaymentLink> $paymentLinks
@@ -271,6 +272,14 @@ class Booking extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * @return HasMany<Document, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
     }
 
     /**

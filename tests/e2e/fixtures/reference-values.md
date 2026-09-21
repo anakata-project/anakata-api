@@ -71,6 +71,12 @@ Source: `BusinessRulesDocument::initial()`.
 | legal.consent_versions.privacy | v2026.1 (pending LEG-002) |
 | legal.consent_versions.insurance | OPS-005 v1 |
 | legal.consent_versions.marketing | v1 |
+| legal_entity.name | PONTOS LLC (a limited liability company) |
+| legal_entity.address_lines | 430 Grand Bay Drive, Apt 1108 · Key Biscayne, FL 33149, United States |
+| legal_entity.email | info@anakata.co |
+| legal_entity.website | anakata.co |
+| legal_entity.ein | 42-4742064 |
+| legal_entity.bank.* | [TBD] (LEG-004) |
 | cancellation.bands | ≥120 d / 5% · ≥90 d / 50% · ≥0 d / 100% |
 
 ## Fee table (engine settings)
@@ -92,10 +98,10 @@ Source: `EngineSettingsDocument::initial()` → `fees` (FIN-004).
 
 Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON). On-screen KPI and chip numbers are ⚠ UNVERIFIED — task 02 report / Pest counts, not a reset screen.
 
-- **55** rows total. ⚠ UNVERIFIED
-- After a fresh seed exactly **16** flagged: 15 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
-- Breakdown: `here` 30 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
-- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 55 / 30 / 15 / 10 / 16. ⚠ UNVERIFIED
+- **65** rows total. ⚠ UNVERIFIED
+- After a fresh seed exactly **21** flagged: 20 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
+- Breakdown: `here` 40 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
+- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 65 / 40 / 15 / 10 / 21. ⚠ UNVERIFIED
 
 Flagged rows:
 
@@ -116,6 +122,11 @@ Flagged rows:
 | consent-privacy | PENDING CLIENT | LEG-002 default |
 | consent-insurance | PENDING CLIENT | OPS-005 default |
 | consent-marketing | PENDING CLIENT | LEG-002 default |
+| legal-entity-bank-name | PENDING CLIENT | LEG-004 default |
+| legal-entity-account-name | PENDING CLIENT | LEG-004 default |
+| legal-entity-account-number | PENDING CLIENT | LEG-004 default |
+| legal-entity-routing | PENDING CLIENT | LEG-004 default |
+| legal-entity-swift | PENDING CLIENT | LEG-004 default |
 | OPS-006 sales open / first cruise | CONFIRMED | non-empty note |
 
 FIN-001 source display on the registry: `USD 13,300 · 25,000 · 199,500`. Five new hold rows source display: `Not defined in v5 — default` (task 02).

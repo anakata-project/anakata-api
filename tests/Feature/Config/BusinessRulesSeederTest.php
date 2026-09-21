@@ -43,6 +43,21 @@ test('the seeded business rules document matches seed-data.json plus the new fie
     expect($document['alerts']['low_occupancy_days_before'])->toBe(90);
     expect($document['retention']['passport_months_after_cruise'])->toBe(24);
     expect($document['retention']['medical_days_after_cruise'])->toBe(90);
+    expect($document['legal_entity']['name'])->toBe('PONTOS LLC (a limited liability company)');
+    expect($document['legal_entity']['address_lines'])->toBe([
+        '430 Grand Bay Drive, Apt 1108',
+        'Key Biscayne, FL 33149, United States',
+    ]);
+    expect($document['legal_entity']['email'])->toBe('info@anakata.co');
+    expect($document['legal_entity']['website'])->toBe('anakata.co');
+    expect($document['legal_entity']['ein'])->toBe('42-4742064');
+    expect($document['legal_entity']['bank'])->toBe([
+        'bank_name' => '[TBD]',
+        'account_name' => '[TBD]',
+        'account_number' => '[TBD]',
+        'routing' => '[TBD]',
+        'swift' => '[TBD]',
+    ]);
 
     $bands = array_map(
         fn (array $band): array => ['min_days' => $band['min'], 'penalty_pct' => $band['pct']],
