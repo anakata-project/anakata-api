@@ -30,6 +30,16 @@ enum BehaviouralEventName: string
         return $this !== self::IdentityStitched;
     }
 
+    public function touchesInventory(): bool
+    {
+        return $this === self::BeginCheckout || $this === self::SubmitBookingRequest;
+    }
+
+    public function side(): string
+    {
+        return $this->touchesInventory() ? 'RMS + CRM' : 'CRM';
+    }
+
     /**
      * @return list<string>
      */

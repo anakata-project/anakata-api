@@ -45,6 +45,7 @@ use App\Models\RefundRequest;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WaitlistEntry;
+use App\Policies\SyncPolicy;
 use App\Services\Config\ConfigRegistry;
 use App\Services\Config\CurrentConfig;
 use App\Services\Stripe\FakeStripeGateway;
@@ -54,6 +55,7 @@ use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\ExtrasDocument;
 use App\Support\Config\Documents\RatesDocument;
+use App\Support\Crm\CrmSync;
 use App\Support\Iso;
 use App\Support\Stripe\StripeGatewayBinding;
 use DateTimeInterface;
@@ -240,6 +242,8 @@ class AppServiceProvider extends ServiceProvider
         foreach (Permission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user): bool => $user->hasPermission($permission));
         }
+
+        Gate::policy(CrmSync::class, SyncPolicy::class);
 
         Date::serializeUsing(fn (DateTimeInterface $date): string => Iso::utc($date));
 

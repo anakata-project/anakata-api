@@ -403,3 +403,106 @@ Consenting visitors send a fixed event vocabulary; identifying submits stitch th
 EOF
 )"
 ```
+
+## Task 04 · The CRM read API: timeline, activity, sync and field ownership
+
+The three CRM screens this sprint builds now have a read API. There is no bus and no replay (L5, B9): the CRM reads the booking tables and recorded job health.
+
+### Contact timeline
+`GET /api/crm/contacts/{contact}/timeline` — newest first, page/`per_page`, `{ at, kind, title, detail, link }`. One SQL `UNION ALL` in `App\Support\Crm\ContactTimeline`.
+
+Sources and wording:
+- **Booking milestones** from `change_history` on the contact’s bookings: created, requested, confirmed, fully paid, cancelled, moved. Detail is `after.what` when it exists; requested and moved use a fixed sentence. No other before/after keys.
+- **Payments** — kind, amount (`Money::format`), status. No method, gateway id, or note.
+- **Deliveries** — kind, status, `to`.
+- **Consents** — document, version, source, accepted or withdrawn. No IP.
+- **Behavioural events** stitched to the contact, with itinerary and departure names resolved.
+- **Merges** from `contact_merges` (who, reason, undone). `contact.merged` history is not also emitted.
+
+Excluded: `payment.*` / `payment_link.*` history, `consent.recorded`, guest and document history, `booking.released`, raw before/after, anything in `SensitiveFields`. A merged contact’s timeline includes the loser’s bookings and events because merge already repoints those rows.
+
+### Activity KPIs
+`GET /api/crm/activity?from&to&name&identified`. Stream: time, event, contact name or `anonymous`, detail, side. `begin_checkout` and `submit_booking_request` are `RMS + CRM`; everything else is `CRM`.
+
+`meta.kpis` is SQL, not page counts:
+- `events_today` — Galápagos today (`BusinessTime`), still respects `name` and `identified`
+- `identified` / `anonymous` / `inventory_touching` — same filters as the list
+- `web_hold_minutes` / `web_hold_extension_minutes` — published business rules (`holds.web_minutes` 20, extension 10)
+
+### Sync & Field Ownership instead of a bus
+Five endpoints. The prototype’s live bus and replay have no equivalent in one application; failed jobs and FAILED deliveries are the replacement.
+
+- `GET /api/crm/sync/ownership` — doc 07 §3 as implemented. “Mirrored to” is `read_by`. Booking-derived CRM rows say they are read directly from the booking tables and name the class. Deals, tasks, conversations: not built (Sprint 10).
+- `GET /api/crm/sync/jobs` — every event on `Schedule` (not the doc 07 job table). Ledger reconcile and the other unscheduled prototype jobs do not appear.
+- `GET /api/crm/sync/failures` — Horizon `failed_jobs` and `deliveries.status = FAILED`.
+- `POST /api/crm/sync/failures/{id}/retry` — `sync.retry` only (Admin). `job:{uuid}` → `queue:retry`. `delivery:{id}` → Sprint 7 resend via `App\Actions\Crm\RetryFailedDelivery` so the CRM controller never imports `App\Actions\Documents`.
+- `GET /api/crm/sync/identity` — merge log (who, when, reason, undone).
+- `GET /api/crm/sync/events` — the six domain events in `app/Events` plus every `BehaviouralEventName`, with producer and listeners. `meta.note` states there is no bus.
+
+Reads use `panel.crm`. `sync.retry` is not on Manager or Sales Exec.
+
+### `scheduled_runs` hooks
+Table `scheduled_runs` (`command`, start, finish, `running|succeeded|failed`, exit code, output ≤ 500). `RecordScheduledRuns::attach()` registers `before` / `after` / `onFailure` on every `Schedule::command()` in `routes/console.php`. A test fails if a scheduled command is missing the hook.
+
+### Deviations
+None from the plan.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 05: regenerate types from these resources.
+- Task 07: panel Activity and Sync screens consume `meta.kpis`; do not count in the panel.
+- Task 09: E2E CRM scenarios for timeline, activity, and a failed job retry.
+
+### Checks
+`composer check` passed (1066 tests). Pint and Larastan clean.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Enums/Permission.php
+git add app/Enums/BehaviouralEventName.php
+git add app/Enums/ScheduledRunOutcome.php
+git add app/Models/ScheduledRun.php
+git add app/Support/Schedule/RecordScheduledRuns.php
+git add app/Support/Crm/BehaviouralEventDetail.php
+git add app/Support/Crm/ContactTimeline.php
+git add app/Support/Crm/EngineActivity.php
+git add app/Support/Crm/FieldOwnership.php
+git add app/Support/Crm/EventCatalogue.php
+git add app/Support/Crm/CrmSync.php
+git add app/Support/Crm/SyncJobs.php
+git add app/Support/Crm/SyncFailures.php
+git add app/Actions/Crm/RetryFailedDelivery.php
+git add app/Policies/SyncPolicy.php
+git add app/Http/Controllers/Crm/ContactTimelineController.php
+git add app/Http/Controllers/Crm/EngineActivityController.php
+git add app/Http/Controllers/Crm/SyncController.php
+git add app/Http/Requests/Crm/IndexContactTimelineRequest.php
+git add app/Http/Requests/Crm/IndexEngineActivityRequest.php
+git add app/Http/Resources/Crm/ContactTimelineItemResource.php
+git add app/Http/Resources/Crm/EngineActivityItemResource.php
+git add app/Http/Resources/Crm/FieldOwnershipResource.php
+git add app/Http/Resources/Crm/ScheduledJobResource.php
+git add app/Http/Resources/Crm/SyncFailureResource.php
+git add app/Http/Resources/Crm/SyncIdentityResource.php
+git add app/Http/Resources/Crm/EventCatalogueResource.php
+git add app/Http/Resources/Crm/RetrySyncFailureResource.php
+git add app/Providers/AppServiceProvider.php
+git add database/migrations/2026_09_21_200082_create_scheduled_runs_table.php
+git add routes/api/crm.php
+git add routes/console.php
+git add tests/Feature/Crm/ContactTimelineTest.php
+git add tests/Feature/Crm/EngineActivityTest.php
+git add tests/Feature/Crm/SyncOwnershipAndEventsTest.php
+git add tests/Feature/Crm/SyncJobsTest.php
+git add tests/Feature/Crm/SyncFailuresTest.php
+git add tests/Feature/OpenApi/CrmResponseSchemasTest.php
+git add docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the CRM read API for timeline, activity and sync health.
+
+The panel can now read a contact timeline, the engine event stream, and the ownership contract as this app actually implements it — recorded job runs and failed side effects, with no event bus.
+EOF
+)"
+```

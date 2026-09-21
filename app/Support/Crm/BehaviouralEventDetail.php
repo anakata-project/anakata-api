@@ -1,0 +1,77 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Crm;
+
+use App\Enums\BehaviouralEventName;
+use App\Support\Money;
+use Carbon\CarbonImmutable;
+
+final class BehaviouralEventDetail
+{
+    /**
+     * @param  array<string, mixed>  $params
+     */
+    public static function make(
+        BehaviouralEventName $name,
+        array $params,
+        ?string $itineraryName = null,
+        ?string $departureDate = null,
+        ?string $yachtName = null,
+    ): string {
+        $parts = [];
+
+        if (is_string($itineraryName) && $itineraryName !== '') {
+            $parts[] = $itineraryName;
+        }
+
+        if (is_string($departureDate) && $departureDate !== '') {
+            $formatted = self::formatDate($departureDate);
+            $parts[] = is_string($yachtName) && $yachtName !== ''
+                ? $formatted.' · '.$yachtName
+                : $formatted;
+        } elseif (is_string($yachtName) && $yachtName !== '') {
+            $parts[] = $yachtName;
+        }
+
+        if (isset($params['cabin_count']) && is_numeric($params['cabin_count'])) {
+            $count = (int) $params['cabin_count'];
+            $parts[] = $count === 1 ? '1 cabin' : $count.' cabins';
+        }
+
+        if (isset($params['step']) && is_string($params['step']) && $params['step'] !== '') {
+            $parts[] = 'step '.$params['step'];
+        }
+
+        if (isset($params['path']) && is_string($params['path']) && $params['path'] !== '') {
+            $parts[] = $params['path'];
+        }
+
+        if (isset($params['value']) && is_numeric($params['value'])) {
+            $parts[] = Money::format((int) $params['value']);
+        }
+
+        if (isset($params['coupon_code']) && is_string($params['coupon_code']) && $params['coupon_code'] !== '') {
+            $parts[] = $params['coupon_code'];
+        }
+
+        if (isset($params['page_path']) && is_string($params['page_path']) && $params['page_path'] !== '') {
+            $parts[] = $params['page_path'];
+        }
+
+        if ($name === BehaviouralEventName::IdentityStitched && isset($params['count']) && is_numeric($params['count'])) {
+            $count = (int) $params['count'];
+            $parts[] = $count === 1 ? '1 prior event' : $count.' prior events';
+        }
+
+        return implode(' · ', $parts);
+    }
+
+    private static function formatDate(string $date): string
+    {
+        $parsed = CarbonImmutable::createFromFormat('Y-m-d', $date);
+
+        return $parsed instanceof CarbonImmutable ? $parsed->format('j M Y') : $date;
+    }
+}

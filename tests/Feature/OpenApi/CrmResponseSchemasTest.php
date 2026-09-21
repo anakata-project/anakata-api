@@ -45,6 +45,14 @@ test('crm OpenAPI schemas have properties', function (): void {
         'ContactMergeResource',
         'ContactMergeResultResource',
         'ContactUnmergeResultResource',
+        'ContactTimelineItemResource',
+        'EngineActivityItemResource',
+        'FieldOwnershipResource',
+        'ScheduledJobResource',
+        'SyncFailureResource',
+        'SyncIdentityResource',
+        'EventCatalogueResource',
+        'RetrySyncFailureResource',
     ];
 
     foreach ($expected as $name) {
