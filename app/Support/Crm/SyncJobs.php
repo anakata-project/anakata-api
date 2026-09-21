@@ -37,7 +37,7 @@ final class SyncJobs
      */
     public static function list(): array
     {
-        $events = app(Schedule::class)->events();
+        $events = self::scheduledEvents();
         $commands = array_values(array_unique(array_map(
             fn (Event $event): string => RecordScheduledRuns::commandName($event),
             $events,
@@ -90,5 +90,25 @@ final class SyncJobs
                     ->count(),
             ],
         ];
+    }
+
+    /**
+     * Console routes register the schedule. Artisan and Pest already load them;
+     * an HTTP request does not, so events() is empty until this file is required.
+     *
+     * @return list<Event>
+     */
+    private static function scheduledEvents(): array
+    {
+        $schedule = app(Schedule::class);
+        $events = $schedule->events();
+
+        if ($events !== []) {
+            return $events;
+        }
+
+        require base_path('routes/console.php');
+
+        return $schedule->events();
     }
 }

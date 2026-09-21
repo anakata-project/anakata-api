@@ -878,3 +878,140 @@ Record sprint 9 task 06: panel CRM Contacts.
 EOF
 )"
 ```
+
+## Task 07 · Web & Engine Activity and Sync
+
+Two CRM panel screens read the Sprint 9 activity and sync API. Types already live on the sibling layer at `v0.10.0` and are re-exported from `anakata-panel/app/types/api.ts`. No KPI math in the panel. No copied `OWNERSHIP` / `EVENTCAT` / `BUS` arrays. No replay button. Layer pin stays `v0.10.0`. Task 08 (engine `useTrack` posting events) is not this task.
+
+This report file is `anakata-api/docs/sprints/sprint-09/REPORT.md` — the same file task 06 appended. The work is in **anakata-panel** (screens, helpers, CSS, i18n) and **anakata-api** (this section, plus a one-method HTTP schedule load so `GET /api/crm/sync/jobs` is not empty outside Artisan/Pest).
+
+Nav already pointed at `/crm/engine/activity` and `/crm/system/sync`. New static pages replace the catch-all placeholder; `app/pages/crm/[group]/[item].vue` stays.
+
+### Web & Engine Activity
+
+`GET /api/crm/activity` with `page`, `per_page=50`, and filters. Event-name options are the `family === 'behavioural'` rows from `GET /api/crm/sync/events` (`$fetch`, so a 403 does not toast). If that request fails, the event filter is hidden; date, identified, KPIs and the stream still load.
+
+Identified / anonymous / all maps to `identified=1`, `identified=0`, or omitting the param. Date range is `DateRangeFilter`; `from` / `to` are sent only when set.
+
+Every name the stream can show is a `BehaviouralEventName`. Prototype rows `hold.expired` and `offer.published` are domain events and are not in this stream, so they are not missing from the filter.
+
+Five `AnkKpi`s from `meta.kpis` (never counted in the panel):
+
+- `identified`, `anonymous`, and `inventory_touching` follow `from`, `to`, `name`, and `identified`.
+- `events_today` follows `name` and `identified`, and ignores the date range (Galápagos today).
+- `web_hold_minutes` and `web_hold_extension_minutes` are the published hold rules. They ignore every filter. Rendered `{minutes} min` with sub `+ {minutes} min extension`.
+
+Notice (i18n): the CRM builds timelines and segments from these events; the RMS only acts on holds and requests; nothing is recorded without the visitor’s consent.
+
+Stream columns: time (`useDates`), event name, contact, detail, side. Pagination matches Contacts.
+
+**Side badges.** `side()` is `CRM` or `RMS + CRM`. `sideTokens` splits on `+`, trims, drops empties. One badge per token via `systemBadgeClass` (case-insensitive: `RMS` → `sys-rms`, `CRM` → `sys-crm`, `ENGINE` / `ENG` → `sys-eng`, `EXTERNAL` / `EXT` → `sys-ext`, anything else including a compound string → `''`).
+
+**Retention hint stays off the page.** The prototype says anonymous events are purged at 13 months, doc 07 section 8 says raw events are kept 24 months, and L6 says unstitched anonymous events are deleted after 30 days. The numbers disagree, so the hint is not restored.
+
+**Contact name → drawer.** The row’s `contact` is a display string; there is no id. `anonymous` (case-insensitive, trimmed) is plain text. Any other name calls `GET /api/crm/contacts?q={encodeURIComponent(trimmed)}&per_page=100`. Trim both the cell and each candidate `name`, compare case-insensitively, and navigate to `/crm/sales/contacts?open={id}` only when exactly one row matches and `data.length` is under 100. Otherwise toast that the name does not open a single contact. Same-name contacts (task 06 duplicates) never pick one of several.
+
+The activity payload should carry `contact_id` later (same category as task 06’s structured 409). This task does not change that API or regenerate types.
+
+### Sync & Field Ownership
+
+Prototype order for the sections this task builds. The data-flow diagram and the “Removed” / “Added” panels are skipped (mirrors and a bus — L5 / B9).
+
+- **KPIs** from `GET /api/crm/sync/jobs` `meta.kpis`: jobs failing (coral when `> 0`), failures open, merges this month. Never `data.length`.
+- **Field ownership** from `GET /api/crm/sync/ownership`. Columns: object, field group, system of record (badge), read by (the API’s `read_by`), rule, and the class in `code` when present.
+- **Event catalogue** from `GET /api/crm/sync/events`. Columns: name, family (`domain` / `behavioural`), producer, listeners (em dash when empty). Class names stay. No payload, effect, or replay column.
+- **Failures** in the live-bus slot, from `GET /api/crm/sync/failures`. The section line is `meta.note` from the events response (`EventCatalogue::NOTE`), shown as the API sends it. A failed row is the list; there is no delivered/retrying bus.
+- **Scheduled jobs** and **identity** side by side (`crm-grid2`, stacking under 1100px). Jobs: command, `cadence` plus `timezone` when set, last finish (else last start), outcome pill, next run, description. `last_outcome === 'failed'` uses the failed pill and a row highlight. Null outcome is an em dash. Identity from `GET /api/crm/sync/identity` (paginated): survivor and loser each link to `/crm/sales/contacts?open={id}`; merged by, when, reason, undone. The static four-step identity copy is not rendered.
+
+**Retry and Resend.** Both are `POST /api/crm/sync/failures/{encodeURIComponent(id)}/retry`. The id is `job:{uuid}` or `delivery:{id}`; the colon is encoded. **Retry** on `kind === 'job'`, **Resend** on `kind === 'delivery'`, and only when `can('sync.retry')`. The server authorises both with `sync.retry` (Admin; not Manager or Sales Exec). Resend is the Sprint 7 send (`RetryFailedDelivery`). Resend confirms before the POST (“This sends the message to the customer again.”). A job retry does not confirm. The clicked row’s button (and the confirm actions) disable while that request is pending. 422/403 surface through `firstApiMessage`, then failures and jobs reload so the KPIs move.
+
+### Helpers and chrome
+
+`app/components/crm/syncHelpers.ts`, tested in `tests/unit/syncHelpers.test.ts`: `systemBadgeClass`, `sideTokens`, `jobOutcomePillClass`. Tests cover each badge token, mixed case (`ENG`, `Engine`, `ENGINE`), unknown and empty values, a compound string through `sideTokens` (and that `systemBadgeClass` itself returns `''` for that string), and every `jobOutcomePillClass` case.
+
+`isAnonymousContact` and `uniqueContactId` sit in the same file for the activity drawer lookup.
+
+CSS in `app/assets/css/crm.css`: `.sys-crm`, `.sys-eng`, `.sys-ext` (`.sys-rms` already lives in shell.css), `.pill.bad`, a failed-job row, and `.crm-grid2`. Strings under `crmActivity` and `crmSync`.
+
+### Deviations
+
+- `GET /api/crm/sync/jobs` returned `data: []` over HTTP because `routes/console.php` is not loaded on a php-fpm request, so `Schedule::events()` was empty. Pest already loads the console routes, which is why task 04 stayed green. `SyncJobs::scheduledEvents()` requires that file when `events()` is empty. Without it the jobs table and `jobs_failing` KPI cannot show a real last run. No types regenerated.
+
+### Open questions
+
+None.
+
+### Notes for later
+
+- Activity payload should carry `contact_id` so the stream does not resolve a drawer by display name.
+- Task 08: the public engine still only calls gtag (`useTrack`); that task posts consented events.
+
+### Quality
+
+- anakata-panel against the sibling layer (`v0.10.0`): `pnpm lint`, `pnpm typecheck`, `pnpm test` (246), `pnpm build` — pass.
+- Fresh clone into `/tmp/anakata-fresh-s9-07` overlayed against a `v0.10.0` ui checkout (no overlay on the layer): panel typecheck and build pass. Layer pin was not bumped.
+- anakata-api: Pint on `SyncJobs.php`; `php artisan test --filter=Sync` — 9 passed.
+
+### Browser
+
+After `COMPOSE_PROJECT_NAME=anakata-api E2E_ALLOW_RESET=1 tests/e2e/bin/reset.sh`, both themes (Carolina admin). Consented events posted through the existing `POST /api/engine/events`, then a request so later rows are identified. One scheduled command run; one failed queue job and one `FAILED` delivery seeded.
+
+**Activity (`/crm/engine/activity`)**
+
+- Five KPIs from the API: events today 6, identified 5, anonymous 1, inventory-touching 1, web hold `20 min` / `+ 10 min extension`.
+- Notice present. Event filter is the behavioural catalogue (no `hold.expired` / `offer.published`).
+- `begin_checkout` shows split **RMS** + **CRM** badges.
+- Twin Guest (two same-name contacts) toasts “That name does not open a single contact.”
+- A. Fontaine → `/crm/sales/contacts?open=12` and the existing drawer.
+- Anonymous filter: identified 0, anonymous 1, inventory-touching 0, events today 1, web hold still 20 + 10. Stream is the anonymous `page_view` with a CRM badge.
+
+**Sync (`/crm/system/sync`)**
+
+- Ownership matrix, event catalogue, `EventCatalogue::NOTE` in the failures slot.
+- KPIs after the schedule load: jobs failing 1 (coral), failures open 2, merges this month 0. Scheduled jobs include `anakata:retention` FAILED (row highlight) and never-run rows as —.
+- **Retry** on `job:{uuid}`: button disabled while pending; job row leaves the list; failures open 2 → 1.
+- **Resend** on `delivery:{id}`: confirm modal, then row + confirm + cancel disable (double-click). Modal closes after the POST.
+
+The public engine still only calls gtag (`useTrack`); task 08 is what posts events.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`).
+
+```bash
+# 1. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/assets/css/crm.css \
+  app/components/crm/syncHelpers.ts \
+  app/pages/crm/engine/activity.vue \
+  app/pages/crm/system/sync.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/syncHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add CRM Activity and Sync screens on the Sprint 9 APIs.
+
+Staff read the engine event stream and field ownership plus job
+health. Failures replace the prototype bus; Retry and Resend
+both go through sync.retry.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Support/Crm/SyncJobs.php \
+  docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Load the console schedule on HTTP job lists.
+
+php-fpm never required routes/console.php, so the sync jobs
+endpoint returned an empty list outside Artisan and Pest.
+Record sprint 9 task 07.
+EOF
+)"
+```
