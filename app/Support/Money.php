@@ -20,4 +20,11 @@ final class Money
 
         return $sign.self::format($dollars).sprintf('.%02d', $remainder);
     }
+
+    public static function formatDocument(int $usd): string
+    {
+        $sign = $usd < 0 ? '−' : '';
+
+        return $sign.number_format(abs($usd), 2, '.', ',');
+    }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Rms\AgencyController;
+use App\Http\Controllers\Rms\BookingBillingController;
 use App\Http\Controllers\Rms\BookingController;
 use App\Http\Controllers\Rms\BookingExtraController;
 use App\Http\Controllers\Rms\BookingFeesController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Rms\ContactController;
 use App\Http\Controllers\Rms\ContactsInController;
 use App\Http\Controllers\Rms\CountryController;
 use App\Http\Controllers\Rms\DepartureController;
+use App\Http\Controllers\Rms\DocumentController;
 use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\ExtrasController;
 use App\Http\Controllers\Rms\GroupController;
@@ -135,6 +137,13 @@ Route::post('bookings/{booking}/consents', [ConsentController::class, 'store'])-
 Route::get('bookings/{booking}/extras', [BookingExtraController::class, 'index'])->whereNumber('booking');
 Route::post('bookings/{booking}/extras', [BookingExtraController::class, 'store'])->whereNumber('booking');
 Route::patch('bookings/{booking}/fees', [BookingFeesController::class, 'update'])->whereNumber('booking');
+Route::patch('bookings/{booking}/billing', [BookingBillingController::class, 'update'])->whereNumber('booking');
+Route::get('bookings/{booking}/documents', [DocumentController::class, 'index'])->whereNumber('booking');
+Route::get('bookings/{booking}/documents/{kind}/html', [DocumentController::class, 'html'])->whereNumber('booking');
+Route::post('bookings/{booking}/documents/{kind}/issue', [DocumentController::class, 'issue'])->whereNumber('booking');
+Route::get('bookings/{booking}/receipts/{payment}/html', [DocumentController::class, 'receiptHtml'])->whereNumber('booking')->whereNumber('payment');
+Route::get('documents/{document}/html', [DocumentController::class, 'issuedHtml'])->whereNumber('document');
+Route::get('documents/{document}/file', [DocumentController::class, 'file'])->whereNumber('document');
 Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
 Route::patch('guests/{guest}', [GuestController::class, 'update'])->whereNumber('guest');
 Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->whereNumber('guest');

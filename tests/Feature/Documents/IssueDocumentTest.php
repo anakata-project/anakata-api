@@ -11,6 +11,7 @@ use App\Models\ChangeHistory;
 use App\Models\Document;
 use App\Models\Payment;
 use App\Support\BusinessTime;
+use App\Support\Documents\Snapshots\SnapshotFactory;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
@@ -18,18 +19,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Tests\Support\Bookings\ReservationFixtures;
-
-/**
- * @return array{title: string, subtitle: string, line: string}
- */
-function proofSnapshot(string $line = 'One line'): array
-{
-    return [
-        'title' => 'Proof',
-        'subtitle' => 'Issue',
-        'line' => $line,
-    ];
-}
 
 function documentBooking(): Booking
 {
@@ -45,6 +34,11 @@ function documentBooking(): Booking
     ]);
 }
 
+function documentSnapshot(Booking $booking, DocumentKind $kind = DocumentKind::Invoice, ?Payment $payment = null): array
+{
+    return SnapshotFactory::build($booking, $kind, $payment);
+}
+
 beforeEach(function (): void {
     $this->seed(RolesSeeder::class);
     $this->seed(InventorySeeder::class);
@@ -58,7 +52,7 @@ afterEach(function (): void {
 test('IssueDocument stores a real PDF, sha and snapshot', function (): void {
     $booking = documentBooking();
     $actor = adminUser();
-    $snapshot = proofSnapshot();
+    $snapshot = documentSnapshot($booking);
 
     $document = app(IssueDocument::class)->handle(
         $booking,
@@ -70,7 +64,9 @@ test('IssueDocument stores a real PDF, sha and snapshot', function (): void {
     expect($document->kind)->toBe(DocumentKind::Invoice);
     expect($document->version)->toBe(1);
     expect($document->number)->toBe('INV-'.BusinessTime::year(now()).'-0001');
-    expect($document->snapshot)->toBe($snapshot);
+    expect($document->snapshot['document']['number'] ?? null)->toBe($document->number);
+    expect($document->snapshot['document']['version'] ?? null)->toBe(1);
+    expect($document->snapshot['totals']['vessel'] ?? null)->toBe(26600);
     expect($document->reason)->toBeNull();
     expect($document->issued_by)->toBe($actor->id);
     expect($document->file_path)->toBe($booking->id.'/INVOICE-v1.pdf');
@@ -94,15 +90,15 @@ test('version 1 draws a number that version 2 keeps, and a final invoice gets it
     $booking = documentBooking();
     $issuer = app(IssueDocument::class);
 
-    $v1 = $issuer->handle($booking, DocumentKind::Invoice, proofSnapshot('v1'), actor: adminUser());
+    $v1 = $issuer->handle($booking, DocumentKind::Invoice, documentSnapshot($booking), actor: adminUser());
     $v2 = $issuer->handle(
         $booking,
         DocumentKind::Invoice,
-        proofSnapshot('v2'),
+        documentSnapshot($booking),
         reason: 'Extra added',
         actor: adminUser(),
     );
-    $final = $issuer->handle($booking, DocumentKind::FinalInvoice, proofSnapshot('final'), actor: adminUser());
+    $final = $issuer->handle($booking, DocumentKind::FinalInvoice, documentSnapshot($booking, DocumentKind::FinalInvoice), actor: adminUser());
 
     expect($v1->number)->toBe('INV-'.BusinessTime::year(now()).'-0001');
     expect($v2->number)->toBe('INV-'.BusinessTime::year(now()).'-0001');
@@ -126,9 +122,9 @@ test('version 1 draws a number that version 2 keeps, and a final invoice gets it
 test('version 2 without a reason is refused', function (): void {
     $booking = documentBooking();
     $issuer = app(IssueDocument::class);
-    $issuer->handle($booking, DocumentKind::Invoice, proofSnapshot(), actor: adminUser());
+    $issuer->handle($booking, DocumentKind::Invoice, documentSnapshot($booking), actor: adminUser());
 
-    expect(fn () => $issuer->handle($booking, DocumentKind::Invoice, proofSnapshot(), actor: adminUser()))
+    expect(fn () => $issuer->handle($booking, DocumentKind::Invoice, documentSnapshot($booking), actor: adminUser()))
         ->toThrow(ValidationException::class);
 });
 
@@ -142,7 +138,7 @@ test('a rollback after the file is written leaves no row and no file', function 
     expect(fn () => app(IssueDocument::class)->handle(
         $booking,
         DocumentKind::Invoice,
-        proofSnapshot(),
+        documentSnapshot($booking),
         actor: adminUser(),
     ))->toThrow(RuntimeException::class, 'force rollback');
 
@@ -163,14 +159,14 @@ test('a second receipt for the same payment returns the existing document', func
     $first = $issuer->handle(
         $booking,
         DocumentKind::Receipt,
-        proofSnapshot('deposit'),
+        documentSnapshot($booking, DocumentKind::Receipt, $payment),
         payment: $payment,
         actor: adminUser(),
     );
     $second = $issuer->handle(
         $booking,
         DocumentKind::Receipt,
-        proofSnapshot('again'),
+        documentSnapshot($booking, DocumentKind::Receipt, $payment),
         payment: $payment,
         actor: adminUser(),
     );
@@ -198,14 +194,14 @@ test('a deposit and a balance payment issue two receipts and two files', functio
     $depositReceipt = $issuer->handle(
         $booking,
         DocumentKind::Receipt,
-        proofSnapshot('deposit'),
+        documentSnapshot($booking, DocumentKind::Receipt, $deposit),
         payment: $deposit,
         actor: adminUser(),
     );
     $balanceReceipt = $issuer->handle(
         $booking,
         DocumentKind::Receipt,
-        proofSnapshot('balance'),
+        documentSnapshot($booking, DocumentKind::Receipt, $balance),
         payment: $balance,
         actor: adminUser(),
     );

@@ -16,6 +16,7 @@ use App\Services\Documents\PdfRenderer;
 use App\Services\References\ReferenceService;
 use App\Support\Bookings\BookingMutationLock;
 use App\Support\History\History;
+use App\Support\Iso;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -116,6 +117,17 @@ final class IssueDocument extends Action
                     }
                 }
 
+                $issuedAt = now();
+                $snapshot['document'] = array_merge(
+                    is_array($snapshot['document'] ?? null) ? $snapshot['document'] : [],
+                    [
+                        'kind' => $kind->value,
+                        'number' => $number,
+                        'version' => $version,
+                        'issued_at' => Iso::utc($issuedAt),
+                    ],
+                );
+
                 $html = view(DocumentView::name($kind), ['snapshot' => $snapshot])->render();
                 $bytes = $this->pdf->render($html);
                 $path = $this->filePath($locked->id, $kind, $version, $payment);
@@ -131,7 +143,7 @@ final class IssueDocument extends Action
                 $document->snapshot = $snapshot;
                 $document->file_path = $path;
                 $document->file_sha256 = hash('sha256', $bytes);
-                $document->issued_at = now();
+                $document->issued_at = $issuedAt;
                 $document->issued_by = $system ? null : ($actor instanceof User ? $actor->id : null);
                 $document->save();
 

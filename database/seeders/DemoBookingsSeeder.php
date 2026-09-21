@@ -180,6 +180,18 @@ final class DemoBookingsSeeder extends Seeder
             ]);
         }
 
+        $billing = [];
+        if (isset($row['billing']) && is_string($row['billing']) && $row['billing'] !== '') {
+            $billing['billing_address'] = $row['billing'];
+        }
+        if (isset($row['phone']) && is_string($row['phone']) && $row['phone'] !== '') {
+            $billing['billing_phone'] = $row['phone'];
+        }
+        if ($billing !== [] && ($booking->billing_address === null || $booking->billing_phone === null)) {
+            $booking->fill($billing);
+            $booking->save();
+        }
+
         if (! $status->holdsInventory()) {
             return;
         }

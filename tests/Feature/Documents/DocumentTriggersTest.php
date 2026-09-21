@@ -7,6 +7,7 @@ use App\Enums\BookingStatus;
 use App\Enums\DocumentKind;
 use App\Models\Booking;
 use App\Models\Document;
+use App\Support\Documents\Snapshots\SnapshotFactory;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
@@ -38,7 +39,7 @@ function issuedProofDocument(): Document
     return app(IssueDocument::class)->handle(
         $booking,
         DocumentKind::Summary,
-        ['title' => 'Proof', 'subtitle' => 'Trigger', 'line' => 'One line'],
+        SnapshotFactory::build($booking, DocumentKind::Summary),
         actor: adminUser(),
     );
 }

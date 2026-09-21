@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ $snapshot['document']['title'] ?? 'Document' }}</title>
+    <style>
+        /* DOCUMENT_FONTS */
+        @page { size: A4; margin: 12mm 13mm; }
+        body { font-family: Archivo, sans-serif; font-size: 12px; line-height: 1.55; color: #202B26; background: #FAF9F0; margin: 0; }
+        .paper { width: 100%; }
+        .dh { width: 100%; border-collapse: collapse; border-bottom: 2px solid #202B26; margin-bottom: 16px; }
+        .dh td { vertical-align: top; padding-bottom: 14px; }
+        .dlogo { font-family: Oswald, sans-serif; letter-spacing: 0.35em; font-size: 20px; }
+        .dtag { font-size: 10px; color: #6b6b5a; letter-spacing: 0.06em; }
+        .dtitle { font-family: Oswald, sans-serif; letter-spacing: 0.16em; font-size: 14px; text-align: right; }
+        .dsub { font-size: 10.5px; color: #585940; line-height: 1.6; text-align: right; }
+        .dsec { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #C43D2E; border-bottom: 1px solid #C43D2E; padding-bottom: 3px; margin: 16px 0 8px; }
+        .dkv { width: 100%; border-collapse: collapse; }
+        .dkv td { padding: 2px 0; vertical-align: top; }
+        .dkv td:first-child { color: #6b6b5a; width: 42%; padding-right: 10px; }
+        .dg2 { width: 100%; border-collapse: collapse; }
+        .dg2 > tbody > tr > td { width: 50%; vertical-align: top; padding-right: 16px; }
+        .dg2 > tbody > tr > td:last-child { padding-right: 0; padding-left: 16px; }
+        .dt { width: 100%; border-collapse: collapse; margin: 6px 0; }
+        .dt th, .dt td { padding: 3px 6px 3px 0; text-align: left; font-size: 11.5px; }
+        .dt.r3 th:nth-child(n+2), .dt.r3 td:nth-child(n+2) { text-align: right; }
+        .dsubt { width: 100%; border-collapse: collapse; border-top: 1px solid #202B26; margin: 4px 0 10px; }
+        .dsubt td { padding-top: 4px; font-weight: 600; }
+        .dsubt td:last-child { text-align: right; }
+        .dtot { border: 1px solid #202B26; padding: 8px 10px; margin: 12px 0; }
+        .dgrand { width: 100%; border-collapse: collapse; background: #202B26; color: #FAF9F0; margin-top: 8px; }
+        .dgrand td { font-family: Oswald, sans-serif; letter-spacing: 0.12em; padding: 8px 10px; }
+        .dgrand td:last-child { text-align: right; }
+        .dnote { font-size: 11px; color: #6b6b5a; margin: 6px 0; }
+        .dfoot { text-align: center; border-top: 1px solid #202B26; margin-top: 22px; padding-top: 10px; font-size: 10.5px; color: #6b6b5a; }
+        .warn { color: #C43D2E; font-weight: 600; }
+        @media print {
+            body { background: #fff; }
+            .paper { page-break-inside: auto; }
+            .dsec { page-break-after: avoid; }
+            .dtot, .dgrand { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+<div class="paper">
+    @yield('body')
+</div>
+</body>
+</html>

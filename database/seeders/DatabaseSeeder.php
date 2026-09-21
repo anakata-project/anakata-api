@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             $this->call(DemoGuestsSeeder::class);
             $this->call(DemoConsentsSeeder::class);
             $this->call(DemoExtrasSeeder::class);
+            $this->call(DemoDocumentsSeeder::class);
         }
     }
 }

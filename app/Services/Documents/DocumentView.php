@@ -12,12 +12,12 @@ final class DocumentView
     {
         return match ($kind) {
             DocumentKind::Invoice,
-            DocumentKind::FinalInvoice,
-            DocumentKind::Summary,
-            DocumentKind::Receipt,
-            DocumentKind::Voucher,
-            DocumentKind::Pretrip,
-            DocumentKind::WireInstructions => 'documents.proof',
+            DocumentKind::FinalInvoice => 'documents.invoice',
+            DocumentKind::Summary => 'documents.summary',
+            DocumentKind::Receipt => 'documents.receipt',
+            DocumentKind::Voucher => 'documents.voucher',
+            DocumentKind::Pretrip => 'documents.pretrip',
+            DocumentKind::WireInstructions => 'documents.wire-instructions',
         };
     }
 }

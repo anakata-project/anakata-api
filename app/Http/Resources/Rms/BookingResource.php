@@ -63,6 +63,10 @@ class BookingResource extends JsonResource
      *     price_lines: list<array{code: string, label: string, amount: int}>,
      *     rates_version: array{id: int, version: int},
      *     internal_notes: string|null,
+     *     billing_name: string|null,
+     *     billing_address: string|null,
+     *     billing_email: string|null,
+     *     billing_phone: string|null,
      *     can_act: bool,
      *     allowed_transitions: list<array{to: string, reason_required: bool}>,
      *     departure: array{id: int, date: string, return_date: string, itinerary_name: string, embark: string, festive: bool, yacht: array{id: int, code: string, name: string}},
@@ -145,6 +149,10 @@ class BookingResource extends JsonResource
                 'version' => $this->ratesVersion->version,
             ],
             'internal_notes' => $this->internal_notes,
+            'billing_name' => $this->billing_name,
+            'billing_address' => $this->billing_address,
+            'billing_email' => $this->billing_email,
+            'billing_phone' => $this->billing_phone,
             'can_act' => $canAct,
             'allowed_transitions' => $actor instanceof User
                 ? Transitions::allowedFor($this->resource, $actor)

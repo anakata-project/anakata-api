@@ -65,6 +65,10 @@ use Illuminate\Support\Facades\DB;
  * @property int $balance_days
  * @property CarbonImmutable|null $balance_due_date_override
  * @property string|null $internal_notes
+ * @property string|null $billing_name
+ * @property string|null $billing_address
+ * @property string|null $billing_email
+ * @property string|null $billing_phone
  * @property bool $png_collected
  * @property bool $tct_collected
  * @property int|null $tct_rate_usd
@@ -126,6 +130,10 @@ use Illuminate\Support\Facades\DB;
     'balance_days',
     'balance_due_date_override',
     'internal_notes',
+    'billing_name',
+    'billing_address',
+    'billing_email',
+    'billing_phone',
     'png_collected',
     'tct_collected',
     'tct_rate_usd',

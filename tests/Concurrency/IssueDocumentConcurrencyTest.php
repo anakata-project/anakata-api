@@ -7,6 +7,7 @@ use App\Enums\BookingStatus;
 use App\Enums\DocumentKind;
 use App\Models\Booking;
 use App\Models\Document;
+use App\Support\Documents\Snapshots\SnapshotFactory;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
@@ -71,7 +72,7 @@ test('two issues on the same booking wait 1205 never 1213 and keep distinct numb
         app(IssueDocument::class)->handle(
             $booking,
             DocumentKind::Invoice,
-            ['title' => 'Proof', 'subtitle' => 'A', 'line' => 'First'],
+            SnapshotFactory::build($booking, DocumentKind::Invoice),
             actor: $actor,
         );
     });
@@ -81,7 +82,7 @@ test('two issues on the same booking wait 1205 never 1213 and keep distinct numb
             app(IssueDocument::class)->handle(
                 $booking,
                 DocumentKind::FinalInvoice,
-                ['title' => 'Proof', 'subtitle' => 'B', 'line' => 'Second'],
+                SnapshotFactory::build($booking, DocumentKind::FinalInvoice),
                 actor: $actor,
             );
             expect(false)->toBeTrue('the second issue should wait on the held locks (1205)');
@@ -101,7 +102,7 @@ test('two issues on the same booking wait 1205 never 1213 and keep distinct numb
         app(IssueDocument::class)->handle(
             $booking,
             DocumentKind::FinalInvoice,
-            ['title' => 'Proof', 'subtitle' => 'B', 'line' => 'Second'],
+            SnapshotFactory::build($booking, DocumentKind::FinalInvoice),
             actor: $actor,
         );
     });
