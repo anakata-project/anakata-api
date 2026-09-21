@@ -10,6 +10,7 @@ use App\Enums\OfferType;
 use App\Enums\ReferenceType;
 use App\Models\Offer;
 use App\Models\User;
+use App\Services\Engine\EngineFeedVersion;
 use App\Services\References\ReferenceService;
 use App\Support\History\History;
 use App\Support\Offers\OfferGuardrails;
@@ -25,7 +26,7 @@ final class CreateOffer extends Action
      */
     public function handle(array $data, User $actor): Offer
     {
-        return $this->transaction(function () use ($data, $actor): Offer {
+        $offer = $this->transaction(function () use ($data, $actor): Offer {
             $data = OfferGuardrails::normalize($data);
             $asDraft = (bool) ($data['as_draft'] ?? false);
             unset($data['as_draft']);
@@ -82,5 +83,11 @@ final class CreateOffer extends Action
 
             return $offer->fresh(['approvedBy']) ?? $offer;
         });
+
+        if ($offer->status === OfferStatus::Live && $offer->enginePlacement() !== 'not_public') {
+            EngineFeedVersion::bump();
+        }
+
+        return $offer;
     }
 }

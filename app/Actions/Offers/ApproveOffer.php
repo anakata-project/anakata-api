@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\OfferStatus;
 use App\Models\Offer;
 use App\Models\User;
+use App\Services\Engine\EngineFeedVersion;
 use App\Support\History\History;
 use Illuminate\Validation\ValidationException;
 
@@ -18,7 +19,7 @@ final class ApproveOffer extends Action
      */
     public function handle(Offer $offer, array $data, User $actor): Offer
     {
-        return $this->transaction(function () use ($offer, $data, $actor): Offer {
+        $offer = $this->transaction(function () use ($offer, $data, $actor): Offer {
             $offer = Offer::query()->whereKey($offer->id)->lockForUpdate()->firstOrFail();
 
             if ($offer->status !== OfferStatus::Pending) {
@@ -43,9 +44,11 @@ final class ApproveOffer extends Action
                 'status' => OfferStatus::Live->value,
             ], reason: $reason, actor: $actor);
 
-            // TODO(task 03) bump the engine feed version on offer approval
-
             return $offer->fresh(['approvedBy']) ?? $offer;
         });
+
+        EngineFeedVersion::bump();
+
+        return $offer;
     }
 }

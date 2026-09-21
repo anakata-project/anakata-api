@@ -9,6 +9,7 @@ use App\Enums\DepartureStatus;
 use App\Enums\ReferenceType;
 use App\Models\Departure;
 use App\Models\Yacht;
+use App\Services\Engine\EngineFeedVersion;
 use App\Services\References\ReferenceService;
 use App\Support\Departures\YachtDateConflict;
 use App\Support\History\History;
@@ -35,7 +36,7 @@ final class CreateDeparture extends Action
         }
 
         return YachtDateConflict::guard($yacht, $date, function () use ($data, $historyContext, $date): Departure {
-            return $this->transaction(function () use ($data, $historyContext, $date): Departure {
+            $departure = $this->transaction(function () use ($data, $historyContext, $date): Departure {
                 $departure = Departure::query()->create([
                     'reference' => app(ReferenceService::class)->next(ReferenceType::Departure),
                     'date' => $date->toDateString(),
@@ -52,6 +53,10 @@ final class CreateDeparture extends Action
 
                 return $departure;
             });
+
+            EngineFeedVersion::bump();
+
+            return $departure;
         });
     }
 

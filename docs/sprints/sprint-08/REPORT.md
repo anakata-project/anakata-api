@@ -203,3 +203,147 @@ Price bookings with offers, the online-deposit advantage and promo codes.
 EOF
 )"
 ```
+
+## Task 03 · Public engine API (feed, availability, freshness)
+
+Unauthenticated `/api/engine` reads: a doc-04 feed, per-cabin availability, promo check, and a D2C quote. Isolated from RMS resources. Drafts never leak. Fresh within 30 seconds via a version-keyed cache plus short HTTP cache — no websockets.
+
+### Routes and isolation (K3)
+`routes/api/engine.php` under the existing `api` + `throttle:engine` (60/min per IP) group. No Sanctum.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/engine/feed` | version-keyed cache + ETag |
+| GET | `/api/engine/departures/{departure}/cabins` | HTTP/server cache ≤ 5s |
+| POST | `/api/engine/promo/check` | extra `throttle:engine-promo` (10/min per IP) |
+| POST | `/api/engine/quote` | `ReservationQuoter`, channel forced D2C |
+
+Controllers in `App\Http\Controllers\Engine`, resources in `App\Http\Resources\Engine`. Arch test: Engine controllers must not use `App\Http\Resources\Rms` or `App\Http\Resources\Crm`. Using `ReservationQuoter` / `PromoCode` / `Availability` is fine.
+
+CORS stays config-only (`FRONTEND_ENGINE_URL`). The production domain is the existing client question (README, open since Sprint 1).
+
+### Feed — `GET /api/engine/feed`
+`App\Services\Engine\EngineFeed`: one query set, then Engine resources. Snake_case, document field names. Departure `id` is the integer PK — no `reference` field.
+
+**Itineraries:** `status = PUBLISHED` only, `sort_order`. Nested `card` / `detail` / `seo`. No `status`, completeness, or counts.
+
+**Departures:** itinerary PUBLISHED, not `HIDDEN`, engine label not `NOT SHOWN` / `CHARTERED — NOT SHOWN`. Include `ON_SALE`, `CLOSED` (`CLOSED — ENQUIRE`), and `CHARTER` (`PRIVATE CHARTER ONLY`). Counts and `label` from `Availability::forDepartures` / `EngineLabel` (F9: `LIMITED AVAILABILITY` when `free === 0 && held > 0`). Per-departure `offers[]` = codes only of LIVE D2C/ALL badge offers that apply to that departure (never festive, never B2B, never promo). Eager-load yacht + itinerary; one Availability batch — query count stays flat as departures are added.
+
+**Rates:** flatten `RatesDocument` years into `suite_pp_double` / `owner_pp_double` / `charter_week` maps; keep `terms` and `rules` as the document’s snake_case keys.
+
+**Settings:** `CurrentConfig::engineSettings()` plus a public `policies` slice of business rules. Guests / calendar / locale / copy / fees / charter come from the engine-settings document, including all PNG categories, `copy.online_deposit_advantage` / `online_deposit_perk`, and a computed `calendar.first_bookable_month` (from `default_search_from`). `charter.capacity` = `guests.max_per_yacht`.
+
+**Policy exclusions** (the slice contains only fields an engine page renders):
+
+- `max_commission_pct` — a trade term; the engine never renders it.
+- `cancellation_bands` — customer-facing cancellation terms stay unpublished until LEG-001 is approved.
+
+Also excluded: bank / legal / retention. The leak test asserts neither `max_commission_pct` nor `cancellation_bands` (nor `min_days` / `penalty_pct` band keys) appears anywhere in the feed.
+
+**Offers (top-level):** LIVE, not promo, channel D2C or ALL, not derived EXPIRED, `enginePlacement() === 'badge'`. Fields doc 04 lists only. No `id`, `reference`, `channel`, `status`, `is_promo_code`, partner, approval.
+
+**Never in any serialised engine JSON:** draft itinerary identifiers, hidden departure identifiers, PAUSED / PENDING / B2B offer codes, promo codes (`ANAKATA10` etc.), `max_commission_pct`, `cancellation_bands`. Walk of every engine response forbids keys `holder`, `reference`, `email`, `phone`, `passport`, and exact `owner` (allow `owner_free`).
+
+### Cabins — `GET /api/engine/departures/{id}/cabins`
+404 if the departure is not engine-visible (HIDDEN / unpublished itinerary / chartered-not-shown). Every physical cabin: `{ code, category, bookable }`. `code` is the 12 Sep guest name (`Suite 01`–`Suite 08`, `Owner's Suite`) — `Cabin.label`, not `S1`. `bookable` is `state === FREE` only. No `claim` / holder payload.
+
+Quote and promo accept that guest `code` **or** the internal `S1`/`OWNER`; the Engine FormRequest (`NormalizesEngineCabins` / `CabinCodes`) normalises to `Cabin.code` before calling `ReservationQuoter`.
+
+Cache-Control `public, max-age=5`. Server remember ≤ 5 seconds, forgotten on `AvailabilityChanged`.
+
+### Promo check and quote
+**Promo** `POST /api/engine/promo/check` `{ code, departure_id, cabins, guests }`. Validity comes from `ReservationQuoter` with channel D2C — not a parallel `PromoCode::check` loop. A party “gets the code” when one of its `quote.lines` has `code` equal to the normalised promo.
+
+- `valid` — at least one selected cabin gets the line
+- `applies_to` — guest-facing cabin codes of those parties (empty when invalid)
+- `line` — the offer’s `price_line` when valid, else `null`
+- `reason` — `null` when valid; festive → `This code does not apply to festive departures`; otherwise `This code is not valid`
+
+A Suite-only code on Suite + Owner's Suite is therefore **valid**, `applies_to: ["Suite 01"]`, and the quote discounts only that cabin. The two responses cannot diverge because they share the quoter.
+
+Tighter limiter `engine-promo`: 10/min per IP (in addition to the read limiter).
+
+**Invalid-attempt log:** `Log::info('engine.promo.invalid', [ip_hash, departure_id, reason])` — never the raw IP, never the code. Hash via `App\Support\IpHash::of(?string $ip)` (HMAC-SHA256 of the trimmed IP with `APP_KEY`). Task 04’s `checkout_sessions.ip_hash` will call the same helper.
+
+**Quote** `POST /api/engine/quote` `{ departure_id, cabins: [{ cabin_code, adults, children }], online_deposit, promo_code }`. Force `channel = D2C`; do not accept `main_channel` or charter. Engine `QuoteResource` mirrors `ReservationQuoteResource`. 404 if the departure is not engine-visible. Walkthrough totals with `online_deposit` + `ANAKATA10`: 21,067 / 20,014.
+
+### Freshness (K4) — no websockets
+`App\Services\Engine\EngineFeedVersion`: integer in cache (`engine:feed:version`). `bump()` increments. Payload cached at `engine:feed:{version}` for **15 seconds** so a missed event still rebuilds on the next request after TTL (doc 04 rule 1’s “periodic reconcile”).
+
+ETag is a hash of the payload **excluding** `generated_at`. Unchanged data → same ETag → `304` on `If-None-Match`. Feed `Cache-Control: public, max-age=15, stale-while-revalidate=15`.
+
+Bump from:
+
+- listener on `AvailabilityChanged` (already fired by `ClaimService`)
+- listener on `ConfigPublished` (rates / business rules / engine settings / extras)
+- after a real save in `CreateItinerary`, `UpdateItinerary`, `DeleteItinerary`, `CreateDeparture`, `UpdateDeparture`, `DeleteDeparture` (`GenerateSeason` bumps via `CreateDeparture`)
+- `ApproveOffer` / `PauseOffer` / `ResumeOffer` (replaced the three `TODO(task 03)`)
+- `CreateOffer` / `UpdateOffer` when the saved row is LIVE and public (VALUE can go live without approve)
+
+No broadcasting.
+
+### Deviations
+None from the approved plan.
+
+### Open questions
+Production CORS / engine domain remains the existing client question (README, open since Sprint 1). Policy exclusions: `max_commission_pct` (trade term) and `cancellation_bands` (unpublished until LEG-001).
+
+### Notes for later
+- Task 04: checkout holds; call `IpHash::of` for `checkout_sessions.ip_hash` so the two cannot drift.
+- Task 06: regenerate OpenAPI types from the new Engine resources.
+- Task 08–09: engine UI consumes this feed / cabins / promo / quote.
+- Task 11: E2E scenarios.
+
+### Checks
+`composer check` passed (917 tests; Pint; Larastan).
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Departures/CreateDeparture.php
+git add app/Actions/Departures/DeleteDeparture.php
+git add app/Actions/Departures/UpdateDeparture.php
+git add app/Actions/Itineraries/CreateItinerary.php
+git add app/Actions/Itineraries/DeleteItinerary.php
+git add app/Actions/Itineraries/UpdateItinerary.php
+git add app/Actions/Offers/ApproveOffer.php
+git add app/Actions/Offers/CreateOffer.php
+git add app/Actions/Offers/PauseOffer.php
+git add app/Actions/Offers/ResumeOffer.php
+git add app/Actions/Offers/UpdateOffer.php
+git add app/Providers/AppServiceProvider.php
+git add routes/api/engine.php
+git add tests/Arch/ArchTest.php
+git add app/Http/Controllers/Engine/DepartureCabinController.php
+git add app/Http/Controllers/Engine/FeedController.php
+git add app/Http/Controllers/Engine/PromoCheckController.php
+git add app/Http/Controllers/Engine/QuoteController.php
+git add app/Http/Requests/Engine/CheckPromoRequest.php
+git add app/Http/Requests/Engine/Concerns/NormalizesEngineCabins.php
+git add app/Http/Requests/Engine/EngineQuoteRequest.php
+git add app/Http/Resources/Engine/DepartureCabinResource.php
+git add app/Http/Resources/Engine/EngineDepartureResource.php
+git add app/Http/Resources/Engine/EngineItineraryResource.php
+git add app/Http/Resources/Engine/EngineOfferResource.php
+git add app/Http/Resources/Engine/EngineQuoteResource.php
+git add app/Http/Resources/Engine/EngineRatesResource.php
+git add app/Http/Resources/Engine/EngineSettingsResource.php
+git add app/Http/Resources/Engine/FeedResource.php
+git add app/Http/Resources/Engine/PromoCheckResource.php
+git add app/Listeners/BumpEngineFeedVersion.php
+git add app/Services/Engine/EngineCabins.php
+git add app/Services/Engine/EngineFeed.php
+git add app/Services/Engine/EngineFeedVersion.php
+git add app/Services/Engine/EnginePromoCheck.php
+git add app/Support/Engine/CabinCodes.php
+git add app/Support/IpHash.php
+git add tests/Feature/Engine/EngineFeedTest.php
+git add tests/Feature/Engine/EnginePromoQuoteTest.php
+git add tests/Feature/OpenApi/EngineResponseSchemasTest.php
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the public engine feed, cabins, promo check and quote.
+
+EOF
+)"
+```
+

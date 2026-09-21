@@ -7,6 +7,7 @@ namespace App\Actions\Itineraries;
 use App\Actions\Action;
 use App\Enums\ItineraryStatus;
 use App\Models\Itinerary;
+use App\Services\Engine\EngineFeedVersion;
 use App\Support\History\History;
 use App\Support\Itineraries\Completeness;
 use Illuminate\Validation\ValidationException;
@@ -28,7 +29,9 @@ final class UpdateItinerary extends Action
     {
         unset($data['code'], $data['hero_image_path']);
 
-        return $this->transaction(function () use ($itinerary, $data): Itinerary {
+        $changed = false;
+
+        $itinerary = $this->transaction(function () use ($itinerary, $data, &$changed): Itinerary {
             foreach ($data as $key => $value) {
                 $itinerary->setAttribute($key, $value);
             }
@@ -48,6 +51,7 @@ final class UpdateItinerary extends Action
             }
 
             $itinerary->save();
+            $changed = true;
 
             $changes = $itinerary->getChanges();
             $previous = $itinerary->getPrevious();
@@ -86,5 +90,11 @@ final class UpdateItinerary extends Action
 
             return $itinerary;
         });
+
+        if ($changed) {
+            EngineFeedVersion::bump();
+        }
+
+        return $itinerary;
     }
 }

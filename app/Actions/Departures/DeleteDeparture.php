@@ -7,6 +7,7 @@ namespace App\Actions\Departures;
 use App\Actions\Action;
 use App\Exceptions\ConflictException;
 use App\Models\Departure;
+use App\Services\Engine\EngineFeedVersion;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
 use Illuminate\Database\QueryException;
@@ -35,5 +36,7 @@ final class DeleteDeparture extends Action
                 throw $exception;
             }
         });
+
+        EngineFeedVersion::bump();
     }
 }

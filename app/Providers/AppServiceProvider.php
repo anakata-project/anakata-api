@@ -6,11 +6,13 @@ namespace App\Providers;
 
 use App\Enums\ConfigKind;
 use App\Enums\Permission;
+use App\Events\AvailabilityChanged;
 use App\Events\BookingChargesChanged;
 use App\Events\BookingStatusChanged;
 use App\Events\ConfigPublished;
 use App\Events\HoldExpired;
 use App\Events\PaymentSettled;
+use App\Listeners\BumpEngineFeedVersion;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\MarkRequestHoldExpired;
 use App\Listeners\SendOnBookingChargesChanged;
@@ -98,6 +100,10 @@ class AppServiceProvider extends ServiceProvider
     {
         RateLimiter::for('engine', function (Request $request): Limit {
             return Limit::perMinute(60)->by($request->ip() ?? 'unknown');
+        });
+
+        RateLimiter::for('engine-promo', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($request->ip() ?? 'unknown');
         });
 
         RateLimiter::for('login', function (Request $request): Limit {
@@ -193,6 +199,8 @@ class AppServiceProvider extends ServiceProvider
         Date::serializeUsing(fn (DateTimeInterface $date): string => Iso::utc($date));
 
         Event::listen(ConfigPublished::class, ClearCurrentConfigCache::class);
+        Event::listen(ConfigPublished::class, BumpEngineFeedVersion::class);
+        Event::listen(AvailabilityChanged::class, BumpEngineFeedVersion::class);
         Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
         Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
         Event::listen(PaymentSettled::class, SendOnPaymentSettled::class);

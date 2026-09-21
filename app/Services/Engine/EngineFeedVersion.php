@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Engine;
+
+use Illuminate\Support\Facades\Cache;
+
+final class EngineFeedVersion
+{
+    public const KEY = 'engine:feed:version';
+
+    public static function current(): int
+    {
+        return (int) Cache::get(self::KEY, 0);
+    }
+
+    public static function bump(): void
+    {
+        if (Cache::add(self::KEY, 1)) {
+            return;
+        }
+
+        Cache::increment(self::KEY);
+    }
+
+    public static function payloadKey(?int $version = null): string
+    {
+        return 'engine:feed:'.($version ?? self::current());
+    }
+
+    public static function cabinsKey(int $departureId): string
+    {
+        return 'engine:cabins:'.$departureId;
+    }
+}

@@ -10,6 +10,15 @@ use App\Models\StripeEvent;
 use App\Services\Stripe\StripeSdkGateway;
 use App\Support\History\History;
 
+arch('engine controllers do not use RMS or CRM resources')
+    ->expect('App\Http\Controllers\Engine')
+    ->not->toUse([
+        'App\Http\Resources\Rms',
+        'App\Http\Resources\Crm',
+        'App\Http\Controllers\Rms',
+        'App\Http\Controllers\Crm',
+    ]);
+
 arch('crm controllers do not use money or booking write paths')
     ->expect('App\Http\Controllers\Crm')
     ->not->toUse([

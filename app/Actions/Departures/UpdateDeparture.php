@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Exceptions\ConflictException;
 use App\Models\Departure;
 use App\Models\Yacht;
+use App\Services\Engine\EngineFeedVersion;
 use App\Support\Departures\YachtDateConflict;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
@@ -43,7 +44,9 @@ final class UpdateDeparture extends Action
         $yacht = Yacht::query()->findOrFail($yachtId);
 
         return YachtDateConflict::guard($yacht, $date, function () use ($departure, $data, $date): Departure {
-            return $this->transaction(function () use ($departure, $data, $date): Departure {
+            $changed = false;
+
+            $departure = $this->transaction(function () use ($departure, $data, $date, &$changed): Departure {
                 $departure = DepartureLocks::lock((int) $departure->id);
 
                 $yachtId = (int) ($data['yacht_id'] ?? $departure->yacht_id);
@@ -69,6 +72,7 @@ final class UpdateDeparture extends Action
                 }
 
                 $departure->save();
+                $changed = true;
 
                 $changes = $departure->getChanges();
                 $previous = $departure->getPrevious();
@@ -100,6 +104,12 @@ final class UpdateDeparture extends Action
 
                 return $departure;
             });
+
+            if ($changed) {
+                EngineFeedVersion::bump();
+            }
+
+            return $departure;
         });
     }
 }

@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\OfferStatus;
 use App\Models\Offer;
 use App\Models\User;
+use App\Services\Engine\EngineFeedVersion;
 use App\Support\History\History;
 use App\Support\Offers\OfferFields;
 use App\Support\Offers\OfferGuardrails;
@@ -20,8 +21,11 @@ final class UpdateOffer extends Action
      */
     public function handle(Offer $offer, array $data, User $actor): Offer
     {
-        return $this->transaction(function () use ($offer, $data, $actor): Offer {
+        $shouldBump = false;
+
+        $offer = $this->transaction(function () use ($offer, $data, $actor, &$shouldBump): Offer {
             $offer = Offer::query()->whereKey($offer->id)->lockForUpdate()->firstOrFail();
+            $wasPublic = $offer->status === OfferStatus::Live && $offer->enginePlacement() !== 'not_public';
 
             $data = OfferGuardrails::normalize($data);
             $asDraft = array_key_exists('as_draft', $data) ? (bool) $data['as_draft'] : false;
@@ -82,7 +86,17 @@ final class UpdateOffer extends Action
 
             History::record($offer, $event, before: $before, after: $after, actor: $actor);
 
-            return $offer->fresh(['approvedBy']) ?? $offer;
+            $fresh = $offer->fresh(['approvedBy']) ?? $offer;
+            $isPublic = $fresh->status === OfferStatus::Live && $fresh->enginePlacement() !== 'not_public';
+            $shouldBump = $wasPublic || $isPublic;
+
+            return $fresh;
         });
+
+        if ($shouldBump) {
+            EngineFeedVersion::bump();
+        }
+
+        return $offer;
     }
 }

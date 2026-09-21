@@ -7,6 +7,7 @@ namespace App\Actions\Itineraries;
 use App\Actions\Action;
 use App\Exceptions\ConflictException;
 use App\Models\Itinerary;
+use App\Services\Engine\EngineFeedVersion;
 use App\Support\History\History;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +30,8 @@ final class DeleteItinerary extends Action
             History::record($itinerary, 'itinerary.deleted');
             $itinerary->delete();
         });
+
+        EngineFeedVersion::bump();
 
         if (is_string($imagePath) && $imagePath !== '') {
             DB::afterCommit(static function () use ($imagePath): void {
