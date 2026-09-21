@@ -16,13 +16,30 @@ final class ReconciliationMatch
 {
     public static function settlementFor(string $paymentIntentId): ?Payment
     {
-        return Payment::query()
+        $base = Payment::query()
             ->whereIn('method', [
                 PaymentMethod::CardStripe,
                 PaymentMethod::StripeLink,
             ])
-            ->where('amount', '>', 0)
-            ->where('gateway_id', $paymentIntentId)
-            ->first();
+            ->where('amount', '>', 0);
+
+        $exact = (clone $base)->where('gateway_id', $paymentIntentId)->first();
+
+        if ($exact instanceof Payment) {
+            return $exact;
+        }
+
+        $rows = (clone $base)
+            ->where('gateway_id', 'like', $paymentIntentId.'#%')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $lead = $rows->first();
+        $lead->amount = (int) $rows->sum('amount');
+
+        return $lead;
     }
 }

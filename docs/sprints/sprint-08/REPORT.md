@@ -347,3 +347,169 @@ EOF
 )"
 ```
 
+## Task 04 · Engine checkout API
+
+Public `/api/engine` write path. Both submit paths create `REQUESTED` bookings with `ANK-R-` references. Money confirms. An unfinished payment never cancels or releases the request.
+
+### Sessions and abuse
+`checkout_sessions`: hashed token (SHA-256 of 32 random bytes), departure, normalised cabins JSON, `HOLDING · SUBMITTED · RELEASED · EXPIRED`, `expires_at`, `extended`, `ip_hash`, then after submit `path`, `stripe_checkout_session_id`, `stripe_expires_at`. Morph alias `checkout_session`. The session is the WEB-hold claim holder.
+
+`POST /api/engine/checkout` locks the departure, claims every cabin `HOLD`/`WEB` for `holds.web_minutes`, quotes with `online_deposit` false, returns `{ token, expires_at, quote }`. Conflict on any cabin rolls the transaction back (`CabinUnavailableException`). Hidden / unpublished departures are 404 via `EngineFeed::isVisible`.
+
+Party rules (SPEC §6 / engine settings) on the field: max 3 per cabin, ≥1 adult with children, no empty cabin, no duplicate, ≤9 cabins, party ≤16. Accepts `code` or `cabin_code`.
+
+Abuse: at most two `HOLDING` sessions per `ip_hash`; a third releases the oldest. Extra limiter `engine-checkout` = 10/min/IP on top of `throttle:engine`. CSRF excepts `api/engine/*` so `DELETE` is sendBeacon-friendly. Lookup is by hash only.
+
+`POST …/extend` once (`holds.web_extension_minutes`) updates both session and claim `expires_at`. `DELETE` releases claims and is 204 if already released / expired / submitted. Unknown token is 404.
+
+Hold expiry: `inventory:release-expired-holds` still frees the cabins; `ExpireWebCheckoutSession` marks a `HOLDING` session `EXPIRED`.
+
+### Submit
+`SubmitEngineCheckout` in one transaction (H10 departure lock): re-quote with current rates/offers/promo and `online_deposit = (path === PAY_DEPOSIT)`. `expected_total` mismatch → `PriceChangedException` 409 `{ message, quote }`, nothing written.
+
+Then: `ResolveContact`, `GRP-` group when ≥2 cabins (coordinator = contact), one `REQUESTED` booking per cabin (`ANK-R-`, `WEB_DIRECT` → D2C / Hotel Booking Engine, frozen lines, `sold_on`, `rates_version_id`), guests with nationality + residency (lead = contact name; PNG stays `PENDING` without DOB), `BookingRequest` SLA + hold rule, convert each WEB claim onto that booking as `HOLD`/`REQUEST` (business-hours expiry; never release-then-claim). Request hold must outlast 30 minutes.
+
+`owner_id` = first active Admin. History is System (*“via the booking engine”*).
+
+Consents, source `ENGINE`, request IP, current `legal.consent_versions`:
+- `PAY_DEPOSIT`: TERMS, CANCELLATION, PRIVACY, INSURANCE
+- `PAY_LATER`: PRIVACY + INSURANCE (TERMS + CANCELLATION wait for task 05)
+- MARKETING only if explicitly true
+
+`PAY_LATER` returns `{ path, references, email }`.
+
+### Stripe Checkout Session
+After commit, `OpenStripeCheckout` creates a Checkout Session (not a Payment Link): line items per booking, metadata `checkout_session_id`, booking ids, each deposit amount, `kind=DEPOSIT`. Expiry 30 minutes. `success_url` / `cancel_url` use `FRONTEND_ENGINE_URL` (`config('anakata.engine_url')`) with placeholder paths. Stripe create failure after commit → 503 `{ path, references, message }`; bookings stay `REQUESTED`.
+
+### Settlement
+`payments.gateway_id` = `{payment_intent}#{booking_id}` (immutable). Staff Payment Link path unchanged (`gateway_id = pi`). Replay is idempotent on that key after `ANK-` is drawn. Method `STRIPE_LINK`.
+
+`ReconciliationMatch` matches exact `gateway_id` or `LIKE '{pi}#%'` and sums amounts.
+
+`ApplyPaymentEffects`: `REQUESTED` + deposit settled → `CONFIRMED` (System). Sprint 7 listeners then issue invoice / summary / receipt.
+
+### Fallback
+Stripe is the only authority. `checkout.session.expired` webhook, or minute command `engine:expire-stripe-checkouts` (candidates: `SUBMITTED` + `PAY_DEPOSIT` + `stripe_expires_at` past + no settled deposit) which **retrieves** the session and acts only when status is `expired`. `complete` / `open` / retrieve failure leave the bookings alone. `stripe_expires_at` is never a trigger.
+
+Fallback re-quotes without the advantage using the booking’s stored `rates_version_id` and `sold_on`. Cabin / offer lines stay; `online_deposit` is removed; the promo line is recomputed on the unreduced figure. History: *“Online deposit not completed — the online advantage was removed; the request stays open for the team”*. Claims untouched. No guest email this sprint.
+
+### Waitlist and charter
+`POST /api/engine/waitlist` → `AddWaitlistEntry` with `source = ENGINE`, nullable actor, System history. Refused when `waitlist_enabled` is off. Limiter `engine-waitlist` 5/min/IP.
+
+`POST /api/engine/charter-enquiries`: guests ≤ `guests.max_per_yacht`, preferred dates **or** departure, contact, message. Stored with `source = ENGINE`, `NEW`. Mail to `config('mail.reservations')` / `MAIL_RESERVATIONS` after commit — not `deliveries`. Limiter `engine-charter` 5/min/IP.
+
+RMS: `GET /api/rms/charter-enquiries` (`panel.rms`), `PATCH` status `NEW → CONTACTED → CLOSED` (`bookings.create`).
+
+### Recorded defaults
+- Consent rule per path (LEG-001/002).
+- `gateway_id` = `{pi}#{booking_id}`; reconcile by `{pi}#%` prefix + sum.
+- Fallback only on Stripe status `expired` (webhook or retrieve).
+- Fallback re-quote uses stored `rates_version_id` + `sold_on`; only advantage + promo lines change.
+- `owner_id` = first active Admin; History is System.
+- Rate limits: checkout 10 / waitlist 5 / charter 5 per minute per IP.
+- Stripe create failure after commit → 503, requests kept.
+- Charter mail: mailer + `MAIL_RESERVATIONS`, not `deliveries`.
+- Bot challenge: README client question, not built.
+
+### Deviations
+None from the approved plan.
+
+### Open questions
+None for this task.
+
+### Notes for later
+- Task 05: remaining declarations (TERMS + CANCELLATION on PAY_LATER) and guest DOB.
+- Task 06: generated types.
+- Task 07: charter panel UI.
+- Task 09: real success / cancel URLs.
+- Task 11: `WEB-*` e2e. No e2e scenario is wrong yet (BKG-11 is staff waitlist).
+
+### Checks
+`composer check` passed (957 tests). Pint and Larastan clean.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add .env.example
+git add app/Actions/Charter/CreateCharterEnquiry.php
+git add app/Actions/Charter/UpdateCharterEnquiryStatus.php
+git add app/Actions/Checkout/CreateCheckoutSession.php
+git add app/Actions/Checkout/ExtendCheckoutSession.php
+git add app/Actions/Checkout/FallBackOnlineDeposit.php
+git add app/Actions/Checkout/OpenStripeCheckout.php
+git add app/Actions/Checkout/ReleaseCheckoutSession.php
+git add app/Actions/Checkout/SubmitEngineCheckout.php
+git add app/Actions/Waitlist/AddWaitlistEntry.php
+git add app/Console/Commands/ExpireStripeCheckoutsCommand.php
+git add app/Enums/CharterEnquirySource.php
+git add app/Enums/CharterEnquiryStatus.php
+git add app/Enums/CheckoutPath.php
+git add app/Enums/CheckoutSessionStatus.php
+git add app/Enums/WaitlistSource.php
+git add app/Exceptions/PriceChangedException.php
+git add app/Http/Controllers/Engine/CharterEnquiryController.php
+git add app/Http/Controllers/Engine/CheckoutController.php
+git add app/Http/Controllers/Engine/WaitlistController.php
+git add app/Http/Controllers/Rms/CharterEnquiryController.php
+git add app/Http/Requests/Engine/Concerns/NormalizesEngineCabins.php
+git add app/Http/Requests/Engine/CreateCheckoutRequest.php
+git add app/Http/Requests/Engine/StoreEngineCharterEnquiryRequest.php
+git add app/Http/Requests/Engine/StoreEngineWaitlistRequest.php
+git add app/Http/Requests/Engine/SubmitCheckoutRequest.php
+git add app/Http/Requests/Rms/IndexCharterEnquiriesRequest.php
+git add app/Http/Requests/Rms/UpdateCharterEnquiryRequest.php
+git add app/Http/Resources/Engine/CheckoutCreatedResource.php
+git add app/Http/Resources/Engine/CheckoutExtendedResource.php
+git add app/Http/Resources/Engine/CheckoutSubmittedResource.php
+git add app/Http/Resources/Engine/EngineCharterEnquiryResource.php
+git add app/Http/Resources/Engine/EngineWaitlistResource.php
+git add app/Http/Resources/Rms/CharterEnquiryResource.php
+git add app/Jobs/ProcessStripeEvent.php
+git add app/Listeners/ExpireWebCheckoutSession.php
+git add app/Mail/CharterEnquiryMail.php
+git add app/Models/Booking.php
+git add app/Models/CharterEnquiry.php
+git add app/Models/CheckoutSession.php
+git add app/Models/WaitlistEntry.php
+git add app/Policies/CharterEnquiryPolicy.php
+git add app/Providers/AppServiceProvider.php
+git add app/Services/Inventory/ClaimService.php
+git add app/Services/Pricing/ReservationQuoter.php
+git add app/Services/Stripe/CreatedCheckoutSession.php
+git add app/Services/Stripe/FakeStripeGateway.php
+git add app/Services/Stripe/RetrievedCheckoutSession.php
+git add app/Services/Stripe/StripeGateway.php
+git add app/Services/Stripe/StripeSdkGateway.php
+git add app/Support/Engine/EngineBookingOwner.php
+git add app/Support/Engine/EnginePartyRules.php
+git add app/Support/OpenApi/PriceChangedExceptionToResponseExtension.php
+git add app/Support/Payments/ApplyPaymentEffects.php
+git add app/Support/Payments/ReconciliationMatch.php
+git add bootstrap/app.php
+git add config/anakata.php
+git add config/mail.php
+git add config/scramble.php
+git add database/factories/CharterEnquiryFactory.php
+git add database/factories/CheckoutSessionFactory.php
+git add database/factories/WaitlistEntryFactory.php
+git add database/migrations/2026_09_21_200070_create_checkout_sessions_table.php
+git add database/migrations/2026_09_21_200071_add_checkout_session_id_to_bookings.php
+git add database/migrations/2026_09_21_200072_add_source_to_waitlist_entries.php
+git add database/migrations/2026_09_21_200073_create_charter_enquiries_table.php
+git add resources/views/mail/charter-enquiry.blade.php
+git add routes/api/engine.php
+git add routes/api/rms.php
+git add routes/console.php
+git add tests/Concurrency/ClaimServiceConcurrencyTest.php
+git add tests/Feature/Engine/EngineCheckoutStripeTest.php
+git add tests/Feature/Engine/EngineCheckoutTest.php
+git add tests/Feature/Engine/EngineWaitlistCharterTest.php
+git add tests/Feature/OpenApi/EngineResponseSchemasTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the public engine checkout, Stripe deposit path and intake APIs.
+
+EOF
+)"
+```
+

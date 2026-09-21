@@ -13,6 +13,14 @@ interface StripeGateway
 {
     public function createPaymentLink(Booking $booking, PaymentKind $kind, int $amountUsd): CreatedPaymentLink;
 
+    /**
+     * @param  list<array{booking: Booking, amountUsd: int}>  $items
+     * @param  array<string, string>  $metadata
+     */
+    public function createCheckoutSession(array $items, array $metadata, CarbonInterface $expiresAt): CreatedCheckoutSession;
+
+    public function retrieveCheckoutSession(string $stripeId): RetrievedCheckoutSession;
+
     public function deactivatePaymentLink(string $stripeId): void;
 
     /**

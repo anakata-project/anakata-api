@@ -9,6 +9,7 @@ use App\Enums\ItineraryStatus;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Cabin;
 use App\Models\CabinClaim;
+use App\Models\CheckoutSession;
 use App\Models\Departure;
 use App\Models\Itinerary;
 use App\Models\Yacht;
@@ -277,4 +278,65 @@ test('two converts spanning two departures in opposite order never deadlock', fu
     expect(CabinClaim::query()->whereNull('released_at')->where('holder_id', $toA->id)->count())->toBe(2);
     expect(CabinClaim::query()->whereNull('released_at')->where('holder_id', $fromB->id)->count())->toBe(2);
     fwrite(STDOUT, "convert-opposite-order concurrency observed: {$observed}\n");
+});
+
+test('submit convert versus a competing claim never frees the cabin', function (): void {
+    ['departure' => $departure, 'cabin' => $cabin] = concurrencyCabin();
+    $session = CheckoutSession::factory()->create([
+        'departure_id' => $departure->id,
+        'cabins' => [['cabin_code' => $cabin->code, 'adults' => 2, 'children' => 0]],
+    ]);
+    $bookingHolder = ClaimHolder::query()->create(['reference' => 'REQ-1', 'name' => 'Request']);
+    $competitor = ClaimHolder::query()->create(['reference' => 'RACE', 'name' => 'Racer']);
+    $observed = 'none';
+
+    DB::transaction(function () use ($departure, $cabin, $session): void {
+        app(ClaimService::class)->claim(
+            $departure,
+            collect([$cabin]),
+            $session,
+            ClaimKind::Hold,
+            HoldType::Web,
+            now()->addMinutes(20),
+        );
+    });
+
+    onClaimConnection('mysql', function () use ($session, $bookingHolder, $cabin): void {
+        DB::beginTransaction();
+        app(ClaimService::class)->convert(
+            $session,
+            $bookingHolder,
+            ClaimKind::Hold,
+            HoldType::Request,
+            now()->addDays(2),
+            collect([$cabin]),
+        );
+    });
+
+    onClaimConnection('mysql_lock', function () use ($departure, $cabin, $competitor, &$observed): void {
+        DB::beginTransaction();
+
+        try {
+            app(ClaimService::class)->claim($departure, collect([$cabin]), $competitor, ClaimKind::Block);
+            expect(false)->toBeTrue('the competing claim should wait, not take a free cabin');
+        } catch (CabinUnavailableException) {
+            expect(false)->toBeTrue('the competing claim should wait on the departure row (1205), not 409');
+        } catch (QueryException $e) {
+            $code = claimMysqlError($e);
+            expect($code)->toBe(1205);
+            $observed = (string) $code;
+            DB::rollBack();
+        }
+    });
+
+    onClaimConnection('mysql', function (): void {
+        DB::commit();
+    });
+
+    $live = CabinClaim::query()->whereNull('released_at')->where('cabin_id', $cabin->id)->get();
+    expect($live)->toHaveCount(1);
+    expect($live->first()?->holder_id)->toBe($bookingHolder->id);
+    expect($live->first()?->hold_type)->toBe(HoldType::Request);
+    expect($observed)->toBe('1205');
+    fwrite(STDOUT, "submit-convert concurrency observed: {$observed}\n");
 });

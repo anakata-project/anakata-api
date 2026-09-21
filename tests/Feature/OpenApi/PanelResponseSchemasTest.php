@@ -73,6 +73,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'BookingRequestResource',
         'HoldResource',
         'WaitlistEntryResource',
+        'CharterEnquiryResource',
         'PaymentResource',
         'PaymentOptionsResource',
         'RecordedPaymentResource',

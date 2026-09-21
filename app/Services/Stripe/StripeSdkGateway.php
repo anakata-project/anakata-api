@@ -27,6 +27,60 @@ final class StripeSdkGateway implements StripeGateway
         ]);
     }
 
+    /**
+     * @param  list<array{booking: Booking, amountUsd: int}>  $items
+     * @param  array<string, string>  $metadata
+     */
+    public function createCheckoutSession(array $items, array $metadata, CarbonInterface $expiresAt): CreatedCheckoutSession
+    {
+        $lineItems = [];
+
+        foreach ($items as $item) {
+            $reference = (string) $item['booking']->displayReference();
+            $lineItems[] = [
+                'price_data' => [
+                    'currency' => 'usd',
+                    'unit_amount' => StripeMoney::toCents($item['amountUsd']),
+                    'product_data' => [
+                        'name' => PaymentKind::Deposit->label().' · '.$reference,
+                    ],
+                ],
+                'quantity' => 1,
+            ];
+        }
+
+        $engineUrl = rtrim((string) config('anakata.engine_url'), '/');
+        $session = $this->client()->checkout->sessions->create([
+            'mode' => 'payment',
+            'line_items' => $lineItems,
+            'expires_at' => $expiresAt->getTimestamp(),
+            'success_url' => $engineUrl.'/confirmation?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $engineUrl.'/checkout?cancelled=1',
+            'metadata' => $metadata,
+            'payment_intent_data' => [
+                'metadata' => $metadata,
+            ],
+        ]);
+
+        return new CreatedCheckoutSession(
+            (string) $session->id,
+            (string) $session->url,
+            CarbonImmutable::createFromTimestamp((int) $session->expires_at, 'UTC'),
+        );
+    }
+
+    public function retrieveCheckoutSession(string $stripeId): RetrievedCheckoutSession
+    {
+        $session = $this->client()->checkout->sessions->retrieve($stripeId);
+        $intent = $session->payment_intent;
+
+        return new RetrievedCheckoutSession(
+            (string) $session->id,
+            (string) $session->status,
+            is_string($intent) ? $intent : (is_object($intent) && isset($intent->id) ? (string) $intent->id : null),
+        );
+    }
+
     public function createPaymentLink(Booking $booking, PaymentKind $kind, int $amountUsd): CreatedPaymentLink
     {
         $reference = (string) $booking->displayReference();

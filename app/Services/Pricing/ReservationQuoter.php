@@ -52,7 +52,8 @@ final class ReservationQuoter
         $snapshots = $this->availability->forDepartures(collect([$departure]));
         $snapshot = $snapshots[$departure->id];
         $guests = $this->config->engineSettings()->guests;
-        $rates = $this->config->rates();
+        $rates = $input['rates'] ?? $this->config->rates();
+        $rates = $rates instanceof RatesDocument ? $rates : $this->config->rates();
         $year = (int) $departure->date->format('Y');
 
         $context = $this->context($input);

@@ -14,6 +14,7 @@ use App\Events\HoldExpired;
 use App\Events\PaymentSettled;
 use App\Listeners\BumpEngineFeedVersion;
 use App\Listeners\ClearCurrentConfigCache;
+use App\Listeners\ExpireWebCheckoutSession;
 use App\Listeners\MarkRequestHoldExpired;
 use App\Listeners\SendOnBookingChargesChanged;
 use App\Listeners\SendOnBookingStatusChanged;
@@ -22,6 +23,8 @@ use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
+use App\Models\CharterEnquiry;
+use App\Models\CheckoutSession;
 use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\Departure;
@@ -106,6 +109,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->ip() ?? 'unknown');
         });
 
+        RateLimiter::for('engine-checkout', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($request->ip() ?? 'unknown');
+        });
+
+        RateLimiter::for('engine-waitlist', function (Request $request): Limit {
+            return Limit::perMinute(5)->by($request->ip() ?? 'unknown');
+        });
+
+        RateLimiter::for('engine-charter', function (Request $request): Limit {
+            return Limit::perMinute(5)->by($request->ip() ?? 'unknown');
+        });
+
         RateLimiter::for('login', function (Request $request): Limit {
             $email = Str::lower((string) $request->input('email'));
 
@@ -154,6 +169,8 @@ class AppServiceProvider extends ServiceProvider
             'agency' => Agency::class,
             'offer' => Offer::class,
             'booking' => Booking::class,
+            'checkout_session' => CheckoutSession::class,
+            'charter_enquiry' => CharterEnquiry::class,
             'document' => Document::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
@@ -202,6 +219,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ConfigPublished::class, BumpEngineFeedVersion::class);
         Event::listen(AvailabilityChanged::class, BumpEngineFeedVersion::class);
         Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
+        Event::listen(HoldExpired::class, ExpireWebCheckoutSession::class);
         Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
         Event::listen(PaymentSettled::class, SendOnPaymentSettled::class);
         Event::listen(BookingChargesChanged::class, SendOnBookingChargesChanged::class);

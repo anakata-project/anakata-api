@@ -66,6 +66,7 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $promo_code
  * @property bool $online_deposit
  * @property CarbonImmutable $sold_on
+ * @property int|null $checkout_session_id
  * @property CarbonImmutable|null $balance_due_date_override
  * @property string|null $internal_notes
  * @property string|null $billing_name
@@ -88,6 +89,7 @@ use Illuminate\Support\Facades\DB;
  * @property-read Agency|null $agency
  * @property-read User|null $commissionApprovedBy
  * @property-read RateVersion $ratesVersion
+ * @property-read CheckoutSession|null $checkoutSession
  * @property-read Collection<int, CabinClaim> $claims
  * @property-read Collection<int, CabinClaim> $activeClaims
  * @property-read Collection<int, Guest> $guests
@@ -135,6 +137,7 @@ use Illuminate\Support\Facades\DB;
     'promo_code',
     'online_deposit',
     'sold_on',
+    'checkout_session_id',
     'balance_due_date_override',
     'internal_notes',
     'billing_name',
@@ -241,6 +244,14 @@ class Booking extends Model
     public function ratesVersion(): BelongsTo
     {
         return $this->belongsTo(RateVersion::class, 'rates_version_id');
+    }
+
+    /**
+     * @return BelongsTo<CheckoutSession, $this>
+     */
+    public function checkoutSession(): BelongsTo
+    {
+        return $this->belongsTo(CheckoutSession::class);
     }
 
     /**

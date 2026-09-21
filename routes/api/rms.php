@@ -9,6 +9,7 @@ use App\Http\Controllers\Rms\BookingExtraController;
 use App\Http\Controllers\Rms\BookingFeesController;
 use App\Http\Controllers\Rms\BusinessRulesController;
 use App\Http\Controllers\Rms\CalendarController;
+use App\Http\Controllers\Rms\CharterEnquiryController;
 use App\Http\Controllers\Rms\ClientDocumentController;
 use App\Http\Controllers\Rms\CommissionController;
 use App\Http\Controllers\Rms\ConsentController;
@@ -189,6 +190,9 @@ Route::post('requests/{booking}/confirm', [RequestController::class, 'confirm'])
 Route::post('requests/{booking}/release', [RequestController::class, 'release'])->whereNumber('booking');
 
 Route::get('holds', [HoldController::class, 'index']);
+
+Route::get('charter-enquiries', [CharterEnquiryController::class, 'index']);
+Route::patch('charter-enquiries/{enquiry}', [CharterEnquiryController::class, 'update'])->whereNumber('enquiry');
 
 Route::get('waitlist', [WaitlistController::class, 'index']);
 Route::post('waitlist', [WaitlistController::class, 'store']);

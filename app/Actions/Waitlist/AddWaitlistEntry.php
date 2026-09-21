@@ -7,6 +7,7 @@ namespace App\Actions\Waitlist;
 use App\Actions\Action;
 use App\Actions\Contacts\ResolveContact;
 use App\Enums\CabinCategory;
+use App\Enums\WaitlistSource;
 use App\Models\User;
 use App\Models\WaitlistEntry;
 use App\Support\History\History;
@@ -22,7 +23,7 @@ final class AddWaitlistEntry extends Action
     /**
      * @param  array<string, mixed>  $data
      */
-    public function handle(array $data, User $actor): WaitlistEntry
+    public function handle(array $data, ?User $actor = null): WaitlistEntry
     {
         return $this->transaction(function () use ($data, $actor): WaitlistEntry {
             $departure = DepartureLocks::lock((int) $data['departure_id']);
@@ -39,6 +40,11 @@ final class AddWaitlistEntry extends Action
                 ? $data['cabin_category']
                 : CabinCategory::from((string) $data['cabin_category']);
 
+            $source = $data['source'] ?? WaitlistSource::Rms;
+            $source = $source instanceof WaitlistSource
+                ? $source
+                : WaitlistSource::from((string) $source);
+
             $entry = WaitlistEntry::query()->create([
                 'departure_id' => $departure->id,
                 'cabin_category' => $category,
@@ -46,13 +52,15 @@ final class AddWaitlistEntry extends Action
                 'adults' => (int) $data['adults'],
                 'children' => (int) $data['children'],
                 'notes' => isset($data['notes']) && is_string($data['notes']) ? $data['notes'] : null,
+                'source' => $source,
             ]);
 
             History::record($entry, 'waitlist.added', after: [
                 'departure_id' => $entry->departure_id,
                 'cabin_category' => $entry->cabin_category->value,
                 'contact_id' => $entry->contact_id,
-            ], actor: $actor);
+                'source' => $entry->source->value,
+            ], actor: $actor, system: $actor === null);
 
             return $entry->refresh()->load(['departure.yacht', 'contact']);
         });

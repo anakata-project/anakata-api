@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Actions\Checkout\FallBackOnlineDeposit;
 use App\Actions\Payments\SettleGatewayPayment;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentMethod;
 use App\Exceptions\UnresolvableStripeEvent;
 use App\Models\Booking;
+use App\Models\CheckoutSession;
 use App\Models\Payment;
 use App\Models\PaymentLink;
 use App\Models\StripeEvent;
@@ -37,6 +39,7 @@ final class ProcessStripeEvent implements ShouldQueue
         try {
             match ($event->type) {
                 'checkout.session.completed' => $this->settleCheckout($event, $settle),
+                'checkout.session.expired' => $this->expireCheckout($event),
                 'charge.refunded' => $this->matchRefund($event),
                 default => $this->ignore($event),
             };
@@ -58,6 +61,15 @@ final class ProcessStripeEvent implements ShouldQueue
             throw new UnresolvableStripeEvent('checkout.session.completed is missing payment_intent or amount.');
         }
 
+        $engine = $this->findEngineSession($session);
+
+        if ($engine instanceof CheckoutSession) {
+            $this->settleEngineCheckout($settle, $engine, $paymentIntent, $session);
+            $this->markProcessed($event, 'settled');
+
+            return;
+        }
+
         $link = $this->findLink($session);
         $booking = $this->findBooking($session, $link);
 
@@ -76,6 +88,87 @@ final class ProcessStripeEvent implements ShouldQueue
         ], null, system: true);
 
         $this->markProcessed($event, 'settled');
+    }
+
+    /**
+     * @param  array<string, mixed>  $session
+     */
+    private function settleEngineCheckout(
+        SettleGatewayPayment $settle,
+        CheckoutSession $engine,
+        string $paymentIntent,
+        array $session,
+    ): void {
+        $engine->load('bookings');
+        $metadata = is_array($session['metadata'] ?? null) ? $session['metadata'] : [];
+
+        foreach ($engine->bookings as $booking) {
+            $amount = $this->engineDepositAmount($metadata, $booking);
+
+            $settle->handle($booking, [
+                'kind' => PaymentKind::Deposit,
+                'method' => PaymentMethod::StripeLink,
+                'amount' => $amount,
+                'gateway_id' => $paymentIntent.'#'.$booking->id,
+            ], null, system: true);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    private function engineDepositAmount(array $metadata, Booking $booking): int
+    {
+        $key = 'deposit_'.$booking->id;
+        $raw = $metadata[$key] ?? null;
+
+        if (is_numeric($raw)) {
+            return (int) $raw;
+        }
+
+        return $booking->depositAmount();
+    }
+
+    /**
+     * @param  array<string, mixed>  $session
+     */
+    private function findEngineSession(array $session): ?CheckoutSession
+    {
+        $stripeId = $this->string($session['id'] ?? null);
+
+        if ($stripeId !== null) {
+            $found = CheckoutSession::query()
+                ->where('stripe_checkout_session_id', $stripeId)
+                ->first();
+
+            if ($found instanceof CheckoutSession) {
+                return $found;
+            }
+        }
+
+        $metadata = is_array($session['metadata'] ?? null) ? $session['metadata'] : [];
+        $id = $this->string($metadata['checkout_session_id'] ?? null);
+
+        if ($id !== null && ctype_digit($id)) {
+            return CheckoutSession::query()->find((int) $id);
+        }
+
+        return null;
+    }
+
+    private function expireCheckout(StripeEvent $event): void
+    {
+        $session = $this->object($event);
+        $engine = $this->findEngineSession($session);
+
+        if (! $engine instanceof CheckoutSession) {
+            $this->markProcessed($event, 'ignored');
+
+            return;
+        }
+
+        app(FallBackOnlineDeposit::class)->handle($engine);
+        $this->markProcessed($event, 'expired');
     }
 
     private function matchRefund(StripeEvent $event): void

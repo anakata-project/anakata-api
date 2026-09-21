@@ -88,20 +88,24 @@ final class ClaimService
         return $released;
     }
 
-    public function convert(Model $fromHolder, Model $toHolder, ClaimKind $kind): int
-    {
+    /**
+     * @param  Collection<int, Cabin>|null  $cabins
+     */
+    public function convert(
+        Model $fromHolder,
+        Model $toHolder,
+        ClaimKind $kind,
+        ?HoldType $holdType = null,
+        ?CarbonInterface $expiresAt = null,
+        ?Collection $cabins = null,
+    ): int {
         $this->guardTransaction();
 
         if (self::$beforeConvert instanceof Closure) {
             (self::$beforeConvert)();
         }
 
-        $active = CabinClaim::query()
-            ->where('holder_type', $fromHolder->getMorphClass())
-            ->where('holder_id', $fromHolder->getKey())
-            ->whereNull('released_at')
-            ->with(['cabin', 'departure'])
-            ->get();
+        $active = $this->activeHolderClaims($fromHolder, $cabins);
 
         if ($active->isEmpty()) {
             return 0;
@@ -112,16 +116,14 @@ final class ClaimService
             $active->pluck('departure_id')->unique()->values()->all(),
         ));
 
-        $active = CabinClaim::query()
-            ->where('holder_type', $fromHolder->getMorphClass())
-            ->where('holder_id', $fromHolder->getKey())
-            ->whereNull('released_at')
-            ->with(['cabin', 'departure'])
-            ->get();
+        $active = $this->activeHolderClaims($fromHolder, $cabins);
 
         if ($active->isEmpty()) {
             return 0;
         }
+
+        $sample = $active->first();
+        $this->assertClaimable($sample->departure, $kind, $holdType, $expiresAt);
 
         $this->releaseByIds($active->pluck('id')->all(), ReleaseReason::Converted);
 
@@ -134,13 +136,13 @@ final class ClaimService
                 continue;
             }
 
-            $cabins = $group->map(fn (CabinClaim $claim): Cabin => $claim->cabin)->sortBy('sort')->values();
+            $targetCabins = $group->map(fn (CabinClaim $claim): Cabin => $claim->cabin)->sortBy('sort')->values();
             try {
                 $created = $created->concat(
-                    $this->insertClaims($departure, $cabins, $toHolder, $kind, null, null),
+                    $this->insertClaims($departure, $targetCabins, $toHolder, $kind, $holdType, $expiresAt),
                 );
             } catch (UniqueConstraintViolationException $exception) {
-                throw $this->conflictOrRethrow($exception, $departure, $cabins, $toHolder);
+                throw $this->conflictOrRethrow($exception, $departure, $targetCabins, $toHolder);
             }
         }
 
@@ -281,16 +283,26 @@ final class ClaimService
      */
     private function activeHolderClaimIds(Model $holder, ?Collection $cabins): array
     {
+        return $this->activeHolderClaims($holder, $cabins)->pluck('id')->all();
+    }
+
+    /**
+     * @param  Collection<int, Cabin>|null  $cabins
+     * @return Collection<int, CabinClaim>
+     */
+    private function activeHolderClaims(Model $holder, ?Collection $cabins): Collection
+    {
         $query = CabinClaim::query()
             ->where('holder_type', $holder->getMorphClass())
             ->where('holder_id', $holder->getKey())
-            ->whereNull('released_at');
+            ->whereNull('released_at')
+            ->with(['cabin', 'departure']);
 
         if ($cabins instanceof Collection) {
             $query->whereIn('cabin_id', $cabins->pluck('id'));
         }
 
-        return $query->pluck('id')->all();
+        return $query->get();
     }
 
     /**

@@ -20,6 +20,11 @@ final class FakeStripeGateway implements StripeGateway
     /** @var array<string, CreatedPaymentLink> */
     public array $links = [];
 
+    /** @var array<string, array{session: CreatedCheckoutSession, status: string, payment_intent: string|null, metadata: array<string, string>}> */
+    public array $checkoutSessions = [];
+
+    public int $checkoutSequence = 0;
+
     /** @var array<string, bool> */
     public array $active = [];
 
@@ -30,9 +35,59 @@ final class FakeStripeGateway implements StripeGateway
 
     public bool $includeFileFixture = false;
 
+    public bool $failCheckout = false;
+
     public static function fixturePath(): string
     {
         return database_path('fixtures/stripe-charges.json');
+    }
+
+    /**
+     * @param  list<array{booking: Booking, amountUsd: int}>  $items
+     * @param  array<string, string>  $metadata
+     */
+    public function createCheckoutSession(array $items, array $metadata, CarbonInterface $expiresAt): CreatedCheckoutSession
+    {
+        if ($this->failCheckout) {
+            throw new RuntimeException('Stripe Checkout Session could not be created.');
+        }
+
+        $this->checkoutSequence++;
+        $id = 'cs_test_'.str_pad((string) $this->checkoutSequence, 3, '0', STR_PAD_LEFT);
+        $expires = CarbonImmutable::instance($expiresAt)->utc();
+        $created = new CreatedCheckoutSession($id, 'https://checkout.stripe.com/c/pay/'.$id, $expires);
+        $this->checkoutSessions[$id] = [
+            'session' => $created,
+            'status' => 'open',
+            'payment_intent' => 'pi_'.$id,
+            'metadata' => $metadata,
+        ];
+
+        return $created;
+    }
+
+    public function retrieveCheckoutSession(string $stripeId): RetrievedCheckoutSession
+    {
+        $row = $this->checkoutSessions[$stripeId] ?? null;
+
+        if ($row === null) {
+            throw new InvalidArgumentException('Unknown Stripe checkout session '.$stripeId);
+        }
+
+        return new RetrievedCheckoutSession($stripeId, $row['status'], $row['payment_intent']);
+    }
+
+    public function setCheckoutSessionStatus(string $stripeId, string $status, ?string $paymentIntent = null): void
+    {
+        if (! isset($this->checkoutSessions[$stripeId])) {
+            throw new InvalidArgumentException('Unknown Stripe checkout session '.$stripeId);
+        }
+
+        $this->checkoutSessions[$stripeId]['status'] = $status;
+
+        if ($paymentIntent !== null) {
+            $this->checkoutSessions[$stripeId]['payment_intent'] = $paymentIntent;
+        }
     }
 
     public function createPaymentLink(Booking $booking, PaymentKind $kind, int $amountUsd): CreatedPaymentLink

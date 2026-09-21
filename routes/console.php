@@ -13,6 +13,10 @@ Schedule::command('inventory:release-expired-holds')
     ->everyMinute()
     ->withoutOverlapping();
 
+Schedule::command('engine:expire-stripe-checkouts')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 Schedule::command('anakata:flag-overdue')
     ->daily()
     ->timezone(BusinessTime::zone())

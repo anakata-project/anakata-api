@@ -22,6 +22,27 @@ trait NormalizesEngineCabins
         return Departure::query()->with(['yacht.cabins', 'itinerary'])->find((int) $id);
     }
 
+    protected function prepareForValidation(): void
+    {
+        $rows = $this->input('cabins');
+
+        if (! is_array($rows)) {
+            return;
+        }
+
+        foreach ($rows as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            if (! isset($row['cabin_code']) && isset($row['code'])) {
+                $rows[$index]['cabin_code'] = $row['code'];
+            }
+        }
+
+        $this->merge(['cabins' => $rows]);
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
@@ -29,7 +50,8 @@ trait NormalizesEngineCabins
     {
         return [
             'cabins' => ['required', 'array', 'min:1'],
-            'cabins.*.cabin_code' => ['required', 'string', 'max:32'],
+            'cabins.*.cabin_code' => ['required_without:cabins.*.code', 'string', 'max:32'],
+            'cabins.*.code' => ['required_without:cabins.*.cabin_code', 'string', 'max:32'],
             'cabins.*.adults' => ['required', 'integer', 'min:0', 'max:36'],
             'cabins.*.children' => ['required', 'integer', 'min:0', 'max:36'],
         ];
@@ -52,7 +74,9 @@ trait NormalizesEngineCabins
                     continue;
                 }
 
-                $code = isset($row['cabin_code']) ? (string) $row['cabin_code'] : '';
+                $code = isset($row['cabin_code'])
+                    ? (string) $row['cabin_code']
+                    : (isset($row['code']) ? (string) $row['code'] : '');
                 $cabin = CabinCodes::resolve($departure, $code);
 
                 if (! $cabin instanceof Cabin) {

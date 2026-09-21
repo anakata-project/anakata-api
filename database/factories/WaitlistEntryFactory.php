@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\CabinCategory;
+use App\Enums\WaitlistSource;
 use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\WaitlistEntry;
@@ -27,6 +28,7 @@ class WaitlistEntryFactory extends Factory
             'adults' => 2,
             'children' => 0,
             'notes' => null,
+            'source' => WaitlistSource::Rms,
             'notified_at' => null,
             'notified_by' => null,
             'notified_channel' => null,

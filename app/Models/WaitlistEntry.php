@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CabinCategory;
 use App\Enums\PreferredChannel;
+use App\Enums\WaitlistSource;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
 use Database\Factories\WaitlistEntryFactory;
@@ -25,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property int $adults
  * @property int $children
  * @property string|null $notes
+ * @property WaitlistSource $source
  * @property Carbon|null $notified_at
  * @property int|null $notified_by
  * @property PreferredChannel|null $notified_channel
@@ -47,6 +49,7 @@ use Illuminate\Support\Carbon;
     'adults',
     'children',
     'notes',
+    'source',
     'notified_at',
     'notified_by',
     'notified_channel',
@@ -71,6 +74,7 @@ class WaitlistEntry extends Model
     {
         return [
             'cabin_category' => CabinCategory::class,
+            'source' => WaitlistSource::class,
             'adults' => 'integer',
             'children' => 'integer',
             'notified_at' => 'datetime',
