@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Extras;
 
 use App\Actions\Action;
+use App\Events\BookingChargesChanged;
 use App\Models\Booking;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
@@ -67,6 +68,8 @@ final class UpdateBookingFees extends Action
                 'tct_rate_usd' => $booking->tct_rate_usd,
                 ...$after,
             ], actor: $actor);
+
+            BookingChargesChanged::dispatch($booking, $after['what']);
 
             return $booking->fresh() ?? $booking;
         });

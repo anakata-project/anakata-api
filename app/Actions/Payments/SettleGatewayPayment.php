@@ -9,6 +9,7 @@ use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Events\PaymentSettled;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\PaymentLink;
@@ -87,6 +88,10 @@ final class SettleGatewayPayment extends Action
 
             $this->effects->handle($booking, $payment);
             $this->markLinkPaid($data['payment_link'] ?? null);
+
+            if ($payment->amount > 0) {
+                PaymentSettled::dispatch($booking, $payment);
+            }
 
             return $payment;
         });

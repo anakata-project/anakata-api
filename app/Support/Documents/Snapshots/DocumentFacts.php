@@ -425,17 +425,23 @@ final class DocumentFacts
         return $this->leadGuest()?->displayName() ?? $this->booking->contact->name;
     }
 
-    public function hasTransferVoucherExtra(): bool
+    public static function bookingHasTransferVoucher(Booking $booking): bool
     {
+        $booking->loadMissing('extras');
         $catalogue = app(CurrentConfig::class)->extras();
 
-        foreach ($this->booking->extras as $extra) {
+        foreach ($booking->extras as $extra) {
             if ($catalogue->find($extra->code)?->triggersTransferVoucher === true) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    public function hasTransferVoucherExtra(): bool
+    {
+        return self::bookingHasTransferVoucher($this->booking);
     }
 
     public function hasPreCruiseHotel(): bool

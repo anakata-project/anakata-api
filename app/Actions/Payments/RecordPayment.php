@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Events\PaymentSettled;
 use App\Models\Booking;
 use App\Models\User;
 use App\Support\Bookings\BookingMutationLock;
@@ -66,6 +67,10 @@ final class RecordPayment extends Action
             History::record($booking, PaymentHistory::RECORDED, after: PaymentHistory::recordedPayload($payment), actor: $actor);
 
             $booking = $this->effects->handle($booking, $payment);
+
+            if ($payment->status === PaymentStatus::Settled && $payment->amount > 0) {
+                PaymentSettled::dispatch($booking, $payment);
+            }
 
             return new RecordedPayment($payment, $booking, $warnings);
         });

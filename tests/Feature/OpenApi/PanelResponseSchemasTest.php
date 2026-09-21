@@ -89,6 +89,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'BookingExtraResource',
         'DocumentResource',
         'DeliveryResource',
+        'DocumentPlanRowResource',
         'CountryResource',
         'MaskedNoteResource',
     ] as $name) {

@@ -83,7 +83,7 @@ test('staff can preview issue list download and reprint an issued version from i
         ->postJson('/api/rms/bookings/'.$booking->id.'/documents/INVOICE/issue', ['reason' => 'Extra added'])
         ->assertCreated()
         ->json();
-    expect($v2['version'])->toBe(2);
+    expect($v2['version'])->toBe(3);
     expect($v2['number'])->toBe($issued['number']);
     expect($v2['file_sha256'])->not->toBe($v1Sha);
 

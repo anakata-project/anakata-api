@@ -244,6 +244,8 @@ final class Registry
             'extras-due-hours' => data_get($document, 'payments.extras_due_hours').' hours',
             'wire-window-hours' => data_get($document, 'payments.wire_window_hours').' hours',
             'balance-reminders' => implode(' / ', data_get($document, 'payments.balance_reminder_days') ?? []).' days',
+            'pretrip-days-before' => data_get($document, 'documents.pretrip_days_before').' days',
+            'voucher-days-before' => data_get($document, 'documents.voucher_days_before').' days',
             'online-deposit-discount' => data_get($document, 'discounts.online_deposit_discount_pct').'%',
             'max-total-discount' => data_get($document, 'discounts.max_total_discount_pct') === null
                 ? 'no cap'
@@ -702,6 +704,28 @@ final class Registry
                 BusinessRulesDocument::sourceDisplay('payments.balance_reminder_days'),
                 data_get($initial, 'payments.balance_reminder_days'),
                 'Payment reminder automation',
+            ),
+            self::here(
+                'pretrip-days-before',
+                $g,
+                'J7',
+                'Pre-trip itinerary — days before departure',
+                RuleStatus::Confirmed,
+                ['documents.pretrip_days_before'],
+                BusinessRulesDocument::sourceDisplay('documents.pretrip_days_before'),
+                data_get($initial, 'documents.pretrip_days_before'),
+                'Document schedule',
+            ),
+            self::here(
+                'voucher-days-before',
+                $g,
+                'J7',
+                'Transfer voucher — days before departure',
+                RuleStatus::Confirmed,
+                ['documents.voucher_days_before'],
+                BusinessRulesDocument::sourceDisplay('documents.voucher_days_before'),
+                data_get($initial, 'documents.voucher_days_before'),
+                'Document schedule',
             ),
             self::here(
                 'online-deposit-discount',

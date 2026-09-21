@@ -31,6 +31,11 @@ final class DeliveryKey
         return 'pretrip:'.$bookingId.':'.$departureDate;
     }
 
+    public static function forVoucher(int $bookingId, string $departureDate): string
+    {
+        return 'voucher:'.$bookingId.':'.$departureDate;
+    }
+
     public static function forPaymentLink(int $linkId): string
     {
         return 'payment_link:'.$linkId;

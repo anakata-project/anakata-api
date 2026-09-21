@@ -10,6 +10,7 @@ use App\Enums\BookingStatus;
 use App\Enums\ClaimKind;
 use App\Enums\ReferenceType;
 use App\Enums\ReleaseReason;
+use App\Events\BookingStatusChanged;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Booking;
 use App\Models\BookingRequest;
@@ -81,6 +82,10 @@ final class TransitionBooking extends Action
                 'what' => $what,
                 'client' => $client,
             ], reason: $reason, actor: $system ? null : $actor, system: $system);
+
+            if ($from !== $to) {
+                BookingStatusChanged::dispatch($booking, $from, $to);
+            }
 
             return $booking->refresh()->load([
                 'departure.yacht',

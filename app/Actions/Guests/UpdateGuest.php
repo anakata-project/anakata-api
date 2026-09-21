@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Guests;
 
 use App\Actions\Action;
+use App\Events\BookingChargesChanged;
 use App\Models\Guest;
 use App\Models\User;
 use App\Support\Bookings\BookingMutationLock;
@@ -29,6 +30,8 @@ final class UpdateGuest extends Action
             $booking = $guest->booking;
             $booking = BookingMutationLock::acquire($booking, (int) $booking->departure_id);
             $guest->setRelation('booking', $booking);
+
+            $feeBefore = (int) $guest->png_fee;
 
             $this->fields->apply($guest, $data, $actor);
             $this->png->toGuest($guest, $booking);
@@ -63,6 +66,10 @@ final class UpdateGuest extends Action
                         ? 'Guardian consent cleared — '.$guest->displayName()
                         : 'Guardian consent recorded — '.$guest->displayName(),
                 ], actor: $actor);
+            }
+
+            if ($booking->png_collected && (int) $guest->png_fee !== $feeBefore) {
+                BookingChargesChanged::dispatch($booking, 'PNG fee changed');
             }
 
             return $guest->fresh() ?? $guest;

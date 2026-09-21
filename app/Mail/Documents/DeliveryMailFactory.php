@@ -9,6 +9,7 @@ use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
 use App\Models\Delivery;
 use App\Models\PaymentLink;
+use App\Support\BusinessTime;
 use Illuminate\Mail\Mailable;
 use InvalidArgumentException;
 
@@ -47,10 +48,10 @@ final class DeliveryMailFactory
 
     private static function reminderDays(Delivery $delivery): int
     {
-        $parts = explode(':', $delivery->idempotency_key);
-        $days = $parts[3] ?? $parts[4] ?? null;
+        $due = $delivery->booking->balanceDueDate()->toDateString();
+        $today = BusinessTime::now()->toDateString();
 
-        return is_numeric($days) ? (int) $days : 0;
+        return max(0, BusinessTime::calendarDaysBetween($today, $due));
     }
 
     private static function openBalanceLink(Delivery $delivery): ?PaymentLink

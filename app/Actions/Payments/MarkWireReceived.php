@@ -6,6 +6,7 @@ namespace App\Actions\Payments;
 
 use App\Actions\Action;
 use App\Enums\PaymentStatus;
+use App\Events\PaymentSettled;
 use App\Models\Payment;
 use App\Models\User;
 use App\Support\Bookings\BookingMutationLock;
@@ -51,6 +52,10 @@ final class MarkWireReceived extends Action
             ], actor: $actor);
 
             $this->effects->handle($booking, $payment);
+
+            if ($payment->amount > 0) {
+                PaymentSettled::dispatch($booking, $payment);
+            }
 
             return $payment->refresh()->load(['booking', 'recordedBy']);
         });

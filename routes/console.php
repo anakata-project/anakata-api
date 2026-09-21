@@ -22,3 +22,8 @@ Schedule::command('anakata:retention')
     ->daily()
     ->timezone(BusinessTime::zone())
     ->withoutOverlapping();
+
+Schedule::command('anakata:documents-due')
+    ->daily()
+    ->timezone(BusinessTime::zone())
+    ->withoutOverlapping();

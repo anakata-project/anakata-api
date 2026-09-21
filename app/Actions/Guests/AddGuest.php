@@ -6,6 +6,7 @@ namespace App\Actions\Guests;
 
 use App\Actions\Action;
 use App\Enums\BookingType;
+use App\Events\BookingChargesChanged;
 use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\User;
@@ -43,6 +44,8 @@ final class AddGuest extends Action
             $guest->ecuador_resident = false;
             $guest->insurance_declared = false;
 
+            $feesBefore = $booking->png_collected ? $booking->feesCollectedFresh() : 0;
+
             $this->fields->apply($guest, $data, $actor);
             $this->png->toGuest($guest, $booking);
             $guest->save();
@@ -54,6 +57,10 @@ final class AddGuest extends Action
                 'position' => $guest->position,
                 'what' => 'Guest slot added ('.$count.' guests)',
             ], actor: $actor);
+
+            if ($booking->png_collected && $booking->feesCollectedFresh() !== $feesBefore) {
+                BookingChargesChanged::dispatch($booking, 'PNG fee changed');
+            }
 
             return $guest->fresh() ?? $guest;
         });

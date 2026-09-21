@@ -3,11 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\BookingStatus;
+use App\Enums\DeliveryStatus;
 use App\Enums\DocumentKind;
+use App\Enums\DocumentPlanStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Booking;
+use App\Models\Delivery;
 use App\Models\Document;
 use App\Models\Payment;
+use App\Support\Documents\DocumentPlan;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\DemoAgenciesSeeder;
 use Database\Seeders\DemoBookingsSeeder;
@@ -20,6 +24,7 @@ use Database\Seeders\DemoRequestsSeeder;
 use Database\Seeders\DemoUsersSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
+use Illuminate\Support\Facades\Mail;
 
 beforeEach(function (): void {
     $this->seed(RolesSeeder::class);
@@ -35,7 +40,8 @@ beforeEach(function (): void {
     $this->seed(DemoExtrasSeeder::class);
 });
 
-test('demo documents seed issues invoices summaries and receipts without sending', function (): void {
+test('demo documents seed issues invoices summaries and receipts as SENT without mailing', function (): void {
+    Mail::fake();
     $this->seed(DemoDocumentsSeeder::class);
     $this->seed(DemoDocumentsSeeder::class);
 
@@ -49,7 +55,15 @@ test('demo documents seed issues invoices summaries and receipts without sending
     $settled = Payment::query()->where('status', PaymentStatus::Settled)->where('amount', '>', 0)->count();
     expect(Document::query()->where('kind', DocumentKind::Receipt)->count())->toBe($settled);
 
+    expect(Delivery::query()->where('status', DeliveryStatus::Sent)->count())
+        ->toBe(Document::query()->count());
+    Mail::assertNothingSent();
+
     $harrison = Booking::query()->where('reference', 'ANK-2026-0003')->first();
     expect($harrison?->billing_address)->toBe('845 Ocean Drive, Miami, FL 33139, USA');
     expect($harrison?->billing_phone)->toBe('+1 305 555 0198');
+
+    $plan = app(DocumentPlan::class)->for($harrison, adminUser());
+    $invoice = collect($plan)->first(fn ($row) => $row->kind->value === DocumentKind::Invoice->value);
+    expect($invoice?->status)->toBe(DocumentPlanStatus::Sent);
 });

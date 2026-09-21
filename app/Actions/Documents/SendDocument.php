@@ -30,11 +30,12 @@ final class SendDocument extends Action
         ?User $actor = null,
         bool $system = false,
         bool $resend = false,
+        ?string $idempotencyKey = null,
     ): Delivery {
-        return $this->transaction(function () use ($booking, $document, $actor, $system, $resend): Delivery {
+        return $this->transaction(function () use ($booking, $document, $actor, $system, $resend, $idempotencyKey): Delivery {
             $kind = DeliveryKind::fromDocument($document->kind);
             $recipients = $this->recipients->resolve($booking, $kind);
-            $firstKey = DeliveryKey::forDocument($document);
+            $firstKey = $idempotencyKey ?? DeliveryKey::forDocument($document);
             $triggeredBy = $system || ! $actor instanceof User
                 ? DeliveryTriggeredBy::System
                 : DeliveryTriggeredBy::User;

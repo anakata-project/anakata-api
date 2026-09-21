@@ -1,0 +1,437 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Documents;
+
+use App\Enums\BookingStatus;
+use App\Enums\DeliveryKind;
+use App\Enums\DeliveryStatus;
+use App\Enums\DocumentKind;
+use App\Enums\DocumentPlanKind;
+use App\Enums\DocumentPlanStatus;
+use App\Enums\PaymentKind;
+use App\Enums\PaymentStatus;
+use App\Models\Booking;
+use App\Models\Delivery;
+use App\Models\Document;
+use App\Models\Payment;
+use App\Models\User;
+use App\Services\Config\CurrentConfig;
+use App\Support\BusinessTime;
+use App\Support\Documents\Snapshots\DocumentFacts;
+use Illuminate\Support\Collection;
+
+final class DocumentPlan
+{
+    public function __construct(
+        private readonly Recipients $recipients,
+        private readonly CurrentConfig $config,
+    ) {}
+
+    /**
+     * @return list<DocumentPlanRow>
+     */
+    public function for(Booking $booking, ?User $actor = null): array
+    {
+        $booking->loadMissing([
+            'departure',
+            'contact',
+            'group.coordinator',
+            'agency',
+            'guests',
+            'extras',
+            'payments',
+            'documents.deliveries',
+            'deliveries',
+        ]);
+
+        $canAct = $actor instanceof User && $actor->can('issueDocument', $booking);
+        $rules = $this->config->businessRules();
+        $pretripDays = $rules->documents->pretripDaysBefore;
+        $voucherDays = $rules->documents->voucherDaysBefore;
+        $reminderSlots = $rules->payments->balanceReminderDays;
+        $today = BusinessTime::now()->toDateString();
+        $departure = $booking->departure->date->toDateString();
+        $due = $booking->balanceDueDate()->toDateString();
+        $confirmed = $booking->status->isConfirmedOrLater();
+        $fullyPaid = in_array($booking->status, [
+            BookingStatus::FullyPaid,
+            BookingStatus::OnBoard,
+            BookingStatus::Completed,
+        ], true);
+        $cruiseOpen = $this->cruiseOutstanding($booking) > 0;
+        $rows = [];
+
+        $rows[] = $this->documentRow(
+            $booking,
+            DocumentPlanKind::Invoice,
+            'Deposit verified → CONFIRMED',
+            $this->issuedDate($booking, DocumentKind::Invoice) ?? $this->depositDate($booking),
+            $confirmed ? DocumentPlanStatus::Due : DocumentPlanStatus::Waiting,
+            $canAct,
+            DeliveryKind::Invoice,
+        );
+
+        $rows[] = $this->documentRow(
+            $booking,
+            DocumentPlanKind::Summary,
+            'With the invoice',
+            $this->issuedDate($booking, DocumentKind::Summary) ?? $this->depositDate($booking),
+            $confirmed ? DocumentPlanStatus::Due : DocumentPlanStatus::Waiting,
+            $canAct,
+            DeliveryKind::Summary,
+        );
+
+        foreach ($this->settledPayments($booking) as $payment) {
+            $rows[] = $this->receiptRow($booking, $payment, $canAct);
+        }
+
+        if ($cruiseOpen) {
+            foreach ($reminderSlots as $index => $days) {
+                $sendDate = BusinessTime::calendarDay($due)->subDays($days)->toDateString();
+                $rows[] = $this->reminderRow(
+                    $booking,
+                    $days,
+                    $index + 1,
+                    $due,
+                    $sendDate,
+                    $today,
+                    $confirmed || $booking->status === BookingStatus::OnHoldAgency,
+                );
+            }
+        } else {
+            $rows[] = new DocumentPlanRow(
+                $booking->id,
+                DocumentPlanKind::Reminder,
+                'Balance reminders',
+                $this->recipientLabel($booking, DeliveryKind::Reminder),
+                'Balance paid',
+                null,
+                DocumentPlanStatus::NotNeeded,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                false,
+            );
+        }
+
+        $pretripDate = BusinessTime::calendarDay($departure)->subDays($pretripDays)->toDateString();
+        $rows[] = $this->documentRow(
+            $booking,
+            DocumentPlanKind::Pretrip,
+            'T−'.$pretripDays,
+            $pretripDate,
+            $this->scheduleStatus($confirmed, $pretripDate, $today),
+            $canAct,
+            DeliveryKind::Pretrip,
+        );
+
+        $rows[] = new DocumentPlanRow(
+            $booking->id,
+            DocumentPlanKind::Questionnaire,
+            DocumentPlanKind::Questionnaire->label(),
+            'Each passenger with email',
+            'T−45 · Arrives in Sprint 11',
+            $pretripDate,
+            DocumentPlanStatus::Waiting,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            false,
+        );
+
+        $hasVoucher = DocumentFacts::bookingHasTransferVoucher($booking);
+        $voucherDate = BusinessTime::calendarDay($departure)->subDays($voucherDays)->toDateString();
+        $rows[] = $this->documentRow(
+            $booking,
+            DocumentPlanKind::Voucher,
+            'T−'.$voucherDays.' · if contracted',
+            $hasVoucher ? $voucherDate : null,
+            $hasVoucher
+                ? $this->scheduleStatus($confirmed, $voucherDate, $today)
+                : DocumentPlanStatus::NotContracted,
+            $canAct && $hasVoucher,
+            DeliveryKind::Voucher,
+        );
+
+        $rows[] = $this->documentRow(
+            $booking,
+            DocumentPlanKind::FinalInvoice,
+            'Balance paid → FULLY PAID',
+            $this->issuedDate($booking, DocumentKind::FinalInvoice) ?? $this->balancePaymentDate($booking),
+            $fullyPaid ? DocumentPlanStatus::Due : DocumentPlanStatus::Waiting,
+            $canAct,
+            DeliveryKind::FinalInvoice,
+        );
+
+        $wire = $this->latestDocument($booking, DocumentKind::WireInstructions);
+
+        if ($wire instanceof Document) {
+            $rows[] = $this->documentRow(
+                $booking,
+                DocumentPlanKind::WireInstructions,
+                'Sent by hand',
+                $wire->issued_at->toDateString(),
+                DocumentPlanStatus::Due,
+                $canAct,
+                DeliveryKind::WireInstructions,
+            );
+        }
+
+        return $rows;
+    }
+
+    private function documentRow(
+        Booking $booking,
+        DocumentPlanKind $kind,
+        string $trigger,
+        ?string $date,
+        DocumentPlanStatus $fallback,
+        bool $canAct,
+        DeliveryKind $deliveryKind,
+    ): DocumentPlanRow {
+        $documentKind = $kind->documentKind();
+        $document = $documentKind instanceof DocumentKind
+            ? $this->latestDocument($booking, $documentKind)
+            : null;
+        $delivery = $document instanceof Document
+            ? $this->lastDelivery($document->deliveries)
+            : $this->lastBookingDelivery($booking, $deliveryKind);
+        $recipients = $this->recipients->resolve($booking, $deliveryKind);
+        $status = $this->statusFromFacts($delivery, $recipients, $fallback);
+        $canPreview = $documentKind instanceof DocumentKind;
+        $canIssue = $canAct && $documentKind instanceof DocumentKind && $kind !== DocumentPlanKind::Receipt;
+        $canResend = $document instanceof Document && $delivery instanceof Delivery
+            && in_array($delivery->status, [
+                DeliveryStatus::Sent,
+                DeliveryStatus::Failed,
+            ], true);
+
+        return new DocumentPlanRow(
+            $booking->id,
+            $kind,
+            $kind->label(),
+            $this->recipientLabel($booking, $deliveryKind),
+            $trigger,
+            $date,
+            $status,
+            $document?->id,
+            $document?->version,
+            $delivery?->id,
+            $this->deliveryError($delivery),
+            $canPreview,
+            $canIssue,
+            $canResend,
+        );
+    }
+
+    private function receiptRow(Booking $booking, Payment $payment, bool $canAct): DocumentPlanRow
+    {
+        $document = $booking->documents
+            ->first(fn (Document $document): bool => $document->kind === DocumentKind::Receipt
+                && (int) $document->payment_id === (int) $payment->id);
+        $delivery = $document instanceof Document
+            ? $this->lastDelivery($document->deliveries)
+            : null;
+        $recipients = $this->recipients->resolve($booking, DeliveryKind::Receipt);
+        $fallback = DocumentPlanStatus::Due;
+        $status = $this->statusFromFacts($delivery, $recipients, $fallback);
+        $date = $payment->paid_at->toDateString();
+
+        return new DocumentPlanRow(
+            $booking->id,
+            DocumentPlanKind::Receipt,
+            'Payment confirmation — '.$payment->kind->label(),
+            $this->recipientLabel($booking, DeliveryKind::Receipt),
+            'Payment verified',
+            $date,
+            $status,
+            $document?->id,
+            $document?->version,
+            $delivery?->id,
+            $this->deliveryError($delivery),
+            true,
+            false,
+            $document instanceof Document && $delivery instanceof Delivery
+                && in_array($delivery->status, [
+                    DeliveryStatus::Sent,
+                    DeliveryStatus::Failed,
+                ], true),
+            paymentId: $payment->id,
+        );
+    }
+
+    private function reminderRow(
+        Booking $booking,
+        int $days,
+        int $index,
+        string $due,
+        string $sendDate,
+        string $today,
+        bool $qualifies,
+    ): DocumentPlanRow {
+        $key = DeliveryKey::forReminder($booking->id, $due, $days);
+        $delivery = $booking->deliveries->first(
+            fn (Delivery $row): bool => $row->idempotency_key === $key
+                || $row->idempotency_key === DeliveryKey::blocked($key),
+        );
+        $recipients = $this->recipients->resolve($booking, DeliveryKind::Reminder);
+        $fallback = ! $qualifies
+            ? DocumentPlanStatus::Waiting
+            : ($sendDate > $today ? DocumentPlanStatus::Scheduled : DocumentPlanStatus::Due);
+        $status = $this->statusFromFacts($delivery, $recipients, $fallback);
+
+        return new DocumentPlanRow(
+            $booking->id,
+            DocumentPlanKind::Reminder,
+            'Balance reminder '.$index.' ('.$days.' days before due)',
+            $this->recipientLabel($booking, DeliveryKind::Reminder),
+            'Due '.$due.' − '.$days.' days',
+            $sendDate,
+            $status,
+            null,
+            null,
+            $delivery?->id,
+            $this->deliveryError($delivery),
+            false,
+            false,
+            false,
+            reminderDays: $days,
+        );
+    }
+
+    private function deliveryError(?Delivery $delivery): ?string
+    {
+        if (! $delivery instanceof Delivery) {
+            return null;
+        }
+
+        return $delivery->error ?? $delivery->blocked_reason;
+    }
+
+    private function statusFromFacts(
+        ?Delivery $delivery,
+        RecipientSet $recipients,
+        DocumentPlanStatus $fallback,
+    ): DocumentPlanStatus {
+        if ($delivery instanceof Delivery) {
+            return match ($delivery->status) {
+                DeliveryStatus::Sent => DocumentPlanStatus::Sent,
+                DeliveryStatus::Failed => DocumentPlanStatus::Failed,
+                DeliveryStatus::Blocked => DocumentPlanStatus::Blocked,
+                DeliveryStatus::Queued => $fallback === DocumentPlanStatus::Waiting
+                    ? DocumentPlanStatus::Due
+                    : $fallback,
+            };
+        }
+
+        if (! $recipients->usable()
+            && ! in_array($fallback, [
+                DocumentPlanStatus::Waiting,
+                DocumentPlanStatus::NotNeeded,
+                DocumentPlanStatus::NotContracted,
+            ], true)
+        ) {
+            return DocumentPlanStatus::Blocked;
+        }
+
+        return $fallback;
+    }
+
+    private function scheduleStatus(bool $qualifies, string $date, string $today): DocumentPlanStatus
+    {
+        if (! $qualifies) {
+            return DocumentPlanStatus::Waiting;
+        }
+
+        return $date > $today ? DocumentPlanStatus::Scheduled : DocumentPlanStatus::Due;
+    }
+
+    private function recipientLabel(Booking $booking, DeliveryKind $kind): string
+    {
+        $set = $this->recipients->resolve($booking, $kind);
+
+        if (! $set->usable()) {
+            return $set->blockedReason ?? 'No email address';
+        }
+
+        $to = implode(', ', $set->to);
+
+        return $set->cc === [] ? $to : $to.' + '.implode(', ', $set->cc);
+    }
+
+    private function latestDocument(Booking $booking, DocumentKind $kind): ?Document
+    {
+        return $booking->documents
+            ->where('kind', $kind)
+            ->sortByDesc('version')
+            ->first();
+    }
+
+    /**
+     * @param  Collection<int, Delivery>  $deliveries
+     */
+    private function lastDelivery(Collection $deliveries): ?Delivery
+    {
+        return $deliveries->sortByDesc('id')->first();
+    }
+
+    private function lastBookingDelivery(Booking $booking, DeliveryKind $kind): ?Delivery
+    {
+        return $booking->deliveries
+            ->where('kind', $kind)
+            ->sortByDesc('id')
+            ->first();
+    }
+
+    private function issuedDate(Booking $booking, DocumentKind $kind): ?string
+    {
+        $document = $this->latestDocument($booking, $kind);
+
+        return $document?->issued_at?->toDateString();
+    }
+
+    private function depositDate(Booking $booking): ?string
+    {
+        $deposit = $this->settledPayments($booking)
+            ->first(fn (Payment $payment): bool => $payment->kind === PaymentKind::Deposit);
+
+        return $deposit?->paid_at?->toDateString();
+    }
+
+    private function balancePaymentDate(Booking $booking): ?string
+    {
+        $balance = $this->settledPayments($booking)
+            ->last(fn (Payment $payment): bool => $payment->kind === PaymentKind::Balance);
+
+        return $balance?->paid_at?->toDateString();
+    }
+
+    /**
+     * @return Collection<int, Payment>
+     */
+    private function settledPayments(Booking $booking): Collection
+    {
+        return $booking->payments
+            ->where('status', PaymentStatus::Settled)
+            ->filter(fn (Payment $payment): bool => $payment->amount > 0)
+            ->sortBy('id')
+            ->values();
+    }
+
+    private function cruiseOutstanding(Booking $booking): int
+    {
+        $paid = (int) $booking->payments
+            ->filter(fn (Payment $payment): bool => $payment->status->countsAsPaid())
+            ->sum('amount');
+
+        return max(0, $booking->total - $paid);
+    }
+}

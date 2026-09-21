@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Extras;
 
 use App\Actions\Action;
+use App\Events\BookingChargesChanged;
 use App\Models\BookingExtra;
 use App\Models\User;
 use App\Support\Bookings\BookingCharges;
@@ -23,6 +24,8 @@ final class RemoveBookingExtra extends Action
             $extra = BookingExtra::query()->whereKey($extra->getKey())->lockForUpdate()->firstOrFail();
             $extra->delete();
 
+            $reason = 'Extra removed — '.$extra->name.' × '.$extra->qty;
+
             History::record($booking, 'extra.removed', before: [
                 'extra_id' => $extra->id,
                 'code' => $extra->code,
@@ -31,8 +34,10 @@ final class RemoveBookingExtra extends Action
                 'rate_usd' => $extra->rate_usd,
                 'note' => $extra->note,
             ], after: [
-                'what' => 'Extra removed — '.$extra->name.' × '.$extra->qty,
+                'what' => $reason,
             ], actor: $actor);
+
+            BookingChargesChanged::dispatch($booking, $reason);
         });
     }
 }

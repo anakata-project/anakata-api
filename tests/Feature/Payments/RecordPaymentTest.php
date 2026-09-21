@@ -80,7 +80,7 @@ test('a settled deposit confirms a pending booking as system with the payment re
         ->orderBy('id')
         ->get();
 
-    expect($events->pluck('event')->all())->toBe(['payment.recorded', 'booking.status_changed']);
+    expect($events->pluck('event')->take(2)->all())->toBe(['payment.recorded', 'booking.status_changed']);
     expect($events[1]->actor_label)->toBe('System');
     expect($events[1]->reason)->toBe('Deposit settled · ANK-R-2026-0413-D01');
 });

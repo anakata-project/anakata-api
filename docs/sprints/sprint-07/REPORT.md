@@ -359,3 +359,122 @@ Add SMTP document email, the delivery log, and manual send endpoints.
 EOF
 )"
 ```
+
+## Task 04 · Triggers, schedule, and document status
+
+### Domain events (J7)
+Three after-commit events, queued listeners (`ShouldQueue`, sync in tests). Never listen to `change_history`. Never send inside the writing transaction.
+
+| Event | Raised from | Documents |
+|---|---|---|
+| `BookingStatusChanged` | `TransitionBooking` when `$from !== $to` (deposit confirm, manual CONFIRMED/FULLY_PAID, `DecideCommissionCap` unblocking ON_HOLD via `ApplyPaymentEffects`) | CONFIRMED / confirmed-or-later (not PENDING / ON_HOLD): invoice + summary. FULLY_PAID: final invoice. Cancelled / released / requested: nothing. |
+| `PaymentSettled` | Newly settled positive rows from `RecordPayment` (not `AWAITING_WIRE`), `MarkWireReceived`, `SettleGatewayPayment` (skip idempotent “gateway id already exists”) | Receipt for that payment. If the booking is FULLY_PAID, fresh balance is zero, a final invoice already exists, and charge-side totals differ: final invoice vN+1, reason `Balance paid after charges changed`. |
+| `BookingChargesChanged` | Top-level extras/fees/move/guest actions only (not `ApplyPng`) | New invoice version only when an invoice already exists, the booking is confirmed-or-later, and **charge-side** totals differ (`vessel`, `fees_collected`, `extras`, `charges_total`, `information_total` — not `paid` / `balance`). |
+
+### Issue-once (retry-safe)
+`IssueOnce` for `INVOICE`, `SUMMARY`, `FINAL_INVOICE`: if no document of that kind exists, `PrepareIssueDocument` then `SendDocument`; if one exists, do **not** issue again — `SendDocument` the latest version with `DeliveryKey::forDocument` (no-op when already SENT/FAILED/QUEUED). A retried CONFIRMED listener after a successful issue keeps invoice **v1** and one delivery.
+
+Charge-change and the FULLY_PAID-after-charges path are the only automatic v2+ issues (they pass a reason).
+
+### One version per change
+The charges listener re-reads the booking and compares a fresh invoice snapshot to the latest version. Two events in one request (add + remove netting to zero) see the same final booking: the first issues at most once, the second is a no-op.
+
+### Final invoice after later charges
+I9: adding a charge after FULLY_PAID does not move the status back. The confirmation invoice may already have been re-issued by `SendOnBookingChargesChanged`. When the new balance is paid, `SendOnPaymentSettled` issues the next final-invoice version (`Balance paid after charges changed`) and sends it once, plus the extra’s receipt.
+
+### Schedule
+`anakata:documents-due`, daily in `Pacific/Galapagos`, `--dry-run` lists and writes nothing.
+
+**Reminders** (CONFIRMED or ON_HOLD_AGENCY, cruise balance open): eligibility from **current facts only** (never `change_history`) — `sendDate <= today`, `balanceDueDate() > today`, cruise still open. Catch-up sends **only the smallest eligible N**. Copy uses **actual days remaining** (`due − today`), not N; the key stays `reminder:{booking_id}:{due_date}:{N}`. OPS-007 extensions move the keys. After the due date, or once `cruiseOutstanding() === 0`, nothing is sent.
+
+**Pre-trip** at `departure − documents.pretrip_days_before` (45). **Voucher** at T−7 only with a transfer-triggering extra. Schedule keys `pretrip:{booking_id}:{departure_date}` / `voucher:{booking_id}:{departure_date}` so a re-run is a no-op.
+
+### Shape change
+`documents.pretrip_days_before` 45 and `documents.voucher_days_before` 7 on `BusinessRulesDocument`. DML migration publishes as System. Registry: all **67** · here **42**.
+
+`fromArray()` defaults a missing documents object to **0 / 0** (same lenient-zero pattern as other ints) so ConfigPublisher records a real 0 → 45 / 0 → 7 change. `initial()` stays 45 / 7. `anakata:config-verify` still fails a latest row that is missing the keys.
+
+### DocumentPlan statuses (J9)
+Computed, never stored. One builder for `GET /bookings/{booking}/documents/plan` (`view`) and `GET /documents` (`viewAny`, departure window, paginated).
+
+SENT · FAILED · BLOCKED · SCHEDULED · WAITING · NOT NEEDED · NOT CONTRACTED · DUE.
+
+Questionnaire is always WAITING, trigger `T−45 · Arrives in Sprint 11`, all `can_*` false. Wire instructions appear only once issued.
+
+### Seed never sends
+`DemoDocumentsSeeder` writes `SENT` deliveries with `DeliveryKey::forDocument` (demo fixture emails often fail RFC validation; the seeder still marks SENT so a later trigger for the same key is a no-op). No `SendDocument`, no events. `Mail::fake()` asserts nothing sent.
+
+### Checks
+`composer check` (Pest 869, Pint, Larastan ≥ 6) passed.
+
+### Notes for later
+- Task 05 regenerates OpenAPI types (`DocumentPlanRowResource`).
+- Task 06 Documents tab consumes `/documents/plan`.
+- Task 07 Client documents consumes `GET /documents`.
+- Task 08 e2e: Mailpit empty after `reset.sh`, DOC scenarios.
+- Questionnaire send remains Sprint 11.
+
+### Files
+See git commands below. Do not run them from the agent.
+
+```bash
+git add app/Actions/Bookings/MoveBooking.php
+git add app/Actions/Bookings/TransitionBooking.php
+git add app/Actions/Documents/SendDocument.php
+git add app/Actions/Extras/AddBookingExtra.php
+git add app/Actions/Extras/RemoveBookingExtra.php
+git add app/Actions/Extras/UpdateBookingFees.php
+git add app/Actions/Guests/AddGuest.php
+git add app/Actions/Guests/RemoveGuest.php
+git add app/Actions/Guests/UpdateGuest.php
+git add app/Actions/Payments/MarkWireReceived.php
+git add app/Actions/Payments/RecordPayment.php
+git add app/Actions/Payments/SettleGatewayPayment.php
+git add app/Console/Commands/DocumentsDueCommand.php
+git add app/Enums/DocumentPlanKind.php
+git add app/Enums/DocumentPlanStatus.php
+git add app/Events/BookingChargesChanged.php
+git add app/Events/BookingStatusChanged.php
+git add app/Events/PaymentSettled.php
+git add app/Http/Controllers/Rms/ClientDocumentController.php
+git add app/Http/Controllers/Rms/DocumentController.php
+git add app/Http/Requests/Rms/IndexClientDocumentsRequest.php
+git add app/Http/Resources/Rms/DocumentPlanRowResource.php
+git add app/Listeners/SendOnBookingChargesChanged.php
+git add app/Listeners/SendOnBookingStatusChanged.php
+git add app/Listeners/SendOnPaymentSettled.php
+git add app/Mail/Documents/DeliveryMailFactory.php
+git add app/Providers/AppServiceProvider.php
+git add app/Support/BusinessRules/Registry.php
+git add app/Support/Config/Documents/BusinessRulesDocument.php
+git add app/Support/Config/Documents/DocumentsRules.php
+git add app/Support/Documents/ChargeSideTotals.php
+git add app/Support/Documents/DeliveryKey.php
+git add app/Support/Documents/DocumentPlan.php
+git add app/Support/Documents/DocumentPlanRow.php
+git add app/Support/Documents/IssueOnce.php
+git add app/Support/Documents/Snapshots/DocumentFacts.php
+git add database/migrations/2026_09_21_200041_add_documents_schedule_to_business_rules.php
+git add database/seeders/DemoDocumentsSeeder.php
+git add routes/api/rms.php
+git add routes/console.php
+git add tests/Feature/Config/AddDocumentsScheduleToBusinessRulesMigrationTest.php
+git add tests/Feature/Config/BusinessRulesEndpointsTest.php
+git add tests/Feature/Config/BusinessRulesSeederTest.php
+git add tests/Feature/Documents/ClientDocumentsIndexTest.php
+git add tests/Feature/Documents/DemoDocumentsSeederTest.php
+git add tests/Feature/Documents/DocumentChargeChangeTest.php
+git add tests/Feature/Documents/DocumentEndpointsTest.php
+git add tests/Feature/Documents/DocumentEventTriggersTest.php
+git add tests/Feature/Documents/DocumentPlanTest.php
+git add tests/Feature/Documents/DocumentsDueCommandTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add tests/Feature/Payments/RecordPaymentTest.php
+git add tests/Feature/Payments/StripeWebhookTest.php
+git add docs/sprints/sprint-07/REPORT.md
+git commit -m "$(cat <<'EOF'
+Wire document triggers, the daily schedule, and computed document status.
+
+EOF
+)"
+```

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Guests;
 
 use App\Actions\Action;
+use App\Events\BookingChargesChanged;
 use App\Models\Guest;
 use App\Models\User;
 use App\Support\Bookings\BookingMutationLock;
@@ -25,6 +26,7 @@ final class RemoveGuest extends Action
                 ]);
             }
 
+            $feeBefore = (int) $guest->png_fee;
             $guest->delete();
 
             History::record($booking, 'guest.removed', before: [
@@ -33,6 +35,10 @@ final class RemoveGuest extends Action
             ], after: [
                 'what' => 'Empty guest slot removed ('.$booking->guests()->count().' guests)',
             ], actor: $actor);
+
+            if ($booking->png_collected && $feeBefore > 0) {
+                BookingChargesChanged::dispatch($booking, 'PNG fee changed');
+            }
         });
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Extras;
 
 use App\Actions\Action;
+use App\Events\BookingChargesChanged;
 use App\Models\Booking;
 use App\Models\BookingExtra;
 use App\Models\User;
@@ -62,13 +63,17 @@ final class AddBookingExtra extends Action
                 'note' => $note,
             ]);
 
+            $reason = 'Extra added — '.$extra->name.' × '.$extra->qty;
+
             History::record($booking, 'extra.added', after: [
                 'extra_id' => $extra->id,
                 'code' => $extra->code,
                 'qty' => $extra->qty,
                 'rate_usd' => $extra->rate_usd,
-                'what' => 'Extra added — '.$extra->name.' × '.$extra->qty.' @ '.Money::format($extra->rate_usd),
+                'what' => $reason.' @ '.Money::format($extra->rate_usd),
             ], actor: $actor);
+
+            BookingChargesChanged::dispatch($booking, $reason);
 
             return $extra;
         });

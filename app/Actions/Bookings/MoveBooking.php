@@ -12,6 +12,7 @@ use App\Enums\ClaimKind;
 use App\Enums\ConfigKind;
 use App\Enums\HoldType;
 use App\Enums\ReleaseReason;
+use App\Events\BookingChargesChanged;
 use App\Exceptions\CabinUnavailableException;
 use App\Exceptions\ConflictException;
 use App\Models\Booking;
@@ -137,6 +138,8 @@ final class MoveBooking extends Action
             $this->png->toBooking($booking);
 
             History::record($booking, 'booking.moved', before: $before, after: $this->historySnapshot($booking), actor: $actor);
+
+            BookingChargesChanged::dispatch($booking, 'Moved — reprice');
 
             return $booking->refresh()->load([
                 'departure.yacht',

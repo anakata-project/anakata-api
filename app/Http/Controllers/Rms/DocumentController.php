@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IssueDocumentRequest;
 use App\Http\Requests\Rms\SendDocumentRequest;
 use App\Http\Resources\Rms\DeliveryResource;
+use App\Http\Resources\Rms\DocumentPlanRowResource;
 use App\Http\Resources\Rms\DocumentResource;
 use App\Models\Booking;
 use App\Models\Delivery;
@@ -20,6 +21,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Services\Documents\DocumentHtml;
 use App\Support\Documents\DeliveryKey;
+use App\Support\Documents\DocumentPlan;
 use App\Support\Documents\Snapshots\SnapshotFactory;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -39,6 +41,18 @@ final class DocumentController extends Controller
             ->get();
 
         return DocumentResource::collection($documents);
+    }
+
+    public function plan(Booking $booking, DocumentPlan $plan): AnonymousResourceCollection
+    {
+        $this->authorize('view', $booking);
+
+        $actor = request()->user();
+
+        return DocumentPlanRowResource::collection($plan->for(
+            $booking,
+            $actor instanceof User ? $actor : null,
+        ));
     }
 
     public function html(Booking $booking, DocumentKind $kind): Response

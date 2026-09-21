@@ -6,10 +6,16 @@ namespace App\Providers;
 
 use App\Enums\ConfigKind;
 use App\Enums\Permission;
+use App\Events\BookingChargesChanged;
+use App\Events\BookingStatusChanged;
 use App\Events\ConfigPublished;
 use App\Events\HoldExpired;
+use App\Events\PaymentSettled;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\MarkRequestHoldExpired;
+use App\Listeners\SendOnBookingChargesChanged;
+use App\Listeners\SendOnBookingStatusChanged;
+use App\Listeners\SendOnPaymentSettled;
 use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\BookingRequest;
@@ -186,6 +192,9 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(ConfigPublished::class, ClearCurrentConfigCache::class);
         Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
+        Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
+        Event::listen(PaymentSettled::class, SendOnPaymentSettled::class);
+        Event::listen(BookingChargesChanged::class, SendOnBookingChargesChanged::class);
 
         if ($this->app->runningUnitTests()) {
             $this->loadMigrationsFrom(base_path('tests/database/migrations'));
