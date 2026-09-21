@@ -17,6 +17,7 @@ use App\Http\Requests\Engine\CreateCheckoutRequest;
 use App\Http\Requests\Engine\SubmitCheckoutRequest;
 use App\Http\Resources\Engine\CheckoutCreatedResource;
 use App\Http\Resources\Engine\CheckoutExtendedResource;
+use App\Http\Resources\Engine\CheckoutStatusResource;
 use App\Http\Resources\Engine\CheckoutSubmittedResource;
 use App\Models\CheckoutSession;
 use App\Models\Departure;
@@ -60,6 +61,18 @@ final class CheckoutController extends Controller
     public function extend(string $token, ExtendCheckoutSession $action): CheckoutExtendedResource
     {
         return new CheckoutExtendedResource($action->handle($this->holding($token)));
+    }
+
+    #[DocumentedResponse(status: 200, type: CheckoutStatusResource::class)]
+    public function status(string $token): CheckoutStatusResource
+    {
+        $session = CheckoutSession::findByToken($token);
+
+        if (! $session instanceof CheckoutSession) {
+            abort(HttpResponse::HTTP_NOT_FOUND);
+        }
+
+        return new CheckoutStatusResource($session);
     }
 
     public function destroy(string $token, ReleaseCheckoutSession $action): Response

@@ -29,7 +29,17 @@ class EngineSettingsResource extends JsonResource
      *         hold_near_business_hours: int,
      *         hold_long_lead_business_days: int,
      *         response_sla_hours: int,
-     *         modification_fee_usd: int
+     *         modification_fee_usd: int,
+     *         extras_due_hours: int
+     *     },
+     *     legal: array{
+     *         consent_versions: array{
+     *             terms: string,
+     *             cancellation: string,
+     *             privacy: string,
+     *             insurance: string,
+     *             marketing: string
+     *         }
      *     },
      *     calendar: array{
      *         default_search_from: string,
@@ -91,6 +101,10 @@ class EngineSettingsResource extends JsonResource
                 'hold_long_lead_business_days' => $rules->holds->longLeadBusinessDays,
                 'response_sla_hours' => $rules->sla->responseHours,
                 'modification_fee_usd' => $rules->modificationFeeUsd,
+                'extras_due_hours' => $rules->payments->extrasDueHours,
+            ],
+            'legal' => [
+                'consent_versions' => $rules->consentVersions->toArray(),
             ],
             'calendar' => [
                 ...$calendar,

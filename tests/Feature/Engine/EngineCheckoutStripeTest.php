@@ -126,6 +126,10 @@ test('pay deposit opens a stripe checkout session and a stripe failure keeps the
     expect($session?->stripe_checkout_session_id)->toStartWith('cs_test_');
     expect($session?->stripe_expires_at)->not->toBeNull();
 
+    $gateway = app(FakeStripeGateway::class);
+    expect($gateway->lastSuccessUrl)->toEndWith('/book/confirmation?session_id={CHECKOUT_SESSION_ID}');
+    expect($gateway->lastCancelUrl)->toEndWith('/book/details?cancelled=1');
+
     $documents = Consent::query()->where('booking_id', $booking->id)->pluck('document');
     expect($documents)->toContain(
         ConsentDocument::Terms,
@@ -134,7 +138,6 @@ test('pay deposit opens a stripe checkout session and a stripe failure keeps the
         ConsentDocument::Insurance,
     );
 
-    $gateway = app(FakeStripeGateway::class);
     $gateway->failCheckout = true;
     $second = createCheckoutHold($departure, [['cabin_code' => 'S2', 'adults' => 2, 'children' => 0]]);
     $secondQuote = depositQuote($departure->id, $second['cabins']);

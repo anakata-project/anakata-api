@@ -328,3 +328,17 @@ test('hidden departures are 404 on the cabins endpoint', function (): void {
 
     $this->getJson('/api/engine/departures/'.$departure->id.'/cabins')->assertNotFound();
 });
+
+test('the public settings include extras due hours and consent versions', function (): void {
+    $json = $this->getJson('/api/engine/feed')->assertOk()->json();
+
+    expect($json['settings']['policies']['extras_due_hours'])->toBe(72);
+    expect($json['settings']['legal']['consent_versions'])->toHaveKeys([
+        'terms',
+        'cancellation',
+        'privacy',
+        'insurance',
+        'marketing',
+    ]);
+    expect($json['settings']['legal']['consent_versions']['privacy'])->not->toBe('');
+});

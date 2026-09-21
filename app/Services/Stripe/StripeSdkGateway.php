@@ -54,8 +54,8 @@ final class StripeSdkGateway implements StripeGateway
             'mode' => 'payment',
             'line_items' => $lineItems,
             'expires_at' => $expiresAt->getTimestamp(),
-            'success_url' => $engineUrl.'/confirmation?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => $engineUrl.'/checkout?cancelled=1',
+            'success_url' => $engineUrl.'/book/confirmation?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $engineUrl.'/book/details?cancelled=1',
             'metadata' => $metadata,
             'payment_intent_data' => [
                 'metadata' => $metadata,

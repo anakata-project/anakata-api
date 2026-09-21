@@ -23,6 +23,8 @@ use App\Models\CheckoutSession;
 use App\Models\Consent;
 use App\Models\Departure;
 use App\Models\Offer;
+use App\Services\Stripe\FakeStripeGateway;
+use App\Support\Countries;
 use App\Support\IpHash;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
@@ -397,4 +399,83 @@ test('an unknown or expired token is 404 on extend and submit', function (): voi
         checkoutSubmitPayload($created['cabins'], (int) $created['quote']['total']),
     )->assertNotFound();
     $this->postJson('/api/engine/checkout/missing/extend')->assertNotFound();
+});
+
+test('checkout status is read from the database and never calls stripe', function (): void {
+    $departure = checkoutWestDeparture();
+    $created = createCheckoutHold($departure);
+    $email = 'status-'.uniqid().'@anakata.test';
+
+    $this->postJson(
+        '/api/engine/checkout/'.$created['token'].'/submit',
+        checkoutSubmitPayload($created['cabins'], (int) $created['quote']['total'], [
+            'email' => $email,
+        ]),
+    )->assertOk();
+
+    $gateway = app(FakeStripeGateway::class);
+    $before = $gateway->retrieveCheckoutCalls;
+
+    $json = $this->getJson('/api/engine/checkout/'.$created['token'].'/status')
+        ->assertOk()
+        ->json();
+
+    expect($gateway->retrieveCheckoutCalls)->toBe($before);
+    expect($json['status'])->toBe(CheckoutSessionStatus::Submitted->value);
+    expect($json['path'])->toBe(CheckoutPath::PayLater->value);
+    expect($json['email'])->toBe($email);
+    expect($json['bookings'])->toHaveCount(1);
+    expect($json['bookings'][0]['status'])->toBe(BookingStatus::Requested->value);
+    expect($json['bookings'][0]['reference'])->toStartWith('ANK-R-');
+    expect($json['stripe_checkout_session_id'])->toBeNull();
+
+    Booking::query()->update(['status' => BookingStatus::Confirmed, 'reference' => 'ANK-2027-0001']);
+
+    $confirmed = $this->getJson('/api/engine/checkout/'.$created['token'].'/status')
+        ->assertOk()
+        ->json();
+
+    expect($gateway->retrieveCheckoutCalls)->toBe($before);
+    expect($confirmed['bookings'][0]['status'])->toBe(BookingStatus::Confirmed->value);
+    expect($confirmed['bookings'][0]['reference'])->toBe('ANK-2027-0001');
+
+    $session = CheckoutSession::findByToken($created['token']);
+    $session?->update(['stripe_expires_at' => now()->subMinute()]);
+
+    $expired = $this->getJson('/api/engine/checkout/'.$created['token'].'/status')
+        ->assertOk()
+        ->json();
+
+    expect($gateway->retrieveCheckoutCalls)->toBe($before);
+    expect($expired['stripe_expires_at'])->not->toBeNull();
+    expect($expired['bookings'][0]['status'])->toBe(BookingStatus::Confirmed->value);
+
+    $this->getJson('/api/engine/checkout/missing/status')->assertNotFound();
+});
+
+test('submit accepts guest cabin labels from the engine deck', function (): void {
+    $departure = checkoutWestDeparture();
+    $created = createCheckoutHold($departure, [['cabin_code' => 'Suite 01', 'adults' => 2, 'children' => 0]]);
+
+    $this->postJson(
+        '/api/engine/checkout/'.$created['token'].'/submit',
+        checkoutSubmitPayload(
+            [['cabin_code' => 'Suite 01', 'adults' => 2, 'children' => 0]],
+            (int) $created['quote']['total'],
+        ),
+    )
+        ->assertOk()
+        ->assertJsonPath('path', CheckoutPath::PayLater->value);
+
+    $booking = Booking::query()->firstOrFail();
+    expect($booking->cabin?->code)->toBe('S1');
+});
+
+test('the public country list comes from the api', function (): void {
+    $rows = $this->getJson('/api/engine/countries')->assertOk()->json();
+
+    expect($rows)->toBeArray();
+    expect(count($rows))->toBe(count(Countries::all()));
+    expect($rows[0] ?? null)->toHaveKeys(['code', 'name']);
+    expect(array_column($rows, 'code'))->toContain('US', 'EC');
 });

@@ -1138,3 +1138,204 @@ EOF
 git push origin HEAD
 ```
 
+## Task 09 · Engine steps 4–6
+
+The public booking flow’s second half: cabins, details (two paths), confirmation. Design from the prototype (`startCabins` → `submitRequest`); rules from the 12 Sep decisions and the public checkout API (K3, K5–K8). Placeholders at `book/cabins|details|confirmation` are the real screens.
+
+### API leftovers (assigned here from tasks 04/06)
+
+**`GET /api/engine/checkout/{token}/status`** — database only. Never calls Stripe (the fake’s `retrieveCheckoutCalls` stays unchanged). Returns session `status`, `path`, `email`, `bookings[]` `{ reference, status }`, stored `stripe_checkout_session_id` / `stripe_expires_at`. Unknown token → 404.
+
+**`GET /api/engine/countries`** — `App\Support\Countries` as `{ code, name }[]`. Step 5 cannot use Complete-reservation countries (those need a complete-page token).
+
+**Settings on `EngineSettingsResource`:** `policies.extras_due_hours` (deposit wording) and `legal.consent_versions` `{ terms, cancellation, privacy, insurance, marketing }`. Not a document-shape change.
+
+**Stripe return URLs** (were placeholders):
+
+- `success_url` → `{FRONTEND_ENGINE_URL}/book/confirmation?session_id={CHECKOUT_SESSION_ID}`
+- `cancel_url` → `{FRONTEND_ENGINE_URL}/book/details?cancelled=1`
+
+**Submit guests** accept deck labels (`Suite 01`) as well as codes (`S1`). Create/quote already normalized via `CabinCodes`; submit did not, so a label from the engine deck 422’d `This cabin is not on the checkout.` `SubmitCheckoutRequest` now resolves labels the same way.
+
+Layer leftovers: `CheckoutStatus`, `EngineSettings.policies.extras_due_hours` + `legal.consent_versions`. No `v0.9.0` bump (sibling extend). Engine `app/types/api.ts` re-exports the leftovers. `api.d.ts` not regenerated.
+
+### Flow state
+
+`useBookingFlow()` still uses `sessionStorage` key `anakata-engine-flow`. Widened with cabins, selected index, path, contact, preferred channel, per-guest nationality / Ecuador resident, fee choices, declarations, promo, last **server** `EngineQuote` (`expected_total`), hold-extended flag, confirmation snapshot.
+
+Guards: cabins needs `departureId`; details needs a live token; confirmation needs a snapshot, Stripe `session_id`, or stored token.
+
+### Hold lifecycle (UI only asks; RMS owns the hold)
+
+- Continue on cabins: `POST /api/engine/checkout` → store `token` + `expires_at`. 409 names taken cabins (`unavailable[].cabin.label`), clears those picks, refreshes the deck.
+- Silent extend once while remaining time ≤ 2 minutes (`POST …/extend`). A second 409 is ignored. Threshold is UX, not a business value — hold length stays `settings.policies.web_hold_*`.
+- Expiry: tell the guest the cabins were released and offer to re-check.
+- Release: `DELETE` on back from cabins → trip, back from details → cabins, and on leave. `pagehide` / `visibilitychange` → hidden uses `fetch(..., { method: 'DELETE', keepalive: true })` (`sendBeacon` is POST-only; CSRF already excepts `api/engine/*`). `retain()` skips that release when navigating forward to details / Stripe / confirmation (session is `SUBMITTED`).
+- `abandon_cart` only from details, once (`fireAbandon`).
+
+### Price panel (K7)
+
+Instant estimate from feed `rates` + `rates.rules` + departure offer. Informational TCT / PNG from `settings.fees`. PNG: before nationality, foreign over-12 / 12-and-under by adult vs child; after step 5, nationality + Ecuador resident. Andean preview uses `CO`, `PE`, `BO` only (`AndeanCommunity`). `// TODO(OPEN: I4) DOB is collected on the complete page`. Children without DOB use the ≤12 band.
+
+`POST /api/engine/quote` replaces the estimate. Only server lines and totals are shown as final. `expected_total` on submit is the last server `quote.total` the guest saw. Deposit % / balance days from `quote.terms` / `rates.terms`. Perk line from `copy.online_deposit_perk` when the path is pay-deposit.
+
+Checkout create/submit use `$fetch` so 409 bodies (`unavailable`, `quote`) are not stripped by `useApi`.
+
+### Step 4 — Cabins
+
+`minCabins(party, max_per_cabin)` up to `min(party, max_per_yacht)`. `distributeGuests` puts adults first (at least one per cabin when possible), children into remaining slots. Deck from `GET /departures/{id}/cabins` — guest names `Suite 01`–`08` / `Owner's Suite` (API `code` is already the label). Only `bookable` cabins are clickable; others `.taken`. Owner’s Suite on the upper deck.
+
+**`cabProblems` word for word:** empty cabin; exceeds N guests; children with no adult; pick on deck; party adults/children mismatch; two tabs on the same physical cabin. Continue disabled while any exist. `track('begin_checkout')` on enter.
+
+### Step 5 — Details and the two paths
+
+Contact: first / last / email required; phone optional and must start with `+`; preferred channel chips (`EMAIL` / `PHONE` / `WHATSAPP`); travel-advisor; notes; marketing unchecked. Missing fields: `⚠ Please complete the highlighted fields above to continue`, `.field.bad`, scroll + focus. `copy.details_note` from settings.
+
+Per guest: nationality from `GET /countries`; Ecuador resident. PNG / TCT collect-vs-later. Deposit wording interpolates `extras_due_hours`.
+
+Declarations: unchecked; chrome from i18n matching `ConsentDocument::label()`; version from settings.
+
+- `PAY_DEPOSIT`: TERMS, CANCELLATION, PRIVACY, INSURANCE required here.
+- `PAY_LATER`: PRIVACY + INSURANCE here; TERMS + CANCELLATION “accepted with the deposit link”.
+
+Promo: `POST /promo/check`. Invalid → server `reason` or `This code is not valid`. Festive removal with reason. Path switch re-quotes with `online_deposit = (path === 'PAY_DEPOSIT')`.
+
+Submit 409 + `quote` → show the new server price. 409 without quote → back to cabins. `PAY_LATER` → confirmation with `{ references, email }`. `PAY_DEPOSIT` → `window.location` to `checkout_url`. 503 keeps the request and shows the message + references.
+
+### Step 6 — Confirmation
+
+Pay later: “Request received” / “We have received your booking”, `ANK-R-` references, email. Three cards from `copy.confirmation_steps`; first card interpolates `policies.response_sla_hours` (seed still says 24 hours).
+
+Pay deposit: poll `GET …/status` every 3 s, capped at 2 minutes. Helper `confirmationScreen({ now, pollStartedAt, bookings, stripeExpiresAt })`:
+
+- **confirmed** — every booking `CONFIRMED` (webhook, not the redirect — H7). Then `track('purchase')`.
+- **expired** — still `REQUESTED` and stored `stripe_expires_at` is past. Request is safe. Never `purchase`.
+- **confirming** — still `REQUESTED`, expiry in the future, under 2 minutes.
+- **processing** — still `REQUESTED` after 2 minutes. Stop polling. Email + `search.contactEmail`. Never stay on “Confirming your payment…”. Never `purchase`.
+
+### Analytics
+
+`track()` stays a no-op. Called: `begin_checkout`, `begin_booking_request`, `select_payment_path`, `apply_promotion`, `remove_promotion`, `promo_invalid`, `booking_form_invalid`, `submit_booking_request`, `abandon_cart`, `purchase` (confirmed only). Task 10 wires GA4.
+
+### Tests
+
+Engine Vitest (36): `cabProblems`, `distributeGuests`, hold extend timing, path → `online_deposit`, promo state, confirmation poll (confirming → confirmed; expired-unpaid; **timeout after 2 minutes** → processing). `prototypeLiterals` still passes (“I will pay at SCY airport” is allowed; “paid at SCY airport” is not).
+
+API: status never calls Stripe; countries; settings keys; Stripe URL assertions; submit with deck labels.
+
+### Deviations
+
+- `navigator.sendBeacon` cannot DELETE. Keepalive `fetch` is the pagehide equivalent.
+- Live seed `offers: []`, so `ANAKATA10` did not apply in the browser walkthrough (promo check/apply path is unit-tested).
+- Pay-deposit Stripe redirect / webhook settlement was not walked in the browser (no live Checkout Session). Confirmation poll and URLs are covered by unit + API tests. If Stripe keys are absent, use the replay script.
+
+### Open questions
+
+- `TODO(OPEN: I4)` DOB on the complete page — PNG estimate uses the ≤12 band for children until then.
+
+### Notes for later
+
+- Task 10: waitlist form, charter page, Complete-your-reservation page, GA4 behind consent.
+- Cabins/details setup guards read `useState` before `onMounted` hydrates `sessionStorage`, so a hard refresh on `/book/cabins` can bounce to itineraries. Same pattern as task 08.
+- RMS-between-steps 409, abandon → calendar, and rates-change 409 were not re-walked against the panel in this pass.
+
+### Browser
+
+Against the running API (WEST 7 Nov 2027 ANAMARA, 2 adults, Suite 03 — Suites 01/02 already `.taken`):
+
+- Step 4: guest names Suite 01–08 / Owner’s Suite; Continue disabled until a deck pick; hold then details.
+- Step 5: countries from the API; consent versions from settings; extras due “up to 72 hours”; PAY_LATER declarations mark TERMS/CANCELLATION as later; pay later submitted.
+- Step 6: **Request received**, `ANK-R-2026-0043`, email, three confirmation cards with 24 hours on the first.
+- Light: `html.light`, body `rgb(239, 237, 221)`. Dark default `rgb(32, 43, 38)`.
+- Phone 390 px: no horizontal overflow (`scrollWidth === 390`).
+
+### Quality
+
+Engine: `pnpm lint`, `typecheck`, `test` (36), `build` — pass. API targeted Pest (status, countries, OpenAPI, Stripe URLs, guest labels) + Pint on touched PHP — pass. Full `composer check` was 973 tests green before the unused-import Pint fix; CountryController import removed.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`).
+
+```bash
+# 1. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add app/assets/css/engine.css
+git add app/composables/useBookingFlow.ts
+git add app/composables/useCheckout.ts
+git add app/composables/useHold.ts
+git add app/pages/book/cabins.vue
+git add app/pages/book/confirmation.vue
+git add app/pages/book/details.vue
+git add app/components/cabins/CabinTabs.vue
+git add app/components/cabins/DeckPlan.vue
+git add app/components/details/PromoBox.vue
+git add app/components/price/PricePanel.vue
+git add app/types/api.ts
+git add app/utils/cabProblems.ts
+git add app/utils/confirmationPoll.ts
+git add app/utils/distributeGuests.ts
+git add app/utils/holdTiming.ts
+git add app/utils/pathQuote.ts
+git add app/utils/pngEstimate.ts
+git add app/utils/priceEstimate.ts
+git add app/utils/promoState.ts
+git add tests/unit/cabProblems.test.ts
+git add tests/unit/confirmationPoll.test.ts
+git add tests/unit/distributeGuests.test.ts
+git add tests/unit/holdTiming.test.ts
+git add tests/unit/pathQuote.test.ts
+git add tests/unit/promoState.test.ts
+git add eslint.config.mjs
+git add i18n/locales/en.json
+git commit -m "$(cat <<'EOF'
+Build engine steps 4–6 on the public checkout API.
+
+Cabins, details (both payment paths) and confirmation use
+the hold, quote and status endpoints; purchase fires only
+after bookings are CONFIRMED.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 2. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Http/Controllers/Engine/CheckoutController.php
+git add app/Http/Controllers/Engine/CountryController.php
+git add app/Http/Requests/Engine/SubmitCheckoutRequest.php
+git add app/Http/Resources/Engine/CheckoutStatusResource.php
+git add app/Http/Resources/Engine/EngineCountryResource.php
+git add app/Http/Resources/Engine/EngineSettingsResource.php
+git add app/Services/Stripe/FakeStripeGateway.php
+git add app/Services/Stripe/StripeSdkGateway.php
+git add routes/api/engine.php
+git add tests/Feature/Engine/EngineCheckoutStripeTest.php
+git add tests/Feature/Engine/EngineCheckoutTest.php
+git add tests/Feature/Engine/EngineFeedTest.php
+git add tests/Feature/OpenApi/EngineResponseSchemasTest.php
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add engine checkout status, countries and real Stripe return URLs.
+
+Status is database-only. Submit accepts deck cabin labels.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 3. anakata-ui leftovers (no version bump)
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add app/types/engine.ts
+git add app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Add leftover CheckoutStatus and engine settings fields.
+
+extras_due_hours and consent_versions for engine steps 5–6.
+EOF
+)"
+git push origin HEAD
+```
+

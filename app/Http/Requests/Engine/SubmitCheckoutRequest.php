@@ -9,6 +9,7 @@ use App\Enums\ConsentDocument;
 use App\Enums\PreferredChannel;
 use App\Models\CheckoutSession;
 use App\Support\Countries;
+use App\Support\Engine\CabinCodes;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -83,12 +84,20 @@ class SubmitCheckoutRequest extends FormRequest
                 return;
             }
 
+            $session->loadMissing('departure.yacht.cabins');
+            $departure = $session->departure;
+            $normalized = [];
+
             foreach ($guests as $index => $guest) {
                 if (! is_array($guest)) {
                     continue;
                 }
 
-                $code = (string) ($guest['cabin_code'] ?? '');
+                $raw = (string) ($guest['cabin_code'] ?? '');
+                $cabin = $departure !== null ? CabinCodes::resolve($departure, $raw) : null;
+                $code = $cabin?->code ?? $raw;
+                $guest['cabin_code'] = $code;
+                $normalized[] = $guest;
 
                 if (! isset($expected[$code])) {
                     $after->errors()->add('guests.'.$index.'.cabin_code', 'This cabin is not on the checkout.');
@@ -97,6 +106,10 @@ class SubmitCheckoutRequest extends FormRequest
                 }
 
                 $counts[$code] = ($counts[$code] ?? 0) + 1;
+            }
+
+            if ($after->errors()->isEmpty()) {
+                $this->merge(['guests' => $normalized]);
             }
 
             foreach ($expected as $code => $count) {

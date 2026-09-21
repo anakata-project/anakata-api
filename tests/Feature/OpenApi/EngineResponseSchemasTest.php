@@ -57,6 +57,8 @@ test('engine OpenAPI schemas have properties', function (): void {
         'CheckoutCreatedResource',
         'CheckoutExtendedResource',
         'CheckoutSubmittedResource',
+        'CheckoutStatusResource',
+        'EngineCountryResource',
         'EngineWaitlistResource',
         'EngineCharterEnquiryResource',
         'CompleteReservationResource',
@@ -107,6 +109,25 @@ test('engine OpenAPI schemas have properties', function (): void {
 
     $created = engineOpenApiSchema($spec, 'CheckoutCreatedResource');
     engineSchemaRef($created['properties']['quote'] ?? [], 'EngineQuoteResource');
+
+    $status = engineOpenApiSchema($spec, 'CheckoutStatusResource');
+    expect($status['properties'])->toHaveKeys([
+        'status',
+        'path',
+        'email',
+        'bookings',
+        'stripe_checkout_session_id',
+        'stripe_expires_at',
+    ]);
+
+    $countries = $spec['paths']['/engine/countries']['get']
+        ?? $spec['paths']['/api/engine/countries']['get']
+        ?? null;
+    expect($countries)->toBeArray();
+    engineSchemaRef(
+        $countries['responses']['200']['content']['application/json']['schema'] ?? [],
+        'EngineCountryResource',
+    );
 
     $submit = $spec['paths']['/engine/checkout/{token}/submit']['post']
         ?? $spec['paths']['/api/engine/checkout/{token}/submit']['post']

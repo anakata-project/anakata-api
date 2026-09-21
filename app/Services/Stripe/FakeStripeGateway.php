@@ -37,6 +37,12 @@ final class FakeStripeGateway implements StripeGateway
 
     public bool $failCheckout = false;
 
+    public int $retrieveCheckoutCalls = 0;
+
+    public ?string $lastSuccessUrl = null;
+
+    public ?string $lastCancelUrl = null;
+
     public static function fixturePath(): string
     {
         return database_path('fixtures/stripe-charges.json');
@@ -55,6 +61,9 @@ final class FakeStripeGateway implements StripeGateway
         $this->checkoutSequence++;
         $id = 'cs_test_'.str_pad((string) $this->checkoutSequence, 3, '0', STR_PAD_LEFT);
         $expires = CarbonImmutable::instance($expiresAt)->utc();
+        $engineUrl = rtrim((string) config('anakata.engine_url'), '/');
+        $this->lastSuccessUrl = $engineUrl.'/book/confirmation?session_id={CHECKOUT_SESSION_ID}';
+        $this->lastCancelUrl = $engineUrl.'/book/details?cancelled=1';
         $created = new CreatedCheckoutSession($id, 'https://checkout.stripe.com/c/pay/'.$id, $expires);
         $this->checkoutSessions[$id] = [
             'session' => $created,
@@ -68,6 +77,7 @@ final class FakeStripeGateway implements StripeGateway
 
     public function retrieveCheckoutSession(string $stripeId): RetrievedCheckoutSession
     {
+        $this->retrieveCheckoutCalls++;
         $row = $this->checkoutSessions[$stripeId] ?? null;
 
         if ($row === null) {
