@@ -147,6 +147,19 @@ class Guest extends Model
     }
 
     /**
+     * Named passengers only — empty padded slots (no first or last name) are excluded.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeNamed(Builder $query): void
+    {
+        $query->where(function (Builder $inner): void {
+            $inner->where($inner->qualifyColumn('first_name'), '!=', '')
+                ->orWhere($inner->qualifyColumn('last_name'), '!=', '');
+        });
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     public function scopeComplete(Builder $query): void

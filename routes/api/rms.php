@@ -11,6 +11,7 @@ use App\Http\Controllers\Rms\CalendarController;
 use App\Http\Controllers\Rms\CommissionController;
 use App\Http\Controllers\Rms\ConsentController;
 use App\Http\Controllers\Rms\ContactController;
+use App\Http\Controllers\Rms\ContactsInController;
 use App\Http\Controllers\Rms\DepartureController;
 use App\Http\Controllers\Rms\EngineSettingsController;
 use App\Http\Controllers\Rms\ExtrasController;
@@ -150,6 +151,8 @@ Route::post('refunds/{refund}/decide', [RefundController::class, 'decide'])->whe
 Route::post('refunds/{refund}/execute', [RefundController::class, 'execute'])->whereNumber('refund');
 
 Route::get('groups', [GroupController::class, 'index']);
+Route::get('contacts-in/nationalities', [ContactsInController::class, 'nationalities']);
+Route::get('contacts-in', [ContactsInController::class, 'index']);
 Route::get('contacts', [ContactController::class, 'index']);
 
 Route::get('requests', [RequestController::class, 'index']);

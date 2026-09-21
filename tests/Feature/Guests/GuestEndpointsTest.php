@@ -145,6 +145,11 @@ test('a future date of birth and an expiry before the dob are 422', function ():
         ->postJson('/api/rms/bookings/'.$booking->id.'/guests', ['nationality' => 'USA'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['nationality']);
+
+    $this->actingAs($actor)
+        ->postJson('/api/rms/bookings/'.$booking->id.'/guests', ['nationality' => 'ZZ'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['nationality']);
 });
 
 test('issues never block a save', function (): void {

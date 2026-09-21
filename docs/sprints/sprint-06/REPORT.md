@@ -427,3 +427,58 @@ EOF
 
 ### Notes for later (do not build)
 Invoice lines (Sprint 7); extras overdue alerts (Sprint 11); on-board extras status (08 C / B6); Contacts In (task 05); panel Extras tab (task 08); rewrite the BKG-01 / PAY-06 lines listed above (task 10). Open refund question: extras and collected fees refunded in full minus nothing until the client says otherwise.
+
+## Task 05 · Contacts In
+
+### The two endpoints
+`GET /api/rms/contacts-in?from&to` — one row per booking or request (requests are `REQUESTED` bookings). Window is Galápagos calendar days on `departures.date`, same as the bookings list. Soft-deleted rows excluded (G8). Cancelled and released stay on the list. Paginated (`per_page` default 50).
+
+`GET /api/rms/contacts-in/nationalities?from&to` — `{ nationalities: [{ nationality, country_name, guests, bookings }], unknown, total_guests }`. One aggregate over `guests.nationality`. Top ten by guests desc, then country name asc. Cancelled, cancelled-postpaid **and released** are excluded (prototype only drops the two cancelled statuses; RELEASED is out too). Soft-deleted bookings excluded.
+
+### Value on the list is `charges_total`
+Not the cruise `total`. A booking with extras or collected fees shows cruise + extras + collected PNG/TCT (task 04 / I9). Prototype `renderContactsIn` still renders `b.total`; the panel column label stays “Value”.
+
+### Visibility
+`Booking::scopeVisibleTo` — own-records unless `bookings.view_all`. Extracted from the bookings index; `BookingController::index` now calls it. `scopeDepartingBetween` is the same `departures.date` window. Contacts In reuses both. Seeded Sales Exec still has `bookings.view_all`; the own-records fixture is a custom role with only `panel.rms`.
+
+### Named guests only
+Empty padded slots (no first name and no last name) are **excluded**, not reported as `slots_not_filled`. They do not count in `unknown` or `total_guests`. `Guest::scopeNamed`. Seeded charter `ANK-2026-0012` (Rutger + yacht-max empty slots) contributes one NL guest; its empty slots do not appear in `unknown`.
+
+### Country names
+`App\Support\Countries` over `app/Support/Countries/iso3166.php` — official ISO-3166-1 alpha-2 English short names. No Composer package. `SaveGuestRequest` now validates against that list (empty still allowed). Prototype `XX` / Other is not a country code. The panel does not get a countries endpoint (guest form select is task 07).
+
+### CRM-guard test
+`nationality` stays in `SensitiveFields` (correct for CRM). The RMS aggregate is allowed. A probe that returns the same payload through `crm.sensitive` throws in testing (`CRM response contained sensitive fields: nationality`), so Sprint 9 cannot move this route into the CRM section unnoticed. The list and aggregate never return `dob`, `passport_no` or notes.
+
+### Still open
+Sprint 4 task 03: `GET /api/rms/contacts?q=` is not own-records scoped. Still undecided whether a Sales Exec should see another owner’s clients. Not decided here.
+
+### Checks
+`composer check` inside Docker — 775 Pest tests (5303 assertions), Pint (752 files), Larastan level 6 (0 errors).
+
+### Git (do not run)
+
+```bash
+git add app/Support/Countries.php app/Support/Countries/iso3166.php
+git add app/Models/Booking.php app/Models/Guest.php
+git add app/Http/Controllers/Rms/BookingController.php
+git add app/Http/Controllers/Rms/ContactsInController.php
+git add app/Http/Requests/Rms/IndexContactsInRequest.php
+git add app/Http/Requests/Rms/SaveGuestRequest.php
+git add app/Http/Resources/Rms/ContactInResource.php
+git add app/Http/Resources/Rms/ContactsInNationalitiesResource.php
+git add routes/api/rms.php
+git add tests/Unit/Support/CountriesTest.php
+git add tests/Feature/ContactsIn
+git add tests/Feature/Guests/GuestEndpointsTest.php
+git add tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the RMS Contacts In list and nationality aggregate.
+
+EOF
+)"
+```
+
+### Notes for later (do not build)
+Panel Contacts In (task 09); regenerate types (task 06); guest-form country select can read `Countries` (task 07). Sprint 4 contact-search visibility still open.

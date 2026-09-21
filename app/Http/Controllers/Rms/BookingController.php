@@ -65,9 +65,10 @@ final class BookingController extends Controller
         $query = Booking::query()
             ->select('bookings.*')
             ->join('departures', 'departures.id', '=', 'bookings.departure_id')
-            ->when(
-                ! $actor->hasPermission(Permission::BookingsViewAll),
-                fn (Builder $query) => $query->where('bookings.owner_id', $actor->id),
+            ->visibleTo($actor)
+            ->departingBetween(
+                is_string($request->validated('from')) ? $request->validated('from') : null,
+                is_string($request->validated('to')) ? $request->validated('to') : null,
             )
             ->when($request->boolean('mine'), fn (Builder $query) => $query->where('bookings.owner_id', $actor->id))
             ->when(
@@ -77,14 +78,6 @@ final class BookingController extends Controller
             ->when(
                 $request->filled('status'),
                 fn (Builder $query) => $query->where('bookings.status', BookingStatus::from((string) $request->validated('status'))),
-            )
-            ->when(
-                $request->filled('from'),
-                fn (Builder $query) => $query->whereDate('departures.date', '>=', (string) $request->validated('from')),
-            )
-            ->when(
-                $request->filled('to'),
-                fn (Builder $query) => $query->whereDate('departures.date', '<=', (string) $request->validated('to')),
             )
             ->when(
                 $request->filled('departure_id'),

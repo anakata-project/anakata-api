@@ -11,6 +11,7 @@ use App\Enums\BookingType;
 use App\Enums\ChannelOfOrigin;
 use App\Enums\MainChannel;
 use App\Enums\PaymentStatus;
+use App\Enums\Permission;
 use App\Enums\PngCategory;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
@@ -776,6 +777,32 @@ class Booking extends Model
         return $started instanceof \DateTimeInterface
             ? CarbonImmutable::instance($started)
             : null;
+    }
+
+    /**
+     * Bookings-index visibility: own-records unless `bookings.view_all`.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeVisibleTo(Builder $query, User $user): void
+    {
+        if ($user->hasPermission(Permission::BookingsViewAll)) {
+            return;
+        }
+
+        $query->where($query->qualifyColumn('owner_id'), $user->id);
+    }
+
+    /**
+     * Galápagos calendar window on the joined `departures.date` column.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeDepartingBetween(Builder $query, ?string $from, ?string $to): void
+    {
+        $query
+            ->when(is_string($from) && $from !== '', fn (Builder $inner) => $inner->whereDate('departures.date', '>=', $from))
+            ->when(is_string($to) && $to !== '', fn (Builder $inner) => $inner->whereDate('departures.date', '<=', $to));
     }
 
     /**

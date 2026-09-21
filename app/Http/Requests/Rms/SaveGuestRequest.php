@@ -6,7 +6,9 @@ namespace App\Http\Requests\Rms;
 
 use App\Models\Guest;
 use App\Support\BusinessTime;
+use App\Support\Countries;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class SaveGuestRequest extends FormRequest
@@ -36,7 +38,7 @@ class SaveGuestRequest extends FormRequest
             'first_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'last_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'dob' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'nationality' => ['sometimes', 'nullable', 'regex:/^[A-Z]{2}$/'],
+            'nationality' => ['sometimes', 'nullable', 'string', Rule::in(Countries::codes())],
             'ecuador_resident' => ['sometimes', 'boolean'],
             'passport_no' => ['sometimes', 'nullable', 'string'],
             'passport_expiry' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
