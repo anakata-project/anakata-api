@@ -134,5 +134,7 @@ test('GET plan is authorised by BookingPolicy view', function (): void {
     $this->actingAs(adminUser())
         ->getJson('/api/rms/bookings/'.$booking->id.'/documents/plan')
         ->assertOk()
-        ->assertJsonCount(8, 'data');
+        ->assertJsonCount(8, 'data')
+        ->assertJsonPath('data.0.booking_reference', $booking->displayReference())
+        ->assertJsonPath('data.0.client', $booking->contact->name);
 });

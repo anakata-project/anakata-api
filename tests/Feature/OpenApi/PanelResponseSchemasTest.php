@@ -629,6 +629,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     $planRow = openApiSchema($spec, 'DocumentPlanRowResource');
     expect($planRow['properties'])->toHaveKeys([
         'booking_id',
+        'booking_reference',
+        'client',
         'kind',
         'name',
         'recipient',
@@ -676,6 +678,17 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     $clientDocumentParams = collect($clientDocuments['parameters'] ?? [])
         ->mapWithKeys(fn (array $parameter): array => [($parameter['name'] ?? '') => $parameter]);
     expect($clientDocumentParams->keys()->all())->toContain('from', 'to');
+    $clientDocumentSchema = $clientDocuments['responses']['200']['content']['application/json']['schema'] ?? [];
+    $filters = $clientDocumentSchema['properties']['meta']['properties']['filters']['properties']
+        ?? $clientDocumentSchema['properties']['meta']['properties']['filters']
+        ?? null;
+    expect($filters)->toBeArray();
+    $filterFields = $filters['properties'] ?? $filters;
+    expect($filterFields)->toHaveKeys(['kinds', 'statuses']);
+    $kindItem = $filterFields['kinds']['items']['properties'] ?? [];
+    $statusItem = $filterFields['statuses']['items']['properties'] ?? [];
+    expect($kindItem)->toHaveKeys(['value', 'label']);
+    expect($statusItem)->toHaveKeys(['value', 'label']);
 
     foreach ([
         ['/rms/bookings/{booking}/documents/{kind}/issue', 'post', '201'],

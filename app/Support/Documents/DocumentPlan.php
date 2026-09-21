@@ -101,8 +101,8 @@ final class DocumentPlan
                 );
             }
         } else {
-            $rows[] = new DocumentPlanRow(
-                $booking->id,
+            $rows[] = $this->row(
+                $booking,
                 DocumentPlanKind::Reminder,
                 'Balance reminders',
                 $this->recipientLabel($booking, DeliveryKind::Reminder),
@@ -130,8 +130,8 @@ final class DocumentPlan
             DeliveryKind::Pretrip,
         );
 
-        $rows[] = new DocumentPlanRow(
-            $booking->id,
+        $rows[] = $this->row(
+            $booking,
             DocumentPlanKind::Questionnaire,
             DocumentPlanKind::Questionnaire->label(),
             'Each passenger with email',
@@ -214,8 +214,8 @@ final class DocumentPlan
                 DeliveryStatus::Failed,
             ], true);
 
-        return new DocumentPlanRow(
-            $booking->id,
+        return $this->row(
+            $booking,
             $kind,
             $kind->label(),
             $this->recipientLabel($booking, $deliveryKind),
@@ -245,8 +245,8 @@ final class DocumentPlan
         $status = $this->statusFromFacts($delivery, $recipients, $fallback);
         $date = $payment->paid_at->toDateString();
 
-        return new DocumentPlanRow(
-            $booking->id,
+        return $this->row(
+            $booking,
             DocumentPlanKind::Receipt,
             'Payment confirmation — '.$payment->kind->label(),
             $this->recipientLabel($booking, DeliveryKind::Receipt),
@@ -288,8 +288,8 @@ final class DocumentPlan
             : ($sendDate > $today ? DocumentPlanStatus::Scheduled : DocumentPlanStatus::Due);
         $status = $this->statusFromFacts($delivery, $recipients, $fallback);
 
-        return new DocumentPlanRow(
-            $booking->id,
+        return $this->row(
+            $booking,
             DocumentPlanKind::Reminder,
             'Balance reminder '.$index.' ('.$days.' days before due)',
             $this->recipientLabel($booking, DeliveryKind::Reminder),
@@ -304,6 +304,46 @@ final class DocumentPlan
             false,
             false,
             reminderDays: $days,
+        );
+    }
+
+    private function row(
+        Booking $booking,
+        DocumentPlanKind $kind,
+        string $name,
+        string $recipient,
+        string $trigger,
+        ?string $date,
+        DocumentPlanStatus $status,
+        ?int $documentId,
+        ?int $version,
+        ?int $deliveryId,
+        ?string $error,
+        bool $canPreview,
+        bool $canIssue,
+        bool $canResend,
+        ?int $reminderDays = null,
+        ?int $paymentId = null,
+    ): DocumentPlanRow {
+        return new DocumentPlanRow(
+            $booking->id,
+            $booking->displayReference(),
+            $booking->contact->name,
+            $kind,
+            $name,
+            $recipient,
+            $trigger,
+            $date,
+            $status,
+            $documentId,
+            $version,
+            $deliveryId,
+            $error,
+            $canPreview,
+            $canIssue,
+            $canResend,
+            $reminderDays,
+            $paymentId,
         );
     }
 

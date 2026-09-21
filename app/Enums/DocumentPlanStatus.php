@@ -14,4 +14,9 @@ enum DocumentPlanStatus: string
     case NotNeeded = 'NOT NEEDED';
     case NotContracted = 'NOT CONTRACTED';
     case Due = 'DUE';
+
+    public function label(): string
+    {
+        return $this->value;
+    }
 }

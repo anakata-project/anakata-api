@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\BookingStatus;
+use App\Enums\DocumentPlanKind;
+use App\Enums\DocumentPlanStatus;
 use App\Models\Booking;
 use App\Support\Documents\DocumentPlan;
 use Database\Seeders\ConfigSeeder;
@@ -50,6 +52,23 @@ test('the client-documents list agrees with each booking plan', function (): voi
         ->all();
 
     expect($fromIndex)->toBe($firstPlan);
+
+    $firstRow = collect($response->json('data'))->firstWhere('booking_id', $first->id);
+    expect($firstRow['booking_reference'])->toBe($first->displayReference());
+    expect($firstRow['client'])->toBe($first->contact->name);
+
+    $kinds = collect($response->json('meta.filters.kinds'));
+    $statuses = collect($response->json('meta.filters.statuses'));
+    expect($kinds->pluck('value')->all())->toBe(array_column(DocumentPlanKind::cases(), 'value'));
+    expect($kinds->pluck('label')->all())->toBe(array_map(
+        fn (DocumentPlanKind $kind): string => $kind->label(),
+        DocumentPlanKind::cases(),
+    ));
+    expect($statuses->pluck('value')->all())->toBe(array_column(DocumentPlanStatus::cases(), 'value'));
+    expect($statuses->pluck('label')->all())->toBe(array_map(
+        fn (DocumentPlanStatus $status): string => $status->label(),
+        DocumentPlanStatus::cases(),
+    ));
 });
 
 test('the client-documents query count does not grow with extra bookings', function (): void {

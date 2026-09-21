@@ -827,3 +827,221 @@ EOF
 )"
 git push origin HEAD
 ```
+
+## Task 07 · anakata-panel · Documents & Manifests: client documents
+
+### API prelude (so the page can read the row)
+`DocumentPlanRow` now carries `bookingReference` (`?string`) and `client` (`string`) after `bookingId`. `DocumentPlan::row()` fills `$booking->displayReference()` and `$booking->contact->name` (contact was already `loadMissing`'d). Every `new DocumentPlanRow` still goes through `row()`. `DocumentPlanRowResource` emits `booking_reference` and `client` (PHPDoc + `toArray`). Same resource on the booking plan.
+
+`GET /api/rms/documents` adds pagination `meta.filters` `{ kinds, statuses: [{ value, label }] }` via `Resource::collection()->additional()`. Labels come from PHP `label()`: kinds already had it; `DocumentPlanStatus::label()` returns `$this->value`. Typed on `#[DocumentedResponse]`. No status-count KPIs — the API does not send them.
+
+`PanelResponseSchemasTest` asserts the two resource keys and OpenAPI `meta.filters`. `ClientDocumentsIndexTest` asserts reference, client, and the full filter lists. The existing flat query-count still passes (contact was already eager-loaded). `DocumentPlanTest` GET plan asserts the two fields.
+
+### anakata-ui `v0.8.1`
+Types regenerated against `http://localhost:8000/docs/api.json`. Layer `0.8.0` → `0.8.1`. Types only.
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 8220 | 8227 |
+| `app/types/documents.ts` | 59 | 61 |
+| `app/types/index.ts` | 219 | 220 |
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 401 | 428 |
+| `app/types/bookings.ts` | 208 | 208 |
+| `app/types/payments.ts` | 161 | 161 |
+| `app/types/anakata-augment.d.ts` | 17 | 17 |
+| `app/types/guests.ts` | 101 | 101 |
+| `app/types/extras.ts` | 24 | 24 |
+
+`ClientDocumentFilters` picks `operations['clientDocument.index']` `meta.filters`. **No leftover overlay.** Delivery leftovers unchanged. Panel and engine README rows now say `` `extends: ['../anakata-ui']` (`v0.8.1`) ``. Neither pin is enforced.
+
+### Page
+`/rms/operations/documents` replaces the placeholder. One `DateRangeFilter` on departure date (noun: documents). Client-documents table from `GET /api/rms/documents`: `booking_reference`, `client`, document, trigger, date, status pill, Preview / Resend. Kind and status chips from `meta.filters` only — local All chip, no hand-written kind/status arrays, no i18n copies of those labels. Search `q` (300 ms). Paginated. Row click `GET /bookings/{id}` and opens `BookingPanel` with `initial-tab="documents"`. No per-booking join.
+
+Preview / Resend reuse task 06: `DocumentPreviewModal`, `DocumentConfirmModal`, `documentRowActions`, `documentStatusPillClass`. `previewTargetFor` extracted into `documentHelpers.ts` (issued html/file; unissued RECEIPT → receipt html; else kind html). `BookingDocumentsTab` uses the same helper.
+
+**KPI:** skipped. The API sends filter enums, not per-status counts. Do not count in the panel.
+
+**Manifests:** labelled section “Departure manifests — arrives in Sprint 11”. Nothing fake.
+
+**Nav:** `permission: 'panel.rms'`. Guards test updated (`sprint: 7`).
+
+### Files touched
+**anakata-api**
+- `app/Enums/DocumentPlanStatus.php`
+- `app/Http/Controllers/Rms/ClientDocumentController.php`
+- `app/Http/Resources/Rms/DocumentPlanRowResource.php`
+- `app/Support/Documents/DocumentPlan.php`
+- `app/Support/Documents/DocumentPlanRow.php`
+- `tests/Feature/Documents/ClientDocumentsIndexTest.php`
+- `tests/Feature/Documents/DocumentPlanTest.php`
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/documents.ts`
+- `app/types/index.ts`
+- `package.json` (`0.8.1`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel**
+- `app/pages/rms/operations/documents.vue` (new)
+- `app/assets/css/documents.css` (new)
+- `app/components/documents/documentHelpers.ts` / `tests/unit/documentHelpers.test.ts`
+- `app/components/documents/BookingDocumentsTab.vue`
+- `app/navigation/rms.ts`
+- `app/types/api.ts`
+- `i18n/locales/en.json`
+- `nuxt.config.ts`
+- `eslint.config.mjs` (`doc-chip-stack`)
+- `tests/unit/guards.test.ts`
+- `README.md` (documentation pin only)
+
+**anakata-engine**
+- `README.md` (documentation pin only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-07/REPORT.md`
+
+### Deviations
+- The task file said chips from “the API's enums” and a fresh clone against `v0.8.0`. Approved plan: small API prelude + `v0.8.1` (`booking_reference`, `client`, `meta.filters`) so the page does not join bookings.
+- `DocumentPlanStatus::label()` added so status chips can use PHP `label()` like kinds.
+- KPI row omitted (API has filters, not counts).
+- `reset.sh` not run — no e2e stack this task. Browser used the local seed.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08: e2e DOC-09. This task did not add scenarios.
+- After `reset.sh`: seeded SENT / FAILED rows, Mailpit resend, Lucía / `panel.rms` gate.
+- Repeat the sibling fresh clone at tagged `v0.8.1` **after** the pushes, with **no** overlay (listed below).
+
+### Quality
+- anakata-api: `composer check` inside Docker — 869 tests (5961 assertions), Pint (851 files), Larastan level 6 (0 errors). Pint `--dirty` is unusable in the container (no git); ran Pint on the explicit PHP paths.
+- anakata-ui: lint, typecheck, test, build — pass.
+- anakata-panel: lint, typecheck, test (223), build — pass.
+- Overlay clone (step 1, this session) into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout). Overlayed the working trees. Confirmed the ui clone is **0.8.1** and has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: typecheck pass
+  - panel / engine: build pass
+  - **OVERLAY CLONE OK**
+- Tag clone (step 2): **pending** until the user pushes `v0.8.1`. Then run the commands in §6 below (user, or agent in a follow-up). No overlay.
+- Browser (Carolina, local seed, light then dark; no `reset.sh`):
+  - Page: 122 documents, kind chips from `meta.filters` (Booking Confirmation & Invoice … Wire Instructions), status chips SENT / FAILED / BLOCKED / SCHEDULED / WAITING / NOT NEEDED / NOT CONTRACTED / DUE. Columns `ANK-2026-0003` / Harrison & Whitfield. Manifests placeholder.
+  - FAILED: empty (no seeded FAILED rows).
+  - BLOCKED: 58 rows (Brand Family — “No email address for the client of record”).
+  - SCHEDULED: 3 rows on Harrison & Whitfield.
+  - SENT: empty. No Resend button on local seed (no issued `can_resend` row). Confirm modal is wired.
+  - Row click opens Harrison & Whitfield on the Documents tab.
+  - Preview: Detailed pre-trip itinerary HTML (Anakata / day-by-day). Print / save PDF enabled. No Download (unissued).
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude (OpenAPI + row fields — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/DocumentPlanStatus.php \
+  app/Http/Controllers/Rms/ClientDocumentController.php \
+  app/Http/Resources/Rms/DocumentPlanRowResource.php \
+  app/Support/Documents/DocumentPlan.php \
+  app/Support/Documents/DocumentPlanRow.php \
+  tests/Feature/Documents/ClientDocumentsIndexTest.php \
+  tests/Feature/Documents/DocumentPlanTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Expose booking reference, client and document filter enums.
+
+The client-documents list and the booking plan share the same
+row resource; chips read meta.filters from PHP label().
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/documents.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for client-document list fields.
+
+booking_reference, client and meta.filters come through from
+the generated spec. ClientDocumentFilters is not a leftover.
+EOF
+)"
+git tag v0.8.1
+git push origin HEAD
+git push origin v0.8.1
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  app/pages/rms/operations/documents.vue \
+  app/assets/css/documents.css \
+  app/components/documents/documentHelpers.ts \
+  app/components/documents/BookingDocumentsTab.vue \
+  tests/unit/documentHelpers.test.ts \
+  tests/unit/guards.test.ts \
+  app/navigation/rms.ts \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  eslint.config.mjs
+git commit -m "$(cat <<'EOF'
+Replace Documents & Manifests with the client-documents list.
+
+Rows come from GET /documents; chips from meta.filters; preview
+and resend reuse the booking-tab helpers.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.8.1.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-07/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 7 task 07: client-documents page and v0.8.1.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.8.1
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```

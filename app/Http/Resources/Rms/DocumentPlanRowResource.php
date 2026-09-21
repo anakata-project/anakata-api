@@ -18,6 +18,8 @@ class DocumentPlanRowResource extends JsonResource
     /**
      * @return array{
      *     booking_id: int,
+     *     booking_reference: string|null,
+     *     client: string,
      *     kind: string,
      *     name: string,
      *     recipient: string,
@@ -42,6 +44,8 @@ class DocumentPlanRowResource extends JsonResource
 
         return [
             'booking_id' => $row->bookingId,
+            'booking_reference' => $row->bookingReference,
+            'client' => $row->client,
             'kind' => $row->kind->value,
             'name' => $row->name,
             'recipient' => $row->recipient,

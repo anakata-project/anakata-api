@@ -11,6 +11,8 @@ final readonly class DocumentPlanRow
 {
     public function __construct(
         public int $bookingId,
+        public ?string $bookingReference,
+        public string $client,
         public DocumentPlanKind $kind,
         public string $name,
         public string $recipient,
