@@ -68,12 +68,12 @@ final class History
             'before' => self::redact($before),
             'after' => self::redact($after),
             'reason' => $reason,
-            'context' => [
+            'context' => self::redact([
                 'source' => self::source(),
                 'ip' => request()->ip(),
                 'request_id' => request()->header('X-Request-Id') ?: (string) Str::uuid(),
                 ...$extraContext,
-            ],
+            ]) ?? [],
         ]);
 
         $entry->save();

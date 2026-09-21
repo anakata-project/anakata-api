@@ -36,4 +36,7 @@ test('core tables exist after migration', function (): void {
     expect(Schema::hasTable('claim_holders'))->toBeTrue(
         'claim_holders missing — tests/database/migrations must be registered for the whole suite.',
     );
+    expect(Schema::hasTable('sensitive_proof_hosts'))->toBeTrue(
+        'sensitive_proof_hosts missing — tests/database/migrations must be registered for the whole suite.',
+    );
 });

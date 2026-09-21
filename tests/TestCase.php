@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Casts\SensitiveEncrypted;
 use App\Services\Inventory\ClaimService;
 use App\Services\References\ReferenceService;
 use App\Support\History\History;
@@ -22,6 +23,8 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        SensitiveEncrypted::flushEncrypter();
 
         $this->setUpTestConfig();
 

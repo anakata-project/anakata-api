@@ -42,5 +42,6 @@
         <env name="STRIPE_PUBLISHABLE" value=""/>
         <env name="STRIPE_WEBHOOK_SECRET" value="whsec_test"/>
         <env name="STRIPE_MODE" value="test"/>
+        <env name="SENSITIVE_DATA_KEY" value="base64:YW5ha2F0YS1waHB1bml0LXNlbnNpdGl2ZS1rZXkzMiE=" force="true"/>
     </php>
 </phpunit>

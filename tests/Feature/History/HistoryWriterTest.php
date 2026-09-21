@@ -130,6 +130,62 @@ test('redaction replaces nested sensitive values and keeps the key', function ()
     ]);
 });
 
+test('redaction replaces sensitive values in a list of guests', function (): void {
+    $role = Role::factory()->create();
+
+    $entry = DB::transaction(fn () => History::record(
+        $role,
+        'guest.updated',
+        ['guests' => [
+            ['passport_no' => 'OLD-PP-111', 'medical_note' => 'old-med-note', 'email' => 'ada@example.com'],
+            ['passport_no' => 'OLD-PP-222', 'name' => 'Julia'],
+        ]],
+        ['guests' => [
+            ['passport_no' => 'NEW-PP-111', 'medical_note' => 'new-med-note', 'email' => 'ada@example.com'],
+            ['passport_no' => 'NEW-PP-222', 'name' => 'Julia'],
+        ]],
+    ));
+
+    expect($entry->before)->toBe([
+        'guests' => [
+            ['passport_no' => '[redacted]', 'medical_note' => '[redacted]', 'email' => 'ada@example.com'],
+            ['passport_no' => '[redacted]', 'name' => 'Julia'],
+        ],
+    ]);
+    expect($entry->after)->toBe([
+        'guests' => [
+            ['passport_no' => '[redacted]', 'medical_note' => '[redacted]', 'email' => 'ada@example.com'],
+            ['passport_no' => '[redacted]', 'name' => 'Julia'],
+        ],
+    ]);
+});
+
+test('a history entry may name passport number and never stores the values', function (): void {
+    $role = Role::factory()->create(['name' => 'Julia Brandt']);
+
+    $entry = DB::transaction(fn () => History::record(
+        $role,
+        'guest.updated',
+        ['passport_no' => 'OLD-PP-JULIA-111', 'medical_note' => 'old-julia-med'],
+        ['passport_no' => 'NEW-PP-JULIA-999', 'medical_note' => 'new-julia-med'],
+        extraContext: ['passport_no' => 'CTX-PP-SHOULD-REDACT'],
+    ));
+
+    expect($entry->before)->toHaveKey('passport_no', '[redacted]');
+    expect($entry->after)->toHaveKey('passport_no', '[redacted]');
+    expect($entry->context['passport_no'] ?? null)->toBe('[redacted]');
+
+    $row = json_encode(DB::table('change_history')->where('id', $entry->id)->first());
+
+    expect($row)->toBeString();
+    expect($row)->toContain('passport_no');
+    expect($row)->not->toContain('OLD-PP-JULIA-111');
+    expect($row)->not->toContain('NEW-PP-JULIA-999');
+    expect($row)->not->toContain('old-julia-med');
+    expect($row)->not->toContain('new-julia-med');
+    expect($row)->not->toContain('CTX-PP-SHOULD-REDACT');
+});
+
 test('source is rms crm engine auth or system from the request path', function (string $path, string $source): void {
     $role = Role::factory()->create();
 

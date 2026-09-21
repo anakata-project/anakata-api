@@ -45,7 +45,13 @@ docker compose exec app sh -c "php artisan migrate"
 docker compose exec app sh -c "php artisan storage:link"
 ```
 
-4. Confirm the API is up:
+4. Generate a **second** key for passport numbers and medical notes. Paste it into `SENSITIVE_DATA_KEY` in `.env` and `.env.testing`. Do **not** copy `APP_KEY`.
+
+```bash
+docker compose exec app sh -c "php artisan key:generate --show"
+```
+
+5. Confirm the API is up:
 
 ```bash
 curl http://localhost:8000/api/health
@@ -53,7 +59,7 @@ curl http://localhost:8000/api/health
 
 A 200 response with `"status":"ok"` and `db` / `redis` / `queue` all `ok` means setup is done.
 
-If `.env` already exists (you have run this before), skip step 1. After `docker compose down -v` the MySQL volume is empty — run steps 2–4 again (Composer and keys can be skipped if `vendor/` and `APP_KEY` are already there).
+If `.env` already exists (you have run this before), skip step 1. After `docker compose down -v` the MySQL volume is empty — run steps 2–5 again (Composer and keys can be skipped if `vendor/`, `APP_KEY` and `SENSITIVE_DATA_KEY` are already there).
 
 ## Start and stop
 
