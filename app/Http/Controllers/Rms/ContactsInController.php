@@ -13,6 +13,7 @@ use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\User;
 use App\Support\Countries;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Collection;
@@ -39,6 +40,10 @@ final class ContactsInController extends Controller
         return ContactInResource::collection($bookings);
     }
 
+    #[DocumentedResponse(
+        status: 200,
+        type: 'array{nationalities: list<array{nationality: string, country_name: string, guests: int, bookings: int}>, unknown: int, total_guests: int}',
+    )]
     public function nationalities(IndexContactsInRequest $request): ContactsInNationalitiesResource
     {
         $this->authorize('viewAny', Booking::class);

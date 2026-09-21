@@ -23,17 +23,7 @@ class BookingConsentResource extends JsonResource
      *     required: bool,
      *     current_version: string,
      *     outdated: bool,
-     *     consent: array{
-     *         id: int,
-     *         document: string,
-     *         version: string,
-     *         accepted_at: string,
-     *         ip: string|null,
-     *         source: string,
-     *         how_obtained: string|null,
-     *         recorded_by: int|null,
-     *         withdrawn: bool
-     *     }|null
+     *     consent: ConsentResource|null
      * }
      */
     public function toArray(Request $request): array
@@ -48,9 +38,10 @@ class BookingConsentResource extends JsonResource
             'label' => $document->label(),
             'required' => $document->required(),
             'current_version' => $current,
+            // @var bool
             'outdated' => $outdated,
             'consent' => $consent instanceof Consent
-                ? (new ConsentResource($consent))->toArray($request)
+                ? new ConsentResource($consent)
                 : null,
         ];
     }

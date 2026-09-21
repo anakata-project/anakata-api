@@ -8,9 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @property-read list<array{nationality: string, country_name: string, guests: int, bookings: int}> $nationalities
- * @property-read int $unknown
- * @property-read int $total_guests
+ * @property array{
+ *     nationalities: list<array{nationality: string, country_name: string, guests: int, bookings: int}>,
+ *     unknown: int,
+ *     total_guests: int
+ * } $resource
  */
 class ContactsInNationalitiesResource extends JsonResource
 {
@@ -25,13 +27,6 @@ class ContactsInNationalitiesResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        /** @var array{nationalities: list<array{nationality: string, country_name: string, guests: int, bookings: int}>, unknown: int, total_guests: int} $payload */
-        $payload = $this->resource;
-
-        return [
-            'nationalities' => $payload['nationalities'],
-            'unknown' => $payload['unknown'],
-            'total_guests' => $payload['total_guests'],
-        ];
+        return $this->resource;
     }
 }

@@ -57,6 +57,7 @@ class ContactInResource extends JsonResource
                 'id' => $this->owner->id,
                 'name' => $this->owner->name,
             ],
+            // @var bool
             'can_act' => $canAct,
         ];
     }

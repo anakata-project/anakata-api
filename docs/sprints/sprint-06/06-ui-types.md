@@ -10,7 +10,8 @@ The panel work of this sprint types itself from the API. Types only: no componen
 
 ## Do
 1. **Check the API side first.** Confirm real properties on: `GuestResource` and the guest list summary with `issues`; the consents list; `BookingExtraResource` and the extras list; the extras config document (current, versions, detail); the new `BookingResource` fields (`guests_summary`, `extras_total`, `fees_collected_total`, `png_collected`, `tct_collected`, `png_pending_count`, `charges_total`, `cruise_outstanding`, `extras_due_at`); the two Contacts In endpoints.
-   - Masked fields must be typed as what the API actually sends: `passport_no: string | null`, and the notes as `string | null` with their `*_on_file: boolean` siblings. The type must not suggest the panel receives a full value it may not show.
+   - Masked fields must be typed as what the API actually sends: `passport_no: string | null`, and each note as `{ value: string | null, on_file: boolean }` (task 01's `Masking::note`). The type must not suggest the panel receives a full value it may not show.
+   - The guest form needs the country list: the prelude adds `GET /api/rms/countries` (`[{ code, name }]`, `panel.rms`) from the same list guest validation uses, so a `Country` alias ships in this release.
    - Anything untyped is fixed in one API prelude commit, added to `PanelResponseSchemasTest`, before the layer hand-writes anything.
 2. **Regenerate.** `pnpm types:api`. Never edit `api.d.ts` by hand. Record before/after line counts of every file in `app/types/`, including the new ones.
 3. **New `app/types/guests.ts`** — `Guest`, `GuestIssue`, `GuestIssueSeverity`, `GuestListSummary`, `PngCategory`, `Consent`, `ConsentDocument`, `ConsentSource`, `ContactInRow`, `NationalityRow`. Re-export from `index.ts`.

@@ -481,4 +481,245 @@ EOF
 ```
 
 ### Notes for later (do not build)
-Panel Contacts In (task 09); regenerate types (task 06); guest-form country select can read `Countries` (task 07). Sprint 4 contact-search visibility still open.
+Panel Contacts In (task 09); regenerate types (task 06); guest-form country select reads `GET /api/rms/countries` (task 06 prelude, task 07). Sprint 4 contact-search visibility still open.
+
+## Task 06 · anakata-ui · Regenerate types, release `v0.7.0`
+
+### What was built
+PHPDoc / OpenAPI prelude on the API so Scramble emits the Sprint 6 shapes, including `GET /api/rms/countries`, then types regenerated against `http://localhost:8000/docs/api.json`. Layer `0.6.4` → `0.7.0`. Types only: no composables, components, or panel behaviour.
+
+Calendar dates stay `string` (`YYYY-MM-DD`). Instants stay ISO strings.
+
+### API prelude
+
+| Target | What landed |
+|---|---|
+| `GET /api/rms/countries` | `{ code, name }[]` from `Countries::all()` (the same ISO list guest validation uses). Raw JSON array, `$wrap = null`. Authorised by the existing `permission:panel.rms` group — not `bookings.create` / form-options. |
+| `MaskedNoteResource` | Named schema for `{ value: string \| null, on_file: boolean }`. `GuestResource` notes `$ref` it. Inline `@var` so Scramble does not emit `on_file: string`. |
+| `ContactsInNationalitiesResource` | `@property` + `#[DocumentedResponse]` so `nationalities` / `unknown` / `total_guests` are typed (were `string`). |
+| `BookingConsentResource.outdated` | Inline `@var bool`. Nested `consent` is a `ConsentResource`. |
+| `ContactInResource.can_act` | Inline `@var bool`. |
+| `PanelResponseSchemasTest` | `GuestResource`, `MaskedNoteResource`, `BookingConsentResource`, `ConsentResource`, `BookingExtraResource`, `CountryResource`; BookingResource charge keys + `guests_summary`; guest-list and extras-list additional properties; extras current/versions paths; contacts-in `from`/`to`; `ConsentDocument` enum. |
+
+`PngCategory` and `ConsentSource` have no FormRequest schema. Resource fields for those stay `string`; the layer leftovers close the unions.
+
+### Note shape
+
+The API sends `medical_note` / `dietary_note` / `accessibility_note` as `{ value: string | null, on_file: boolean }` (`Masking::note`). `passport_no` is `string | null` (full, masked, or empty). The type does not claim the panel always has the full note: `value` is nullable.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 6535 | 7490 |
+| `app/types/inventory.ts` | 247 | 247 |
+| `app/types/config.ts` | 368 | 401 |
+| `app/types/bookings.ts` | 208 | 208 |
+| `app/types/payments.ts` | 161 | 161 |
+| `app/types/index.ts` | 176 | 204 |
+| `app/types/anakata-augment.d.ts` | 17 | 17 |
+| `app/types/guests.ts` | — | 101 |
+| `app/types/extras.ts` | — | 24 |
+
+### Schema → alias (`app/types/guests.ts`)
+
+| Alias | Source |
+|---|---|
+| `MaskedNote` | `MaskedNoteResource` (`value: string \| null`, `on_file: boolean`) |
+| `Guest` | `GuestResource` + `png_category: PngCategory \| null` |
+| `PngCategory` | leftover (`PENDING` … `FOREIGN_12_AND_UNDER`) — mirrors `App\Enums\PngCategory` |
+| `GuestIssueSeverity` | leftover `'error' \| 'warning'` |
+| `GuestIssue` | generated `guest.index` issue item + `severity` overlay |
+| `GuestListSummary` | generated `guest.index` additional (`complete_count`, `total`, `png_known_total`, `png_pending_count`, `issues`) |
+| `ConsentDocument` | named enum schema |
+| `ConsentSource` | leftover `'ENGINE' \| 'PAYMENT_LINK' \| 'STAFF'` |
+| `Consent` | `ConsentResource` + `document` / `source` overlays |
+| `BookingConsent` | extra alias — `BookingConsentResource` (the list row the panel table iterates) |
+| `Country` | `CountryResource` (`GET /rms/countries`) |
+| `ContactInRow` | `ContactInResource` + booking enum overlays |
+| `NationalityRow` / `NationalitiesSummary` | `ContactsInNationalitiesResource` |
+
+### Schema → alias (`app/types/extras.ts` + `config.ts`)
+
+New `extras.ts` (not `payments.ts`): booking extras are frozen catalogue lines, not ledger payments. Guests already have their own file.
+
+| Alias | Source |
+|---|---|
+| `BookingExtra` | `BookingExtraResource` (fully generated) |
+| `ExtrasListSummary` | generated `bookingExtra.index` additional (fee-display facts) |
+| `ExtrasCatalogueItem` | leftover — mirrors `App\Support\Config\Documents\ExtraItem` |
+| `ExtrasCatalogue` / `ExtrasDocument` | leftover — `ConfigCurrentResource.document` is untyped |
+| `ExtrasVersion` | `ConfigVersion<ExtrasCatalogue>` (same envelope as rates / engine / rules) |
+| `ConsentVersions` | leftover on `BusinessRulesDocument.legal.consent_versions` |
+| `RuleGroup` | leftover gained `'legal'` |
+
+### Booking
+
+Same `Booking` alias. Scalars `guests_summary`, `extras_total`, `fees_collected_total`, `png_collected`, `tct_collected`, `png_pending_count`, `charges_total`, `cruise_outstanding`, `extras_due_at` come through from `BookingResource`. No new overlays.
+
+### Kept leftovers
+
+No inventory leftovers retired. New leftovers listed above, each with a `Mirrors App\…` comment.
+
+No country / PNG / consent / extras runtime list in the layer. Labels and names come from the API.
+
+### Pins
+
+Panel and engine README rows now say `` `extends: ['../anakata-ui']` (`v0.7.0`) ``. **Neither pin is enforced** — the apps resolve the sibling folder, so the version line is documentation only.
+
+### Files touched
+**anakata-api (prelude)**
+- `app/Http/Controllers/Rms/CountryController.php` (new)
+- `app/Http/Resources/Rms/CountryResource.php` (new)
+- `app/Http/Resources/Rms/MaskedNoteResource.php` (new)
+- `app/Http/Resources/Rms/GuestResource.php`
+- `app/Http/Resources/Rms/BookingConsentResource.php`
+- `app/Http/Resources/Rms/ContactInResource.php`
+- `app/Http/Resources/Rms/ContactsInNationalitiesResource.php`
+- `app/Http/Controllers/Rms/ContactsInController.php`
+- `routes/api/rms.php`
+- `tests/Feature/Countries/CountriesEndpointTest.php` (new)
+- `tests/Feature/OpenApi/PanelResponseSchemasTest.php`
+
+**anakata-ui**
+- `app/types/api.d.ts`
+- `app/types/guests.ts` (new)
+- `app/types/extras.ts` (new)
+- `app/types/config.ts`
+- `app/types/index.ts`
+- `package.json` (`0.7.0`)
+- `CHANGELOG.md`
+- `README.md`
+
+**anakata-panel / anakata-engine**
+- `README.md` (documentation pin only)
+
+**anakata-api (this report)**
+- `docs/sprints/sprint-06/REPORT.md`
+
+### Deviations
+- `BookingConsent` is an extra alias (not in the task list) because the consent table iterates `BookingConsentResource`, not `ConsentResource`.
+- `NationalitiesSummary` is the envelope around `NationalityRow`.
+- Extras catalogue leftovers live in `config.ts` and are re-exported from `extras.ts`.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 07: nationality select from `GET /api/rms/countries` (`Country`). Note cards read `guest.medical_note.on_file` / `.value`, not `medical_note_on_file`.
+- Task 08: extras tab from `BookingExtra` + `ExtrasListSummary`; catalogue editor from `ExtrasCatalogue`.
+- Task 09: Contacts In from `ContactInRow` / `NationalityRow`.
+
+### Quality
+- anakata-api: `composer check` inside Docker — 778 tests (5455 assertions), Pint (756 files), Larastan level 6 (0 errors).
+- anakata-ui: lint, typecheck, test (35), build — pass.
+- anakata-panel / anakata-engine: typecheck — pass.
+- Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` (sibling layout). Overlayed the working trees. Confirmed the ui clone has **no** `app/types/nuxt.d.ts`.
+  - ui / panel / engine: typecheck pass
+  - panel / engine: build pass
+  - **OVERLAY CLONE OK**
+  - **Repeat this clone after the pushes below**, checking out `anakata-ui` at `v0.7.0` with **no** overlay.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Run in this order.
+
+```bash
+# 1. anakata-api prelude (countries + OpenAPI typing — not this report)
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/CountryController.php \
+  app/Http/Controllers/Rms/ContactsInController.php \
+  app/Http/Resources/Rms/CountryResource.php \
+  app/Http/Resources/Rms/MaskedNoteResource.php \
+  app/Http/Resources/Rms/GuestResource.php \
+  app/Http/Resources/Rms/BookingConsentResource.php \
+  app/Http/Resources/Rms/ContactInResource.php \
+  app/Http/Resources/Rms/ContactsInNationalitiesResource.php \
+  routes/api/rms.php \
+  tests/Feature/Countries/CountriesEndpointTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php
+git commit -m "$(cat <<'EOF'
+Type Sprint 6 OpenAPI responses and add GET /rms/countries.
+
+Guest notes emit MaskedNoteResource; Contacts In nationalities and
+the ISO country list are named schemas so the layer can regenerate
+them instead of hand-writing the shapes.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/config.ts \
+  app/types/index.ts \
+  app/types/guests.ts \
+  app/types/extras.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for guests, extras, countries and charges.
+
+Sprint 6 aliases live in guests.ts and extras.ts; Booking keeps
+the same name. Catalogue leftovers stay in config.ts.
+EOF
+)"
+git tag v0.7.0
+git push origin HEAD
+git push origin v0.7.0
+```
+
+```bash
+# 3. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.7.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 4. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add README.md
+git commit -m "$(cat <<'EOF'
+Document the layer pin as v0.7.0.
+
+extends still resolves the sibling folder; the version is documentation only.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 5. anakata-api report
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-06/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 6 task 06: regenerated UI API types.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 6. Fresh-clone repeat — after the pushes, no working-tree overlay
+rm -rf /tmp/anakata-fresh
+mkdir -p /tmp/anakata-fresh
+git clone https://github.com/anakata-project/anakata-ui.git /tmp/anakata-fresh/anakata-ui
+git -C /tmp/anakata-fresh/anakata-ui checkout v0.7.0
+git clone https://github.com/anakata-project/anakata-panel.git /tmp/anakata-fresh/anakata-panel
+git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fresh/anakata-engine
+# then in each: pnpm install
+# ui / panel / engine: pnpm typecheck
+# panel / engine: pnpm build
+```
+

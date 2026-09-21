@@ -83,6 +83,12 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'RefundRequestResource',
         'ContactInResource',
         'ContactsInNationalitiesResource',
+        'GuestResource',
+        'BookingConsentResource',
+        'ConsentResource',
+        'BookingExtraResource',
+        'CountryResource',
+        'MaskedNoteResource',
     ] as $name) {
         openApiSchema($spec, $name);
     }
@@ -164,7 +170,18 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'commission_cap_pct',
         'refund',
         'payment_links',
+        'guests_summary',
+        'extras_total',
+        'fees_collected_total',
+        'png_collected',
+        'tct_collected',
+        'png_pending_count',
+        'charges_total',
+        'cruise_outstanding',
+        'extras_due_at',
     ]);
+    $guestsSummary = openApiProperties($booking['properties']['guests_summary'] ?? []);
+    expect($guestsSummary)->toHaveKeys(['complete', 'total']);
 
     $payment = openApiSchema($spec, 'PaymentResource');
     expect($payment['properties'])->toHaveKeys([
@@ -415,6 +432,7 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'AgencyStatus',
         'CommissionAccrualStatus',
         'RefundRequestStatus',
+        'ConsentDocument',
     ] as $enum) {
         $schema = $spec['components']['schemas'][$enum] ?? null;
         expect($schema)->toBeArray("schema {$enum} is missing");
@@ -433,4 +451,148 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         ?? null;
     expect($move)->toBeArray();
     expect($move['responses']['409'] ?? null)->toBeArray();
+
+    $guest = openApiSchema($spec, 'GuestResource');
+    expect($guest['properties'])->toHaveKeys([
+        'passport_no',
+        'medical_note',
+        'dietary_note',
+        'accessibility_note',
+        'png_category',
+        'png_category_label',
+        'png_fee',
+        'complete',
+        'guardian',
+        'is_minor_now',
+        'age_at_departure',
+    ]);
+    expect($guest['properties']['passport_no']['type'] ?? null)->toBe(['string', 'null']);
+    $noteSchema = openApiSchema($spec, 'MaskedNoteResource');
+    expect($noteSchema['properties'])->toHaveKeys(['value', 'on_file']);
+    expect($noteSchema['properties']['value']['type'] ?? null)->toBe(['string', 'null']);
+    expect($noteSchema['properties']['on_file']['type'] ?? null)->toBe('boolean');
+    expect(openApiSchema($spec, 'BookingConsentResource')['properties']['outdated']['type'] ?? null)->toBe('boolean');
+    expect(openApiSchema($spec, 'ContactInResource')['properties']['can_act']['type'] ?? null)->toBe('boolean');
+    foreach (['medical_note', 'dietary_note', 'accessibility_note'] as $note) {
+        $ref = $guest['properties'][$note]['$ref'] ?? $guest['properties'][$note]['allOf'][0]['$ref'] ?? null;
+        if (is_string($ref)) {
+            expect($ref)->toContain('MaskedNoteResource');
+        } else {
+            $noteProps = openApiProperties($guest['properties'][$note] ?? []);
+            expect($noteProps)->toHaveKeys(['value', 'on_file']);
+        }
+    }
+
+    $guests = $spec['paths']['/rms/bookings/{booking}/guests']['get']
+        ?? $spec['paths']['/api/rms/bookings/{booking}/guests']['get']
+        ?? null;
+    expect($guests)->toBeArray();
+    $guestsSchema = $guests['responses']['200']['content']['application/json']['schema'] ?? [];
+    $guestsProps = $guestsSchema['properties'] ?? [];
+    expect($guestsProps)->toHaveKeys([
+        'data',
+        'complete_count',
+        'total',
+        'png_known_total',
+        'png_pending_count',
+        'issues',
+    ]);
+    $issueItem = $guestsProps['issues']['items']['properties'] ?? [];
+    expect($issueItem)->toHaveKeys(['severity', 'code', 'guest_id', 'message']);
+
+    $consents = $spec['paths']['/rms/bookings/{booking}/consents']['get']
+        ?? $spec['paths']['/api/rms/bookings/{booking}/consents']['get']
+        ?? null;
+    expect($consents)->toBeArray();
+    $consent = openApiSchema($spec, 'BookingConsentResource');
+    expect($consent['properties'])->toHaveKeys([
+        'document',
+        'label',
+        'required',
+        'current_version',
+        'outdated',
+        'consent',
+    ]);
+
+    $bookingExtras = $spec['paths']['/rms/bookings/{booking}/extras']['get']
+        ?? $spec['paths']['/api/rms/bookings/{booking}/extras']['get']
+        ?? null;
+    expect($bookingExtras)->toBeArray();
+    $bookingExtrasSchema = $bookingExtras['responses']['200']['content']['application/json']['schema'] ?? [];
+    $bookingExtrasProps = $bookingExtrasSchema['properties'] ?? [];
+    expect($bookingExtrasProps)->toHaveKeys([
+        'data',
+        'extras_total',
+        'png_collected',
+        'tct_collected',
+        'png_known_total',
+        'png_pending_count',
+        'tct_pp',
+        'tct_count',
+        'extras_due_hours',
+        'extras_due_at',
+    ]);
+    $bookingExtra = openApiSchema($spec, 'BookingExtraResource');
+    expect($bookingExtra['properties'])->toHaveKeys([
+        'code',
+        'name',
+        'unit',
+        'qty',
+        'rate_usd',
+        'amount',
+        'note',
+    ]);
+
+    $extras = $spec['paths']['/rms/extras']['get']
+        ?? $spec['paths']['/api/rms/extras']['get']
+        ?? null;
+    expect($extras)->toBeArray();
+    $extrasVersions = $spec['paths']['/rms/extras/versions']['get']
+        ?? $spec['paths']['/api/rms/extras/versions']['get']
+        ?? null;
+    expect($extrasVersions)->toBeArray();
+    $extrasDetail = $spec['paths']['/rms/extras/versions/{version}']['get']
+        ?? $spec['paths']['/api/rms/extras/versions/{version}']['get']
+        ?? null;
+    expect($extrasDetail)->toBeArray();
+
+    $contactsIn = $spec['paths']['/rms/contacts-in']['get']
+        ?? $spec['paths']['/api/rms/contacts-in']['get']
+        ?? null;
+    expect($contactsIn)->toBeArray();
+    $contactsInParams = collect($contactsIn['parameters'] ?? [])
+        ->mapWithKeys(fn (array $parameter): array => [($parameter['name'] ?? '') => $parameter]);
+    expect($contactsInParams->keys()->all())->toContain('from', 'to');
+    $contactIn = openApiSchema($spec, 'ContactInResource');
+    expect($contactIn['properties'])->toHaveKeys([
+        'display_reference',
+        'charges_total',
+        'contact',
+        'travel_advisor',
+        'owner',
+        'can_act',
+    ]);
+
+    $nationalities = $spec['paths']['/rms/contacts-in/nationalities']['get']
+        ?? $spec['paths']['/api/rms/contacts-in/nationalities']['get']
+        ?? null;
+    expect($nationalities)->toBeArray();
+    $nationalitiesResource = openApiSchema($spec, 'ContactsInNationalitiesResource');
+    expect($nationalitiesResource['properties'])->toHaveKeys([
+        'nationalities',
+        'unknown',
+        'total_guests',
+    ]);
+    $nationalityItem = $nationalitiesResource['properties']['nationalities']['items']['properties'] ?? [];
+    expect($nationalityItem)->toHaveKeys(['nationality', 'country_name', 'guests', 'bookings']);
+
+    $countries = $spec['paths']['/rms/countries']['get']
+        ?? $spec['paths']['/api/rms/countries']['get']
+        ?? null;
+    expect($countries)->toBeArray();
+    $country = openApiSchema($spec, 'CountryResource');
+    expect($country['properties'])->toHaveKeys(['code', 'name']);
+    $countriesSchema = $countries['responses']['200']['content']['application/json']['schema'] ?? [];
+    $countriesItems = $countriesSchema['items'] ?? $countriesSchema['properties']['data']['items'] ?? null;
+    expect($countriesItems)->toBeArray();
 });
