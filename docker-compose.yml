@@ -23,10 +23,16 @@ services:
       - .docker/nginx-vhost-common.d/sse.conf:/opt/docker/etc/nginx/vhost.common.d/sse.conf
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.anakata-api.rule=Host(`anakata.local`)"
+      - "traefik.http.routers.anakata-api.rule=Host(`anakata-rms-api.engine-c.com`)"
+      - "traefik.http.routers.anakata-api.entrypoints=web,websecure"
+      - "traefik.http.routers.anakata-api.tls=true"
+      - "traefik.http.routers.anakata-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.anakata-api.service=anakata-api"
       - "traefik.http.services.anakata-api.loadbalancer.server.port=80"
-      - "traefik.http.routers.anakata-ws.rule=Host(`ws.anakata.local`)"
+      - "traefik.http.routers.anakata-ws.rule=Host(`ws.anakata-rms-api.engine-c.com`)"
+      - "traefik.http.routers.anakata-ws.entrypoints=web,websecure"
+      - "traefik.http.routers.anakata-ws.tls=true"
+      - "traefik.http.routers.anakata-ws.tls.certresolver=letsencrypt"
       - "traefik.http.routers.anakata-ws.service=anakata-ws"
       - "traefik.http.services.anakata-ws.loadbalancer.server.port=8080"
       - "traefik.docker.network=traefik-network"
@@ -84,7 +90,16 @@ services:
       timeout: 3s
       retries: 10
     networks:
+      - traefik-network
       - anakata-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.anakata-mailpit.rule=Host(`anakata-rms-mail.engine-c.com`)"
+      - "traefik.http.routers.anakata-mailpit.entrypoints=web,websecure"
+      - "traefik.http.routers.anakata-mailpit.tls=true"
+      - "traefik.http.routers.anakata-mailpit.tls.certresolver=letsencrypt"
+      - "traefik.http.services.anakata-mailpit.loadbalancer.server.port=8025"
+      - "traefik.docker.network=traefik-network"
 
 networks:
   traefik-network:

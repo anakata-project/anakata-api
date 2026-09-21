@@ -993,3 +993,148 @@ EOF
 git push origin HEAD
 ```
 
+## Task 08 · anakata-engine · Steps 1–3
+
+The public engine’s first half: dates & guests, itinerary cards / departure rows, and trip details with a WEST-only D3 route map. Content and rules come only from `GET /api/engine/feed` (K3). Chrome (buttons, crumbs, footnotes) is i18n English; yacht names, itinerary copy, rates, labels, guest rules and the sales window are feed fields.
+
+### Data (SSR + freshness)
+`useEngineFeed()` is `useApi().useFetch('/api/engine/feed', { key, server: true })`. Pages render the payload on the server (A6 / SEO). On the client the same payload revalidates every 15 s and on `visibilitychange` → visible (task 03’s 30-second freshness). Types are the layer’s `Engine*` re-exports (`app/types/api.ts`).
+
+`useBookingFlow()` is the prototype’s `S`: adults, children, month window, itinerary, departure, plus `checkoutToken` / `checkoutExpiresAt` slots for task 09. Written to `sessionStorage` key `anakata-engine-flow` (try/catch). Empty months hydrate from `settings.calendar.default_search_*` and `default_adults`.
+
+### Engine Map — steps 1–3
+
+| Map element | Feed / helper |
+|---|---|
+| Yacht name on rows & trip details | `departures[].yacht` |
+| Sales calendar / first bookable | `settings.calendar.first_bookable`, `sales_from` / `sales_to` |
+| Guest rules (max cabin / yacht, child ages, adult-with-children) | `settings.guests.*` → booking-bar footnote |
+| Default search window | `settings.calendar.default_search_from` / `default_search_to` |
+| Locale / currency | English only (doc 04); `rates.currency` |
+| Card photo, name, description, chips | `itineraries[].card` + `name` / `tagline` / `overview` |
+| “Suites from” | `rates.suite_pp_double` via `suitesFrom` / `suitePpDouble` |
+| Departures (N) | `departures` filtered by itinerary + `inWindow` |
+| Trip overview line | `itineraries[].overview` |
+| Departure row — dates, yacht, note | `embark` / `disembark` / `yacht` / `note` |
+| Availability label | `departures[].label` (exact `EngineLabel` fixtures; unknown throws) |
+| Waitlist button | `rowAction` + `departures[].waitlist` → `WaitlistStub` (task 10 form) |
+| Offer badge / dealbar | `departures[].offers` + `feed.offers` (`cardDealbar`, `fromPrice` PCT strike / CREDIT badge) |
+| Trip title, hero, badges, facts, description | `itineraries[].card` + `detail` |
+| Departure dates table | same itinerary’s `departures` |
+| Tabs Overview / Itinerary / Includes / FAQs | `card.highlights`, `detail.day_by_day`, `included` / `excluded`, `faqs` |
+| Rail “From” | `fromPrice` / `suitesFrom` |
+| Sidebar notes | `settings.copy.book_now_pay_later`, `traveling_with_children`, `solo_and_triple` |
+
+Steps 4–6 and the charter page stay placeholders.
+
+### Step 1 — Dates & guests
+`SearchBookingBar` on `/`. Two-click month picker from the published sales window (not a hard-coded November 2027). Adult / child steppers; child ages from settings. Minimum cabins `ceil(party ÷ max_per_cabin)`. Check availability → `track('search_availability')` → `/itineraries`.
+
+### Step 2 — Itinerary & departure
+Three cards from `feed.itineraries`. Expand lists rows inside the guest window. Labels are the `EngineLabelTest` strings (`AVAILABLE`, `ONLY N CABIN(S) LEFT`, `LIMITED AVAILABILITY`, `FULL · WAITLIST`, `FULL`, `CLOSED — ENQUIRE`, `PRIVATE CHARTER ONLY`). Unknown labels throw. CTA matrix: Select only when the label is bookable **and** free cabins ≥ `minCabins`; LIMITED → Waitlist + Contact us (never Select); PRIVATE CHARTER ONLY → `/charter`. Prices are “from” estimates. Festive rows append `+ festive`.
+
+### Step 3 — Trip details + route map
+`/itineraries/[slug]`: header, facts, long description, departure switcher, five tabs when a map exists, rail, Select cabins → `/book/cabins` (task 09).
+
+**Route map:** `routeMapFor(code)` returns WEST only. NORTH / FEST have no Route map tab (not the Western map mislabelled). D3 is `await import('d3')` inside `RouteMap` `onMounted`, and the component is `ClientOnly` behind the Route map tab. `prefers-reduced-motion` skips motion. Map geometry lives in `app/data/routeMaps/west.ts` + `west.geo.json` until the feed carries maps.
+
+`TODO(OPEN: Engine route maps)` — the ported prototype still reads San Cristóbal → Baltra, days starting Monday; the engine sells SCY → SCY, Sunday → Sunday. The Itinerary tab uses the feed’s Sunday / SCY day-by-day.
+
+### Theme and state
+Layer colour mode (`nuxt-color-mode` in `localStorage`, try/catch via Nuxt). Engine-specific layout in `app/assets/css/engine.css` (bookbar, cards, rows, trip, rail, map, waitlist; 980 px; reduced-motion). Flow in `sessionStorage` as above.
+
+### Analytics
+`track(event, params)` in `useTrack.ts` is a no-op. Called for `search_availability`, `view_itinerary`, `select_departure`, `view_itinerary_detail`, `view_route_map`. Task 10 wires GA4 behind consent.
+
+### Tests
+Vitest (same stack as the panel). `engineFlow.test.ts`: `minCabins`, two-click months, party fit, `rowAction` / `isSelectable`, unknown label throw, `suitePpDouble` Record **and** year-aligned array. `prototypeLiterals.test.ts` greps `app` / `i18n` (skips `node_modules`, `.output`, route-map sources) for ANATARA, “Anakata I”, cabin 201–208 / 301, USD 13,300, “paid at SCY airport”. `track.test.ts` spies the no-op.
+
+### Deviations
+- `suite_pp_double` arrives from Laravel as a year-aligned JSON array, not a `Record<year, number>`. `suitePpDouble` accepts both (without this, cards showed USD 0).
+- Nuxt collapses `trip/TripRail.vue` → `TripRail` (not `TripTripRail`). Same for `WaitlistStub`. Using the doubled names rendered unknown custom elements and an empty rail.
+- Vue pinned to `3.5.43` (same as the panel) so the layer and app do not load two Vue copies (empty SSR / NUXT_E4011).
+- `pnpm.overrides` is ignored by pnpm 12; removed.
+- Live seed used here had `offers: []`, so no `−%` dealbar / sand row. Every visible label was `AVAILABLE`. FULL · WAITLIST and LIMITED AVAILABILITY are unit-tested; the 30-second RMS flip is task 11.
+- Route-map days/ports are local prototype data, not feed fields (open question).
+
+### Open questions
+- Northern and Festive route maps (client).
+- Western map Baltra / Monday vs SCY / Sunday (`TODO(OPEN: Engine route maps)`).
+
+### Notes for later
+- Task 09: cabins, details, the two paths; consume `checkoutToken` slots.
+- Task 10: waitlist form, charter page, GA4 behind consent.
+- Task 11: `WEB-01`… walkthrough, offer badge, FULL / LIMITED within 30 s.
+- Do not commit `.pnpm-store/` if a local store appeared during install.
+
+### Browser
+Against the running API feed (15 departures, WEST / NORTH / FEST, default search Nov 2027–Jan 2028, 2 adults):
+
+- Step 1: settings footnote (max 3 / cabin, 16 / yacht, adult-with-children); window NOV 2027—JAN 2028.
+- Step 2: three cards; after hydrate Departures (6)/(6)/(3); yachts ANAMARA / ANATIVA; labels AVAILABLE; suites from **USD 13,300**; festive rows `+ festive`.
+- Step 3 WEST: rail USD 13,300 + feed copy (pay later / children / solo); switcher; Overview, day-by-day (Sunday SCY from the feed), Includes / Excludes, FAQs; Route map “The Western Route” with D3 SVG and day list.
+- NORTH and FEST: no Route map tab.
+- Light (`rgb(239, 237, 221)`) and dark (`rgb(32, 43, 38)`); `nuxt-color-mode` persisted. Phone 390 px: no horizontal overflow; rail still shows the from-price.
+
+### Quality
+`pnpm lint`, `typecheck`, `test` (19), `build` — pass. Layer extend is `../anakata-ui` (`v0.9.0`). Fresh-clone typecheck/build against a clean `v0.9.0` checkout was not re-run here (no ui change).
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Do **not** add `.pnpm-store/`.
+
+```bash
+# 1. anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add app/assets/css/engine.css
+git add app/pages/index.vue
+git add app/pages/itineraries/index.vue
+git add app/pages/itineraries/[slug].vue
+git add app/components/itineraries/DepartureActions.vue
+git add app/components/itineraries/ItineraryCard.vue
+git add app/components/itineraries/PriceCell.vue
+git add app/components/search/BookingBar.vue
+git add app/components/trip/DepartureSwitcher.vue
+git add app/components/trip/RouteMap.vue
+git add app/components/trip/TripRail.vue
+git add app/components/waitlist/WaitlistStub.vue
+git add app/composables/useBookingFlow.ts
+git add app/composables/useEngineFeed.ts
+git add app/composables/useReveals.ts
+git add app/composables/useTrack.ts
+git add app/composables/useWaitlist.ts
+git add app/data/routeMaps/west.ts
+git add app/data/routeMaps/west.geo.json
+git add app/types/api.ts
+git add app/types/json.d.ts
+git add app/utils/engineFlow.ts
+git add app/utils/routeMaps.ts
+git add tests/unit/engineFlow.test.ts
+git add tests/unit/prototypeLiterals.test.ts
+git add tests/unit/track.test.ts
+git add vitest.config.ts
+git add eslint.config.mjs
+git add i18n/locales/en.json
+git add package.json
+git add pnpm-lock.yaml
+git commit -m "$(cat <<'EOF'
+Build engine steps 1–3 from the public feed.
+
+Dates, itinerary cards and trip details render only what
+GET /api/engine/feed publishes, with a WEST-only D3 route map.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 2. anakata-api — report only
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record sprint 8 task 08 (engine steps 1–3).
+EOF
+)"
+git push origin HEAD
+```
+
