@@ -20,6 +20,11 @@ final class OfferPolicy extends Policy
         return $actor->hasPermission(Permission::PanelRms);
     }
 
+    public function viewHistory(User $actor, Offer $offer): bool
+    {
+        return $actor->hasPermission(Permission::PanelRms);
+    }
+
     public function create(User $actor): bool
     {
         return $actor->hasPermission(Permission::OffersManage);

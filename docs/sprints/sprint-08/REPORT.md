@@ -874,3 +874,122 @@ git clone https://github.com/anakata-project/anakata-engine.git /tmp/anakata-fre
 # panel / engine: pnpm build
 ```
 
+## Task 07 · Panel Offers, charter enquiries, guest link
+
+Staff-facing Sprint 8 UI in **anakata-panel**, plus the offer history route Task 01 never exposed. Types from anakata-ui `v0.9.0`. The panel renders API-derived columns only — no `offerIssues()`, no FIN-005 math, no local benefit / scope / window / placement / status.
+
+### Offers page and drawer
+`/rms/booking-engine/offers` replaces the sprint placeholder. List matches `#v-offers`: prototype notice, `DateRangeFilter` (`from`/`to` on the API offer span), **New offer** when `offers.manage`. Columns: code + name, `benefit_label`, `scope_label`, window labels, engine placement (+ `live_departures_count` on LIVE), status chip. `PENDING` displays as **PENDING DIRECTOR**. Empty: `No offers in this date range.`
+
+`OfferDrawer` is a `USlideover` (ItineraryEditor pattern). Fields: code (uppercase, max 20), name, type, value or `value_text`, channel + partner, Suite/Owner, itineraries from `GET /api/rms/itineraries` (festive rows disabled + `(festive — never)`), windows, combinable, promo-code checkbox (API field; not in the prototype), engine badge / card / row / price line / terms. Preview is form values only. Static notices only; 422s via `applyApiFormError`.
+
+| Action | Permission | Behaviour |
+|---|---|---|
+| Save / Submit for Director approval | `offers.manage` | POST/PATCH without `as_draft`. Price-affecting → `PENDING` + toast. VALUE → `LIVE`. |
+| Save as draft | `offers.manage` | `as_draft: true`. Hidden for LIVE / PAUSED (API refuses). |
+| Approve / Reject | `offers.approve` | `ReasonModal`, `hint="required"`. |
+| Pause / Resume | `offers.manage` | Pause toast: `removed from the booking engine in < 30 seconds`. |
+| Sales Exec | no `offers.manage` | fieldset disabled + `Sales Exec role: view only.` |
+
+Tabs: **Offer** \| **History**. History uses `HistoryTimeline` against the new route. No Delete.
+
+### Rates & Promotions
+`RatesPromotionsPanel` is the single reader of `GET /api/rms/offers` (Offers and Rates share it). Compact: code, benefit, scope, windows, status, Pause (`offers.manage` + LIVE) / Manage. Non-LIVE rows `.promo-off`. Footer: prototype guardrail note + `Manage in Offers →`.
+
+### Charter enquiries
+`CharterEnquiriesPanel` under the Booking Requests queue (Holds → waitlist tone; no prototype markup). `GET /api/rms/charter-enquiries`. Columns: received, contact, preferred dates or departure date, guests, message, status. Next-step only (`NEW → CONTACTED → CLOSED`) when `bookings.create`. Empty: `No charter enquiries.` After `reset.sh` the queue is empty until `POST /api/engine/charter-enquiries`.
+
+### Complete your reservation link
+On `BookingPaymentsTab`, outside `payments.record`: when `booking.can_act`, **Copy guest link** → `POST /api/rms/bookings/{id}/complete-link` → clipboard + toast. Note that payment-link and reminder emails already contain the URL. 422 (cancelled / released / deleted) surfaces as the server message.
+
+### New Reservation sends `main_channel`
+`quoteRequestPayload` adds `main_channel` when a channel is chosen (omitted while empty so the computed stays `null`). `quotePayload` already watches `mainChannel`, so a trade switch re-quotes. Unit tests cover the payload shape.
+
+### Offer history route (API)
+Task 01 wrote `offer.created|updated|submitted|approved|rejected|paused|resumed` and `Offer::history()`, but there was no list endpoint. Every other RMS subject has one.
+
+- `OfferPolicy::viewHistory` → `panel.rms`
+- `GET /api/rms/offers/{offer}/history` → paginated `ChangeHistoryResource`
+- Pest in `OfferEndpointsTest` (manager create + list; Sales Exec can read)
+
+Panel already has `ChangeHistoryEntry`; no anakata-ui regen. `describeHistory` covers the seven `offer.*` events.
+
+### Helpers
+`offerStatusPillClass` is presentation only (`OSTAT`). `offerFormToPayload` is shape only (uppercase code, blanks → `null`, `as_draft`). Status / type / channel **values** from the generated enums; labels in i18n.
+
+### Deviations
+- History route added in this task (planned). Task 01 never exposed it.
+- Promo-code checkbox is on the form (API field, not in `editOffer`).
+- Save as draft is hidden once LIVE / PAUSED.
+
+### Open questions
+None.
+
+### Notes for later
+- Task 08–10: engine UI. Pause / approve freshness is already the Task 03 bump.
+- Task 11: `OFF-01`…`OFF-04` browser scenarios.
+
+### Quality
+- anakata-api (history only): `OfferEndpointsTest` 5/5; Pint + Larastan on the four touched files.
+- anakata-panel: `pnpm lint`, `typecheck`, `test` (227), `build` — pass against the sibling layer (`v0.9.0`).
+- Fresh-clone typecheck/build against a clean `v0.9.0` checkout was not re-run here (no ui change this task). Repeat after the panel push if you want the overlay-free check.
+
+### Browser
+After `reset.sh`, both themes: Offers notice + filter + New offer; festive itineraries disabled; Carolina PCT `PANEL10` → PENDING DIRECTOR with Approve / Reject / History; Rates Promotions compact list + Manage in Offers; Payments tab guest-link block when `can_act`; Charter empty then one row from `POST /api/engine/charter-enquiries`, **Mark contacted** → CONTACTED.
+
+Not fully clicked in this pass: Sales Exec role switch (copy + disabled fieldset are in the drawer), Director approve → LIVE / pause toast, clipboard of the guest URL, trade-channel New Reservation total vs stored booking (payload + unit tests are in). Those are the Task 11 `OFF-*` paths.
+
+### Git commands for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`).
+
+```bash
+# 1. anakata-api — history route
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Http/Controllers/Rms/OfferController.php
+git add app/Policies/OfferPolicy.php
+git add routes/api/rms.php
+git add tests/Feature/Offers/OfferEndpointsTest.php
+git add docs/sprints/sprint-08/REPORT.md
+git commit -m "$(cat <<'EOF'
+Expose offer history and record sprint 8 task 07.
+
+The Offers drawer History tab needs the same paginated change-history
+route every other RMS subject already has.
+EOF
+)"
+git push origin HEAD
+```
+
+```bash
+# 2. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/assets/css/inventory.css
+git add app/components/bookings/NewReservationModal.vue
+git add app/components/bookings/newReservationHelpers.ts
+git add app/components/history/describe.ts
+git add app/components/offers/OfferDrawer.vue
+git add app/components/offers/RatesPromotionsPanel.vue
+git add app/components/offers/offerHelpers.ts
+git add app/components/payments/BookingPaymentsTab.vue
+git add app/components/requests/CharterEnquiriesPanel.vue
+git add app/pages/rms/booking-engine/offers.vue
+git add app/pages/rms/commercial/rates.vue
+git add app/pages/rms/reservations/booking-requests.vue
+git add app/types/api.ts
+git add eslint.config.mjs
+git add i18n/locales/en.json
+git add tests/unit/describe.test.ts
+git add tests/unit/newReservationHelpers.test.ts
+git add tests/unit/offerHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add RMS Offers, charter enquiries and the guest complete link.
+
+Staff manage offers from one API list (also Rates & Promotions),
+advance charter enquiries, copy the complete-reservation URL, and
+send main_channel on every New Reservation quote.
+EOF
+)"
+git push origin HEAD
+```
+

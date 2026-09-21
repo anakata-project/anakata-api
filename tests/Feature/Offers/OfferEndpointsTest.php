@@ -112,3 +112,19 @@ test('derived labels match the prototype wording', function (): void {
         ->assertJsonPath('scope_label', 'All channels · Suites + Owner\'s · All non-festive itineraries')
         ->assertJsonPath('booking_window_label', '1 Jan 2027 → 31 Mar 2027');
 });
+
+test('offer history is listed', function (): void {
+    $created = $this->actingAs(managerUser())
+        ->postJson('/api/rms/offers', OfferFixtures::payload(['as_draft' => true]))
+        ->assertCreated()
+        ->json();
+
+    $this->actingAs(managerUser())
+        ->getJson('/api/rms/offers/'.$created['id'].'/history')
+        ->assertOk()
+        ->assertJsonPath('data.0.event', 'offer.created');
+
+    $this->actingAs(salesExecUser())
+        ->getJson('/api/rms/offers/'.$created['id'].'/history')
+        ->assertOk();
+});

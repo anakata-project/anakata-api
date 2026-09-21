@@ -168,6 +168,7 @@ Route::post('offers/{offer}/approve', [OfferController::class, 'approve'])->wher
 Route::post('offers/{offer}/reject', [OfferController::class, 'reject'])->whereNumber('offer');
 Route::post('offers/{offer}/pause', [OfferController::class, 'pause'])->whereNumber('offer');
 Route::post('offers/{offer}/resume', [OfferController::class, 'resume'])->whereNumber('offer');
+Route::get('offers/{offer}/history', [OfferController::class, 'history'])->whereNumber('offer');
 
 Route::get('agencies', [AgencyController::class, 'index']);
 Route::post('agencies', [AgencyController::class, 'store']);

@@ -17,6 +17,7 @@ use App\Http\Requests\Rms\IndexOffersRequest;
 use App\Http\Requests\Rms\RejectOfferRequest;
 use App\Http\Requests\Rms\StoreOfferRequest;
 use App\Http\Requests\Rms\UpdateOfferRequest;
+use App\Http\Resources\Rms\ChangeHistoryResource;
 use App\Http\Resources\Rms\OfferResource;
 use App\Models\Offer;
 use App\Models\User;
@@ -149,6 +150,19 @@ final class OfferController extends Controller
         }
 
         return new OfferResource($action->handle($offer, $actor));
+    }
+
+    public function history(Offer $offer): AnonymousResourceCollection
+    {
+        $this->authorize('viewHistory', $offer);
+
+        $entries = $offer->history()
+            ->with('actor')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(25);
+
+        return ChangeHistoryResource::collection($entries);
     }
 
     private static function dateQuery(mixed $value): ?string
