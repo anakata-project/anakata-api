@@ -49,6 +49,7 @@ enum SystemRole: string
                 Permission::ConsentsRecord,
                 Permission::CampaignsManage,
                 Permission::GuestsViewSensitive,
+                Permission::GuestExperienceManage,
             ]),
             self::SalesExec => collect([
                 Permission::PanelRms,

@@ -16,7 +16,7 @@ final class Recipients
 
         $cc = [];
 
-        if ($kind === DeliveryKind::Summary || $kind === DeliveryKind::DataChaser) {
+        if ($kind === DeliveryKind::Summary || $kind === DeliveryKind::DataChaser || $kind === DeliveryKind::Questionnaire) {
             $to = $this->usable($this->leadGuestEmail($booking));
             $role = 'lead guest';
 
@@ -42,6 +42,11 @@ final class Recipients
         }
 
         return new RecipientSet([$to], $cc, null);
+    }
+
+    public function usableAddress(?string $email): ?string
+    {
+        return $this->usable($email);
     }
 
     private function clientOfRecord(Booking $booking): ?string

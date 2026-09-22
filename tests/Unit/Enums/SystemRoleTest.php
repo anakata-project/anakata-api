@@ -27,6 +27,7 @@ test('manager default permissions match the sprint list', function (): void {
         Permission::ConsentsRecord->value,
         Permission::CampaignsManage->value,
         Permission::GuestsViewSensitive->value,
+        Permission::GuestExperienceManage->value,
     ]);
 });
 

@@ -18,8 +18,10 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $booking_id
+ * @property int|null $guest_id
  * @property string $token_hash
  * @property BookingAccessTokenPurpose $purpose
+ * @property list<int>|null $covered_guest_ids
  * @property Carbon $expires_at
  * @property Carbon|null $revoked_at
  * @property string $page_url
@@ -28,11 +30,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Booking $booking
+ * @property-read Guest|null $guest
  */
 #[Fillable([
     'booking_id',
+    'guest_id',
     'token_hash',
     'purpose',
+    'covered_guest_ids',
     'expires_at',
     'revoked_at',
     'page_url',
@@ -49,6 +54,7 @@ class BookingAccessToken extends Model
     {
         return [
             'purpose' => BookingAccessTokenPurpose::class,
+            'covered_guest_ids' => 'array',
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
         ];
@@ -60,6 +66,14 @@ class BookingAccessToken extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * @return BelongsTo<Guest, $this>
+     */
+    public function guest(): BelongsTo
+    {
+        return $this->belongsTo(Guest::class);
     }
 
     /**

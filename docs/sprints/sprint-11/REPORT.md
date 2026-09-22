@@ -310,3 +310,120 @@ The daily job stops at the departure date, and captain files are purged on the m
 EOF
 )"
 ```
+
+## Task 04 · Guest preferences and the hotel-manager brief
+
+The pre-trip questionnaire is versioned guest answers. Restricted answers are encrypted. The documents job sends the link. Guests and staff can save a new version. The hotel-manager brief is rendered on request. The captain's manifest reads the current answers, and retention clears every version on the medical date.
+
+### Questions
+`PreferenceQuestions` is the prototype `PREF_Q` list, in that order: `diet`, `breakfast`, `pillow`, `temp`, `bev`, `intensity`, `time`, `interests`, `celebr`, `access`, `emerg`, `first`, `req`. Wording is PENDING the guest-experience team (N6), noted in the class and here. None are required. Dietary is free text. Kosher is not an option. `access` and `emerg` are the only restricted keys. Unknown keys, non-strings, text over 500 characters, and choice values off the list are 422. Empty is allowed.
+
+`GET /api/rms/guest-experience/questions` (`panel.rms`) serves the same list the engine payload embeds.
+
+### Schema
+New table `guest_preferences`. `answers` holds the non-restricted keys only. `accessibility` and `emergency_contact` use `SensitiveEncrypted` and are in `SensitiveFields`, so the CRM guard strips them and history redacts them if a value is ever stored under those names. Preference history itself does not store answer text.
+
+A save locks the guest and inserts the next version. It does not update a previous row. Current answers are the latest row with `purged_at` null. A `BEFORE UPDATE` trigger allows only the retention purge (set `purged_at`, clear `answers` and both encrypted columns). There is no delete trigger, so deleting a guest can cascade. `source` is `GUEST_LINK` or `STAFF`.
+
+`booking_access_tokens` gains nullable `guest_id` and `covered_guest_ids`, snapshotted at issue. Purpose `QUESTIONNAIRE`. A complete-page token does not open the questionnaire, and a questionnaire token does not open the complete page. Both mismatches are 404 with `Not found.` Tokens expire at the end of the return date (`BusinessTime::dayEndUtc`), not the departure date.
+
+### Sending
+`anakata:documents-due` uses the pre-trip date gate (`documents.pretrip_days_before`, catch-up, confirmed or later). A booking that already has its pre-trip still gets the questionnaire once. `DeliveryKind::Questionnaire` attaches no PDF. Keys are `questionnaire:{booking}:{guestId}` and `questionnaire:{booking}:lead`.
+
+A guest with a usable email gets their own mail and a token whose snapshot is that guest. Guests without a usable email share one mail to the lead guest, else the group coordinator, else billing, else the contact. That token's snapshot is those guests. If nobody can receive it, one blocked delivery is recorded. `--dry-run` lists and writes nothing. The link is `{engine_url}/questionnaire/{token}`.
+
+The document-plan row is no longer the Sprint 11 placeholder. Trigger is `T−{pretrip_days_before}`. Status follows the same schedule and delivery facts as the pre-trip row, aggregated across that booking's questionnaire deliveries (failed, then blocked, then queued or due, then sent). No Preview, Issue, or Resend. DOC-01 E7 for ANK-2026-0003 stays `23 Sep 2027`, status `BLOCKED` or `SCHEDULED`.
+
+### Guest link
+Same middleware as the complete page (`throttle:engine-complete`, `noindex`).
+
+`GET /api/engine/questionnaire/{token}` returns the booking reference, departure date, itinerary name, the questions, and only the snapshotted guests (first name and cabin). Current non-restricted answers are returned. `access` and `emerg` are the string `provided` or empty.
+
+`PUT .../guests/{guest}` inserts one version, source `GUEST_LINK`, `recorded_by` null, actor label `Guest (self-service)`. 404 when the guest is outside the snapshot, or the token is expired, revoked, or the wrong purpose.
+
+An omitted or empty `access` / `emerg` copies the previous encrypted value onto the new version. A non-empty value replaces it. The guest link cannot clear a restricted answer. Non-restricted keys save what was sent, including empty.
+
+### Staff
+Writes need `guest_experience.manage` (`Permission::GuestExperienceManage`, label Record guest preferences, group guests). Manager receives it in `SystemRole` and in a grant migration (`Sprint 11: Manager may record guest preferences`). Admin already has every permission. Sales Exec does not. The own-records rule is not applied.
+
+Reading or writing `access` / `emerg` also needs `guests.view_sensitive`. A staff save without that permission that includes those keys is 403. Omitting them copies the previous values forward. Staff who have the permission clear a restricted answer by sending it empty. That is the only clear path.
+
+`GET /api/rms/departures/{departure}/guest-experience` uses `ManifestRoster` (sold bookings). KPIs: guests on board, booking count, answered/total, send date from `pretrip_days_before` (sent versus scheduled from the date versus today), celebrations, and accessibility-or-medical (preference `access` or guest `medical_note`; the count is visible to everyone). Per guest: name, booking reference, email or `no email — sent to lead guest`, cabin, status `ANSWERED` / `SENT_NO_REPLY` / `SCHEDULED`, dietary, celebration, activity (`intensity` · `time`). Restricted fields are values with `guests.view_sensitive`, otherwise booleans.
+
+`GET` and `PUT /api/rms/guests/{guest}/preferences` return the current answers and the version history. PUT is source `STAFF`, `recorded_by` the actor.
+
+`GET /api/rms/departures/{departure}/hotel-manager-brief` is `text/html`, rendered on request, not stored, not emailed. Sections: dietary, celebrations, accessibility only with `guests.view_sensitive`, special requests, room-and-rhythm counts (pillow, temp, breakfast, intensity, time, first), and how many have not answered. Emergency contact is not on the brief. `?format=pdf` streams that same HTML through `PdfRenderer`. The PDF starts with `%PDF` and is not written to the manifests disk. Fonts are embedded with `DocumentFonts`, extracted from the manifest paper layout. Each successful GET writes one `brief.printed` history row on the departure (actor, format) with no answer text.
+
+Both save paths write `guest.preferences_recorded` on the guest only when a key changed: the changed keys, the version, and the source. No answer text. A no-op still inserts the version and writes no history entry.
+
+### Captain's manifest and retention
+`CaptainParticulars` reads the current preference beside the guest notes. Emergency is `emergency_contact`, else `—`. Dietary is preference `diet` and `dietary_note`. Medical is `medical_note`, `accessibility_note`, and preference `accessibility`. `ManifestRoster` eager-loads that row. The next `IssueManifest::request()` sees a different captain hash and writes `PASSENGER_CHANGE`. `first()` does not regenerate. A preference-only change does not change the DPNG hash. Saving an answer does not reissue a manifest.
+
+`anakata:retention` purges every version's `answers`, `accessibility`, and `emergency_contact` on `retention.medical_days_after_cruise` and sets `purged_at`. Rows stay. Guests with unpurged preferences are candidates even when the medical notes are already empty. The count is `preferences_purged` on the existing `retention.applied` entry. Dry run counts only. After the purge, those answer strings are not in `guest_preferences` or `change_history`.
+
+### Separation
+No CRM route. `App\Actions\GuestExperience` and `App\Support\GuestExperience` are on the CRM denylist next to manifests.
+
+`composer check` inside Docker: 1170 tests passed, Pint passed, Larastan passed.
+
+### Deviations
+The update trigger allows the retention purge and refuses every other update. A delete trigger was not added, because a guest delete must be able to cascade.
+
+`DocumentFonts` was pulled out of `ManifestFiles` so the brief can embed the same faces without writing the manifests disk.
+
+`ResolveCompleteAccessToken` now requires purpose `COMPLETE`, and the complete-page URL lookup ignores questionnaire tokens.
+
+### Open questions
+Question wording is still PENDING the guest-experience team (N6). Doc 03's OPS-006 row was not changed; that row is the sales-open date.
+
+### Notes for later
+The engine questionnaire page is task 08. The panel Guest Experience screen is task 10. NPS is task 05. GX e2e scenarios are task 12. This task does not reissue a captain's manifest when an answer is saved.
+
+`SendDeliveryJob` records `payment_request.sent` for every non-document delivery, which now includes the questionnaire. That is the same path as the data chaser and was left as it is.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Complete/ResolveCompleteAccessToken.php \
+  app/Actions/Crm/RetryFailedDelivery.php app/Actions/GuestExperience \
+  app/Console/Commands/DocumentsDueCommand.php app/Console/Commands/RetentionCommand.php \
+  app/Enums/BookingAccessTokenPurpose.php app/Enums/DeliveryKind.php \
+  app/Enums/DocumentPlanKind.php app/Enums/Permission.php \
+  app/Enums/PreferenceQuestionType.php app/Enums/PreferenceSource.php \
+  app/Enums/PreferenceStatus.php app/Enums/SystemRole.php \
+  app/Http/Controllers/Engine/QuestionnaireController.php \
+  app/Http/Controllers/Rms/GuestExperienceController.php \
+  app/Http/Requests/Engine/UpdateQuestionnaireRequest.php \
+  app/Http/Requests/Rms/UpdateGuestPreferencesRequest.php \
+  app/Http/Resources/Engine/QuestionnaireResource.php \
+  app/Http/Resources/Rms/PreferenceQuestionResource.php \
+  app/Mail/Documents/DeliveryMailFactory.php app/Mail/Documents/DocumentMail.php \
+  app/Mail/Documents/QuestionnaireMail.php \
+  app/Models/BookingAccessToken.php app/Models/Guest.php app/Models/GuestPreference.php \
+  app/Policies/GuestPreferencePolicy.php app/Services/Documents/DocumentFonts.php \
+  app/Support/Documents/DeliverySubject.php app/Support/Documents/DocumentPlan.php \
+  app/Support/Documents/Recipients.php app/Support/GuestExperience \
+  app/Support/Manifests/CaptainParticulars.php app/Support/Manifests/ManifestFiles.php \
+  app/Support/Manifests/ManifestRoster.php app/Support/Roles/GrantGuestExperienceManage.php \
+  app/Support/SensitiveFields.php \
+  database/factories/GuestPreferenceFactory.php \
+  database/migrations/2026_09_22_230001_create_guest_preferences_table.php \
+  database/migrations/2026_09_22_230002_add_questionnaire_scope_to_booking_access_tokens.php \
+  database/migrations/2026_09_22_230003_grant_guest_experience_manage_to_manager.php \
+  resources/views/guest-experience resources/views/mail/documents/questionnaire.blade.php \
+  routes/api/engine.php routes/api/rms.php \
+  tests/Arch/ArchTest.php tests/Feature/Documents/DocumentPlanTest.php \
+  tests/Feature/GuestExperience tests/Feature/Retention/RetentionCommandTest.php \
+  tests/Unit/Enums/SystemRoleTest.php tests/Unit/GuestExperience \
+  tests/Unit/Support/SensitiveFieldsTest.php \
+  tests/e2e/scenarios/documents/DOC-01-confirmed-documents-tab.md \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record versioned guest preferences and print the hotel-manager brief.
+
+The questionnaire goes out with the pre-trip itinerary, restricted answers stay encrypted, and retention clears them with the medical notes.
+EOF
+)"
+```

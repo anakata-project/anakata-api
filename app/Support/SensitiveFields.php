@@ -14,6 +14,8 @@ final class SensitiveFields
         'accessibility_note',
         'dob',
         'nationality',
+        'accessibility',
+        'emergency_contact',
     ];
 
     /**

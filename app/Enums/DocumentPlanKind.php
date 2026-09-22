@@ -49,7 +49,7 @@ enum DocumentPlanKind: string
     {
         return match ($this) {
             self::Reminder => DeliveryKind::Reminder,
-            self::Questionnaire => null,
+            self::Questionnaire => DeliveryKind::Questionnaire,
             default => $this->documentKind() !== null
                 ? DeliveryKind::fromDocument($this->documentKind())
                 : null,

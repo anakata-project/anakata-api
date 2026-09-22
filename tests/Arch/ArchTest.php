@@ -35,6 +35,8 @@ arch('crm controllers do not use money or booking write paths')
         'App\Actions\Offers',
         'App\Actions\Manifests',
         'App\Support\Manifests',
+        'App\Actions\GuestExperience',
+        'App\Support\GuestExperience',
     ]);
 
 arch('privacy controllers are not used by the crm')

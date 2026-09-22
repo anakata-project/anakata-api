@@ -43,6 +43,7 @@ enum Permission: string
     case AgenciesManage = 'agencies.manage';
 
     case GuestsViewSensitive = 'guests.view_sensitive';
+    case GuestExperienceManage = 'guest_experience.manage';
 
     case PipelineMoveStage = 'pipeline.move_stage';
     case ContactsManage = 'contacts.manage';
@@ -89,6 +90,7 @@ enum Permission: string
             self::ExtrasManage => 'Manage extras catalog',
             self::AgenciesManage => 'Manage agencies',
             self::GuestsViewSensitive => 'View sensitive guest data',
+            self::GuestExperienceManage => 'Record guest preferences',
             self::PipelineMoveStage => 'Move lead stage',
             self::ContactsManage => 'Manage contacts',
             self::ContactsMerge => 'Merge contacts',
@@ -132,7 +134,8 @@ enum Permission: string
             self::OffersApprove,
             self::ExtrasManage,
             self::AgenciesManage => 'commercial',
-            self::GuestsViewSensitive => 'guests',
+            self::GuestsViewSensitive,
+            self::GuestExperienceManage => 'guests',
             self::PipelineMoveStage,
             self::ContactsManage,
             self::ContactsMerge,

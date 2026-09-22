@@ -8,7 +8,8 @@ use App\Models\Guest;
 
 /**
  * Dietary, emergency and medical lines on the captain's manifest.
- * Task 04 wires preferences into this method; until then, guest notes only.
+ * Preferences sit beside the guest notes. A change is a passenger change
+ * because these cells are part of the captain snapshot hash.
  */
 final class CaptainParticulars
 {
@@ -17,10 +18,15 @@ final class CaptainParticulars
      */
     public static function for(Guest $guest): array
     {
+        $preference = $guest->currentPreference;
+
         return [
-            'emergency' => '—',
-            'dietary' => self::text($guest->dietary_note),
-            'medical' => self::text(self::join($guest->medical_note, $guest->accessibility_note)),
+            'emergency' => self::text($preference?->emergency_contact),
+            'dietary' => self::text(self::join($preference?->answer('diet'), $guest->dietary_note)),
+            'medical' => self::text(self::join(
+                self::join($guest->medical_note, $guest->accessibility_note),
+                $preference?->accessibility,
+            )),
         ];
     }
 

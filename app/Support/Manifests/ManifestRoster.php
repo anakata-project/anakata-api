@@ -45,7 +45,7 @@ final class ManifestRoster
             ->orderBy('cabins.sort')
             ->orderBy('guests.position')
             ->orderBy('guests.id')
-            ->with(['booking.cabin'])
+            ->with(['booking.cabin', 'currentPreference'])
             ->get();
 
         return $guests->values()->map(

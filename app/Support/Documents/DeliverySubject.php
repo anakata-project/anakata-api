@@ -25,6 +25,7 @@ final class DeliverySubject
             DeliveryKind::WireInstructions => 'Wire transfer instructions — '.$ref,
             DeliveryKind::Reminder, DeliveryKind::PaymentLink => $kind->label().' — '.$ref,
             DeliveryKind::DataChaser => 'Passenger details needed — '.$ref,
+            DeliveryKind::Questionnaire => 'Your preferences questionnaire — '.$ref,
         };
     }
 

@@ -10,6 +10,7 @@ use App\Http\Controllers\Engine\DepartureCabinController;
 use App\Http\Controllers\Engine\EngineEventsController;
 use App\Http\Controllers\Engine\FeedController;
 use App\Http\Controllers\Engine\PromoCheckController;
+use App\Http\Controllers\Engine\QuestionnaireController;
 use App\Http\Controllers\Engine\QuoteController;
 use App\Http\Controllers\Engine\WaitlistController;
 use Illuminate\Support\Facades\Route;
@@ -36,4 +37,6 @@ Route::middleware(['throttle:engine-complete', 'noindex'])->group(function (): v
     Route::put('complete/{token}/billing', [CompleteReservationController::class, 'updateBilling']);
     Route::put('complete/{token}/guests/{guest}', [CompleteReservationController::class, 'updateGuest'])->whereNumber('guest');
     Route::post('complete/{token}/declarations', [CompleteReservationController::class, 'recordDeclarations']);
+    Route::get('questionnaire/{token}', [QuestionnaireController::class, 'show']);
+    Route::put('questionnaire/{token}/guests/{guest}', [QuestionnaireController::class, 'update'])->whereNumber('guest');
 });

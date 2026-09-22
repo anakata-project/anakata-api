@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Actions\GuestExperience\RecordGuestPreferences;
 use App\Enums\BookingStatus;
+use App\Enums\PreferenceSource;
 use App\Models\Booking;
 use App\Models\ChangeHistory;
 use App\Models\Guest;
+use App\Models\GuestPreference;
 use App\Support\BusinessTime;
 use App\Support\Retention\RetentionWindow;
 use Carbon\CarbonImmutable;
@@ -14,6 +17,7 @@ use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\Bookings\ReservationFixtures;
 
 beforeEach(function (): void {
@@ -164,6 +168,66 @@ test('a soft-deleted booking is still purged', function (): void {
     $guest->refresh();
     expect($guest->passport_no)->toBeNull();
     expect(ChangeHistory::query()->where('event', 'retention.applied')->where('subject_id', $booking->id)->exists())->toBeTrue();
+});
+
+test('preferences are purged on the medical date and leave no answer text', function (): void {
+    $booking = retentionCabin('2028-02-22');
+    $guest = retentionGuest($booking, [
+        'passport_no' => null,
+        'passport_expiry' => null,
+        'medical_note' => null,
+        'dietary_note' => null,
+        'accessibility_note' => null,
+    ]);
+
+    $diet = 'QX-DIET-KELP-91';
+    $access = 'QX-ACCESS-RAMP-91';
+
+    app(RecordGuestPreferences::class)->handle(
+        $guest,
+        ['diet' => $diet, 'access' => $access],
+        PreferenceSource::GuestLink,
+        true,
+        actorLabel: 'Guest (self-service)',
+    );
+
+    $this->travelTo(CarbonImmutable::parse('2028-05-29 12:00:00', BusinessTime::zone()));
+    Artisan::call('anakata:retention');
+
+    $row = GuestPreference::query()->where('guest_id', $guest->id)->first();
+    expect($row)->not->toBeNull();
+    expect($row?->answers['diet'] ?? null)->toBe($diet);
+    expect($row?->accessibility)->toBe($access);
+    expect($row?->purged_at)->toBeNull();
+
+    $this->travelTo(CarbonImmutable::parse('2028-05-30 12:00:00', BusinessTime::zone()));
+    $this->artisan('anakata:retention', ['--dry-run' => true])->assertSuccessful();
+
+    $row = GuestPreference::query()->where('guest_id', $guest->id)->first();
+    expect($row?->answers['diet'] ?? null)->toBe($diet);
+    expect($row?->purged_at)->toBeNull();
+
+    Artisan::call('anakata:retention');
+
+    $row = GuestPreference::query()->where('guest_id', $guest->id)->first();
+    expect($row)->not->toBeNull();
+    expect($row?->answers)->toBe([]);
+    expect($row?->accessibility)->toBeNull();
+    expect($row?->emergency_contact)->toBeNull();
+    expect($row?->purged_at)->not->toBeNull();
+
+    $stored = DB::table('guest_preferences')->where('guest_id', $guest->id)->get();
+    $history = DB::table('change_history')->get();
+    $blob = json_encode([$stored, $history]);
+
+    expect($blob)->not->toContain($diet);
+    expect($blob)->not->toContain($access);
+
+    $entry = ChangeHistory::query()->where('event', 'retention.applied')->where('subject_id', $booking->id)->first();
+    expect($entry?->after['preferences_purged'] ?? null)->toBe(1);
+    expect($entry?->context['what'] ?? null)->toBe(
+        'Retention — guest preferences purged for 1 rows (90 days after the cruise, B4)',
+    );
 });
 
 test('the retention command is scheduled daily in Galapagos time', function (): void {

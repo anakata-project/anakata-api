@@ -15,6 +15,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\Delivery;
 use App\Models\Document;
+use App\Models\Guest;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
@@ -130,22 +131,7 @@ final class DocumentPlan
             DeliveryKind::Pretrip,
         );
 
-        $rows[] = $this->row(
-            $booking,
-            DocumentPlanKind::Questionnaire,
-            DocumentPlanKind::Questionnaire->label(),
-            'Each passenger with email',
-            'T−45 · Arrives in Sprint 11',
-            $pretripDate,
-            DocumentPlanStatus::Waiting,
-            null,
-            null,
-            null,
-            null,
-            false,
-            false,
-            false,
-        );
+        $rows[] = $this->questionnaireRow($booking, $pretripDays, $pretripDate, $today, $confirmed);
 
         $hasVoucher = DocumentFacts::bookingHasTransferVoucher($booking);
         $voucherDate = BusinessTime::calendarDay($departure)->subDays($voucherDays)->toDateString();
@@ -186,6 +172,91 @@ final class DocumentPlan
         }
 
         return $rows;
+    }
+
+    private function questionnaireRow(
+        Booking $booking,
+        int $pretripDays,
+        string $pretripDate,
+        string $today,
+        bool $confirmed,
+    ): DocumentPlanRow {
+        $deliveries = $booking->deliveries
+            ->where('kind', DeliveryKind::Questionnaire)
+            ->sortByDesc('id')
+            ->values();
+        $fallback = $this->scheduleStatus($confirmed, $pretripDate, $today);
+        $latest = $deliveries->first();
+
+        return $this->row(
+            $booking,
+            DocumentPlanKind::Questionnaire,
+            DocumentPlanKind::Questionnaire->label(),
+            'Each passenger with email',
+            'T−'.$pretripDays,
+            $pretripDate,
+            $this->questionnaireStatus($booking, $deliveries, $fallback),
+            null,
+            null,
+            $latest?->id,
+            $this->deliveryError($latest),
+            false,
+            false,
+            false,
+        );
+    }
+
+    /**
+     * @param  Collection<int, Delivery>  $deliveries
+     */
+    private function questionnaireStatus(
+        Booking $booking,
+        Collection $deliveries,
+        DocumentPlanStatus $fallback,
+    ): DocumentPlanStatus {
+        if ($deliveries->isEmpty()) {
+            if ($fallback !== DocumentPlanStatus::Waiting && ! $this->questionnaireCanSend($booking)) {
+                return DocumentPlanStatus::Blocked;
+            }
+
+            return $fallback;
+        }
+
+        if ($deliveries->contains(fn (Delivery $delivery): bool => $delivery->status === DeliveryStatus::Failed)) {
+            return DocumentPlanStatus::Failed;
+        }
+
+        if ($deliveries->contains(fn (Delivery $delivery): bool => $delivery->status === DeliveryStatus::Blocked)) {
+            return DocumentPlanStatus::Blocked;
+        }
+
+        if ($deliveries->contains(fn (Delivery $delivery): bool => $delivery->status === DeliveryStatus::Queued)) {
+            return DocumentPlanStatus::Due;
+        }
+
+        return DocumentPlanStatus::Sent;
+    }
+
+    private function questionnaireCanSend(Booking $booking): bool
+    {
+        $named = $booking->guests->contains(
+            fn (Guest $guest): bool => trim($guest->first_name.$guest->last_name) !== ''
+                || $this->recipients->usableAddress($guest->email) !== null,
+        );
+
+        if (! $named) {
+            return false;
+        }
+
+        $hasGuestEmail = $booking->guests->contains(
+            fn (Guest $guest): bool => $this->recipients->usableAddress($guest->email) !== null,
+        );
+
+        if ($hasGuestEmail) {
+            return true;
+        }
+
+        return $this->recipients->resolve($booking, DeliveryKind::Questionnaire)->usable();
     }
 
     private function documentRow(

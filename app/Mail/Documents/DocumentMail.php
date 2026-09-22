@@ -48,6 +48,7 @@ final class DocumentMail extends Mailable
             DeliveryKind::Pretrip => 'mail.documents.pretrip',
             DeliveryKind::WireInstructions => 'mail.documents.wire-instructions',
             DeliveryKind::DataChaser => throw new InvalidArgumentException('A data chaser is not a document.'),
+            DeliveryKind::Questionnaire => throw new InvalidArgumentException('A questionnaire is not a document.'),
             default => 'mail.documents.invoice',
         };
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Documents\SendPaymentRequest;
+use App\Actions\GuestExperience\SendQuestionnaires;
 use App\Enums\BookingStatus;
 use App\Enums\DeliveryKind;
 use App\Enums\DocumentKind;
@@ -15,18 +16,21 @@ use App\Support\BusinessTime;
 use App\Support\Documents\DeliveryKey;
 use App\Support\Documents\IssueOnce;
 use App\Support\Documents\Snapshots\DocumentFacts;
+use App\Support\GuestExperience\QuestionnairePlan;
 use Illuminate\Console\Command;
 
 final class DocumentsDueCommand extends Command
 {
     protected $signature = 'anakata:documents-due {--dry-run : List what would be sent and write nothing}';
 
-    protected $description = 'Send due balance reminders, pre-trip itineraries and transfer vouchers (J7)';
+    protected $description = 'Send due balance reminders, pre-trip itineraries, preference questionnaires and transfer vouchers (J7)';
 
     public function handle(
         CurrentConfig $config,
         SendPaymentRequest $reminders,
         IssueOnce $issueOnce,
+        QuestionnairePlan $questionnaires,
+        SendQuestionnaires $sendQuestionnaires,
     ): int {
         $today = BusinessTime::now()->toDateString();
         $dry = (bool) $this->option('dry-run');
@@ -54,6 +58,8 @@ final class DocumentsDueCommand extends Command
                 $voucherDays,
                 $reminders,
                 $issueOnce,
+                $questionnaires,
+                $sendQuestionnaires,
                 &$sent,
             ): void {
                 $sent += $this->reminders($booking, $today, $reminderDays, $dry, $reminders);
@@ -65,6 +71,7 @@ final class DocumentsDueCommand extends Command
                     $dry,
                     $issueOnce,
                 );
+                $sent += $this->questionnaires($booking, $today, $pretripDays, $dry, $questionnaires, $sendQuestionnaires);
                 $sent += $this->scheduledDocument(
                     $booking,
                     $today,
@@ -189,5 +196,49 @@ final class DocumentsDueCommand extends Command
         $issueOnce->handle($booking, $kind, $key);
 
         return 1;
+    }
+
+    private function questionnaires(
+        Booking $booking,
+        string $today,
+        int $daysBefore,
+        bool $dry,
+        QuestionnairePlan $plan,
+        SendQuestionnaires $send,
+    ): int {
+        if (! $booking->status->isConfirmedOrLater()) {
+            return 0;
+        }
+
+        $departure = $booking->departure->date->toDateString();
+        $sendDate = BusinessTime::calendarDay($departure)->subDays($daysBefore)->toDateString();
+
+        if ($sendDate > $today) {
+            return 0;
+        }
+
+        $pending = [];
+
+        foreach ($plan->dispatches($booking) as $dispatch) {
+            if (Delivery::query()->where('idempotency_key', $dispatch->key)->exists()) {
+                continue;
+            }
+
+            $pending[] = $dispatch;
+        }
+
+        if ($pending === []) {
+            return 0;
+        }
+
+        if ($dry) {
+            foreach ($pending as $dispatch) {
+                $this->line($dispatch->label);
+            }
+
+            return count($pending);
+        }
+
+        return $send->handle($booking);
     }
 }

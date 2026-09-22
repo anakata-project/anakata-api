@@ -6,6 +6,7 @@ namespace App\Support\Manifests;
 
 use App\Enums\ManifestKind;
 use App\Models\Departure;
+use App\Services\Documents\DocumentFonts;
 use App\Services\Documents\PdfRenderer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -36,7 +37,7 @@ final class ManifestFiles
         try {
             $html = $this->html($departure, $kind, $passengers, $due);
             $pdfPath = $stem.'.pdf';
-            $disk->put($pdfPath, $this->pdf->render($this->withFonts($html)));
+            $disk->put($pdfPath, $this->pdf->render(DocumentFonts::embed($html)));
             $written[] = $pdfPath;
 
             $csvPath = null;
@@ -141,31 +142,5 @@ final class ManifestFiles
         }
 
         return $bytes;
-    }
-
-    private function withFonts(string $html): string
-    {
-        return str_replace('/* DOCUMENT_FONTS */', $this->fontFaceCss(), $html);
-    }
-
-    private function fontFaceCss(): string
-    {
-        $faces = [];
-
-        foreach ([
-            'Oswald' => resource_path('fonts/documents/Oswald/Oswald-Regular.ttf'),
-            'Archivo' => resource_path('fonts/documents/Archivo/Archivo-Regular.ttf'),
-            'IBM Plex Mono' => resource_path('fonts/documents/IBMPlexMono/IBMPlexMono-Regular.ttf'),
-        ] as $family => $path) {
-            $bytes = file_get_contents($path);
-
-            if ($bytes === false) {
-                continue;
-            }
-
-            $faces[] = '@font-face { font-family: "'.$family.'"; src: url(data:font/ttf;base64,'.base64_encode($bytes).") format('truetype'); font-weight: normal; font-style: normal; }";
-        }
-
-        return implode("\n", $faces);
     }
 }

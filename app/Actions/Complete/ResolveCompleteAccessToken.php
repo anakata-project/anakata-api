@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Complete;
 
+use App\Enums\BookingAccessTokenPurpose;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Models\BookingAccessToken;
@@ -15,7 +16,10 @@ final class ResolveCompleteAccessToken
     {
         $row = BookingAccessToken::findByToken($token);
 
-        if (! $row instanceof BookingAccessToken || ! $row->isActive()) {
+        if (! $row instanceof BookingAccessToken
+            || ! $row->isActive()
+            || $row->purpose !== BookingAccessTokenPurpose::Complete
+        ) {
             CompleteAccess::abortNotFound();
         }
 

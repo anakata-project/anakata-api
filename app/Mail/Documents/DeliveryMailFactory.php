@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail\Documents;
 
+use App\Enums\BookingAccessTokenPurpose;
 use App\Enums\DeliveryKind;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
@@ -40,6 +41,11 @@ final class DeliveryMailFactory
                 $delivery->booking,
                 self::completePageUrl($delivery->booking),
             ),
+            DeliveryKind::Questionnaire => new QuestionnaireMail(
+                $delivery,
+                $delivery->booking,
+                self::questionnaireUrl($delivery),
+            ),
             default => self::documentMail($delivery, $pdfBytes),
         };
     }
@@ -73,7 +79,7 @@ final class DeliveryMailFactory
     private static function completePageUrl(Booking $booking): string
     {
         $url = $booking->accessTokens->first(
-            fn (BookingAccessToken $token): bool => $token->isActive(),
+            fn (BookingAccessToken $token): bool => $token->purpose === BookingAccessTokenPurpose::Complete && $token->isActive(),
         )?->page_url;
 
         if (! is_string($url) || $url === '') {
@@ -99,5 +105,31 @@ final class DeliveryMailFactory
         }
 
         return $link;
+    }
+
+    private static function questionnaireUrl(Delivery $delivery): string
+    {
+        $parts = explode(':', $delivery->idempotency_key);
+        $scope = $parts[0] === 'resend' ? ($parts[3] ?? '') : ($parts[2] ?? '');
+
+        $token = $delivery->booking->accessTokens->first(
+            function (BookingAccessToken $token) use ($scope): bool {
+                if ($token->purpose !== BookingAccessTokenPurpose::Questionnaire || ! $token->isActive()) {
+                    return false;
+                }
+
+                if ($scope === 'lead') {
+                    return $token->guest_id === null;
+                }
+
+                return (string) $token->guest_id === $scope;
+            },
+        );
+
+        if (! $token instanceof BookingAccessToken || $token->page_url === '') {
+            throw new InvalidArgumentException('A questionnaire link is missing for this delivery.');
+        }
+
+        return $token->page_url;
     }
 }

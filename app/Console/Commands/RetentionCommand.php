@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Enums\ManifestKind;
 use App\Models\Booking;
 use App\Models\Guest;
+use App\Models\GuestPreference;
 use App\Models\Manifest;
 use App\Models\SubjectRequest;
 use App\Services\Config\CurrentConfig;
@@ -34,6 +35,7 @@ final class RetentionCommand extends Command
 
         $passportGuests = 0;
         $noteGuests = 0;
+        $preferenceRows = 0;
         $changedBookings = 0;
 
         $this->candidates()->chunkById(100, function ($bookings) use (
@@ -43,6 +45,7 @@ final class RetentionCommand extends Command
             $dry,
             &$passportGuests,
             &$noteGuests,
+            &$preferenceRows,
             &$changedBookings,
         ): void {
             foreach ($bookings as $booking) {
@@ -63,6 +66,7 @@ final class RetentionCommand extends Command
 
                 $passports = 0;
                 $notes = 0;
+                $preferences = $purgeNotes ? $this->unpurgedPreferences($booking) : 0;
 
                 foreach ($booking->guests as $guest) {
                     if ($purgePassports && $this->hasPassportData($guest)) {
@@ -74,19 +78,20 @@ final class RetentionCommand extends Command
                     }
                 }
 
-                if ($passports === 0 && $notes === 0) {
+                if ($passports === 0 && $notes === 0 && $preferences === 0) {
                     continue;
                 }
 
                 $passportGuests += $passports;
                 $noteGuests += $notes;
+                $preferenceRows += $preferences;
                 $changedBookings++;
 
                 if ($dry) {
                     continue;
                 }
 
-                DB::transaction(function () use ($booking, $purgePassports, $purgeNotes, $passports, $notes, $months, $days): void {
+                DB::transaction(function () use ($booking, $purgePassports, $purgeNotes, $passports, $notes, $preferences, $months, $days): void {
                     foreach ($booking->guests as $guest) {
                         $dirty = false;
 
@@ -106,13 +111,18 @@ final class RetentionCommand extends Command
                         if ($dirty) {
                             $guest->save();
                         }
+
+                        if ($purgeNotes) {
+                            $this->purgePreferences($guest);
+                        }
                     }
 
                     History::record($booking, 'retention.applied', after: [
                         'passports_anonymised' => $passports,
                         'notes_purged' => $notes,
+                        'preferences_purged' => $preferences,
                     ], extraContext: [
-                        'what' => $this->historyWhat($passports, $notes, $months, $days),
+                        'what' => $this->historyWhat($passports, $notes, $preferences, $months, $days),
                     ], system: true);
                 });
             }
@@ -122,7 +132,7 @@ final class RetentionCommand extends Command
         $manifests = $this->purgeManifests($rules->passportMonthsAfterCruise, $rules->medicalDaysAfterCruise, $today, $dry);
 
         $verb = $dry ? 'Would change' : 'Changed';
-        $this->info($verb.' '.$changedBookings.' booking(s): '.$passportGuests.' passport(s), '.$noteGuests.' note set(s).');
+        $this->info($verb.' '.$changedBookings.' booking(s): '.$passportGuests.' passport(s), '.$noteGuests.' note set(s), '.$preferenceRows.' preference row(s).');
         $this->info(($dry ? 'Would delete ' : 'Deleted ').$exports.' access export(s).');
         $this->info(($dry ? 'Would purge ' : 'Purged ').$manifests['captain'].' CAPTAIN file(s) and '.$manifests['dpng'].' DPNG file(s).');
 
@@ -143,6 +153,8 @@ final class RetentionCommand extends Command
                         ->orWhereNotNull('medical_note')
                         ->orWhereNotNull('dietary_note')
                         ->orWhereNotNull('accessibility_note');
+                })->orWhereHas('preferences', function (Builder $preferences): void {
+                    $preferences->whereNull('purged_at');
                 });
             })
             ->orderBy('id');
@@ -160,7 +172,7 @@ final class RetentionCommand extends Command
             || $guest->accessibility_note !== null;
     }
 
-    private function historyWhat(int $passports, int $notes, int $months, int $days): string
+    private function historyWhat(int $passports, int $notes, int $preferences, int $months, int $days): string
     {
         $parts = [];
 
@@ -172,7 +184,34 @@ final class RetentionCommand extends Command
             $parts[] = 'medical notes purged for '.$notes.' guests ('.$days.' days after the cruise, B4)';
         }
 
+        if ($preferences > 0) {
+            $parts[] = 'guest preferences purged for '.$preferences.' rows ('.$days.' days after the cruise, B4)';
+        }
+
         return 'Retention — '.implode('; ', $parts);
+    }
+
+    private function unpurgedPreferences(Booking $booking): int
+    {
+        return GuestPreference::query()
+            ->whereIn('guest_id', $booking->guests->pluck('id'))
+            ->whereNull('purged_at')
+            ->count();
+    }
+
+    private function purgePreferences(Guest $guest): void
+    {
+        GuestPreference::query()
+            ->where('guest_id', $guest->id)
+            ->whereNull('purged_at')
+            ->orderBy('id')
+            ->each(function (GuestPreference $preference): void {
+                $preference->answers = [];
+                $preference->accessibility = null;
+                $preference->emergency_contact = null;
+                $preference->purged_at = now();
+                $preference->save();
+            });
     }
 
     private function expireExports(CurrentConfig $config, bool $dry): int

@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -106,6 +108,29 @@ class Guest extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * @return HasMany<GuestPreference, $this>
+     */
+    public function preferences(): HasMany
+    {
+        return $this->hasMany(GuestPreference::class);
+    }
+
+    /**
+     * Latest version that retention has not purged.
+     *
+     * @return HasOne<GuestPreference, $this>
+     */
+    public function currentPreference(): HasOne
+    {
+        return $this->hasOne(GuestPreference::class)->ofMany(
+            ['version' => 'max'],
+            function (Builder $query): void {
+                $query->whereNull('purged_at');
+            },
+        );
     }
 
     /**

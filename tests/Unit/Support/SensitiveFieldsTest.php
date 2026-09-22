@@ -12,6 +12,8 @@ test('registry lists the initial sensitive field names', function (): void {
         'accessibility_note',
         'dob',
         'nationality',
+        'accessibility',
+        'emergency_contact',
     ]);
 });
 

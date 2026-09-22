@@ -51,7 +51,7 @@ function planCabin(array $overrides = []): Booking
     ]);
 }
 
-test('the plan lists waiting invoice rows and a questionnaire placeholder', function (): void {
+test('the plan lists waiting invoice rows and a scheduled questionnaire', function (): void {
     $booking = planCabin();
     $rows = app(DocumentPlan::class)->for($booking, adminUser());
     $byKind = collect($rows)->keyBy(fn ($row) => $row->kind->value);
@@ -59,7 +59,7 @@ test('the plan lists waiting invoice rows and a questionnaire placeholder', func
     expect($byKind[DocumentPlanKind::Invoice->value]->status)->toBe(DocumentPlanStatus::Waiting);
     expect($byKind[DocumentPlanKind::Summary->value]->status)->toBe(DocumentPlanStatus::Waiting);
     expect($byKind[DocumentPlanKind::Questionnaire->value]->status)->toBe(DocumentPlanStatus::Waiting);
-    expect($byKind[DocumentPlanKind::Questionnaire->value]->trigger)->toContain('Arrives in Sprint 11');
+    expect($byKind[DocumentPlanKind::Questionnaire->value]->trigger)->toBe('T−45');
     expect($byKind[DocumentPlanKind::Voucher->value]->status)->toBe(DocumentPlanStatus::NotContracted);
     expect($byKind[DocumentPlanKind::FinalInvoice->value]->status)->toBe(DocumentPlanStatus::Waiting);
     expect(collect($rows)->firstWhere('kind', DocumentPlanKind::WireInstructions))->toBeNull();

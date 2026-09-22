@@ -7,4 +7,5 @@ namespace App\Enums;
 enum BookingAccessTokenPurpose: string
 {
     case Complete = 'COMPLETE';
+    case Questionnaire = 'QUESTIONNAIRE';
 }

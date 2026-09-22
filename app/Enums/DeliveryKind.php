@@ -16,6 +16,7 @@ enum DeliveryKind: string
     case PaymentLink = 'PAYMENT_LINK';
     case WireInstructions = 'WIRE_INSTRUCTIONS';
     case DataChaser = 'DATA_CHASER';
+    case Questionnaire = 'QUESTIONNAIRE';
 
     public function label(): string
     {
@@ -30,12 +31,13 @@ enum DeliveryKind: string
             self::PaymentLink => 'Payment link',
             self::WireInstructions => 'Wire Instructions',
             self::DataChaser => 'Passenger details needed',
+            self::Questionnaire => 'Guest preferences questionnaire',
         };
     }
 
     public function attachesPdf(): bool
     {
-        return $this !== self::Reminder && $this !== self::PaymentLink && $this !== self::DataChaser;
+        return ! in_array($this, [self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire], true);
     }
 
     public function copiesAgency(): bool
@@ -58,7 +60,7 @@ enum DeliveryKind: string
             self::Voucher => DocumentKind::Voucher,
             self::Pretrip => DocumentKind::Pretrip,
             self::WireInstructions => DocumentKind::WireInstructions,
-            self::Reminder, self::PaymentLink, self::DataChaser => null,
+            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire => null,
         };
     }
 
