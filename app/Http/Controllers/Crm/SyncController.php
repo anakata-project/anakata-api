@@ -38,7 +38,7 @@ final class SyncController extends Controller
 
     #[DocumentedResponse(
         status: 200,
-        type: 'array{data: list<App\\Http\\Resources\\Crm\\ScheduledJobResource>, meta: array{kpis: array{jobs_failing: int, failures_open: int, merges_this_month: int}}}',
+        type: 'array{data: list<App\\Http\\Resources\\Crm\\ScheduledJobResource>, meta: array{kpis: array{jobs_failing: int, failures_open: int, merges_this_month: int}, catalogue: list<array{job: string, command: string, sentence: string}>}}',
     )]
     public function jobs(): JsonResource
     {
@@ -49,6 +49,7 @@ final class SyncController extends Controller
         return ScheduledJobResource::collection($page['jobs'])->additional([
             'meta' => [
                 'kpis' => $page['kpis'],
+                'catalogue' => $page['catalogue'],
             ],
         ]);
     }

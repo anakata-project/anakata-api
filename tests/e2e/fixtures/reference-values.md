@@ -404,6 +404,11 @@ Source: `routes/console.php` and `tests/Feature/Crm/SyncJobsTest.php`. On-screen
 | `anakata:retention` | daily | `Pacific/Galapagos` |
 | `anakata:events-retention` | daily | `Pacific/Galapagos` |
 | `anakata:documents-due` | daily | `Pacific/Galapagos` |
+| `anakata:voyage-status` | daily at 00:15 (`15 0 * * *`) | `Pacific/Galapagos` |
+| `anakata:ledger-check` | nightly 02:00 (`0 2 * * *`) | `Pacific/Galapagos` |
+| `anakata:commission-scan` | nightly 02:30 (`30 2 * * *`) | `Pacific/Galapagos` |
+| `anakata:occupancy-check` | daily at 07:00 (`0 7 * * *`) | `Pacific/Galapagos` |
+| `anakata:document-check` | hourly (`0 * * * *`) | `Pacific/Galapagos` |
 | `telescope:prune --hours=48` | daily | — (only when Telescope is installed) |
 
 Fresh seed: `last_outcome` is null so the Outcome / Last run cells are `—`; `next_run_at` is set. KPIs start at jobs failing **0**, failures open **0**, merges this month **0**. ⚠ UNVERIFIED

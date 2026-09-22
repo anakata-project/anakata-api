@@ -54,6 +54,15 @@ final class AlertSweep
             $this->resolveBase(AlertKeys::cap($booking->id), 'the booking left ON_HOLD_AGENCY');
         }
 
+        if (in_array($from, [BookingStatus::Confirmed, BookingStatus::OnHoldAgency], true)
+            && ! in_array($to, [BookingStatus::Confirmed, BookingStatus::OnHoldAgency], true)
+        ) {
+            $this->resolveBase(
+                AlertKeys::confirmedAtDeparture($booking->id),
+                'the booking left '.$from->value,
+            );
+        }
+
         $this->resolveOverdueIfLeftScope($booking->id);
     }
 
@@ -96,6 +105,7 @@ final class AlertSweep
     {
         $this->resolveOverdueLeftScope();
         $this->resolveOverdueDueDateChanged();
+        $this->resolveConfirmedAtDeparture();
         $this->resolveCaps();
         $this->resolveWires();
         $this->resolveSlas();
@@ -275,6 +285,21 @@ final class AlertSweep
             ->orderBy('id')
             ->each(function (Alert $alert): void {
                 $this->resolve->handle($alert, 'the overdue flag cleared');
+            });
+    }
+
+    private function resolveConfirmedAtDeparture(): void
+    {
+        Alert::query()
+            ->where('kind', AlertKind::ConfirmedAtDeparture)
+            ->unresolved()
+            ->whereNotIn('booking_id', Booking::query()->whereIn('status', [
+                BookingStatus::Confirmed,
+                BookingStatus::OnHoldAgency,
+            ])->select('id'))
+            ->orderBy('id')
+            ->each(function (Alert $alert): void {
+                $this->resolve->handle($alert, 'the booking left CONFIRMED or ON_HOLD_AGENCY');
             });
     }
 

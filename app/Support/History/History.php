@@ -54,7 +54,7 @@ final class History
 
         if ($system) {
             $actor = null;
-            $label = 'System';
+            $label = (is_string($actorLabel) && $actorLabel !== '') ? $actorLabel : 'System';
         } elseif ($actorLabel !== null && $actorLabel !== '') {
             $actor = null;
             $label = $actorLabel;

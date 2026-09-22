@@ -36,4 +36,49 @@ final class AlertKeys
 
         return 'delivery:'.$bookingId.':'.$kind->value;
     }
+
+    public static function confirmedAtDeparture(int $bookingId): string
+    {
+        return 'confirmed-at-departure:'.$bookingId;
+    }
+
+    public static function ledgerStripe(string $paymentIntent): string
+    {
+        return 'ledger:stripe:'.$paymentIntent;
+    }
+
+    public static function ledgerPaid(int $bookingId): string
+    {
+        return 'ledger:paid:'.$bookingId;
+    }
+
+    public static function ledgerRefund(string $chargeId): string
+    {
+        return 'ledger:refund:'.$chargeId;
+    }
+
+    public static function leakTrade(int $bookingId): string
+    {
+        return 'leak:trade:'.$bookingId;
+    }
+
+    public static function leakAdvisor(int $bookingId): string
+    {
+        return 'leak:advisor:'.$bookingId;
+    }
+
+    public static function leakCap(int $bookingId): string
+    {
+        return 'leak:cap:'.$bookingId;
+    }
+
+    public static function leakTerms(int $agencyId): string
+    {
+        return 'leak:terms:'.$agencyId;
+    }
+
+    public static function occupancy(int $departureId): string
+    {
+        return 'occupancy:'.$departureId;
+    }
 }

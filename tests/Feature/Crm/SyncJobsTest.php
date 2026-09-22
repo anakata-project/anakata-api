@@ -48,6 +48,52 @@ test('every scheduled command is listed and has a recording hook', function (): 
     expect($response->json('meta.kpis'))->toHaveKeys(['jobs_failing', 'failures_open', 'merges_this_month']);
 });
 
+test('doc 07 jobs are catalogued and the new commands keep galapagos time and a run hook', function (): void {
+    $events = collect(app(Schedule::class)->events());
+    $expected = [
+        'anakata:voyage-status' => '15 0 * * *',
+        'anakata:ledger-check' => '0 2 * * *',
+        'anakata:commission-scan' => '30 2 * * *',
+        'anakata:occupancy-check' => '0 7 * * *',
+        'anakata:document-check' => '0 * * * *',
+    ];
+
+    foreach ($expected as $command => $expression) {
+        $matches = $events->filter(
+            fn (Event $event): bool => RecordScheduledRuns::commandName($event) === $command,
+        );
+
+        expect($matches)->toHaveCount(1);
+        $event = $matches->first();
+        expect($event)->toBeInstanceOf(Event::class)
+            ->and($event->expression)->toBe($expression)
+            ->and($event->timezone)->toBe('Pacific/Galapagos')
+            ->and($event->withoutOverlapping)->toBeTrue()
+            ->and($event->onOneServer)->toBeTrue()
+            ->and(RecordScheduledRuns::isAttached($event))->toBeTrue();
+    }
+
+    $catalogue = $this->actingAs(salesExecUser())->getJson('/api/crm/sync/jobs')->json('meta.catalogue');
+    $byJob = collect($catalogue)->keyBy('job');
+
+    expect($byJob->keys()->all())->toBe([
+        'Ledger reconcile',
+        'Commission leakage scan',
+        'Hold expiry sweep',
+        'Occupancy check',
+        'Document version check',
+        'Segment recompute',
+        'Consent sweep',
+    ])
+        ->and($byJob['Ledger reconcile']['command'])->toBe('anakata:ledger-check')
+        ->and($byJob['Ledger reconcile']['sentence'])->toBe('Drift is reported and never corrected.')
+        ->and($byJob['Hold expiry sweep']['command'])->toBe('inventory:release-expired-holds')
+        ->and($byJob['Segment recompute']['command'])->toBe('not needed')
+        ->and($byJob['Segment recompute']['sentence'])->toBe('Not needed: segments are derived in SQL (L2).')
+        ->and($byJob['Consent sweep']['command'])->toBe('not needed')
+        ->and($byJob['Consent sweep']['sentence'])->toBe('Not needed: consent is read at send time from one register (M2).');
+});
+
 test('sync jobs lists every command over HTTP without the console routes loaded', function (): void {
     $schedule = app(Schedule::class);
     $events = new ReflectionProperty($schedule, 'events');

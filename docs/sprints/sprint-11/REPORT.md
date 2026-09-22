@@ -106,3 +106,101 @@ The sweep raises and resolves from SQL, freezes critical-mail recipients on the 
 EOF
 )"
 ```
+
+## Task 02 · Voyage status and the scheduled jobs
+
+Five scheduled commands. Alerts still go through `RaiseAlert` and `ResolveAlert`. None of them insert or update a payment, execute a refund, move a `CONFIRMED` or `ON_HOLD_AGENCY` booking, or issue a document version.
+
+`CONFIRMED` and `ON_HOLD_AGENCY` on or after the Galápagos departure date share one kind, `CONFIRMED_AT_DEPARTURE`. The sentence names the status (`CONFIRMED` or `ON_HOLD_AGENCY`). It resolves when the booking leaves that status. The unused `OVERDUE` status is ignored. The derived overdue flag does not change this command.
+
+### Voyage status
+`anakata:voyage-status` at 00:15 `Pacific/Galapagos`. Cabin and charter bookings, no type filter. The `ON_BOARD` pass finishes, then the `COMPLETED` pass reads status again. A `FULLY_PAID` booking whose return date has already passed becomes `FULLY_PAID` → `ON_BOARD` → `COMPLETED` in that night, with both history rows and both `BookingStatusChanged` events.
+
+- `FULLY_PAID` and Galápagos today ≥ departure date → `ON_BOARD`
+- `ON_BOARD` and Galápagos today ≥ `Departure::returnDate()` (`ContactDerived::returnDateSql()`) → `COMPLETED`
+
+Each move is `TransitionBooking` with `system: true` and actor label `System · voyage status`. `History::record` uses that label only when `system` is true and the label is non-empty. Other system transitions stay `System`. A second run the same day selects nothing to move. `RaiseAlert` returns the open row.
+
+`CONFIRMED_AT_DEPARTURE` also resolves from `RaiseAlertsOnBookingStatusChanged` (fact `the booking left {from}`) and from `AlertSweep` when the booking is neither `CONFIRMED` nor `ON_HOLD_AGENCY` (fact `the booking left CONFIRMED or ON_HOLD_AGENCY`). The sweep does not raise `LEDGER_DRIFT`, `COMMISSION_LEAKAGE`, or `LOW_OCCUPANCY`. Critical mail stays on `anakata:alerts`. `emails()` is still true only for `CRITICAL`, so `CONFIRMED_AT_DEPARTURE` and `LEDGER_DRIFT` mail; the other two do not.
+
+### Ledger check
+`anakata:ledger-check` at 02:00. Read-only on `payments`. A difference raises `LEDGER_DRIFT`. The next run resolves that key when the difference is gone (`the next ledger run found no difference`). `stripe_events` has no immutability trigger. The drift test updates `payload` directly. The payments trigger still refuses `UPDATE` of `amount`.
+
+Settled card payments are `CARD_STRIPE` and `STRIPE_LINK` (the same settlement bucket as `ReconciliationMatch`), amount > 0, non-null `gateway_id`. Engine checkout writes `STRIPE_LINK`. An applied unmatched charge is `CARD_STRIPE`. Groups are the PaymentIntent: `gateway_id` with any `#{booking_id}` suffix stripped. The group sum is compared to the latest `checkout.session.completed` `amount_total` and currency `usd` through `StripeMoney`. One alert per PaymentIntent. The sentence names every booking reference. `booking_id` is the first of the group. A missing event is a difference.
+
+Each booking with a payment compares `Booking::paidSql()` to `Ledger::paidFresh()`. There is no stored `paid` column.
+
+Refunds are cumulative. Executed card refund rows (`PaymentKind::Refund` linked from `refund_requests.executed_payment_id`, `CARD_STRIPE` or `STRIPE_LINK`) are summed per charge and compared to the latest `charge.refunded` `amount_refunded` and currency. Refund ids are the union across events for that charge. A card refund with no event is a difference, one alert per payment (`ledger:refund:payment:{id}`), because there is no charge id to group on. A wire refund with no Stripe event is not selected.
+
+### Commission scan
+`anakata:commission-scan` at 02:30. One `COMMISSION_LEAKAGE` per finding. Resolve fact `the finding is gone`. Cap is `CurrentConfig` `commission.capPct`.
+
+- Sold booking (`ContactDerived::soldStatuses()`) with no `agency_id` whose `channel_of_origin` is one of Travel Advisor, Luxury Agency, Host Agency, Consortia, Tour Operator, Luxury Tour Operator, DMC, Incoming Operator. `CommissionScan::tradeChannels()` is those eight cases. Wholesaler is not in the set.
+- Same sold set, no agency, booking request `travel_advisor` true.
+- `APPROVED` agency with `commission_pct` above the cap and a booking that is not `ON_HOLD_AGENCY` and not `commission_approved`. `CANCELLED`, `CANCELLED_POSTPAID`, and `RELEASED` are excluded. `ON_HOLD_AGENCY` stays `COMMISSION_CAP`.
+- `APPROVED` agency whose `payment_terms` is null or blank.
+
+### Occupancy check
+`anakata:occupancy-check` at 07:00. `ON_SALE` departures whose Galápagos date is after today and on or before today plus `alerts.lowOccupancyDaysBefore`. Counts from `Availability`: sellable = sold + held + free. Integer percent `intdiv(sold * 100, sellable)`. Raise `LOW_OCCUPANCY` when that percent is strictly below `alerts.lowOccupancyPct`. Sellable 0 is skipped. Both thresholds come from current business rules.
+
+A departure is resolved when it is not in that raise set: the percent is no longer below, the date is today or earlier, or the status is no longer `ON_SALE`. The stored fact is `occupancy is no longer below the threshold, or the departure has sailed`.
+
+### Document version check
+`anakata:document-check` hourly, timezone Galápagos. Latest issued version of invoice, summary, receipt, final invoice, pre-trip, and voucher. Reminders, wire instructions, and the questionnaire are not selected.
+
+If that version has no `SENT` and no `QUEUED` delivery, and no `FAILED` delivery, it calls `SendDocument` with `DeliveryKey::forDocument`. It does not pass `resend`. It never calls `PrepareIssueDocument`.
+
+A `FAILED` key is set back to `QUEUED` at most once, `error` cleared, `SendDeliveryJob` dispatched on the same key after commit, and `delivery.requeued` written on the booking (`document_id`, `delivery_id`, `idempotency_key`). The next run sees that history row and leaves a second `FAILED` as `FAILED`. `DELIVERY_FAILED` stays open for a person. No recipient still records `BLOCKED` through `SendDocument`, and the existing delivery listener raises `DELIVERY_FAILED`.
+
+### Catalogue and schedule
+`JobCatalogue` is the doc 07 §7 list: Ledger reconcile → `anakata:ledger-check` (“Drift is reported and never corrected.”), Commission leakage scan → `anakata:commission-scan`, Hold expiry sweep → `inventory:release-expired-holds`, Occupancy check → `anakata:occupancy-check`, Document version check → `anakata:document-check`, Segment recompute → `not needed` (“Not needed: segments are derived in SQL (L2).”), Consent sweep → `not needed` (“Not needed: consent is read at send time from one register (M2).”).
+
+`GET /api/crm/sync/jobs` puts that list on `meta.catalogue`. `data` stays the scheduled commands, so `SyncJobsTest` still expects `data` to equal the schedule. The panel table renders `data`, so the five new commands show up. It does not read `meta.catalogue`. Types regenerate in task 07.
+
+The five commands are on `AnakataSchedule` with `timezone(BusinessTime::zone())`, `withoutOverlapping()`, `onOneServer()`, and `RecordScheduledRuns::attach`. Existing events were left without `onOneServer()`.
+
+### Alert registry
+
+| Kind | Severity | Audience | Section | Resolves when |
+|---|---|---|---|---|
+| `CONFIRMED_AT_DEPARTURE` | CRITICAL | `bookings.overdue_decision`, `payments.record` | rms | leaves `CONFIRMED` or `ON_HOLD_AGENCY` |
+| `LEDGER_DRIFT` | CRITICAL | `payments.record`, `refunds.approve` | rms | the next ledger run finds no difference |
+| `COMMISSION_LEAKAGE` | WARN | `agencies.manage` | rms | that finding is gone |
+| `LOW_OCCUPANCY` | INFO | `departures.manage`, `rates.manage` | rms | percent no longer below, or the departure has sailed |
+
+Keys: `confirmed-at-departure:{booking}`, `ledger:stripe:{intent}`, `ledger:paid:{booking}`, `ledger:refund:{charge}`, `leak:trade:{booking}`, `leak:advisor:{booking}`, `leak:cap:{booking}`, `leak:terms:{agency}`, `occupancy:{departure}`.
+
+### Tests
+`tests/Feature/Operations/` covers the midnight boundary (UTC 05:30 still the previous Galápagos day, 06:30 is departure day), charter, catch-up to `COMPLETED` with both history rows and `BookingStatusChanged` labelled `System · voyage status`, a same-day re-run with no second history row, and `CONFIRMED` / `ON_HOLD_AGENCY` raising the alert without a status change.
+
+Ledger: a clean ledger is silent; two bookings that sum to the event stay silent; a tampered `amount_total` raises one alert naming both; restoring the payload resolves it; two partial refunds that sum to `amount_refunded` stay silent. Payment row count and amounts are unchanged.
+
+Leakage: one alert per finding, the eight channels, Wholesaler excluded, a cancelled over-cap booking silent, resolve when the agency or terms appear. Occupancy: just below the percent, exactly the percent, one day inside and one day outside the window, a sailed departure resolves. Document check: one re-queue on the same key, no new document version, a second `FAILED` left `FAILED`, no recipient raises `DELIVERY_FAILED`.
+
+The catalogue lists all seven doc 07 rows. Every scheduled event still has a run hook. CRM-09 E2 and the Scheduled jobs table in `tests/e2e/fixtures/reference-values.md` include the five commands. `AlertsTest` kinds count is 9.
+
+`composer check` inside Docker: 1145 tests passed, Pint passed, Larastan passed.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Bookings/TransitionBooking.php \
+  app/Console/Commands/CommissionScanCommand.php app/Console/Commands/DocumentCheckCommand.php \
+  app/Console/Commands/LedgerCheckCommand.php app/Console/Commands/OccupancyCheckCommand.php \
+  app/Console/Commands/VoyageStatusCommand.php \
+  app/Enums/AlertKind.php app/Http/Controllers/Crm/SyncController.php \
+  app/Support/Alerts/AlertKeys.php app/Support/Alerts/AlertRegistry.php app/Support/Alerts/AlertSweep.php \
+  app/Support/Crm/SyncJobs.php app/Support/History/History.php app/Support/Operations \
+  app/Support/Schedule/AnakataSchedule.php app/Support/Schedule/JobCatalogue.php \
+  tests/Feature/Alerts/AlertsTest.php tests/Feature/Crm/SyncJobsTest.php tests/Feature/Operations \
+  tests/e2e/fixtures/reference-values.md tests/e2e/scenarios/crm/CRM-09-sync-jobs-retry.md \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Schedule voyage status and the operational checks from doc 07.
+
+Voyage dates move through TransitionBooking, and ledger, commission, occupancy, and document checks raise alerts without correcting payments or issuing documents.
+EOF
+)"
+```

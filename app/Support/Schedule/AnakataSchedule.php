@@ -68,6 +68,51 @@ final class AnakataSchedule
                 ->withoutOverlapping(),
         );
 
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:voyage-status')
+                ->dailyAt('00:15')
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Move FULLY_PAID to ON_BOARD and ON_BOARD to COMPLETED'),
+        );
+
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:ledger-check')
+                ->dailyAt('02:00')
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Report ledger drift and never correct it'),
+        );
+
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:commission-scan')
+                ->dailyAt('02:30')
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Scan for commission leakage'),
+        );
+
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:occupancy-check')
+                ->dailyAt('07:00')
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Raise low-occupancy alerts'),
+        );
+
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:document-check')
+                ->hourly()
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Re-queue one failed automatic document send'),
+        );
+
         if (class_exists(PruneCommand::class)) {
             RecordScheduledRuns::attach(
                 $schedule->command('telescope:prune --hours=48')->daily(),

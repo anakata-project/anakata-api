@@ -41,9 +41,9 @@ final class TransitionBooking extends Action
      *
      * @throws CabinUnavailableException
      */
-    public function handle(Booking $booking, array $data, ?User $actor, bool $system = false): Booking
+    public function handle(Booking $booking, array $data, ?User $actor, bool $system = false, ?string $actorLabel = null): Booking
     {
-        return $this->transaction(function () use ($booking, $data, $actor, $system): Booking {
+        return $this->transaction(function () use ($booking, $data, $actor, $system, $actorLabel): Booking {
             $expectedDepartureId = (int) $booking->departure_id;
             $booking = BookingMutationLock::acquire($booking, $expectedDepartureId);
             $booking->load(['departure.yacht.cabins', 'cabin', 'contact', 'claims']);
@@ -83,7 +83,7 @@ final class TransitionBooking extends Action
                 'status' => $to->value,
                 'what' => $what,
                 'client' => $client,
-            ], reason: $reason, actor: $system ? null : $actor, system: $system);
+            ], reason: $reason, actor: $system ? null : $actor, system: $system, actorLabel: $system ? $actorLabel : null);
 
             if ($from !== $to) {
                 BookingStatusChanged::dispatch($booking, $from, $to);

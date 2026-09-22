@@ -57,6 +57,38 @@ final class AlertRegistry
                 'A later delivery of the same document is sent.',
                 'crm',
             ),
+            new AlertKindDefinition(
+                AlertKind::ConfirmedAtDeparture,
+                AlertSeverity::Critical,
+                [Permission::BookingsOverdueDecision, Permission::PaymentsRecord],
+                'A booking is still CONFIRMED or ON_HOLD_AGENCY on or after its departure date.',
+                'The booking leaves that status.',
+                'rms',
+            ),
+            new AlertKindDefinition(
+                AlertKind::LedgerDrift,
+                AlertSeverity::Critical,
+                [Permission::PaymentsRecord, Permission::RefundsApprove],
+                'A Stripe payment, paid figure, or refund total disagrees with the ledger.',
+                'The next ledger run finds no difference for that PaymentIntent, booking, or charge.',
+                'rms',
+            ),
+            new AlertKindDefinition(
+                AlertKind::CommissionLeakage,
+                AlertSeverity::Warn,
+                [Permission::AgenciesManage],
+                'A trade booking has no agency, an over-cap booking escaped the hold, or an approved agency has no payment terms.',
+                'That finding is gone.',
+                'rms',
+            ),
+            new AlertKindDefinition(
+                AlertKind::LowOccupancy,
+                AlertSeverity::Info,
+                [Permission::DeparturesManage, Permission::RatesManage],
+                'An open departure inside the low-occupancy window is below the sold-cabin threshold.',
+                'The sold percent is no longer below the threshold, or the departure has sailed.',
+                'rms',
+            ),
         ];
     }
 

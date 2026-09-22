@@ -11,6 +11,7 @@ use App\Models\Delivery;
 use App\Models\ScheduledRun;
 use App\Support\BusinessTime;
 use App\Support\Iso;
+use App\Support\Schedule\JobCatalogue;
 use App\Support\Schedule\RecordScheduledRuns;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Event;
@@ -32,7 +33,8 @@ final class SyncJobs
      *         last_output: string|null,
      *         next_run_at: string|null
      *     }>,
-     *     kpis: array{jobs_failing: int, failures_open: int, merges_this_month: int}
+     *     kpis: array{jobs_failing: int, failures_open: int, merges_this_month: int},
+     *     catalogue: list<array{job: string, command: string, sentence: string}>
      * }
      */
     public static function list(): array
@@ -89,6 +91,7 @@ final class SyncJobs
                     ->whereBetween('merged_at', [$monthStart, $monthEnd])
                     ->count(),
             ],
+            'catalogue' => JobCatalogue::rows(),
         ];
     }
 }
