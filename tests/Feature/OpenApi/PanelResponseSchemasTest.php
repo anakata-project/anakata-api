@@ -807,6 +807,7 @@ test('sprint 11 response schemas name their enums and optional preference fields
         'PreferenceQuestionType',
         'GuestResponseSource',
         'CommissionAccrualStatus',
+        'AgencyUserStatus',
     ] as $enum) {
         $schema = $spec['components']['schemas'][$enum] ?? null;
         expect($schema)->toBeArray("schema {$enum} is missing");
@@ -917,6 +918,16 @@ test('sprint 11 response schemas name their enums and optional preference fields
 
     $agency = openApiSchema($spec, 'AgencyResource');
     expect($agency['properties'])->toHaveKey('users');
+    $userStatus = $agency['properties']['users']['items']['properties']['status'] ?? [];
+    expect(sprint11SchemaRef($userStatus))->toContain('AgencyUserStatus');
+    $userStatusSchema = $spec['components']['schemas']['AgencyUserStatus'] ?? null;
+    expect($userStatusSchema)->toBeArray();
+    expect($userStatusSchema['enum'] ?? null)->toEqualCanonicalizing([
+        'INVITE_ON_APPROVAL',
+        'INVITE_ON_PORTAL_LAUNCH',
+        'ACTIVE',
+        'DISABLED',
+    ]);
 });
 
 /**

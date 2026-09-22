@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Rms;
 
+use App\Enums\AgencyUserStatus;
 use App\Models\Agency;
 use App\Models\Booking;
 use App\Services\Config\CurrentConfig;
@@ -43,7 +44,7 @@ class AgencyResource extends JsonResource
      *     decision_reason: string|null,
      *     sla_business_days_elapsed: int,
      *     sla_breached: bool,
-     *     users: list<array{id: int, name: string, email: string, status: string}>,
+     *     users: list<array{id: int, name: string, email: string, status: AgencyUserStatus}>,
      *     bookings_count: int,
      *     revenue: int,
      *     commission_accrued: int,
@@ -65,7 +66,7 @@ class AgencyResource extends JsonResource
      *     decision_reason: string|null,
      *     sla_business_days_elapsed: int,
      *     sla_breached: bool,
-     *     users: list<array{id: int, name: string, email: string, status: string}>,
+     *     users: list<array{id: int, name: string, email: string, status: AgencyUserStatus}>,
      *     revenue: int,
      *     commission_accrued: int,
      *     bookings_count: int,
@@ -107,7 +108,7 @@ class AgencyResource extends JsonResource
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'status' => $user->status->value,
+                'status' => $user->status,
             ])->values()->all(),
         ];
 

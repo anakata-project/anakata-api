@@ -1137,3 +1137,117 @@ Scores and restricted fields follow the API, and the history line is the recorde
 EOF
 )"
 ```
+
+## Task 11 — B2B & Agent Portal
+
+The B2B page shows commission payable and commission paid from `meta.kpis`. The agency drawer lists portal users, loads `GET /api/rms/agencies/{id}/portal-preview` when the user has `agencies.manage`, and lists staff commissions with a fixed-amount payout. Payments & Revenue labels the five commission statuses, including PAID.
+
+### Agency user status and v0.12.1
+
+`AgencyResource` typed `users[].status` as `string`, and the map returned `->value`, so Scramble never emitted `AgencyUserStatus`. The PHPDoc now names `AgencyUserStatus` on both user lists, and the map returns the enum instance. The JSON value is unchanged. `PanelResponseSchemasTest` asserts the ref and the cases `INVITE_ON_APPROVAL`, `INVITE_ON_PORTAL_LAUNCH`, `ACTIVE`, `DISABLED`.
+
+`pnpm types:api` regenerated `app/types/api.d.ts`. The leftover `PENDING | INVITED | ACTIVE | DISABLED` union is gone. `AgencyUser.status` is the generated schema. The layer is `0.12.0` → `0.12.1`. Panel and engine remote pins are `#v0.12.1`. Local dev still uses `../anakata-ui`.
+
+### Panel
+
+- B2B KPIs: payable and paid, formatted with `useMoney()`. No subtraction on the page.
+- `commissionStatusClass` and `agencyUserStatusLabel` in `agencyHelpers.ts`, with unit tests.
+- Portal users: the four labels, add user (`POST …/users`), Disable on `ACTIVE` and Enable on `DISABLED` (`PATCH` `{ status }`). Invite statuses have no toggle. The note says invitations are sent when the agent portal launches.
+- Preview is read-only and comes from `portal-preview`: net rates, my bookings, my commissions, sales materials (`items` then `note`). No public rate and no `public − commission` in the panel.
+- Staff commissions replace the old bookings table. Record payout is shown only for `PAYABLE` when `can('commissions.record_payout')`. The POST sends the row’s `commission_amount` integer. A 422 shows `firstApiMessage`. A 201 reloads the agency and the list.
+- Payments & Revenue pills: BLOCKED, EARNED ON COMPLETION, PAYABLE, PAID, CANCELLED. The `ACCRUED` bridge remains only on the pill class.
+
+### Checks
+
+API schema test for the sprint 11 response schemas passed. Pint on `AgencyResource.php` and `PanelResponseSchemasTest.php` passed. Larastan on `AgencyResource.php` reported no errors. `php artisan test --filter=Agency` passed (21). Layer lint, typecheck, test (35), and build passed. Panel lint, typecheck, test (269), and build passed. Engine typecheck and build passed against the sibling layer.
+
+Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}` with the working trees copied on (no `node_modules`). The ui tree is `0.12.1`. Panel and engine resolve the sibling layer, so they do not fetch `#v0.12.1`. `pnpm typecheck` and `pnpm build` passed in all three. The tag does not exist yet. Repeat the clone after the commands below, checking out `anakata-ui` at `v0.12.1` with no overlay.
+
+### Browser
+
+Payable check, signed in as Carolina, before the other checks. `ANK-2026-0007` was `CONFIRMED` with balance USD 21,267 (the seed file’s 20,948 is not the figure on the screen). Recorded that balance as a wire (22 Sep 2026) and marked it received (`WIRE-B01`). The booking became `FULLY PAID` with balance 0. The original departure was left alone. Departures accepted a new empty Sunday, 16 Aug 2026, ANAMARA, Northern Passage, closed to sale.
+
+Move to another departure did not offer that date. The modal loads departures from Galápagos tomorrow, and the list started at 7 Nov 2027. Stopped there. The booking and `DEP-003` were not patched. `anakata:voyage-status` was not run. The drawer was never shown as PAYABLE, and no payout was recorded. Mateo was not checked against a PAYABLE row.
+
+`reset.sh` (`COMPOSE_PROJECT_NAME=anakata-api E2E_ALLOW_RESET=1`) ran before the seed checks.
+
+On the restored seed, light and dark:
+
+- B2B KPIs: accrued USD 2,328, payable USD 0, paid USD 0.
+- Blue Latitude Travel (AG-001, 10%): users, preview, commissions. Added A. Costa; the next open shows Invite on portal launch and no toggle. Disabled S. Ferreira, then enabled; the next open shows Active. The row did not repaint while the drawer stayed open (the API had already saved).
+- Preview suite for 2027 is USD 11,970. Rates shows the published suite for 2027 as USD 13,300. 13,300 minus 10% is 11,970. Owner’s Suite USD 22,500 from 25,000, charter USD 179,550 from 199,500. The preview does not show those public figures.
+- `ANK-2026-0007` shows payable 21 Dec 2027 and EARNED ON COMPLETION. No Record payout on that row.
+- Payments & Revenue labels the same commission EARNED ON COMPLETION. Meridian stays BLOCKED.
+- Mateo (`mateo@anakata.test`) opens the same drawer, including the preview, and has no Record payout button. The row is not PAYABLE, so this does not show the permission hiding a button that Carolina would see.
+
+Scenarios for task 12, named only: `B2B-01`, `B2B-02`, `B2B-03`.
+
+### Git
+
+Do not run these here.
+
+```bash
+# anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Resources/Rms/AgencyResource.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Expose agency user status as AgencyUserStatus.
+
+Scramble emits the named schema when the resource returns the enum.
+EOF
+)"
+```
+
+```bash
+# anakata-ui — commit, then tag v0.12.1
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  CHANGELOG.md \
+  app/types/api.d.ts \
+  app/types/index.ts \
+  app/types/payments.ts \
+  package.json
+git commit -m "$(cat <<'EOF'
+Release v0.12.1 with AgencyUserStatus on agency users.
+
+The leftover union named statuses the API no longer returns.
+EOF
+)"
+git tag v0.12.1
+git push origin HEAD
+git push origin v0.12.1
+```
+
+```bash
+# anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/components/agencies/AgencyDrawer.vue \
+  app/components/agencies/CommissionPayoutModal.vue \
+  app/components/agencies/agencyHelpers.ts \
+  app/pages/rms/commercial/b2b.vue \
+  app/pages/rms/commercial/payments.vue \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  tests/unit/agencyHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Show agency portal users, the net-rate preview, and commission payout.
+
+Payable and paid come from the list KPIs, and the payout amount is the booking commission.
+EOF
+)"
+```
+
+```bash
+# anakata-engine
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add nuxt.config.ts
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.12.1.
+EOF
+)"
+```
