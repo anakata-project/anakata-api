@@ -12,6 +12,7 @@ use App\Enums\ConsentPurpose;
 use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
 use App\Enums\GuestResponseSource;
+use App\Enums\Permission;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Mail\Alerts\AlertMail;
@@ -28,6 +29,7 @@ use App\Models\Delivery;
 use App\Models\Departure;
 use App\Models\Guest;
 use App\Models\GuestResponse;
+use App\Models\Role;
 use App\Models\SubjectRequest;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
@@ -124,13 +126,13 @@ function npsPlainToken(Booking $booking, ?int $guestId): string
 }
 
 /**
- * @return array{score: int, recommend: int|null, why: string, best: string, better: string, crew: string}
+ * @return array{score: int, rec: int|null, why: string, best: string, better: string, crew: string}
  */
 function npsAnswerBody(int $score, string $why = 'the wildlife', ?int $recommend = 9): array
 {
     return [
         'score' => $score,
-        'recommend' => $recommend,
+        'rec' => $recommend,
         'why' => $why,
         'best' => 'the landing',
         'better' => 'more time ashore',
@@ -278,15 +280,15 @@ test('the survey link covers only its guests and rejects the wrong purpose, an e
 
     $this->getJson('/api/engine/survey/'.$leadToken)
         ->assertOk()
-        ->assertJsonPath('data.reference', 'ANK-NPS-LINK')
-        ->assertJsonPath('data.departure_date', $fixture['departure']->date->toDateString())
-        ->assertJsonPath('data.guests.0.id', $fixture['companion']->id)
-        ->assertJsonPath('data.guests.0.responded', false)
-        ->assertJsonMissingPath('data.guests.0.why');
+        ->assertJsonPath('reference', 'ANK-NPS-LINK')
+        ->assertJsonPath('departure_date', $fixture['departure']->date->toDateString())
+        ->assertJsonPath('guests.0.id', $fixture['companion']->id)
+        ->assertJsonPath('guests.0.responded', false)
+        ->assertJsonMissingPath('guests.0.why');
 
     $this->postJson('/api/engine/survey/'.$leadToken.'/guests/'.$fixture['companion']->id, npsAnswerBody(7, 'companion note'))
         ->assertOk()
-        ->assertJsonPath('data.guests.0.responded', true)
+        ->assertJsonPath('guests.0.responded', true)
         ->assertJsonMissing(['why' => 'companion note']);
 
     $this->postJson('/api/engine/survey/'.$leadToken.'/guests/'.$fixture['lead']->id, npsAnswerBody(8))
@@ -656,4 +658,59 @@ test('erasure clears the contact own survey text, keeps the score, and leaves th
         ->and($request->outcome)->toContain('the score was kept');
 
     expect(GuestResponse::query()->find($own->id)?->score)->toBe(8);
+});
+
+test('the survey question list is served to the engine and to panel.rms, and the scales are enforced', function (): void {
+    $manager = managerUser();
+    $sales = salesExecUser();
+    $crmOnly = User::factory()->create([
+        'role_id' => Role::factory()->create([
+            'permissions' => [Permission::PanelCrm],
+        ])->id,
+    ]);
+    $fixture = npsBooking('2028-08-06', 'ANK-NPS-Q', $manager, contactEmail: 'questions@example.com');
+    npsSendSurveys($fixture['booking']);
+    $token = npsPlainToken($fixture['booking'], $fixture['lead']->id);
+
+    $engine = $this->getJson('/api/engine/survey/'.$token)->assertOk();
+    $rms = $this->actingAs($sales)->getJson('/api/rms/guest-experience/survey-questions')->assertOk();
+
+    expect($engine->json('questions'))->toBe($rms->json('data'))
+        ->and(collect($engine->json('questions'))->pluck('key')->all())->toBe([
+            'score', 'why', 'best', 'better', 'crew', 'rec',
+        ])
+        ->and($engine->json('questions.0.type'))->toBe('scale')
+        ->and($engine->json('questions.0.min'))->toBe(1)
+        ->and($engine->json('questions.0.max'))->toBe(10)
+        ->and($engine->json('questions.1.type'))->toBe('text')
+        ->and($engine->json('questions.1.min'))->toBeNull()
+        ->and($engine->json('questions.5.key'))->toBe('rec')
+        ->and($engine->json('questions.5.min'))->toBe(0)
+        ->and($engine->json('questions.5.max'))->toBe(10);
+
+    $this->actingAs($crmOnly)->getJson('/api/rms/guest-experience/survey-questions')->assertForbidden();
+    $this->actingAs($sales)->getJson('/api/rms/guest-experience/nps')->assertForbidden();
+
+    $this->postJson('/api/engine/survey/'.$token.'/guests/'.$fixture['lead']->id, [
+        ...npsAnswerBody(0),
+    ])->assertStatus(422)->assertJsonValidationErrors(['score']);
+
+    $this->postJson('/api/engine/survey/'.$token.'/guests/'.$fixture['lead']->id, [
+        ...npsAnswerBody(11),
+    ])->assertStatus(422)->assertJsonValidationErrors(['score']);
+
+    $this->postJson('/api/engine/survey/'.$token.'/guests/'.$fixture['lead']->id, [
+        ...npsAnswerBody(8),
+        'recommend' => 9,
+    ])->assertStatus(422)->assertJsonValidationErrors(['recommend']);
+
+    $this->postJson('/api/engine/survey/'.$token.'/guests/'.$fixture['lead']->id, npsAnswerBody(8, 'the wildlife', 0))
+        ->assertOk();
+
+    expect(GuestResponse::query()->where('guest_id', $fixture['lead']->id)->first()?->recommend)->toBe(0);
+
+    $this->actingAs($sales)->postJson('/api/rms/bookings/'.$fixture['booking']->id.'/guest-responses', [
+        ...npsAnswerBody(9),
+        'guest_id' => $fixture['companion']->id,
+    ])->assertForbidden();
 });

@@ -882,6 +882,10 @@ test('sprint 11 response schemas name their enums and optional preference fields
     $question = openApiSchema($spec, 'PreferenceQuestionResource');
     expect(sprint11SchemaRef($question['properties']['type']))->toContain('PreferenceQuestionType');
 
+    $surveyQuestion = openApiSchema($spec, 'SurveyQuestionResource');
+    expect($surveyQuestion['properties'] ?? null)->toHaveKeys(['key', 'label', 'type', 'min', 'max']);
+    expect(sprint11SchemaRef($surveyQuestion['properties']['type']))->toContain('SurveyQuestionType');
+
     $nps = openApiSchema($spec, 'NpsViewResource');
     expect($nps['properties'])->toHaveKeys(['kpis', 'responses', 'facts']);
     expect($nps['properties']['responses']['items']['properties'] ?? [])->toHaveKeys([

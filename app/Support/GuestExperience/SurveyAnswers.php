@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\GuestExperience;
 
+use Illuminate\Validation\Validator;
+
 final readonly class SurveyAnswers
 {
     public function __construct(
@@ -23,7 +25,7 @@ final readonly class SurveyAnswers
     {
         return new self(
             score: (int) $input['score'],
-            recommend: self::score($input['recommend'] ?? null),
+            recommend: self::score($input['rec'] ?? null),
             why: self::text($input['why'] ?? null),
             best: self::text($input['best'] ?? null),
             better: self::text($input['better'] ?? null),
@@ -37,21 +39,21 @@ final readonly class SurveyAnswers
      */
     public static function rules(bool $callNotes): array
     {
-        $rules = [
-            'score' => ['required', 'integer', 'min:1', 'max:10'],
-            'recommend' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'why' => ['nullable', 'string', 'max:1000'],
-            'best' => ['nullable', 'string', 'max:1000'],
-            'better' => ['nullable', 'string', 'max:1000'],
-            'crew' => ['nullable', 'string', 'max:1000'],
-        ];
+        return SurveyQuestions::rules($callNotes);
+    }
 
-        if ($callNotes) {
-            $rules['call_notes'] = ['nullable', 'string', 'max:1000'];
-            $rules['guest_id'] = ['required', 'integer'];
+    /**
+     * @param  array<mixed>  $input
+     */
+    public static function rejectUnknown(array $input, bool $callNotes, Validator $validator): void
+    {
+        foreach (array_keys($input) as $key) {
+            if (! is_string($key) || SurveyQuestions::allows($key, $callNotes)) {
+                continue;
+            }
+
+            $validator->errors()->add($key, 'This question is not on the survey.');
         }
-
-        return $rules;
     }
 
     private static function score(mixed $value): ?int

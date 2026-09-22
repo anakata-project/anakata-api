@@ -166,6 +166,7 @@ Route::post('documents/{document}/send', [DocumentController::class, 'send'])->w
 Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
 Route::get('guest-experience/nps', [GuestResponseController::class, 'index']);
 Route::get('guest-experience/questions', [GuestExperienceController::class, 'questions']);
+Route::get('guest-experience/survey-questions', [GuestResponseController::class, 'questions']);
 Route::post('bookings/{booking}/guest-responses', [GuestResponseController::class, 'store'])->whereNumber('booking');
 Route::get('departures/{departure}/guest-experience', [GuestExperienceController::class, 'show'])->whereNumber('departure');
 Route::get('departures/{departure}/hotel-manager-brief', [GuestExperienceController::class, 'brief'])->whereNumber('departure');

@@ -449,6 +449,8 @@ Two `RuleWhere::Here` rows in Guests & capacity. The three numeric paths are Con
 ### Engine and the score
 `GET /api/engine/survey/{token}` returns the booking reference, itinerary name, departure date, and covered guests with `responded`. No free text. `POST /api/engine/survey/{token}/guests/{guest}` records the six answers. The guest must be in `covered_guest_ids`. A wrong purpose, an expired token, or a revoked token is rejected the same way as the questionnaire resolver.
 
+`SurveyQuestions` is the prototype `NPS_Q` list, in that order: `score` (scale 1–10, required), `why`, `best`, `better`, `crew` (text, max 1,000), `rec` (scale 0–10). Wording is PENDING CLIENT, noted in the class. The same list is on the engine GET as `questions` (`key`, `label`, `type` `scale`|`text`, `min`, `max`) and at `GET /api/rms/guest-experience/survey-questions`. The engine does not hold the wording. Validation reads the registry: an unknown key is 422, each scale is bounded by its own min and max, and text is max 1,000. The write body uses `rec`. The column, the NPS rows, and the access export stay `recommend`. Reading the question wording needs nothing beyond `panel.rms` (`GuestResponsePolicy::viewQuestions`). Recording a response still needs `guest_experience.manage`. `PagePath` stores `/questionnaire/` and `/survey/` as `/questionnaire/[token]` and `/survey/[token]`.
+
 `RecordGuestResponse` is the one write path for the engine and for staff. Inside the transaction it inserts the row, then:
 
 - score below `nps.alert_below`: `NPS_REPLY` (key `nps-reply:{response}`, due `responded_at` plus 24 clock hours, needs `guest_experience.manage`) and a `CRITICAL` `NPS_LOW` alert on the same base key, audience `[guest_experience.manage]`, section `rms`, `guest_response_id` set. The email is the existing critical path on `anakata:alerts`. `AlertRegistry` is 11 kinds. Completing, cancelling, or auto-closing `NPS_REPLY` resolves the alert with fact `the task closed`. `AlertSweep` resolves an open `NPS_LOW` whose task is no longer open.
@@ -664,14 +666,14 @@ Only when the caller has `guests.view_sensitive` does PHP add `accessibility: st
 
 | File | Before | After |
 |---|---|---|
-| `app/types/api.d.ts` | 13022 | 14448 |
+| `app/types/api.d.ts` | 13022 | 14508 |
 | `app/types/alerts.ts` | — | 11 |
 | `app/types/documents.ts` | 61 | 66 |
 | `app/types/guests.ts` | 101 | 120 |
 | `app/types/payments.ts` | 161 | 167 |
 | `app/types/crm.ts` | 230 | 232 |
-| `app/types/engine.ts` | 354 | 370 |
-| `app/types/index.ts` | 330 | 359 |
+| `app/types/engine.ts` | 354 | 371 |
+| `app/types/index.ts` | 330 | 360 |
 
 ### Schema → alias
 
@@ -701,8 +703,9 @@ Only when the caller has `guests.view_sensitive` does PHP add `accessibility: st
 | `ScheduledJobCatalogueRow` | `sync.jobs` `meta.catalogue` item `{job, command, sentence}` |
 | `QuestionnaireView` | `QuestionnaireResource` |
 | `QuestionnaireAnswersInput` | `UpdateQuestionnaireRequest`, `answers` overlaid |
-| `SurveyView` | `SurveyResource` |
-| `SurveyInput` | `StoreSurveyResponseRequest` |
+| `SurveyView` | `SurveyResource` (includes `questions`) |
+| `SurveyQuestion` | `SurveyQuestionResource` |
+| `SurveyInput` | `StoreSurveyResponseRequest` (`rec`, not `recommend`) |
 
 `CommissionStatus` stays `CommissionAccrualStatus`. `AgencyUser` stays the existing alias.
 
@@ -813,6 +816,126 @@ cd /home/mohammad/Code/iconic/anakata/anakata-engine
 git add nuxt.config.ts README.md
 git commit -m "$(cat <<'EOF'
 Pin the shared layer fallback to v0.12.0.
+EOF
+)"
+```
+
+## Task 08 · Questionnaire and survey pages
+
+`/questionnaire/[token]` and `/survey/[token]` render the API payload. Question labels, options, and scale ends are not in i18n or in the components. Neither page imports `useTrack` or calls `track`. The consent banner stays the one in the default layout. `routeRules` for both paths match `/complete/**` (private, no-store). Invalid and expired tokens use the complete-page copy.
+
+### Questionnaire
+`GET /api/engine/questionnaire/{token}` as `QuestionnaireView`. Header is reference, itinerary name, and the departure date. One section per guest (first name, cabin). `text` is an input, `choice` is a select of `options`. Restricted questions show “Seen only by the operations team”. When the stored answer is the sentinel `provided`, the control is empty and shows “Provided — enter again to replace”. The sentinel is not the field value and is not sent back. Other answers prefill. `PUT` sends `{ answers }`. Validation messages are `answers.{key}`. Saving one guest refreshes only that guest’s draft, so another guest’s unsaved answers stay on the page.
+
+### Survey
+`GET /api/engine/survey/{token}` as `SurveyView`. Same header. One form per guest with `responded: false`. Scale buttons are that question’s `min` through `max` (score 1–10, `rec` 0–10). The four text questions use their API labels. `POST` sends the registry keys, including `rec`. A guest already `responded`, or a 409, shows “Thank you — received”.
+
+### Response shape
+`QuestionnaireResource` and `SurveyResource` set `$wrap = null`, the same as `CompleteReservationResource`, so `$fetch` returns the page object the generated type describes. The RMS survey-question collection stays wrapped. Feature tests assert the unwrapped engine JSON.
+
+### Redaction
+`pagePath.ts` collapses `/questionnaire/` and `/survey/` the way `/complete/` does, including a query string and a hash. The router plugin still queues `page_view` through that helper.
+
+### Checks
+Engine lint, typecheck, test (78), and build passed against the sibling layer. API schema tests (3, 913 assertions) and Larastan on the survey resources passed after the unwrap.
+
+Fresh-clone against `v0.12.0` was not run. The local tag points at `62bb705` and does not contain `SurveyQuestion`. Those aliases are uncommitted on `anakata-ui`. The engine pages import them from the sibling working tree. Repeat the clone after the tag below includes this regeneration.
+
+### Browser
+Against the running API, both themes (light `rgb(239, 237, 221)`, dark `rgb(32, 43, 38)`). Screenshots timed out; the computed backgrounds and the page snapshots are what was checked.
+
+- Lead questionnaire link for `ANK-2026-0003` (Daniel and Claire, both Suite 01, Western Realm, 7 Nov 2027). Daniel’s diet prefilled as `no shellfish` after reload. An accessibility note saved, the field came back empty with “Provided — enter again to replace”, and the note text was not on the page. Claire’s diet saved as `vegetarian` without clearing Daniel. The link is the page URL stored on the token. Mailpit had no questionnaire message to click.
+- Survey on `ANK-NPS-BROWSER`: score 6 and recommend 9 (`rec`), stored as `GUEST_LINK`. Reopen shows “Thank you — received”. Score buttons are 1–10 and recommend buttons are 0–10. A staff response already on that guest (score 7, recommend 8) was removed from the local database so the form could be submitted.
+- Expired questionnaire token shows “This link is no longer available”.
+- Stored `page_view` rows for these loads are `/questionnaire/[token]` and `/survey/[token]`. No row contains either raw token. The API redacts `page_path` again on ingest, so those rows do not by themselves prove the request body. The engine unit tests cover redaction before enqueue. A browser hook did not capture an `/api/engine/events` body.
+
+### Git commands
+Do not run these in the agent. Explicit paths only. Run in this order. The engine commit comes after the tag that contains `SurveyQuestion`.
+
+Skip the task 07 engine pin. That commit is already `d7daf00`. The remaining `nuxt.config.ts` diff is the questionnaire and survey `routeRules`, and it belongs in the engine commit below. Do not run the task 07 `git tag v0.12.0`; that tag already exists on `62bb705`.
+
+```bash
+# 1. anakata-api — survey registry and unwrapped engine pages
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Enums/SurveyQuestionType.php \
+  app/Http/Controllers/Rms/GuestResponseController.php \
+  app/Http/Requests/Engine/StoreSurveyResponseRequest.php \
+  app/Http/Requests/Rms/StoreGuestResponseRequest.php \
+  app/Http/Resources/Engine/QuestionnaireResource.php \
+  app/Http/Resources/Engine/SurveyResource.php \
+  app/Http/Resources/Rms/SurveyQuestionResource.php \
+  app/Policies/GuestResponsePolicy.php \
+  app/Support/Engine/PagePath.php \
+  app/Support/GuestExperience/SurveyAnswers.php \
+  app/Support/GuestExperience/SurveyPage.php \
+  app/Support/GuestExperience/SurveyQuestion.php \
+  app/Support/GuestExperience/SurveyQuestions.php \
+  docs/sprints/sprint-11/07-ui-types.md \
+  docs/sprints/sprint-11/REPORT.md \
+  routes/api/rms.php \
+  tests/Feature/GuestExperience/EngineQuestionnaireTest.php \
+  tests/Feature/GuestExperience/NpsTest.php \
+  tests/Feature/OpenApi/EngineResponseSchemasTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Unit/Engine/PagePathTest.php
+git commit -m "$(cat <<'EOF'
+Serve the survey questions from one registry and return the engine pages unwrapped.
+
+The engine renders that list, and reading the wording needs only panel.rms.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit the regeneration, then point v0.12.0 at it
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/engine.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the survey question list.
+
+SurveyView carries questions, and the survey write field is rec.
+EOF
+)"
+```
+
+The local tag `v0.12.0` is `62bb705` and has no `SurveyQuestion`. Task 07 recorded that this tag was not pushed. If it is still absent from the remote, move it onto the commit above and push. If it is already on the remote, do not move it; tag `v0.13.0` instead and pin the panel and the engine to that tag.
+
+```bash
+git tag -d v0.12.0
+git tag v0.12.0
+git push origin HEAD
+git push origin v0.12.0
+```
+
+```bash
+# 3. anakata-engine — after that tag exists
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add \
+  app/assets/css/engine.css \
+  app/pages/questionnaire \
+  app/pages/survey \
+  app/types/api.ts \
+  app/utils/pagePath.ts \
+  app/utils/questionnaireFields.ts \
+  app/utils/scaleValues.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  tests/unit/engineEvents.test.ts \
+  tests/unit/engineQueue.test.ts \
+  tests/unit/pagePath.test.ts \
+  tests/unit/questionnaireFields.test.ts \
+  tests/unit/scaleValues.test.ts
+git commit -m "$(cat <<'EOF'
+Add the questionnaire and survey pages from the published types.
+
+Token paths are redacted before a page view is queued, and a restricted answer is not shown back.
 EOF
 )"
 ```

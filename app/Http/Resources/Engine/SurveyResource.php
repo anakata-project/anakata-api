@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Engine;
 
+use App\Enums\SurveyQuestionType;
 use App\Models\BookingAccessToken;
 use App\Support\GuestExperience\SurveyPage;
 use Illuminate\Http\Request;
@@ -14,11 +15,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *     reference: string,
  *     departure_date: string,
  *     itinerary_name: string,
+ *     questions: list<array{key: string, label: string, type: SurveyQuestionType, min: int|null, max: int|null}>,
  *     guests: list<array{id: int, first_name: string, last_name: string, responded: bool}>
  * } $resource
  */
 class SurveyResource extends JsonResource
 {
+    public static $wrap = null;
+
     public function __construct(mixed $resource)
     {
         if ($resource instanceof BookingAccessToken) {
@@ -33,6 +37,7 @@ class SurveyResource extends JsonResource
      *     reference: string,
      *     departure_date: string,
      *     itinerary_name: string,
+     *     questions: list<array{key: string, label: string, type: SurveyQuestionType, min: int|null, max: int|null}>,
      *     guests: list<array{id: int, first_name: string, last_name: string, responded: bool}>
      * }
      */

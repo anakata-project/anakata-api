@@ -25,7 +25,7 @@ Same recipe as every type release (Sprint 10 task 07 is the latest example):
      - `crm.ts`: `ScheduledJobCatalogueRow` (it extends the Sync jobs payload);
      - the inputs next to their outputs.
    - Re-export the new file from `index.ts`.
-   - `app/types/engine.ts`: `QuestionnaireView`, `QuestionnaireAnswersInput`, `SurveyView`, `SurveyInput`.
+   - `app/types/engine.ts`: `QuestionnaireView`, `QuestionnaireAnswersInput`, `SurveyQuestion`, `SurveyView` (including its `questions` list), `SurveyInput`.
    
    No CRM file imports these.
 4. **Release** `0.11.0 → 0.12.0`, CHANGELOG, README alias list. Commit, tag after the commit, push HEAD then the tag, explicit paths. Update the panel and engine README and `nuxt.config.ts` pins.

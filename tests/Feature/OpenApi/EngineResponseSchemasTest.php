@@ -162,5 +162,13 @@ test('engine OpenAPI schemas have properties', function (): void {
 
     $survey = $spec['components']['schemas']['StoreSurveyResponseRequest'] ?? null;
     expect($survey)->toBeArray();
-    expect($survey['properties'] ?? null)->toHaveKeys(['score', 'recommend', 'why', 'best', 'better', 'crew']);
+    expect($survey['properties'] ?? null)->toHaveKeys(['score', 'rec', 'why', 'best', 'better', 'crew']);
+    expect($survey['properties'] ?? null)->not->toHaveKey('recommend');
+
+    $surveyPage = engineOpenApiSchema($spec, 'SurveyResource');
+    expect($surveyPage['properties'] ?? null)->toHaveKey('questions');
+    $surveyQuestion = $surveyPage['properties']['questions']['items']['properties']
+        ?? $surveyPage['properties']['questions']['items']['allOf'][0]['properties']
+        ?? [];
+    expect($surveyQuestion)->toHaveKeys(['key', 'label', 'type', 'min', 'max']);
 });

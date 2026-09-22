@@ -80,11 +80,11 @@ test('the guest link returns questions and never echoes restricted answers', fun
             'breakfast' => 'Light',
         ],
     ])->assertOk()
-        ->assertJsonPath('data.reference', 'ANK-2026-6408')
-        ->assertJsonPath('data.guests.0.first_name', 'Ada')
-        ->assertJsonPath('data.guests.0.answers.diet', 'no shellfish')
-        ->assertJsonPath('data.guests.0.answers.access', 'provided')
-        ->assertJsonPath('data.guests.0.answers.emerg', '')
+        ->assertJsonPath('reference', 'ANK-2026-6408')
+        ->assertJsonPath('guests.0.first_name', 'Ada')
+        ->assertJsonPath('guests.0.answers.diet', 'no shellfish')
+        ->assertJsonPath('guests.0.answers.access', 'provided')
+        ->assertJsonPath('guests.0.answers.emerg', '')
         ->assertJsonMissing(['last_name' => 'Lovelace']);
 
     expect(GuestPreference::query()->where('guest_id', $fixture['lead']->id)->first()?->accessibility)->toBe('QX-ACCESS-RAMP-91');
@@ -97,8 +97,8 @@ test('the guest link returns questions and never echoes restricted answers', fun
 
     $this->getJson('/api/engine/questionnaire/'.$fixture['token'])
         ->assertOk()
-        ->assertJsonPath('data.guests.0.answers.access', 'provided')
-        ->assertJsonMissingPath('data.guests.0.last_name');
+        ->assertJsonPath('guests.0.answers.access', 'provided')
+        ->assertJsonMissingPath('guests.0.last_name');
 
     expect($this->getJson('/api/engine/questionnaire/'.$fixture['token'])->getContent())
         ->not->toContain('QX-ACCESS-RAMP-91');
@@ -110,7 +110,7 @@ test('an empty restricted answer on the guest link keeps the stored value', func
 
     $this->putJson($url, ['answers' => ['access' => 'QX-ACCESS-RAMP-91', 'diet' => 'kelp']])->assertOk();
     $this->putJson($url, ['answers' => ['access' => '', 'diet' => 'kelp']])->assertOk()
-        ->assertJsonPath('data.guests.0.answers.access', 'provided');
+        ->assertJsonPath('guests.0.answers.access', 'provided');
 
     $latest = GuestPreference::query()->where('guest_id', $fixture['lead']->id)->orderByDesc('version')->first();
     expect($latest?->version)->toBe(2)

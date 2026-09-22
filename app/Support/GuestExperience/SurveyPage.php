@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\GuestExperience;
 
+use App\Enums\SurveyQuestionType;
 use App\Models\BookingAccessToken;
 use App\Models\Guest;
 use App\Models\GuestResponse;
@@ -15,6 +16,7 @@ final class SurveyPage
      *     reference: string,
      *     departure_date: string,
      *     itinerary_name: string,
+     *     questions: list<array{key: string, label: string, type: SurveyQuestionType, min: int|null, max: int|null}>,
      *     guests: list<array{id: int, first_name: string, last_name: string, responded: bool}>
      * }
      */
@@ -48,6 +50,7 @@ final class SurveyPage
             'reference' => (string) ($booking->displayReference() ?? ''),
             'departure_date' => $booking->departure->date->toDateString(),
             'itinerary_name' => $booking->departure->itinerary->name,
+            'questions' => SurveyQuestions::payload(),
             'guests' => $guests->map(fn (Guest $guest): array => [
                 'id' => $guest->id,
                 'first_name' => $guest->first_name,

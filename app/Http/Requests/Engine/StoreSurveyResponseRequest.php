@@ -6,6 +6,7 @@ namespace App\Http\Requests\Engine;
 
 use App\Support\GuestExperience\SurveyAnswers;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreSurveyResponseRequest extends FormRequest
 {
@@ -20,6 +21,13 @@ class StoreSurveyResponseRequest extends FormRequest
     public function rules(): array
     {
         return SurveyAnswers::rules(callNotes: false);
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            SurveyAnswers::rejectUnknown($this->all(), callNotes: false, validator: $validator);
+        });
     }
 
     public function answers(): SurveyAnswers

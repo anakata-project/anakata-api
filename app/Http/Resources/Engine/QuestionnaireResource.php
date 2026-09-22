@@ -21,6 +21,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class QuestionnaireResource extends JsonResource
 {
+    public static $wrap = null;
+
     public function __construct(mixed $resource)
     {
         if ($resource instanceof BookingAccessToken) {

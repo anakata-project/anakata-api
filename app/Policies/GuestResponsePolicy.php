@@ -18,4 +18,9 @@ final class GuestResponsePolicy extends Policy
     {
         return $actor->hasPermission(Permission::GuestExperienceManage);
     }
+
+    public function viewQuestions(User $actor): bool
+    {
+        return $actor->hasPermission(Permission::PanelRms);
+    }
 }

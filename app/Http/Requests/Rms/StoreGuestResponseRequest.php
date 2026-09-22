@@ -7,6 +7,7 @@ namespace App\Http\Requests\Rms;
 use App\Models\GuestResponse;
 use App\Support\GuestExperience\SurveyAnswers;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreGuestResponseRequest extends FormRequest
 {
@@ -21,6 +22,13 @@ class StoreGuestResponseRequest extends FormRequest
     public function rules(): array
     {
         return SurveyAnswers::rules(callNotes: true);
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            SurveyAnswers::rejectUnknown($this->all(), callNotes: true, validator: $validator);
+        });
     }
 
     public function answers(): SurveyAnswers
