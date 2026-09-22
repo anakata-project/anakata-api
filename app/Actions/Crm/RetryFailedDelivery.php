@@ -47,7 +47,10 @@ final class RetryFailedDelivery extends Action
             return $this->paymentRequests->handle($booking, DeliveryKind::Reminder, reminderDays: 1, actor: $actor, resend: true);
         }
 
-        if ($delivery->kind === DeliveryKind::DataChaser || $delivery->kind === DeliveryKind::Questionnaire) {
+        if ($delivery->kind === DeliveryKind::DataChaser
+            || $delivery->kind === DeliveryKind::Questionnaire
+            || $delivery->kind === DeliveryKind::Survey
+            || $delivery->kind === DeliveryKind::ReviewRequest) {
             throw new HttpException(422, 'That delivery has no document to resend.');
         }
 

@@ -23,6 +23,7 @@ use App\Models\Payment;
 use App\Models\RefundRequest;
 use App\Models\SubjectRequest;
 use App\Services\Config\CurrentConfig;
+use App\Support\BusinessTime;
 use App\Support\Money;
 use App\Support\Payments\WireWindow;
 use Carbon\CarbonInterface;
@@ -68,6 +69,10 @@ final class TaskSweep
 
         if ($from === BookingStatus::OnHoldAgency && $to !== BookingStatus::OnHoldAgency) {
             $this->closeKind(TaskKind::CommissionCap, 'cap:'.$booking->id, 'the booking left ON_HOLD_AGENCY');
+        }
+
+        if ($to === BookingStatus::Completed) {
+            $this->raisePostTripCall($booking);
         }
     }
 
@@ -174,6 +179,26 @@ final class TaskSweep
             TaskKind::SubjectRequest => $this->subjectCleared($task),
             default => null,
         };
+    }
+
+    private function raisePostTripCall(Booking $booking): void
+    {
+        $booking->loadMissing('departure.itinerary');
+        $rules = $this->config->businessRules();
+        $reference = self::reference($booking);
+        $from = BusinessTime::calendarDay($booking->departure->returnDate()->toDateString());
+
+        $this->raise->handle(
+            TaskKind::PostTripCall,
+            'post-trip-call:'.$booking->id,
+            'Post-trip call · '.$reference,
+            $reference.' · MKT-006',
+            TaskDue::businessDays($from, 2, $rules),
+            $booking->owner_id,
+            Permission::GuestExperienceManage,
+            contactId: $booking->contact_id,
+            bookingId: $booking->id,
+        );
     }
 
     private function raiseRequest(Booking $booking): void

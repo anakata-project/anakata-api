@@ -10,6 +10,7 @@ use App\Enums\AlertSeverity;
 use App\Enums\BookingStatus;
 use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
+use App\Enums\GuestResponseSource;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\TaskKind;
@@ -29,6 +30,8 @@ use App\Models\ChangeHistory;
 use App\Models\CrmTask;
 use App\Models\Delivery;
 use App\Models\Departure;
+use App\Models\Guest;
+use App\Models\GuestResponse;
 use App\Models\Payment;
 use App\Models\User;
 use App\Support\Alerts\AlertKeys;
@@ -572,17 +575,31 @@ test('meta counts ignore section and equal the sum of the open section lists', f
         ->and($openCrm->json('meta.total'))->toBe(2);
 });
 
-test('kinds lists the registry and a guest response id needs no foreign key', function (): void {
+test('kinds lists the registry and a guest response references the response row', function (): void {
     $this->actingAs(adminUser())->getJson('/api/alerts/kinds')
         ->assertOk()
-        ->assertJsonCount(10, 'data')
+        ->assertJsonCount(11, 'data')
         ->assertJsonPath('data.0.emails', false)
         ->assertJsonPath('data.0.section', 'rms');
 
-    expect(AlertRegistry::all())->toHaveCount(10);
+    expect(AlertRegistry::all())->toHaveCount(11);
 
-    $alert = Alert::factory()->create(['guest_response_id' => 424242]);
-    expect($alert->fresh()?->guest_response_id)->toBe(424242);
+    $booking = alertBooking();
+    $guest = Guest::factory()->create([
+        'booking_id' => $booking->id,
+        'is_lead' => true,
+        'first_name' => 'Ada',
+        'last_name' => 'Lovelace',
+    ]);
+    $response = GuestResponse::query()->create([
+        'guest_id' => $guest->id,
+        'booking_id' => $booking->id,
+        'score' => 6,
+        'source' => GuestResponseSource::Staff,
+        'responded_at' => now(),
+    ]);
+    $alert = Alert::factory()->create(['guest_response_id' => $response->id]);
+    expect($alert->fresh()?->guest_response_id)->toBe($response->id);
     expect(fn () => $alert->delete())->toThrow(LogicException::class);
 });
 

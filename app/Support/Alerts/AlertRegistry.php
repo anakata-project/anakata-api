@@ -97,6 +97,14 @@ final class AlertRegistry
                 'The passenger data is complete, or the departure has sailed.',
                 'rms',
             ),
+            new AlertKindDefinition(
+                AlertKind::NpsLow,
+                AlertSeverity::Critical,
+                [Permission::GuestExperienceManage],
+                'A post-trip score is below nps.alert_below.',
+                'The NPS reply task closes.',
+                'rms',
+            ),
         ];
     }
 

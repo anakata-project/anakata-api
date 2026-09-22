@@ -26,6 +26,8 @@ final class DeliverySubject
             DeliveryKind::Reminder, DeliveryKind::PaymentLink => $kind->label().' — '.$ref,
             DeliveryKind::DataChaser => 'Passenger details needed — '.$ref,
             DeliveryKind::Questionnaire => 'Your preferences questionnaire — '.$ref,
+            DeliveryKind::Survey => 'Your post-trip survey — '.$ref,
+            DeliveryKind::ReviewRequest => 'Would you share a review? — '.$ref,
         };
     }
 

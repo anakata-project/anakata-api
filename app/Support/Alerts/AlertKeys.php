@@ -86,4 +86,9 @@ final class AlertKeys
     {
         return 'manifest-data:'.$departureId;
     }
+
+    public static function npsReply(int $guestResponseId): string
+    {
+        return 'nps-reply:'.$guestResponseId;
+    }
 }

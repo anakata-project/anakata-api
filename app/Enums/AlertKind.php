@@ -16,6 +16,7 @@ enum AlertKind: string
     case CommissionLeakage = 'COMMISSION_LEAKAGE';
     case LowOccupancy = 'LOW_OCCUPANCY';
     case ManifestDataOverdue = 'MANIFEST_DATA_OVERDUE';
+    case NpsLow = 'NPS_LOW';
 
     public function label(): string
     {
@@ -30,6 +31,7 @@ enum AlertKind: string
             self::CommissionLeakage => 'Commission leakage',
             self::LowOccupancy => 'Low occupancy',
             self::ManifestDataOverdue => 'Manifest data overdue',
+            self::NpsLow => 'NPS below threshold',
         };
     }
 }

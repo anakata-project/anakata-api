@@ -109,6 +109,7 @@ final class AlertSweep
         $this->resolveCaps();
         $this->resolveWires();
         $this->resolveSlas();
+        $this->resolveNps();
         $this->resolveDeliveries();
     }
 
@@ -324,6 +325,23 @@ final class AlertSweep
             ->orderBy('id')
             ->each(function (Alert $alert): void {
                 $this->resolve->handle($alert, 'the wire was received or released');
+            });
+    }
+
+    private function resolveNps(): void
+    {
+        Alert::query()
+            ->where('kind', AlertKind::NpsLow)
+            ->unresolved()
+            ->orderBy('id')
+            ->each(function (Alert $alert): void {
+                $task = $alert->crm_task_id !== null ? CrmTask::query()->find($alert->crm_task_id) : null;
+
+                if ($task instanceof CrmTask && $task->status === TaskStatus::Open) {
+                    return;
+                }
+
+                $this->resolve->handle($alert, 'the task closed');
             });
     }
 

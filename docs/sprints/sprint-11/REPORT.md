@@ -427,3 +427,121 @@ The questionnaire goes out with the pre-trip itinerary, restricted answers stay 
 EOF
 )"
 ```
+
+## Task 05 · NPS and the post-trip touchpoints
+
+Completing a voyage starts the post-trip sequence. The survey is a service message. A low score alerts guest experience. A high score asks for a review only when the responding guest is the contact and marketing consent allows. The CRM shows that contact's own latest score.
+
+### Rules
+`nps` on the business-rules document, typed as `NpsRules`: `survey_hours_after_return` 24, `alert_below` 7, `review_request_from` 8, `review_url` `PENDING CLIENT` (a string, not a URL rule). The DML migration `2026_09_22_240001_add_nps_rules_to_business_rules` publishes through `ConfigPublisher` as System with approval reference `Sprint 11: nps.* added (defaults 24 / 7 / 8 / PENDING CLIENT, source N8, review URL PENDING CLIENT)`. It is a no-op when all four keys exist. `down()` is empty.
+
+Two `RuleWhere::Here` rows in Guests & capacity. The three numeric paths are Confirmed, N8. `nps.review_url` is Pending client, LEG-002. Registry counts are **85 / 60 / 15 / 10 / 37**. `herePaths()` still equals every leaf. `anakata:config-verify` fails on a document without `nps` and passes after the migration. The 60-day token life is a constant on `IssueSurveyAccessToken`, cited from this task, not a fifth rule.
+
+### Schema
+`guest_responses`: guest, booking, score 1–10, nullable recommend 0–10, `why`, `best`, `better`, `crew`, nullable `call_notes`, source `GUEST_LINK` or `STAFF`, nullable `recorded_by`, `responded_at`, and the audit columns. Unique `(guest_id, booking_id)`. The action checks under a lock and returns 409; the index is the backstop. A new migration adds the foreign key on the existing `alerts.guest_response_id` (`nullOnDelete`). The text columns are not in `SensitiveFields`. CRM exclusion is by resource shape.
+
+### Post-trip call
+`TaskSweep::onBookingStatusChanged` raises `POST_TRIP_CALL` when the booking becomes `COMPLETED`, whether the voyage job or a hand transition dispatched `BookingStatusChanged`. Key `post-trip-call:{booking}`, owner `booking.owner_id`, needs `guest_experience.manage`, due the return date plus 2 business days. `clearedFact()` stays null for this kind. It closes on the existing CRM complete endpoint, or when a staff response is saved with non-empty `call_notes` (`CloseTask::autoClose`). A guest-link response does not close it. Replaying the status event does not raise a second task.
+
+### Survey
+`anakata:nps-survey` is hourly in the Galápagos zone, `withoutOverlapping`, `onOneServer`, wrapped in `RecordScheduledRuns::attach`. It is not in `JobCatalogue`. A completed booking is selected once Galápagos now is at or after the start of the return date plus `nps.survey_hours_after_return`. Each guest with a usable email gets purpose `SURVEY`, that guest covered, delivery key `survey:{guest}`. Guests with no email go on the lead link (`guest_id` null, key `survey:{booking}:lead`). No usable lead address records one `BLOCKED` delivery. The token expires at the end of the Galápagos day 60 days after the return date. `page_url` is `{engine}/survey/{plain}`. The hash is stored. The send is idempotent on the delivery key and does not call `ConsentGate` (PENDING LEG-002). `DeliveryKind::Survey` and `SurveyMail` go through `DeliveryMailFactory`. No PDF.
+
+### Engine and the score
+`GET /api/engine/survey/{token}` returns the booking reference, itinerary name, departure date, and covered guests with `responded`. No free text. `POST /api/engine/survey/{token}/guests/{guest}` records the six answers. The guest must be in `covered_guest_ids`. A wrong purpose, an expired token, or a revoked token is rejected the same way as the questionnaire resolver.
+
+`RecordGuestResponse` is the one write path for the engine and for staff. Inside the transaction it inserts the row, then:
+
+- score below `nps.alert_below`: `NPS_REPLY` (key `nps-reply:{response}`, due `responded_at` plus 24 clock hours, needs `guest_experience.manage`) and a `CRITICAL` `NPS_LOW` alert on the same base key, audience `[guest_experience.manage]`, section `rms`, `guest_response_id` set. The email is the existing critical path on `anakata:alerts`. `AlertRegistry` is 11 kinds. Completing, cancelling, or auto-closing `NPS_REPLY` resolves the alert with fact `the task closed`. `AlertSweep` resolves an open `NPS_LOW` whose task is no longer open.
+- score at or above `nps.review_request_from`: send `REVIEW_REQUEST` (key `review:{guest}`, body contains `nps.review_url`) only when `ContactGuest` says the guest is the contact and `ConsentGate` allows `MARKETING` for that contact. Otherwise nothing is sent, and the booking history says `no marketing consent on record for this guest`. That sentence covers a companion, a contact who has not consented, and a guest with no email.
+- a score in between (7 at the defaults) does neither.
+
+One history row, event `booking.nps_recorded`, `after.what` = `Post-trip survey recorded — score {n}` plus the follow-up clause. `ContactGuest::matches` is the shared email match for the review, the CRM score, the access export, and erasure.
+
+### CRM and staff
+`ContactDerived::npsSql()` is the latest `guest_responses.score` on that contact's bookings from the guest whose email matches the contact (`LOWER(TRIM(guests.email)) = contacts.email`), ordered by `responded_at` desc, `id` desc. Null when there is no such row. `ContactResource` returns `int|null`. No CRM route returns `why`, `best`, `better`, `crew`, `call_notes`, or `recommend`. `anakata-ui` `api.d.ts` is unchanged (`nps: null` until task 07). The contacts list and the contact drawer render `nps`, falling back to "—".
+
+`POST /api/rms/bookings/{booking}/guest-responses` needs `guest_experience.manage` and `view` on the booking. The booking must be `COMPLETED` (422 otherwise). A second response for the same guest and booking is 409. `GET /api/rms/guest-experience/nps` is the same permission, not own-records. `from` and `to` are inclusive Galápagos dates on `responded_at`. KPIs are the one-decimal average, the response count, the count of scores below the threshold, and the count of `REVIEW_REQUEST` deliveries queued or sent for those guests. Rows carry `score_class` `low` / `neutral` / `high`. Facts always include `first_expected_survey_on` and the three numeric rule values. The list does not include `why` or `call_notes`.
+
+### Subject requests
+The access export adds `survey_responses` for the contact's own rows: booking reference, score, recommend, the four texts, and `responded_at`. Companion responses and `call_notes` are not included. Erasure nulls `why`, `best`, `better`, `crew`, and `call_notes` on the contact's own responses, keeps `score` and `recommend`, and leaves companion rows as recorded. The outcome sentence names those five fields and says the score was kept. The retention job does not purge these texts.
+
+### Checks
+`composer check`: 1183 tests, Pint, Larastan, no errors. `config-verify` fails before the migration and passes after it, inside `AddNpsRulesToBusinessRulesMigrationTest`.
+
+The local API returns `nps: 7` for contact NPS Ada and `nps: null` for NPS None, on the contact profile and on the contacts list, with no free-text keys. Those are the values the list and the drawer bind (`nps` falling back to "—"). The browser click-through of the panel was not completed: the browser tools were blocked, then the snapshot approval was rejected.
+
+### Deviations
+The alert kinds test used to store `guest_response_id` 424242 with no foreign key. The new migration adds that key, so the test now links a real `guest_responses` row. The migration test asserts the four `nps` values one by one because MySQL JSON does not keep the PHP key order. The review delivery's `to` keeps the guest's stored address; the contact match still goes through `Contact::normalizeEmail`.
+
+### Open questions
+LEG-002. Survey free text (`why`, `best`, `better`, `crew`, `call_notes`) is kept until a retention rule is decided. `nps.review_url` stays `PENDING CLIENT` until the review site is named.
+
+### Notes for later
+Task 07 regenerates `api.d.ts`. Task 08 is the survey page. Task 10 is the Guest Experience screen and the panel sentence that uses `first_expected_survey_on`. Task 12 should refresh the business-rules e2e counts (they were already behind, at 81, and the registry is now 85 / 60 / 15 / 10 / 37) and `reference-values.md`. The permission label is still "Record guest preferences". `SendDeliveryJob` still records `payment_request.sent` for a non-document delivery, which now includes the survey and the review request. The local database has contacts NPS Ada and NPS None, and booking `ANK-NPS-BROWSER`, from the API check.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Crm/CloseTask.php app/Actions/Crm/RetryFailedDelivery.php \
+  app/Actions/GuestExperience/IssueSurveyAccessToken.php \
+  app/Actions/GuestExperience/RecordGuestResponse.php \
+  app/Actions/GuestExperience/ResolveSurveyAccessToken.php \
+  app/Actions/GuestExperience/SendSurveys.php \
+  app/Actions/Privacy/EraseContact.php app/Actions/Privacy/ExportSubjectAccess.php \
+  app/Console/Commands/NpsSurveyCommand.php \
+  app/Enums/AlertKind.php app/Enums/BookingAccessTokenPurpose.php \
+  app/Enums/DeliveryKind.php app/Enums/GuestResponseSource.php app/Enums/TaskKind.php \
+  app/Http/Controllers/Engine/SurveyController.php \
+  app/Http/Controllers/Rms/GuestResponseController.php \
+  app/Http/Requests/Engine/StoreSurveyResponseRequest.php \
+  app/Http/Requests/Rms/NpsIndexRequest.php \
+  app/Http/Requests/Rms/StoreGuestResponseRequest.php \
+  app/Http/Resources/Crm/ContactResource.php \
+  app/Http/Resources/Engine/SurveyResource.php \
+  app/Mail/Documents/DeliveryMailFactory.php app/Mail/Documents/DocumentMail.php \
+  app/Mail/Documents/ReviewRequestMail.php app/Mail/Documents/SurveyMail.php \
+  app/Models/Contact.php app/Models/GuestResponse.php \
+  app/Policies/GuestResponsePolicy.php \
+  app/Support/Alerts/AlertKeys.php app/Support/Alerts/AlertRegistry.php \
+  app/Support/Alerts/AlertSweep.php \
+  app/Support/BusinessRules/Registry.php \
+  app/Support/Config/Documents/BusinessRulesDocument.php \
+  app/Support/Config/Documents/NpsRules.php \
+  app/Support/Crm/ContactDerived.php app/Support/Crm/TaskSweep.php \
+  app/Support/Documents/DeliverySubject.php app/Support/Documents/Recipients.php \
+  app/Support/GuestExperience/ContactGuest.php \
+  app/Support/GuestExperience/NpsDashboard.php \
+  app/Support/GuestExperience/SurveyAnswers.php \
+  app/Support/GuestExperience/SurveyDispatch.php \
+  app/Support/GuestExperience/SurveyPage.php \
+  app/Support/GuestExperience/SurveyPlan.php \
+  app/Support/Schedule/AnakataSchedule.php \
+  database/migrations/2026_09_22_240001_add_nps_rules_to_business_rules.php \
+  database/migrations/2026_09_22_240002_create_guest_responses_table.php \
+  resources/views/mail/documents/review-request.blade.php \
+  resources/views/mail/documents/survey.blade.php \
+  routes/api/engine.php routes/api/rms.php \
+  tests/Feature/Alerts/AlertsTest.php \
+  tests/Feature/Config/AddNpsRulesToBusinessRulesMigrationTest.php \
+  tests/Feature/Config/BusinessRulesEndpointsTest.php \
+  tests/Feature/Config/BusinessRulesSeederTest.php \
+  tests/Feature/GuestExperience/NpsTest.php \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record one NPS response per guest and act on the score.
+
+The post-trip call and survey start from completion, a low score alerts guest experience, and a review goes only to the contact when marketing consent allows.
+EOF
+)"
+
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/components/crm/ContactDrawer.vue app/pages/crm/sales/contacts.vue
+git commit -m "$(cat <<'EOF'
+Show the contact's own NPS on the list and in the drawer.
+
+A missing score still renders as a dash.
+EOF
+)"
+```

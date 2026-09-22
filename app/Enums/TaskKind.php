@@ -15,6 +15,8 @@ enum TaskKind: string
     case DealQuote = 'DEAL_QUOTE';
     case Manual = 'MANUAL';
     case SubjectRequest = 'SUBJECT_REQUEST';
+    case PostTripCall = 'POST_TRIP_CALL';
+    case NpsReply = 'NPS_REPLY';
 
     public function label(): string
     {
@@ -28,6 +30,8 @@ enum TaskKind: string
             self::DealQuote => 'Quote follow-up',
             self::Manual => 'Manual',
             self::SubjectRequest => 'Subject request',
+            self::PostTripCall => 'Post-trip call',
+            self::NpsReply => 'NPS reply',
         };
     }
 
@@ -43,6 +47,8 @@ enum TaskKind: string
             self::DealQuote => 'CRM · OPS-009 SLA timer',
             self::Manual => 'Manual',
             self::SubjectRequest => 'CRM · subject request',
+            self::PostTripCall => 'RMS · MKT-006',
+            self::NpsReply => 'RMS · NPS reply',
         };
     }
 }

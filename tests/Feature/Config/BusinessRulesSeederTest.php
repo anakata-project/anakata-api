@@ -41,6 +41,10 @@ test('the seeded business rules document matches seed-data.json plus the new fie
     expect($document['manifests']['dpng_charter_days'])->toBe($policies['manifestCh']);
     expect($document['alerts']['low_occupancy_pct'])->toBe(40);
     expect($document['alerts']['low_occupancy_days_before'])->toBe(90);
+    expect($document['nps']['survey_hours_after_return'])->toBe(24);
+    expect($document['nps']['alert_below'])->toBe(7);
+    expect($document['nps']['review_request_from'])->toBe(8);
+    expect($document['nps']['review_url'])->toBe('PENDING CLIENT');
     expect($document['retention']['passport_months_after_cruise'])->toBe(24);
     expect($document['retention']['medical_days_after_cruise'])->toBe(90);
     expect($document['retention']['behavioural_raw_months'])->toBe(24);

@@ -49,6 +49,8 @@ final class DocumentMail extends Mailable
             DeliveryKind::WireInstructions => 'mail.documents.wire-instructions',
             DeliveryKind::DataChaser => throw new InvalidArgumentException('A data chaser is not a document.'),
             DeliveryKind::Questionnaire => throw new InvalidArgumentException('A questionnaire is not a document.'),
+            DeliveryKind::Survey => throw new InvalidArgumentException('A survey is not a document.'),
+            DeliveryKind::ReviewRequest => throw new InvalidArgumentException('A review request is not a document.'),
             default => 'mail.documents.invoice',
         };
 

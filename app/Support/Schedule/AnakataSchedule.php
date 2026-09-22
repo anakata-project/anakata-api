@@ -122,6 +122,15 @@ final class AnakataSchedule
                 ->description('Re-queue one failed automatic document send'),
         );
 
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:nps-survey')
+                ->hourly()
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Send the post-trip survey after return'),
+        );
+
         if (class_exists(PruneCommand::class)) {
             RecordScheduledRuns::attach(
                 $schedule->command('telescope:prune --hours=48')->daily(),

@@ -25,6 +25,7 @@ use App\Http\Controllers\Rms\ExtrasController;
 use App\Http\Controllers\Rms\GroupController;
 use App\Http\Controllers\Rms\GuestController;
 use App\Http\Controllers\Rms\GuestExperienceController;
+use App\Http\Controllers\Rms\GuestResponseController;
 use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
@@ -163,7 +164,9 @@ Route::get('documents/{document}/html', [DocumentController::class, 'issuedHtml'
 Route::get('documents/{document}/file', [DocumentController::class, 'file'])->whereNumber('document');
 Route::post('documents/{document}/send', [DocumentController::class, 'send'])->whereNumber('document');
 Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
+Route::get('guest-experience/nps', [GuestResponseController::class, 'index']);
 Route::get('guest-experience/questions', [GuestExperienceController::class, 'questions']);
+Route::post('bookings/{booking}/guest-responses', [GuestResponseController::class, 'store'])->whereNumber('booking');
 Route::get('departures/{departure}/guest-experience', [GuestExperienceController::class, 'show'])->whereNumber('departure');
 Route::get('departures/{departure}/hotel-manager-brief', [GuestExperienceController::class, 'brief'])->whereNumber('departure');
 Route::get('guests/{guest}/preferences', [GuestExperienceController::class, 'preferences'])->whereNumber('guest');

@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Actions\Crm;
 
 use App\Actions\Action;
+use App\Actions\Alerts\ResolveAlert;
 use App\Enums\ActivityKind;
+use App\Enums\AlertKind;
 use App\Enums\Permission;
+use App\Enums\TaskKind;
 use App\Enums\TaskSource;
 use App\Enums\TaskStatus;
+use App\Models\Alert;
 use App\Models\ContactActivity;
 use App\Models\CrmTask;
 use App\Models\User;
@@ -19,6 +23,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class CloseTask extends Action
 {
+    public function __construct(private readonly ResolveAlert $resolveAlerts) {}
+
     public function autoClose(CrmTask $task, string $fact): CrmTask
     {
         if ($task->status !== TaskStatus::Open) {
@@ -36,6 +42,8 @@ final class CloseTask extends Action
                 'fact' => $fact,
                 'outcome' => 'Resolved in the RMS',
             ], system: true);
+
+            $this->resolveNpsReply($task);
 
             return $task->refresh();
         });
@@ -72,6 +80,8 @@ final class CloseTask extends Action
                 'outcome' => $outcome,
             ]);
 
+            $this->resolveNpsReply($task);
+
             return $task->refresh();
         });
     }
@@ -100,8 +110,26 @@ final class CloseTask extends Action
                 'outcome' => $outcome,
             ]);
 
+            $this->resolveNpsReply($task);
+
             return $task->refresh();
         });
+    }
+
+    private function resolveNpsReply(CrmTask $task): void
+    {
+        if ($task->kind !== TaskKind::NpsReply || $task->status === TaskStatus::Open) {
+            return;
+        }
+
+        Alert::query()
+            ->where('kind', AlertKind::NpsLow)
+            ->where('crm_task_id', $task->id)
+            ->unresolved()
+            ->orderBy('id')
+            ->each(function (Alert $alert): void {
+                $this->resolveAlerts->handle($alert, 'the task closed');
+            });
     }
 
     private function assertMayAct(CrmTask $task, User $actor): void

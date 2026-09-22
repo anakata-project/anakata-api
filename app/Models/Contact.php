@@ -196,6 +196,7 @@ class Contact extends Model
             ->selectRaw('('.ContactDerived::segmentSql($crm).') as segment')
             ->selectRaw('('.ContactDerived::lifecycleSql().') as lifecycle')
             ->selectRaw('('.ContactDerived::marketingConsentSql().') as marketing_consent')
+            ->selectRaw('('.ContactDerived::npsSql().') as nps')
             ->selectRaw('('.ContactDerived::firstBookingColumnSql('main_channel').') as first_main_channel')
             ->selectRaw('('.ContactDerived::firstBookingColumnSql('channel_of_origin').') as first_channel_of_origin');
     }

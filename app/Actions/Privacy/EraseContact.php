@@ -16,11 +16,13 @@ use App\Models\ContactActivity;
 use App\Models\CrmTask;
 use App\Models\ErasureLog;
 use App\Models\Group;
+use App\Models\GuestResponse;
 use App\Models\RefundRequest;
 use App\Models\SubjectRequest;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
+use App\Support\GuestExperience\ContactGuest;
 use App\Support\History\History;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -52,7 +54,7 @@ final class EraseContact extends Action
         $this->guard($contact);
 
         $months = $this->config->businessRules()->retention->passportMonthsAfterCruise;
-        $outcome = 'Erased the contact. Kept issued documents, payments, the booking consent log, the consent register and the bookings, which stay linked to this contact id. Guest passport data is anonymised '.$months.' months after each cruise returns; medical notes follow the published retention window. A later booking with the same email is a new contact and inherits no consent.';
+        $outcome = 'Erased the contact. Kept issued documents, payments, the booking consent log, the consent register and the bookings, which stay linked to this contact id. Guest passport data is anonymised '.$months.' months after each cruise returns; medical notes follow the published retention window. Survey text (why, best, better, crew, call_notes) was cleared on this contact\'s own responses; the score was kept. A later booking with the same email is a new contact and inherits no consent.';
 
         return $this->transaction(function () use ($request, $actor, $verifiedHow, $contact, $email, $outcome): SubjectRequest {
             $sessions = BehaviouralEvent::query()
@@ -71,6 +73,25 @@ final class EraseContact extends Action
                 'body' => 'Erased on '.BusinessTime::now()->toDateString(),
                 'occurred_at' => Carbon::now(),
             ]);
+
+            GuestResponse::query()
+                ->with('guest')
+                ->whereIn('booking_id', $this->bookingIds($contact))
+                ->orderBy('id')
+                ->get()
+                ->each(function (GuestResponse $response) use ($email): void {
+                    if (! ContactGuest::matches($response->guest->email, $email)) {
+                        return;
+                    }
+
+                    $response->forceFill([
+                        'why' => null,
+                        'best' => null,
+                        'better' => null,
+                        'crew' => null,
+                        'call_notes' => null,
+                    ])->save();
+                });
 
             ErasureLog::query()->create([
                 'contact_id' => $contact->id,

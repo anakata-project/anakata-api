@@ -24,6 +24,7 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly SlaRules $sla,
         public readonly ManifestsRules $manifests,
         public readonly AlertsRules $alerts,
+        public readonly NpsRules $nps,
         public readonly RetentionRules $retention,
         public readonly ConsentVersions $consentVersions,
         public readonly LegalEntityRules $legalEntity,
@@ -79,6 +80,12 @@ final class BusinessRulesDocument extends ConfigDocument
             'alerts' => [
                 'low_occupancy_pct' => 40,
                 'low_occupancy_days_before' => 90,
+            ],
+            'nps' => [
+                'survey_hours_after_return' => 24,
+                'alert_below' => 7,
+                'review_request_from' => 8,
+                'review_url' => 'PENDING CLIENT',
             ],
             'retention' => [
                 'passport_months_after_cruise' => 24,
@@ -156,6 +163,7 @@ final class BusinessRulesDocument extends ConfigDocument
         $sla = is_array($data['sla'] ?? null) ? $data['sla'] : [];
         $manifests = is_array($data['manifests'] ?? null) ? $data['manifests'] : [];
         $alerts = is_array($data['alerts'] ?? null) ? $data['alerts'] : [];
+        $nps = is_array($data['nps'] ?? null) ? $data['nps'] : [];
         $retention = is_array($data['retention'] ?? null) ? $data['retention'] : [];
         $legal = is_array($data['legal'] ?? null) ? $data['legal'] : [];
         $consentVersions = is_array($legal['consent_versions'] ?? null) ? $legal['consent_versions'] : [];
@@ -233,6 +241,12 @@ final class BusinessRulesDocument extends ConfigDocument
                 (int) ($alerts['low_occupancy_pct'] ?? 0),
                 (int) ($alerts['low_occupancy_days_before'] ?? 0),
             ),
+            new NpsRules(
+                (int) ($nps['survey_hours_after_return'] ?? 0),
+                (int) ($nps['alert_below'] ?? 0),
+                (int) ($nps['review_request_from'] ?? 0),
+                is_string($nps['review_url'] ?? null) ? $nps['review_url'] : '',
+            ),
             new RetentionRules(
                 (int) ($retention['passport_months_after_cruise'] ?? 0),
                 (int) ($retention['medical_days_after_cruise'] ?? 0),
@@ -296,6 +310,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
      *     manifests: array{dpng_fit_days: int, dpng_charter_days: int, captain_days: int, chase_days_before_due: int},
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
+     *     nps: array{survey_hours_after_return: int, alert_below: int, review_request_from: int, review_url: string},
      *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int, behavioural_raw_months: int, behavioural_unstitched_days: int},
      *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string, analytics: string}},
      *     legal_entity: array{name: string, address_lines: list<string>, email: string, website: string, ein: string, bank: array{bank_name: string, account_name: string, account_number: string, routing: string, swift: string}},
@@ -316,6 +331,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'sla' => $this->sla->toArray(),
             'manifests' => $this->manifests->toArray(),
             'alerts' => $this->alerts->toArray(),
+            'nps' => $this->nps->toArray(),
             'retention' => $this->retention->toArray(),
             'legal' => [
                 'consent_versions' => $this->consentVersions->toArray(),
@@ -376,6 +392,11 @@ final class BusinessRulesDocument extends ConfigDocument
             'alerts' => ['required', 'array'],
             'alerts.low_occupancy_pct' => ['required', 'integer', 'min:1', 'max:100'],
             'alerts.low_occupancy_days_before' => ['required', 'integer', 'min:1', 'max:365'],
+            'nps' => ['required', 'array'],
+            'nps.survey_hours_after_return' => ['required', 'integer', 'min:1', 'max:168'],
+            'nps.alert_below' => ['required', 'integer', 'min:1', 'max:10'],
+            'nps.review_request_from' => ['required', 'integer', 'min:0', 'max:10'],
+            'nps.review_url' => ['required', 'string', 'min:1', 'max:200'],
             'retention' => ['required', 'array'],
             'retention.passport_months_after_cruise' => ['required', 'integer', 'min:1', 'max:120'],
             'retention.medical_days_after_cruise' => ['required', 'integer', 'min:1', 'max:3650'],
@@ -459,6 +480,10 @@ final class BusinessRulesDocument extends ConfigDocument
             'manifests.chase_days_before_due' => 'N5 · Passenger-data chaser — days before the DPNG due date',
             'alerts.low_occupancy_pct' => '§10 · Low-occupancy alert',
             'alerts.low_occupancy_days_before' => '§10 · Low-occupancy alert',
+            'nps.survey_hours_after_return' => 'N8 · Survey hours after return',
+            'nps.alert_below' => 'N8 · NPS alert below',
+            'nps.review_request_from' => 'N8 · Review request from',
+            'nps.review_url' => 'LEG-002 · Public review URL',
             'retention.passport_months_after_cruise' => '§6.4 · Passport retention',
             'retention.medical_days_after_cruise' => 'LEG-002 · Medical notes retention',
             'retention.behavioural_raw_months' => 'L6 · Behavioural events raw retention',
@@ -590,6 +615,10 @@ final class BusinessRulesDocument extends ConfigDocument
             'manifests.captain_days' => '7 days (N4 / prototype T−7)',
             'manifests.chase_days_before_due' => '10 days (PENDING CLIENT, N5)',
             'alerts.low_occupancy_pct', 'alerts.low_occupancy_days_before' => '40% at 90 days',
+            'nps.survey_hours_after_return',
+            'nps.alert_below',
+            'nps.review_request_from' => '24 h after return · alert below 7 · review from 8 (N8)',
+            'nps.review_url' => 'PENDING CLIENT (LEG-002)',
             'retention.passport_months_after_cruise' => '24 months',
             'retention.medical_days_after_cruise' => '90 days',
             'retention.behavioural_raw_months' => '24 months (PENDING CLIENT, L6 / doc 07 §8)',

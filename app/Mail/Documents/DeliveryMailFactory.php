@@ -12,6 +12,7 @@ use App\Models\Booking;
 use App\Models\BookingAccessToken;
 use App\Models\Delivery;
 use App\Models\PaymentLink;
+use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
 use Illuminate\Mail\Mailable;
 use InvalidArgumentException;
@@ -45,6 +46,16 @@ final class DeliveryMailFactory
                 $delivery,
                 $delivery->booking,
                 self::questionnaireUrl($delivery),
+            ),
+            DeliveryKind::Survey => new SurveyMail(
+                $delivery,
+                $delivery->booking,
+                self::surveyUrl($delivery),
+            ),
+            DeliveryKind::ReviewRequest => new ReviewRequestMail(
+                $delivery,
+                $delivery->booking,
+                app(CurrentConfig::class)->businessRules()->nps->reviewUrl,
             ),
             default => self::documentMail($delivery, $pdfBytes),
         };
@@ -128,6 +139,33 @@ final class DeliveryMailFactory
 
         if (! $token instanceof BookingAccessToken || $token->page_url === '') {
             throw new InvalidArgumentException('A questionnaire link is missing for this delivery.');
+        }
+
+        return $token->page_url;
+    }
+
+    private static function surveyUrl(Delivery $delivery): string
+    {
+        $parts = explode(':', $delivery->idempotency_key);
+        $lead = ($parts[2] ?? '') === 'lead';
+        $guestId = $parts[1] ?? '';
+
+        $token = $delivery->booking->accessTokens->first(
+            function (BookingAccessToken $token) use ($lead, $guestId): bool {
+                if ($token->purpose !== BookingAccessTokenPurpose::Survey || ! $token->isActive()) {
+                    return false;
+                }
+
+                if ($lead) {
+                    return $token->guest_id === null;
+                }
+
+                return (string) $token->guest_id === $guestId;
+            },
+        );
+
+        if (! $token instanceof BookingAccessToken || $token->page_url === '') {
+            throw new InvalidArgumentException('A survey link is missing for this delivery.');
         }
 
         return $token->page_url;

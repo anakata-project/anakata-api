@@ -145,6 +145,23 @@ final class ContactDerived
         END';
     }
 
+    public static function npsSql(): string
+    {
+        return '(
+            SELECT guest_responses.score
+            FROM guest_responses
+            INNER JOIN bookings ON bookings.id = guest_responses.booking_id
+            INNER JOIN guests ON guests.id = guest_responses.guest_id
+            WHERE bookings.contact_id = contacts.id
+              AND bookings.deleted_at IS NULL
+              AND contacts.email IS NOT NULL
+              AND guests.email IS NOT NULL
+              AND LOWER(TRIM(guests.email)) = contacts.email
+            ORDER BY guest_responses.responded_at DESC, guest_responses.id DESC
+            LIMIT 1
+        )';
+    }
+
     public static function marketingConsentSql(): string
     {
         return 'COALESCE((

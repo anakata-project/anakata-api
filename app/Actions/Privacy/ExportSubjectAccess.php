@@ -18,8 +18,10 @@ use App\Models\CrmTask;
 use App\Models\Delivery;
 use App\Models\Document;
 use App\Models\Group;
+use App\Models\GuestResponse;
 use App\Models\Payment;
 use App\Models\SubjectRequest;
+use App\Support\GuestExperience\ContactGuest;
 use App\Support\Iso;
 use App\Support\SensitiveFields;
 use Illuminate\Support\Facades\Storage;
@@ -157,7 +159,40 @@ final class ExportSubjectAccess extends Action
                     'undone_at' => $merge->undone_at !== null ? Iso::utc($merge->undone_at) : null,
                 ])->all(),
             'passenger_data' => self::PASSENGER_NOTE,
+            'survey_responses' => $this->surveyResponses($contact, $bookingIds),
         ];
+    }
+
+    /**
+     * The contact's own answers only. A companion on the same booking is left out.
+     *
+     * @param  list<int>  $bookingIds
+     * @return list<array{booking_reference: string, score: int, recommend: int|null, why: string|null, best: string|null, better: string|null, crew: string|null, responded_at: string|null}>
+     */
+    private function surveyResponses(Contact $contact, array $bookingIds): array
+    {
+        if ($bookingIds === []) {
+            return [];
+        }
+
+        return GuestResponse::query()
+            ->with(['guest', 'booking'])
+            ->whereIn('booking_id', $bookingIds)
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (GuestResponse $response): bool => ContactGuest::guestIs($response->guest, $contact))
+            ->map(fn (GuestResponse $response): array => [
+                'booking_reference' => (string) ($response->booking->displayReference() ?? ''),
+                'score' => $response->score,
+                'recommend' => $response->recommend,
+                'why' => $response->why,
+                'best' => $response->best,
+                'better' => $response->better,
+                'crew' => $response->crew,
+                'responded_at' => Iso::utc($response->responded_at),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
