@@ -15,7 +15,7 @@ A colliding email must not silently overwrite the other person. The 409 names th
 
 ## Expected
 - [ ] E1 · Save stays on the drawer. Warning: `That email belongs to contact #{id} (K. Osei). Merge the contacts to keep a single record.` The `{id}` is K. Osei’s id. ⚠ UNVERIFIED — `UpdateContact` message; task 06 saw `contact #20`.
-- [ ] E2 · **Review merge** is offered (`contacts.merge` + parsed `contact #(\d+)`).
+- [ ] E2 · **Review merge** is offered. The button uses `conflicting_contact.id` from the 409 body. The message text is still `That email belongs to contact #{id} (K. Osei). Merge the contacts to keep a single record.`
 - [ ] E3 · Anna Whitfield’s email is unchanged (still `whitfield.anna@anakata.test`). K. Osei is still a separate row.
 - [ ] E4 · Clicking **Review merge** opens the merge modal with both contacts. Stop there — CRM-04 owns merge and undo.
 

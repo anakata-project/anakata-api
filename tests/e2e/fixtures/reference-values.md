@@ -98,9 +98,9 @@ Source: `EngineSettingsDocument::initial()` → `fees` (FIN-004).
 
 Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON after Sprint 9). On-screen KPI and chip numbers are ⚠ UNVERIFIED — Pest counts, not a reset screen in this task.
 
-- **72** rows total. ⚠ UNVERIFIED
-- After a fresh seed exactly **26** flagged: 25 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
-- Breakdown: `here` 47 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
+- **81** rows total. ⚠ UNVERIFIED — `BusinessRulesEndpointsTest` (`registry` count 81), not a reset screen.
+- After a fresh seed exactly **35** flagged (`counts.differs_or_flagged`). ⚠ UNVERIFIED — same Pest assertion.
+- Breakdown: `here` 56 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED — same Pest assertion.
 - On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 81 / 56 / 15 / 10 / 35. ⚠ UNVERIFIED
 
 Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. Sprint 10 adds `consent-analytics` (PENDING CLIENT, LEG-002), eight `crm-pipeline-*` rows (PENDING CLIENT, M4) and `privacy-request-sla` (PENDING LEG-002, M7), which is why the counts are 81 / 56 / 15 / 10 / 35. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
@@ -129,6 +129,15 @@ Flagged rows:
 | consent-insurance | PENDING CLIENT | OPS-005 default |
 | consent-marketing | PENDING CLIENT | LEG-002 default |
 | consent-analytics | PENDING CLIENT | LEG-002 default |
+| crm-pipeline-sla-new-lead | PENDING CLIENT | M4 · 4 business hours |
+| crm-pipeline-sla-qualifying | PENDING CLIENT | M4 · 5 business days |
+| crm-pipeline-sla-negotiation | PENDING CLIENT | M4 · 7 business days |
+| crm-pipeline-probability-new-lead | PENDING CLIENT | M4 · 5% |
+| crm-pipeline-probability-qualifying | PENDING CLIENT | M4 · 15% |
+| crm-pipeline-probability-quoted | PENDING CLIENT | M4 · 35% |
+| crm-pipeline-probability-negotiation | PENDING CLIENT | M4 · 55% |
+| crm-pipeline-probability-deposit | PENDING CLIENT | M4 · 80% |
+| privacy-request-sla | PENDING CLIENT | M7 · 30 calendar days |
 | legal-entity-bank-name | PENDING CLIENT | LEG-004 default |
 | legal-entity-account-name | PENDING CLIENT | LEG-004 default |
 | legal-entity-account-number | PENDING CLIENT | LEG-004 default |
@@ -397,3 +406,15 @@ Source: `routes/console.php` and `tests/Feature/Crm/SyncJobsTest.php`. On-screen
 | `telescope:prune --hours=48` | daily | — (only when Telescope is installed) |
 
 Fresh seed: `last_outcome` is null so the Outcome / Last run cells are `—`; `next_run_at` is set. KPIs start at jobs failing **0**, failures open **0**, merges this month **0**. ⚠ UNVERIFIED
+
+## Sprint 10 · pipeline, tasks, consent, campaigns, delivery
+
+Nothing in this section was read off a `reset.sh` screen in task 11. Amounts and counts copied from a live database are not the reset contract.
+
+- **Deals.** No seeder inserts deals. A fresh reset has an empty board. Open pipeline is USD 0 until a request or a manual deal exists. ⚠ UNVERIFIED — task 08 browser on the live database saw no cards and open pipeline USD 0.
+- **Pipeline cash.** Collected, scheduled in, awaiting first payment and overdue must equal Payments & Revenue on the same reset. Do not copy task 08’s live figures (USD 103,493 / 380,347 / 433,547). ⚠ UNVERIFIED
+- **Stage probabilities and SLAs** (PENDING CLIENT, `BusinessRulesDocument` initial): new lead 5% / 4 business hours, qualifying 15% / 5 business days, quoted 35%, negotiation 55% / 7 business days, deposit pending 80%. ⚠ UNVERIFIED — document initial, not a screen.
+- **Register counts** (`ConsentRegister`, not a reset screen). Transactional equals every not-merged contact. Marketing equals contacts whose latest register row is granted: `DemoConsentsSeeder` writes one I6 MARKETING row per confirmed-or-later booking except `ANK-2026-0007`, and the backfill copies those. Profiling, remarketing, WhatsApp and analytics are 0 until someone opts in. Do not copy the task 09 live counts. ⚠ UNVERIFIED — seeder + `ConsentRegister.php`.
+- **Deliveries.** `DemoDocumentsSeeder` marks issued invoices, summaries and settled receipts **SENT**. It does not seed FAILED or BLOCKED. ⚠ UNVERIFIED — seeder, not a reset screen.
+- **Sold statuses** for campaign measures: CONFIRMED, FULLY_PAID, ON_BOARD, COMPLETED, OVERDUE. REQUESTED does not count. ⚠ UNVERIFIED — `ContactDerived::soldStatuses()`, not a screen.
+

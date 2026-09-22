@@ -15,14 +15,14 @@ A consented visitor’s itinerary and checkout events must land on the new conta
 4. Contact: First `E2E`, Last `Crm05`, Email `e2e.crm05@anakata.test`, phone `+1 650 253 0005`, preferred **Email**. Guests: both nationalities **United States**. Fees: PNG **I will pay at SCY airport**; TCT **Arrange the TCT with the team later**. Declarations: **Privacy policy** and **Travel insurance declaration**.
 5. **Option 1 · Book now, pay later.** `Send booking request`. Read `/book/confirmation` — next request after seed is **ANK-R-2026-0043**.
 6. **Carolina.** Open `http://localhost:3001/crm/sales/contacts`. Search `e2e.crm05@anakata.test`. Open the row. Read lifecycle and the timeline.
-7. Open `http://localhost:3001/crm/engine/activity`. Find events for this contact. Confirm they are not left as **anonymous**.
+7. Open `http://localhost:3001/crm/engine/activity`. Find events for this contact. Confirm they are not left as **anonymous**. Click the contact. The contacts page opens with `?open=` set to that contact’s id, and the drawer is that person — not a name search.
 
 ## Expected
 - [ ] E1 · After **Analytics on**: `anakata-engine-analytics` = `accepted`; `anakata-engine-session` is a JSON object with a random `id`. ⚠ UNVERIFIED — `engineSession.ts`.
 - [ ] E2 · At least one `POST http://localhost:8000/api/engine/events` (or the engine API base) with that `session_id` and a `page_view` and/or `view_departure`. No email, name or phone in `params`.
 - [ ] E3 · Confirmation shows `ANK-R-2026-0043` for `E2E Crm05`. ⚠ UNVERIFIED — same next-reference as WEB-07.
 - [ ] E4 · Carolina: contact lifecycle **SQL** (REQUESTED outranks MQL). Timeline includes stitched behavioural titles (`page_view` / `view_departure` / `begin_checkout` as the API sends them) plus the booking **Requested**. ⚠ UNVERIFIED — `ContactTimeline` behavioural copy + stitch on checkout submit.
-- [ ] E5 · Activity stream names this contact (not `anonymous`) for those events. Side badges include **CRM**.
+- [ ] E5 · Activity stream names this contact (not `anonymous`) for those events. Side badges include **CRM**. The row’s `contact_id` is the new contact. Clicking it opens `/crm/sales/contacts?open={id}` on that drawer.
 
 ## Cross-checks
 - `bin/db-check.sh 'App\Models\Contact::query()->withDerived()->where("email","e2e.crm05@anakata.test")->first()'` → `lifecycle` `SQL`, `engine_identified_at` not null.

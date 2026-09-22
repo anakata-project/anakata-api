@@ -15,6 +15,7 @@ The CRM list is the people record. If lifecycle, lifetime value, segment or cons
 5. Confirm these names are also on the list: Harrison & Whitfield, The Brandt Family, L. Moreau, S. Ferreira, Anna Whitfield, K. Osei.
 6. Set **Lifecycle — All** to **BOOKED**. Read the remaining rows, then set it back to All.
 7. Set **Consent — All** to **Marketing opted in**, then **Transactional only**. Set it back to All.
+8. Open `http://localhost:3001/crm/system/consent`, then return to Contacts. Read Fontaine’s lifecycle again.
 
 ## Expected
 - [ ] E1 · Notice: `The CRM is the system of record for people: identity, attribution, consent, lifecycle, segment, preferred channel, NPS. Passport, date of birth and medical data live only in the RMS and are never here.`
@@ -25,6 +26,7 @@ The CRM list is the people record. If lifecycle, lifetime value, segment or cons
 - [ ] E6 · Named rows above are present. Each other lifecycle / LTV / segment line is ⚠ UNVERIFIED — do not invent a table from the bookings seed. S. Ferreira is **AGENT** (approved agency email). L. Moreau is **SQL** (REQUESTED). Anna Whitfield and K. Osei are waitlist-only. ⚠ UNVERIFIED — `ContactDerived` + seeders.
 - [ ] E7 · Lifecycle **BOOKED** shrinks the list. Fontaine stays. L. Moreau (SQL) leaves. Clearing the filter restores the full list.
 - [ ] E8 · **Transactional only** includes M. Castellanos (`ANK-2026-0007` has no marketing consent). **Marketing opted in** includes Fontaine. ⚠ UNVERIFIED — `DemoConsentsSeeder`.
+- [ ] E9 · After opening the consent register, Fontaine’s lifecycle is still **BOOKED**. The register does not retype lifecycle.
 
 ## Notes
 Values: `fixtures/reference-values.md` (CRM contacts). Do not type passport, date of birth or nationality onto this page.

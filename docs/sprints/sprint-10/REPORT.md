@@ -28,6 +28,7 @@ Do not run these in the agent.
 ```bash
 cd /home/mohammad/Code/iconic/anakata/anakata-api
 git add app/Exceptions/EmailConflictException.php \
+  app/Http/Controllers/Crm/ContactController.php \
   app/Support/OpenApi/EmailConflictExceptionToResponseExtension.php \
   app/Support/Schedule/AnakataSchedule.php \
   app/Actions/Contacts/UpdateContact.php \
@@ -185,7 +186,7 @@ New lead is 4 business hours, qualifying 5 business days (the entry day does not
 `GET /api/crm/pipeline` (filters `owner`, `type`, `q` apply to the columns only), `GET /api/crm/pipeline/stage-map`, `GET /api/crm/deals/{deal}`, `POST /api/crm/deals`, assign, bind, and `PATCH` stage. Every CRM user sees every deal. Cash KPIs use the same ledger as Payments & Revenue: collected, awaiting first payment, and overdue match `PaymentsKpis::ledger()`. `scheduled_in` is the balance of confirmed and fully paid bookings. Open pipeline and the weighted forecast are stages 1–5. The query count stays flat as deals are added. Deal opened, bound, stage changed and marked lost appear on the contact timeline.
 
 ### Checks
-`composer check` ran the suite at 1090 passed and 1 failed: `PipelineResource` had no OpenAPI properties. The resource return types were then spelled out; `CrmResponseSchemasTest` passed (175 assertions). Pint is clean (1158 files). Larastan reports no errors. Pipeline tests were re-run after the `DealStages` rename (9 passed).
+`composer check` ran the suite at 1090 passed and 1 failed: `PipelineResource` had no OpenAPI properties. The resource return types were then spelled out; `CrmResponseSchemasTest` passed (175 assertions). Pint is clean (1158 files). Larastan reports no errors. Pipeline tests were re-run after the `DealStages` rename (9 passed). A later case in that projection test puts a `RELEASED` booking in **Lost**; that test passed on its own.
 
 ### Git commands
 Do not run these in the agent.
@@ -288,7 +289,7 @@ System tasks are raised from RMS state and closed when that state clears. Comple
 `mine` is tasks the user owns plus tasks whose `needs_permission` they hold. `all` requires `records.act_on_any` (Admin passes). `unassigned` is owner null. Priority is `bad` when due, `warn` when due today in Galápagos, otherwise `ok`. Completing an open task writes one `TASK_COMPLETED` activity. The activity rule rejects a passport-like body and a date of birth, and the JSON does not echo the value. Task and activity responses pass the sensitive-field walk. System raises, completions and auto-closes appear on the contact timeline (`Task raised`, `Task completed`, `Task auto-closed`).
 
 ### Checks
-`composer check`: 1097 passed (8027 assertions), Pint clean (1190 files), Larastan no errors. A Friday 17:00 response due is not a weekend, and a Monday holiday pushes a one-business-day due from Friday to Tuesday.
+`composer check`: 1097 passed (8027 assertions), Pint clean (1190 files), Larastan no errors. A Friday 17:00 response due is not a weekend, and a Monday holiday pushes a one-business-day due from Friday to Tuesday. A later test releases a request through `RaiseTasksOnBookingStatusChanged` and auto-closes the response task without the sweep; that test passed on its own.
 
 ### Git commands
 Do not run these in the agent.
@@ -541,7 +542,7 @@ Write inputs are the generated request schemas (`RecordContactConsentRequest`, `
 Sprint 9 leftovers stay (`Segment`, `can_act`, `swapped`, `skipped_rows`, activity `name`). New leftovers are the three string unions above, plus the purpose, stage, type and kind overlays. No runtime list of stages, kinds, purposes or statuses.
 
 ### Checks
-Layer lint, typecheck, test (35) and build passed. Panel and engine typecheck and build passed against the sibling layer.
+Layer lint, typecheck, test (35) and build passed. Panel and engine typecheck and build passed against the sibling layer. Engine typecheck and build passed again on the clean tree.
 
 Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}`, working trees overlaid. The ui clone is **0.11.0** and has **no** `app/types/nuxt.d.ts`.
 
@@ -735,4 +736,152 @@ The contact drawer reads consent state from the API. Subject requests stay with 
 EOF
 )"
 ```
+
+## Task 10 · anakata-panel · Campaigns, delivery, navigation
+
+### Campaigns
+`/crm/marketing/campaigns` replaces the placeholder. The notice says offers are created in the RMS and the CRM only measures bookings that carry the offer code or the campaign UTM key. Cards show the API measures. Null sends, clicks and ROAS render as "—". The sends note ("Marketing email is not built yet") is shown once. Bookings behind a card link to `/rms/reservations/bookings?open={reference}`. Offers without an active campaign can be wrapped with Create campaign when the user has `campaigns.manage` (name, preselected offer, UTM key, audience, media spend). Edit and archive sit on an active card. The attribution table and the conflict sentence come from `GET /api/crm/campaigns/attribution-model`.
+
+The window line shows the booking window and the travel window from the offer, then the channel and PUBLISHED IN RMS. OPENING-27 has a null booking window and travel 2027-11-01 – 2027-12-31, so the line is `— · 2027-11-01 – 2027-12-31 · D2C`.
+
+### Documents & Delivery
+`/crm/sales/documents` shows the KPI row and the engagement note ("Opens and downloads are not tracked (LEG-002)"). The log lists booking, client name, document with RMS-rendered, version, channel, status and time, the error or blocked reason, who triggered it, and Open in RMS (`rms_path`). Filters are status, kind, dates and booking reference. There is no resend and no recipient address. The issuer bank rule is not loaded on this screen, so there is no LEG-004 sentence. One hint: "The CRM does not render documents."
+
+`/rms/operations/documents?booking={id}` opens that booking's panel on the Documents tab.
+
+### Navigation
+`NavItem.sprint` is `number | 'later'`. Inbox, B2B Partners, Journeys, Segments and Automations say "Planned for a later sprint". Alerts stays "Coming in Sprint 11".
+
+Helpers, tested: `deliveryStatusClass` (FAILED and BLOCKED → `bad`, SENT → `ok`), `formatMeasure` (null → "—").
+
+### Checks
+Panel `pnpm lint`, `pnpm test` (257), `pnpm typecheck`, and `pnpm build` passed again after the travel-window line. The overlay clone at `/tmp/anakata-fresh` (anakata-ui 0.11.0) typechecked after that line was copied in.
+
+`reset.sh` was not applied. It targets compose project `anakata-e2e`, which has no app container. The live `anakata-api` database was used. The engine on port 3000 was down, so the UTM booking was `POST /api/engine/checkout`.
+
+Browser, both themes, Mateo (Manager) unless noted:
+
+- Light: create **Opening 2027** on OPENING-27, UTM `opening27`, audience "Opening guests". Seeded CONFIRMED bookings do not carry OPENING-27. The three rows that do are REQUESTED, and measures count sold statuses only, so the card showed redeemed 0 and revenue USD 0. That matches the sold set.
+- Engine pay-later on departure 1 cabin S4 with first and last touch `campaign: opening27` (ANK-R-2026-0044). Status stayed REQUESTED. Attributed first touch stayed 0.
+- Carolina confirmed that request in the RMS (`REQUESTED` → `CONFIRMED`, ANK-2026-0022). The card then showed redeemed 1, revenue USD 26,600, first touch 1 · USD 26,600, last touch the same. The bookings row linked to the RMS drawer.
+- Mateo sees the drawer and the own-records line; he cannot cancel a booking owned by Carolina. Carolina cancelled it (`CANCELLED`, reason "Sprint 10 campaign measure check"). The card dropped to redeemed 0, revenue USD 0, first touch 0. Confirmed in the dark theme after reload.
+- Dark delivery log: sent today 0, failed 1, blocked 1, queued over 15 min 0. The failed row is ANK-2026-0018, "TransportException: mailbox unavailable". The blocked row is the same booking, "No email address for the client of record". Open in RMS opened `/rms/operations/documents?booking=11` on the Documents tab.
+- Placeholders: inbox, B2B partners, journeys, segments and automations say "Planned for a later sprint". Alerts says "Coming in Sprint 11".
+
+### Git
+Not run. `i18n/locales/en.json` and `app/types/api.ts` also hold the task 09 additions if that commit has not been made yet.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/pages/crm/marketing/campaigns.vue \
+  app/pages/crm/sales/documents.vue \
+  app/pages/rms/operations/documents.vue \
+  app/components/crm/CampaignModal.vue \
+  app/components/crm/campaignHelpers.ts \
+  app/components/shell/PlaceholderPage.vue \
+  app/navigation/crm.ts \
+  app/navigation/types.ts \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  tests/unit/crmCampaignHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Show campaign measures and the delivery log from the API.
+
+Later navigation says so. The CRM does not create an offer or resend a document.
+EOF
+)"
+```
+
+## Task 11 · anakata-api · E2E scenarios; P1 not run
+
+### Code gate
+Local HEADs, not a fetch:
+
+| Repo | SHA | Subject | Against origin/dev |
+|---|---|---|---|
+| anakata-api | `fe0861a` | Measure campaigns from sold bookings and list what the RMS already sent. | ahead 6, dirty |
+| anakata-ui | `39575f4` | Regenerate API types for the Sprint 10 CRM and privacy responses. | dirty; local tag `v0.11.0` |
+| anakata-panel | `c1eceea` | Pin the shared layer fallback to v0.11.0. | ahead 1, dirty |
+| anakata-engine | `c7e4ca3` | Pin the shared layer fallback to v0.11.0. | ahead 1, clean |
+
+The gate wants `origin/dev` checked out hard, ui at the pushed tag `v0.11.0`, and a descendant whose diff outside `tests/e2e/runs` is empty. None of that is true, and this agent does not fetch, reset, commit, or push. `up.sh` was not run. Run file: `tests/e2e/runs/2026-09-22-1249-sprint10-env.md`.
+
+`composer check` after the release projection and the release-closes-task cases: 1107 passed (8239 assertions), Pint clean (1234 files), Larastan no errors.
+
+### Scenarios
+Written, not walked. P1 grows by PIPE-01–03, TASK-01–03, PRIV-01–04, CAMP-01, DLV-01. P2: PIPE-04, TASK-04, PRIV-05, CAMP-02.
+
+Revisits: CRM-01 (lifecycle unchanged after the register), CRM-03 (consent block no longer says the register arrives in Sprint 10), CRM-05 and CRM-06 (a named activity row opens the contact by `contact_id`; an anonymous name is not a button), CRM-08 (Review merge uses `conflicting_contact.id`), BR-01 (flagged pending-client rows now include analytics, eight pipeline rows, and the subject-request SLA; counts stay 81 / 56 / 15 / 10 / 35).
+
+PRIV-01 also requires the I6 MARKETING row and `source_consent_id`. TASK-02 names `commissions.override_cap` and `bookings.overdue_decision`.
+
+`reference-values.md` drops the stale 72-row bullets. Marker split for the Sprint 10 fixture block: every line there is ⚠ UNVERIFIED (seeder, `BusinessRulesDocument` initial, or a non-reset browser). None of those figures was read off a `reset.sh` screen. Screen-read lines in that block: 0.
+
+### Runs
+Not run in this session. E2E belongs on a Cursor cloud agent opened with only `anakata-api` (one git remote), which is the machine task 11 names. This workspace has four remotes, so a cloud agent started here cannot pass that spawn, and this session does not run the scenarios.
+
+Both runs stay NOT RUN. Every new P1 id is NOT RUN. The Sprints 1–9 P1 on `e2e/sprint-09` is still not attached. The code-gate note remains `tests/e2e/runs/2026-09-22-1249-sprint10-env.md`.
+
+### Open questions
+These are still with the client. The sprint shipped the defaults.
+
+- Pipeline stage probabilities (5 / 15 / 35 / 55 / 80) and stage SLAs (4 business hours, 5 business days, 7 business days). PENDING CLIENT.
+- Who handles subject requests, and whether 30 calendar days is the LOPDP SLA. Default: Admin only, 30 days.
+- Erasure while a return date is still ahead. Default: refuse until that date has passed.
+- Where profiling, remarketing and WhatsApp consent are captured, and with what text. The engine captures marketing and, through the banner, analytics.
+- Open and download tracking in transactional email. Not built.
+- Journeys, segments, automations, the inbox and CRM B2B partners stay “later”.
+
+### Merge steps
+Not run. The sprint task files, the README, and section M in `docs/requirements/08-dev-decisions.md` are still untracked or modified, and no earlier section lists them:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  docs/requirements/08-dev-decisions.md \
+  docs/sprints/sprint-10
+```
+
+Commit the product work from tasks 01–10 first (the commands are in those sections), push `anakata-ui` tag `v0.11.0`, then the scenario branch. Run files are gitignored, so the run note needs `-f`:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git checkout -b e2e/sprint-10
+git add \
+  tests/e2e/scenarios/INDEX.md \
+  tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md \
+  tests/e2e/scenarios/crm/CRM-01-seeded-contacts.md \
+  tests/e2e/scenarios/crm/CRM-03-drawer-timeline-no-sensitive.md \
+  tests/e2e/scenarios/crm/CRM-05-consent-stitch.md \
+  tests/e2e/scenarios/crm/CRM-06-no-consent-no-events.md \
+  tests/e2e/scenarios/crm/CRM-08-email-conflict-offers-merge.md \
+  tests/e2e/scenarios/crm/PIPE-01-kpis-match-ledger-bound-locked.md \
+  tests/e2e/scenarios/crm/PIPE-02-own-deal-move-lost-reason.md \
+  tests/e2e/scenarios/crm/PIPE-03-request-then-deposit-confirmed.md \
+  tests/e2e/scenarios/crm/PIPE-04-charter-enquiry-take-and-bind.md \
+  tests/e2e/scenarios/crm/TASK-01-request-task-closes-on-release.md \
+  tests/e2e/scenarios/crm/TASK-02-overdue-and-commission-cap.md \
+  tests/e2e/scenarios/crm/TASK-03-complete-writes-timeline-not-booking.md \
+  tests/e2e/scenarios/crm/TASK-04-manual-task-reassign-all-tab.md \
+  tests/e2e/scenarios/crm/PRIV-01-engine-opt-in-on-register.md \
+  tests/e2e/scenarios/crm/PRIV-02-objection-withdraws-marketing.md \
+  tests/e2e/scenarios/crm/PRIV-03-access-export-no-passenger.md \
+  tests/e2e/scenarios/crm/PRIV-04-erasure-after-return.md \
+  tests/e2e/scenarios/crm/PRIV-05-manager-no-subject-requests.md \
+  tests/e2e/scenarios/crm/CAMP-01-opening-27-redeemed.md \
+  tests/e2e/scenarios/crm/CAMP-02-utm-first-touch.md \
+  tests/e2e/scenarios/crm/DLV-01-log-matches-documents-tab.md \
+  tests/e2e/fixtures/reference-values.md \
+  docs/sprints/sprint-10/REPORT.md
+git add -f tests/e2e/runs/2026-09-22-1249-sprint10-env.md
+git commit -m "$(cat <<'EOF'
+Add the Sprint 10 CRM scenarios and record the code-gate stop.
+
+The P1 run waits until the four repos match the reviewed commits.
+EOF
+)"
+```
+
+After that push, and after `v0.11.0` is on the ui remote, the P1 run is a separate pass on `e2e/sprint-10`. It was not started here.
 
