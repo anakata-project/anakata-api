@@ -30,6 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->prefix('api/crm')
                 ->group(base_path('routes/api/crm.php'));
 
+            Route::middleware(['api', 'auth:sanctum', 'active', 'permission:privacy.manage', 'crm.sensitive'])
+                ->prefix('api/privacy')
+                ->group(base_path('routes/api/privacy.php'));
+
             Route::middleware(['api', 'throttle:engine'])
                 ->prefix('api/engine')
                 ->group(base_path('routes/api/engine.php'));

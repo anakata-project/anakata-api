@@ -31,7 +31,13 @@ arch('crm controllers do not use money or booking write paths')
         'App\Actions\Guests',
         'App\Actions\Extras',
         'App\Services\Pricing',
+        'App\Actions\Privacy',
+        'App\Actions\Offers',
     ]);
+
+arch('privacy controllers are not used by the crm')
+    ->expect('App\Http\Controllers\Crm')
+    ->not->toUse('App\Http\Controllers\Privacy');
 
 arch('models use HasAuditColumns')
     ->expect('App\Models')

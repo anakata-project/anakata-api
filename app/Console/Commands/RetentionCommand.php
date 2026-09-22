@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Booking;
 use App\Models\Guest;
+use App\Models\SubjectRequest;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
 use App\Support\History\History;
@@ -13,6 +14,7 @@ use App\Support\Retention\RetentionWindow;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 final class RetentionCommand extends Command
 {
@@ -114,8 +116,11 @@ final class RetentionCommand extends Command
             }
         });
 
+        $exports = $this->expireExports($config, $dry);
+
         $verb = $dry ? 'Would change' : 'Changed';
         $this->info($verb.' '.$changedBookings.' booking(s): '.$passportGuests.' passport(s), '.$noteGuests.' note set(s).');
+        $this->info(($dry ? 'Would delete ' : 'Deleted ').$exports.' access export(s).');
 
         return self::SUCCESS;
     }
@@ -164,5 +169,30 @@ final class RetentionCommand extends Command
         }
 
         return 'Retention — '.implode('; ', $parts);
+    }
+
+    private function expireExports(CurrentConfig $config, bool $dry): int
+    {
+        $days = $config->businessRules()->privacy->requestSlaDays;
+        $cutoff = now()->subDays($days);
+        $count = 0;
+
+        SubjectRequest::query()
+            ->whereNotNull('export_path')
+            ->whereNotNull('completed_at')
+            ->where('completed_at', '<=', $cutoff)
+            ->orderBy('id')
+            ->each(function (SubjectRequest $request) use ($dry, &$count): void {
+                $count++;
+
+                if ($dry || $request->export_path === null) {
+                    return;
+                }
+
+                Storage::disk('local')->delete($request->export_path);
+                $request->forceFill(['export_path' => null])->save();
+            });
+
+        return $count;
     }
 }
