@@ -1100,6 +1100,47 @@ EOF
 git push -u origin e2e/sprint-09
 ```
 
+## Task 08 · anakata-engine · Consented events, session identifier, UTM capture
+
+### What was built
+The engine posts consented behavioural events to `POST /api/engine/events` and carries UTM attribution plus a session id into identifying submissions. Code lives in anakata-engine (`useTrack`, `engineQueue`, `engineSession`, `engine-events.client.ts`, checkout / waitlist / charter / complete). This section was missing from the original Sprint 9 write-up.
+
+### Consent gating (LEG-002)
+One banner gates GA4 and first-party events. Before consent, and after refusal, no session id is created, nothing is written to `localStorage` for tracking, and `track()` does not post. Withdrawal deletes the stored id and the persisted first touch (`clearSession`, `clearPersistedTouches`).
+
+**Open decision, still PENDING LEG-002:** checkout sends the current session's UTM touch even when analytics consent was not given. `useCheckout` sets `session_id` only when consent is `accepted`, and still calls `attributionForCheckout` so an unconsented submit sends that session's touch (or empty) as `attribution`. The session touch therefore leaves the browser with checkout without a separate analytics consent.
+
+### Identifier
+After consent, a random `crypto.randomUUID()` is stored in first-party `localStorage` under `anakata-engine-session` (`engineSession.ts`). It rotates after 30 days of inactivity. It is not a cookie and not derived from the device. Doc 07 §6 describes a cookie; the implementation uses `localStorage` instead.
+
+Consent itself is stored only in the browser (`ANALYTICS_STORAGE_KEY`). The API does not receive the banner choice except by the presence of a session and, later, stitching.
+
+### Batching and the beacon
+Events queue with a client `event_id`, `occurred_at`, and whitelisted params. The queue flushes in batches of up to 25, on a short timer, and on `pagehide` and `visibilitychange` (hidden) via `navigator.sendBeacon` (`engine-events.client.ts`, `engineQueue.ts` `scheduleUnloadFlush`). A unit test asserts those two listeners flush once. **Whether a beacon reached the API was not observed:** Sprint 9's P1 was not run, and there is no captured request log in this report. The ingest action dedupes with `insertOrIgnore` on unique `event_id`, so a beacon replay does not insert a second row.
+
+### UTM
+Landing reads `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` and the path. The current session's touch stays in `sessionStorage`. With consent, first touch is kept in `localStorage` and last touch updates on each new UTM landing. Checkout sends `attribution: { first_touch, last_touch }`. Without consent, both are the current session's touch or empty.
+
+### Banner copy
+The banner body says "cookies": "We use analytics cookies only if you agree. Wording and the cookie policy are pending (LEG-002)." (`anakata-engine/i18n/locales/en.json`).
+
+### Checks
+`pnpm lint`, `typecheck`, `test`, and `build` were the task's gate in anakata-engine. The browser pass against a reset seed was not attached (Sprint 9 P1 not run).
+
+### Git commands
+Do not run these in the agent. The engine commit, if it is not already on `dev`, is the one that added the files above. This report section is an anakata-api docs change:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record Sprint 9 task 08 in the sprint report.
+
+The engine work shipped without its report section.
+EOF
+)"
+```
+
 ## Sprint 9 summary
 
 ### What is done

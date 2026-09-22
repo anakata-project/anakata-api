@@ -8,14 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @property array{at: string, name: string, contact: string, detail: string, side: string} $resource
+ * @property array{at: string, name: string, contact: string, contact_id: int|null, detail: string, side: string} $resource
  */
 class EngineActivityItemResource extends JsonResource
 {
     public static $wrap = null;
 
     /**
-     * @return array{at: string, name: string, contact: string, detail: string, side: string}
+     * @return array{at: string, name: string, contact: string, contact_id: int|null, detail: string, side: string}
      */
     public function toArray(Request $request): array
     {

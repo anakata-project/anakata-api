@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\OpenApi\CabinUnavailableExceptionToResponseExtension;
+use App\Support\OpenApi\EmailConflictExceptionToResponseExtension;
 use App\Support\OpenApi\PriceChangedExceptionToResponseExtension;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
@@ -158,6 +159,7 @@ return [
     'extensions' => [
         CabinUnavailableExceptionToResponseExtension::class,
         PriceChangedExceptionToResponseExtension::class,
+        EmailConflictExceptionToResponseExtension::class,
     ],
 
     /*

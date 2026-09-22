@@ -196,6 +196,33 @@ copy_if_missing() {
   cp "${src}" "${dest}"
 }
 
+# up.sh rebuilds env files from the e2e environment unless E2E_KEEP_ENV=1.
+install_env() {
+  local src="$1"
+  local dest="$2"
+  if [ "${E2E_KEEP_ENV:-}" = "1" ]; then
+    copy_if_missing "${src}" "${dest}"
+    return 0
+  fi
+  say "Rebuilding ${dest} from $(basename "${src}")"
+  cp "${src}" "${dest}"
+}
+
+print_heads() {
+  local name dir sha subject
+  for name in api ui panel engine; do
+    case "${name}" in
+      api) dir="${API_ROOT}" ;;
+      ui) dir="${UI_DIR}" ;;
+      panel) dir="${PANEL_DIR}" ;;
+      engine) dir="${ENGINE_DIR}" ;;
+    esac
+    sha="$(git -C "${dir}" rev-parse HEAD)"
+    subject="$(git -C "${dir}" log -1 --format=%s)"
+    say "HEAD ${name} ${sha} ${subject}"
+  done
+}
+
 git_clone_url() {
   local repo="$1"
   if [ -n "${GH_TOKEN:-}" ]; then
@@ -209,9 +236,21 @@ ensure_sibling() {
   local name="$1"
   local ref="$2"
   local dest="${ANAKATA_ROOT}/${name}"
-  if [ -d "${dest}" ]; then
-    say "Sibling ${name} already at ${dest} — leaving it"
+  if [ -d "${dest}/.git" ]; then
+    if [ -n "$(git -C "${dest}" status --porcelain)" ]; then
+      die "Sibling ${name} at ${dest} has a dirty working tree. Commit, stash, or discard it before checking out ${ref}."
+    fi
+    say "Fetching ${name} and checking out ${ref}"
+    git -C "${dest}" fetch origin --tags
+    if git -C "${dest}" rev-parse --verify --quiet "refs/remotes/origin/${ref}" >/dev/null; then
+      git -C "${dest}" checkout --detach "origin/${ref}"
+    else
+      git -C "${dest}" checkout --detach "${ref}"
+    fi
     return 0
+  fi
+  if [ -d "${dest}" ]; then
+    die "Sibling ${name} exists at ${dest} but is not a git checkout."
   fi
   say "Cloning ${name} (branch ${ref}) into ${dest}"
   git clone --branch "${ref}" --single-branch "$(git_clone_url "${name}")" "${dest}"

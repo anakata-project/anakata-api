@@ -100,6 +100,32 @@ test('timestamps are clamped to the last 24 hours and not the future', function 
     expect($future->occurred_at->lessThanOrEqualTo(now()->addSeconds(5)))->toBeTrue();
 });
 
+test('an offset timestamp is stored at the same UTC instant as its Z form', function (): void {
+    $instant = now()->subHour()->utc()->startOfSecond();
+    $offset = $instant->copy()->setTimezone('+05:00')->toIso8601String();
+    $zulu = $instant->toIso8601ZuluString();
+
+    $this->postJson('/api/engine/events', [
+        'session_id' => engineSessionId(),
+        'events' => [
+            engineEvent(BehaviouralEventName::PageView->value, ['page_path' => '/offset'], occurredAt: $offset),
+        ],
+    ])->assertOk();
+
+    $this->postJson('/api/engine/events', [
+        'session_id' => engineSessionId(),
+        'events' => [
+            engineEvent(BehaviouralEventName::PageView->value, ['page_path' => '/zulu'], occurredAt: $zulu),
+        ],
+    ])->assertOk();
+
+    $offsetRow = BehaviouralEvent::query()->where('params->page_path', '/offset')->firstOrFail();
+    $zuluRow = BehaviouralEvent::query()->where('params->page_path', '/zulu')->firstOrFail();
+
+    expect($offsetRow->occurred_at->utc()->equalTo($zuluRow->occurred_at->utc()))->toBeTrue();
+    expect($offsetRow->occurred_at->utc()->equalTo($instant))->toBeTrue();
+});
+
 test('events store no ip or user agent', function (): void {
     $this->withHeaders(['User-Agent' => 'Mozilla/5.0 test-agent'])
         ->postJson('/api/engine/events', [

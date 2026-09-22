@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\BookingStatus;
+use App\Enums\ConsentCapturePoint;
 use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ConsentSource;
 use App\Enums\ContactLifecycle;
 use App\Enums\ContactType;
@@ -14,6 +16,7 @@ use App\Models\Booking;
 use App\Models\ChangeHistory;
 use App\Models\Consent;
 use App\Models\Contact;
+use App\Models\ContactConsent;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\SensitiveFields;
@@ -87,6 +90,15 @@ test('the contact profile reads bookings without sensitive fields', function ():
         'source' => ConsentSource::Staff,
         'withdrawn' => false,
     ]);
+    $register = new ContactConsent;
+    $register->contact_id = $contact->id;
+    $register->purpose = ConsentPurpose::Marketing;
+    $register->granted = true;
+    $register->version = 'v1';
+    $register->captured_at = now();
+    $register->capture_point = ConsentCapturePoint::Staff;
+    $register->how_obtained = 'seeded for the profile';
+    $register->save();
 
     $response = $this->actingAs($actor)
         ->getJson('/api/crm/contacts/'.$contact->id)
@@ -150,7 +162,9 @@ test('patch updates owned fields, records field names, and conflicts on another 
             'email' => $other->email,
         ])
         ->assertStatus(409)
-        ->assertJsonPath('message', 'That email belongs to contact #'.$other->id.' ('.$other->name.'). Merge the contacts to keep a single record.');
+        ->assertJsonPath('message', 'That email belongs to contact #'.$other->id.' ('.$other->name.'). Merge the contacts to keep a single record.')
+        ->assertJsonPath('conflicting_contact.id', $other->id)
+        ->assertJsonPath('conflicting_contact.name', $other->name);
 });
 
 test('patch is forbidden without contacts.manage even when the user can open the CRM', function (): void {

@@ -78,12 +78,16 @@ final class IngestBehaviouralEvents extends Action
             ? $value
             : Carbon::parse(is_string($value) ? $value : (string) $now);
 
-        if ($occurred->greaterThan($now)) {
-            return $now->copy();
+        $occurred = $occurred->utc();
+        $nowUtc = $now->copy()->utc();
+        $floorUtc = $floor->copy()->utc();
+
+        if ($occurred->greaterThan($nowUtc)) {
+            return $nowUtc;
         }
 
-        if ($occurred->lessThan($floor)) {
-            return $floor->copy();
+        if ($occurred->lessThan($floorUtc)) {
+            return $floorUtc;
         }
 
         return $occurred;

@@ -66,6 +66,20 @@ test('crm OpenAPI schemas have properties', function (): void {
         'SyncIdentityResource',
         'EventCatalogueResource',
         'RetrySyncFailureResource',
+        'ConsentRegisterRowResource',
+        'ConsentDataMapRowResource',
+        'ContactConsentsResource',
+        'PipelineResource',
+        'StageMapResource',
+        'DealResource',
+        'TaskListResource',
+        'ContactActivityResource',
+        'SubjectRequestResource',
+        'CampaignIndexResource',
+        'CampaignOffersResource',
+        'CampaignBookingPageResource',
+        'AttributionModelResource',
+        'DeliveryIndexResource',
     ];
 
     foreach ($expected as $name) {
@@ -162,6 +176,26 @@ test('crm OpenAPI schemas have properties', function (): void {
         'web_hold_extension_minutes',
     ]);
 
+    $activityItem = crmOpenApiSchema($spec, 'EngineActivityItemResource');
+    expect($activityItem['properties'])->toHaveKey('contact_id');
+    $contactIdSchema = $activityItem['properties']['contact_id'];
+    $contactIdNullable = ($contactIdSchema['nullable'] ?? false) === true
+        || (is_array($contactIdSchema['type'] ?? null) && in_array('null', $contactIdSchema['type'], true));
+    expect($contactIdNullable)->toBeTrue();
+
+    $contactUpdate = $spec['paths']['/crm/contacts/{contact}']['patch']
+        ?? $spec['paths']['/api/crm/contacts/{contact}']['patch']
+        ?? null;
+    expect($contactUpdate)->toBeArray();
+    $conflictResponse = $contactUpdate['responses']['409'] ?? null;
+    expect($conflictResponse)->toBeArray();
+    $conflictSchema = $conflictResponse['content']['application/json']['schema'] ?? [];
+    if (isset($conflictResponse['$ref'])) {
+        $conflictName = basename((string) $conflictResponse['$ref']);
+        $conflictSchema = $spec['components']['responses'][$conflictName]['content']['application/json']['schema'] ?? [];
+    }
+    expect($conflictSchema['properties'] ?? [])->toHaveKeys(['message', 'conflicting_contact']);
+
     $jobs = $spec['paths']['/crm/sync/jobs']['get']
         ?? $spec['paths']['/api/crm/sync/jobs']['get']
         ?? null;
@@ -175,4 +209,18 @@ test('crm OpenAPI schemas have properties', function (): void {
     expect($events)->toBeArray();
     $note = $events['responses']['200']['content']['application/json']['schema']['properties']['meta']['properties']['note'] ?? [];
     expect($note['type'] ?? null)->toBe('string');
+
+    $register = $spec['paths']['/crm/consents/register']['get']
+        ?? $spec['paths']['/api/crm/consents/register']['get']
+        ?? null;
+    expect($register)->toBeArray();
+
+    $consents = $spec['paths']['/crm/contacts/{contact}/consents']['get']
+        ?? $spec['paths']['/api/crm/contacts/{contact}/consents']['get']
+        ?? null;
+    expect($consents)->toBeArray();
+
+    $state = crmOpenApiSchema($spec, 'ContactConsentsResource');
+    expect($state['properties'])->toHaveKeys(['current', 'history']);
+    expect(json_encode($state))->not->toContain('"ip"');
 });

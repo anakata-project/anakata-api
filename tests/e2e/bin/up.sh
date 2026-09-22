@@ -12,8 +12,8 @@ ensure_docker
 ensure_networks
 ensure_log_dir
 
-copy_if_missing "${E2E_ENV_DIR}/api.env" "${API_ROOT}/.env"
-copy_if_missing "${E2E_ENV_DIR}/api.testing.env" "${API_ROOT}/.env.testing"
+install_env "${E2E_ENV_DIR}/api.env" "${API_ROOT}/.env"
+install_env "${E2E_ENV_DIR}/api.testing.env" "${API_ROOT}/.env.testing"
 
 say "Starting mysql, redis, mailpit (wait until healthy)"
 compose up -d --wait mysql redis mailpit
@@ -41,8 +41,10 @@ wait_horizon 60
 
 "${E2E_BIN_DIR}/reset.sh"
 
-copy_if_missing "${E2E_ENV_DIR}/frontends.env" "${PANEL_DIR}/.env"
-copy_if_missing "${E2E_ENV_DIR}/frontends.env" "${ENGINE_DIR}/.env"
+install_env "${E2E_ENV_DIR}/frontends.env" "${PANEL_DIR}/.env"
+install_env "${E2E_ENV_DIR}/frontends.env" "${ENGINE_DIR}/.env"
+
+print_heads
 
 ensure_pnpm
 pnpm_frozen "${UI_DIR}"

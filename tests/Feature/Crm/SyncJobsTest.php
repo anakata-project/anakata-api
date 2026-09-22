@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\ScheduledRunOutcome;
 use App\Models\ScheduledRun;
+use App\Support\Schedule\AnakataSchedule;
 use App\Support\Schedule\RecordScheduledRuns;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
+use ReflectionProperty;
 
 beforeEach(function (): void {
     $this->seed(RolesSeeder::class);
@@ -44,6 +46,28 @@ test('every scheduled command is listed and has a recording hook', function (): 
     }
 
     expect($response->json('meta.kpis'))->toHaveKeys(['jobs_failing', 'failures_open', 'merges_this_month']);
+});
+
+test('sync jobs lists every command over HTTP without the console routes loaded', function (): void {
+    $schedule = app(Schedule::class);
+    $events = new ReflectionProperty($schedule, 'events');
+    $events->setValue($schedule, []);
+
+    expect($schedule->events())->toBeEmpty();
+
+    AnakataSchedule::register($schedule);
+
+    $expected = collect($schedule->events())
+        ->map(fn (Event $event): string => RecordScheduledRuns::commandName($event))
+        ->all();
+
+    expect($expected)->not->toBeEmpty();
+
+    $listed = collect($this->actingAs(salesExecUser())->getJson('/api/crm/sync/jobs')->json('data'))
+        ->pluck('command')
+        ->all();
+
+    expect($listed)->toBe($expected);
 });
 
 test('a scheduled command records start, finish and outcome', function (): void {

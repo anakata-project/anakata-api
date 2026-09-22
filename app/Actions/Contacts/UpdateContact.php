@@ -7,7 +7,7 @@ namespace App\Actions\Contacts;
 use App\Actions\Action;
 use App\Enums\ContactType;
 use App\Enums\PreferredChannel;
-use App\Exceptions\ConflictException;
+use App\Exceptions\EmailConflictException;
 use App\Models\Contact;
 use App\Models\User;
 use App\Support\Contacts\PhoneNumber;
@@ -45,7 +45,9 @@ final class UpdateContact extends Action
 
                     if ($other instanceof Contact) {
                         $named = $other->currentSurvivor();
-                        throw new ConflictException(
+                        throw new EmailConflictException(
+                            $named->id,
+                            $named->name,
                             'That email belongs to contact #'.$named->id.' ('.$named->name.'). Merge the contacts to keep a single record.',
                         );
                     }

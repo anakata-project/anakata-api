@@ -71,7 +71,9 @@ test('activity filters, sides and KPIs agree with the list', function (): void {
     expect($rows->firstWhere('name', 'submit_booking_request')['side'])->toBe('RMS + CRM');
     expect($rows->firstWhere('name', 'begin_checkout')['side'])->toBe('RMS + CRM');
     expect($rows->firstWhere('name', 'view_itinerary')['contact'])->toBe('anonymous');
+    expect($rows->firstWhere('name', 'view_itinerary')['contact_id'])->toBeNull();
     expect($rows->firstWhere('name', 'submit_booking_request')['contact'])->toBe('E. Harmon');
+    expect($rows->firstWhere('name', 'submit_booking_request')['contact_id'])->toBe($contact->id);
     expect($rows->firstWhere('name', 'view_itinerary')['detail'])->toBe($itinerary->name);
 
     $kpis = $response->json('meta.kpis');

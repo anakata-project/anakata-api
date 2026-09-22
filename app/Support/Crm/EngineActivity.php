@@ -21,7 +21,7 @@ final class EngineActivity
     /**
      * @param  array{from?: string, to?: string, name?: string, identified?: bool}  $filters
      * @return array{
-     *     rows: LengthAwarePaginator<int, array{at: string, name: string, contact: string, detail: string, side: string}>,
+     *     rows: LengthAwarePaginator<int, array{at: string, name: string, contact: string, contact_id: int|null, detail: string, side: string}>,
      *     kpis: array{
      *         events_today: int,
      *         identified: int,
@@ -184,7 +184,7 @@ final class EngineActivity
 
     /**
      * @param  array{itineraries: array<string, string>, departures: array<int, array{date: string, yacht: string}>}  $names
-     * @return array{at: string, name: string, contact: string, detail: string, side: string}
+     * @return array{at: string, name: string, contact: string, contact_id: int|null, detail: string, side: string}
      */
     private static function format(BehaviouralEvent $event, array $names): array
     {
@@ -196,6 +196,7 @@ final class EngineActivity
             'at' => Iso::utc($event->occurred_at),
             'name' => $event->name->value,
             'contact' => $event->contact instanceof Contact ? $event->contact->name : 'anonymous',
+            'contact_id' => $event->contact instanceof Contact ? $event->contact->id : null,
             'detail' => BehaviouralEventDetail::make(
                 $event->name,
                 $event->params,

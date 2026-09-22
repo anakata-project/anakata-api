@@ -8,14 +8,25 @@ use App\Enums\ConfigKind;
 use App\Enums\Permission;
 use App\Events\AvailabilityChanged;
 use App\Events\BookingChargesChanged;
+use App\Events\BookingCreated;
 use App\Events\BookingStatusChanged;
+use App\Events\CharterEnquiryReceived;
 use App\Events\ConfigPublished;
 use App\Events\HoldExpired;
+use App\Events\PaymentAwaitingWire;
 use App\Events\PaymentSettled;
+use App\Events\RefundRequested;
 use App\Listeners\BumpEngineFeedVersion;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\ExpireWebCheckoutSession;
 use App\Listeners\MarkRequestHoldExpired;
+use App\Listeners\OpenDealOnBookingCreated;
+use App\Listeners\OpenDealOnCharterEnquiryReceived;
+use App\Listeners\RaiseTasksOnBookingCreated;
+use App\Listeners\RaiseTasksOnBookingStatusChanged;
+use App\Listeners\RaiseTasksOnCharterEnquiry;
+use App\Listeners\RaiseTasksOnPaymentAwaitingWire;
+use App\Listeners\RaiseTasksOnRefundRequested;
 use App\Listeners\SendOnBookingChargesChanged;
 use App\Listeners\SendOnBookingStatusChanged;
 use App\Listeners\SendOnPaymentSettled;
@@ -23,12 +34,16 @@ use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
+use App\Models\Campaign;
 use App\Models\CharterEnquiry;
 use App\Models\CheckoutSession;
 use App\Models\Consent;
 use App\Models\Contact;
+use App\Models\ContactActivity;
 use App\Models\ContactAlias;
 use App\Models\ContactMerge;
+use App\Models\CrmTask;
+use App\Models\Deal;
 use App\Models\Departure;
 use App\Models\Document;
 use App\Models\EngineSettingsVersion;
@@ -43,6 +58,7 @@ use App\Models\PaymentLink;
 use App\Models\RateVersion;
 use App\Models\RefundRequest;
 use App\Models\Role;
+use App\Models\SubjectRequest;
 use App\Models\User;
 use App\Models\WaitlistEntry;
 use App\Policies\SyncPolicy;
@@ -57,10 +73,12 @@ use App\Support\Config\Documents\ExtrasDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Crm\CrmSync;
 use App\Support\Iso;
+use App\Support\Schedule\AnakataSchedule;
 use App\Support\Stripe\StripeGatewayBinding;
 use DateTimeInterface;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
@@ -193,6 +211,11 @@ class AppServiceProvider extends ServiceProvider
             'departure' => Departure::class,
             'internal_block' => InternalBlock::class,
             'contact' => Contact::class,
+            'deal' => Deal::class,
+            'crm_task' => CrmTask::class,
+            'campaign' => Campaign::class,
+            'subject_request' => SubjectRequest::class,
+            'contact_activity' => ContactActivity::class,
             'contact_merge' => ContactMerge::class,
             'contact_alias' => ContactAlias::class,
             'group' => Group::class,
@@ -253,8 +276,23 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
         Event::listen(HoldExpired::class, ExpireWebCheckoutSession::class);
         Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
+        Event::listen(BookingCreated::class, OpenDealOnBookingCreated::class);
+        Event::listen(BookingCreated::class, RaiseTasksOnBookingCreated::class);
+        Event::listen(CharterEnquiryReceived::class, OpenDealOnCharterEnquiryReceived::class);
+        Event::listen(CharterEnquiryReceived::class, RaiseTasksOnCharterEnquiry::class);
+        Event::listen(BookingStatusChanged::class, RaiseTasksOnBookingStatusChanged::class);
+        Event::listen(RefundRequested::class, RaiseTasksOnRefundRequested::class);
+        Event::listen(PaymentAwaitingWire::class, RaiseTasksOnPaymentAwaitingWire::class);
         Event::listen(PaymentSettled::class, SendOnPaymentSettled::class);
         Event::listen(BookingChargesChanged::class, SendOnBookingChargesChanged::class);
+
+        $this->app->afterResolving(Schedule::class, function (Schedule $schedule): void {
+            AnakataSchedule::register($schedule);
+        });
+
+        if ($this->app->resolved(Schedule::class)) {
+            AnakataSchedule::register($this->app->make(Schedule::class));
+        }
 
         if ($this->app->runningUnitTests()) {
             $this->loadMigrationsFrom(base_path('tests/database/migrations'));
