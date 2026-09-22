@@ -11,11 +11,13 @@ use App\Http\Requests\Rms\NpsIndexRequest;
 use App\Http\Requests\Rms\StoreGuestResponseRequest;
 use App\Http\Resources\Rms\GuestResponseResource;
 use App\Http\Resources\Rms\NpsViewResource;
+use App\Http\Resources\Rms\SurveyGuestResource;
 use App\Http\Resources\Rms\SurveyQuestionResource;
 use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\GuestResponse;
 use App\Support\GuestExperience\NpsDashboard;
+use App\Support\GuestExperience\SurveyGuests;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -23,6 +25,15 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class GuestResponseController extends Controller
 {
+    #[DocumentedResponse(status: 200, type: SurveyGuestResource::class)]
+    public function surveyGuests(Booking $booking): AnonymousResourceCollection
+    {
+        $this->authorize('view', $booking);
+        $this->authorize('record', GuestResponse::class);
+
+        return SurveyGuestResource::collection(SurveyGuests::forBooking($booking));
+    }
+
     #[DocumentedResponse(status: 200, type: SurveyQuestionResource::class)]
     public function questions(): AnonymousResourceCollection
     {

@@ -899,6 +899,13 @@ test('sprint 11 response schemas name their enums and optional preference fields
     expect($staff['properties'])->toHaveKeys(['id', 'guest_id', 'score', 'source']);
     expect(sprint11SchemaRef($staff['properties']['source']))->toContain('GuestResponseSource');
 
+    $picker = openApiSchema($spec, 'GuestExperienceDepartureResource');
+    expect($picker['properties'])->toHaveKeys(['departure_id', 'date', 'yacht', 'passengers']);
+
+    $surveyGuest = openApiSchema($spec, 'SurveyGuestResource');
+    expect($surveyGuest['properties'])->toHaveKeys(['guest_id', 'name', 'cabin', 'responded']);
+    expect($surveyGuest['properties'])->not->toHaveKeys(['passport_no', 'medical_note', 'dob', 'nationality']);
+
     $commission = openApiSchema($spec, 'CommissionResource');
     expect($commission['properties']['payout'] ?? null)->toBeArray();
     expect(sprint11SchemaRef($commission['properties']['status']))->toContain('CommissionAccrualStatus');

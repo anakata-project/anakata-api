@@ -1026,3 +1026,114 @@ The badge follows the caller's audience counts, and manifest actions stay behind
 EOF
 )"
 ```
+
+## Task 10 · Panel Guest Experience
+
+`/rms/operations/guest-experience` is a real page. The catch-all placeholder no longer serves that route. Strings are in `guestExperience` in the panel i18n file. No T−45, 24, 7, or 8 is written into the notice or the helpers; the NPS empty state and KPI subtitles interpolate `facts`.
+
+### Departure picker
+`GET /api/rms/guest-experience/departures` (`GuestExperienceDepartureResource`). `GuestPreferencePolicy::viewAny` (`panel.rms`). `DepartureList` counts guests on non-deleted bookings in `ManifestRoster::COUNTED`, then loads those departures with the yacht, ordered by date then id. Each row is `departure_id`, `date`, `yacht`, `passengers`.
+
+This is its own endpoint rather than `GET /api/rms/manifests`. That list is the documents screen. Task 09 left it unbounded, and a later change to manifest columns or filters would break the picker. A bounded manifests query would still couple the two screens.
+
+The select labels each option `date · yacht · n guests` and defaults to the first date on or after today. If every departure is past, it uses the latest. After reset the first option was `7 Nov 2027 · ANAMARA · 5 guests`.
+
+### Page
+The selected departure loads `GET /api/rms/departures/{id}/guest-experience`. KPIs: guests on board with the booking count, questionnaires answered over total with sent-versus-scheduled and the formatted send date, celebrations, and accessibility / medical. The count is always shown. The subtitle is the operations wording when the caller has `guests.view_sensitive`, and the restricted wording otherwise. The guest table shows name, booking reference, email or the no-email note, cabin, a status pill, dietary, celebration, activity, and View or Record. `ANSWERED` adds the formatted time and source. `SCHEDULED` adds the send date. View is only for `ANSWERED`.
+
+`prefStatusClass`: `ANSWERED` → `p-conf`, `SENT_NO_REPLY` → `p-hold`, `SCHEDULED` → `p-pend`.
+
+### Preferences
+The modal loads questions and `GET /api/rms/guests/{id}/preferences`. `text` is an input, `choice` is a select of `options`. Ordinary keys bind `current.answers`. `access` and `emerg` bind `accessibility` and `emergency_contact`. Without `guests.view_sensitive` those two rows are “Restricted — operations team only” and are omitted from the PUT. With the permission they are editable, and an empty string clears. Save is shown only with `guest_experience.manage`; otherwise every control is disabled. Version lines are version, source, formatted `answered_at`, `recorded_by.name`, and purged when `purged_at` is set. Answer text is not printed there.
+
+### Brief
+“Hotel manager brief — print” opens `DocumentPreviewModal`. HTML is `GET /api/rms/departures/{id}/hotel-manager-brief`. PDF is the same path with `?format=pdf`. The panel does not store or rebuild the brief.
+
+### NPS
+`GET /api/rms/guest-experience/nps` is requested only when the caller has `guest_experience.manage`. Lucía’s page has no NPS section. An empty `responses` list shows the prototype sentence with `survey_hours_after_return`, `first_expected_survey_on`, `alert_below`, and `review_request_from`. Otherwise the KPI row and the responses table use those thresholds in the subtitles. The score pill is `npsScoreClass(score, facts.alert_below, facts.review_request_from)`: below the alert → `p-canc`, at or above the review threshold → `p-conf`, otherwise `p-pend`. `why` and `call_notes` are not on this table.
+
+### Post-trip form
+On a `COMPLETED` booking’s Overview, “Record post-trip survey” shows for `guest_experience.manage`. The guest select calls `GET /api/rms/bookings/{booking}/survey-guests` (`SurveyGuestResource`): `guest_id`, `name`, `cabin`, `responded`. Authorize like the store: `view` on the booking, then `guest_experience.manage`. A guest with `responded` is disabled.
+
+This is not `GET /api/rms/bookings/{booking}/guests`. That route is reachable with booking `view` and without `guests.view_sensitive`, but `GuestResource` always includes `passport_no`, `passport_expiry`, and the medical, dietary, and accessibility notes (masked without the permission, values with it). Seeded Mateo holds both `guest_experience.manage` and `guests.view_sensitive`, so the Guests tab payload would still hand the modal those fields. The departure guest-experience payload is not loaded on the booking panel, and it includes every passenger’s dietary, celebration, and activity text. The names-and-cabins list does not.
+
+The form posts `GuestResponseInput` (`rec`, not `recommend`). After 201 it reads page 1 of booking history and shows `after.what` of the new `booking.nps_recorded` row. `describe.ts` returns that same `after.what`, so the History tab matches the modal.
+
+### Checks
+Pest `GuestExperienceListsTest` (picker is `panel.rms`, only departures with passengers, cancelled and empty departures excluded; survey guests are names and cabins, 403 without `guest_experience.manage`, 403 for a sales exec who owns the booking, no passport or note keys). Schema assertions for both resources. Pint on the touched PHP. Larastan on the new and touched app files: no errors. Panel lint, typecheck, unit tests, and build passed. Layer lint, typecheck, tests, and build passed.
+
+`v0.12.0` does not contain `GuestExperienceDepartureResource` or `SurveyGuestResource`. The fresh-clone check overlays the anakata-ui working tree onto a clone of that tag, copies the panel working tree beside it, then `pnpm typecheck` and `pnpm build` in the panel. Both passed. A clone of the tag alone would not.
+
+### Browser
+After `reset.sh` on the `anakata-api` compose project. Screenshots timed out; the page text, pill classes, and computed backgrounds are what was checked. Light background `rgb(250, 249, 240)`, dark `rgb(20, 27, 23)`. The page still showed the answered row in both.
+
+- Carolina: picker and KPIs (5 guests, 2 bookings, 0/5 then 1/5, celebrations 1, accessibility 1 with “details in the manifest”). She recorded Daniel Harrison (vegetarian, continental, anniversary, moderate, accessibility “Low step at the gangway”). Status became `ANSWERED` · staff, pill `p-conf`, and version `v1 · staff · Carolina M.`. Her brief includes the accessibility section.
+- Mateo (both `guest_experience.manage` and `guests.view_sensitive`): the accessibility KPI says “details in the manifest”, the NPS panel is present, and Daniel’s accessibility and emergency fields are editable with the saved values.
+- Lucía: the accessibility KPI says “restricted to operations” and the count stays 1. She has no NPS section. Daniel’s modal shows “Restricted — operations team only” for both restricted questions, every other control is disabled, and there is no save button. Her brief has dietary and celebrations and no accessibility section.
+- Claire Whitfield’s engine questionnaire (`/questionnaire/{token}`, task 08) saved “Pescatarian”. The panel shows `ANSWERED` · guest link.
+- `ANK-2026-0005` was moved `FULLY_PAID` → `ON_BOARD` → `COMPLETED` through `TransitionBooking` with the clock on the return date (14 Nov 2027). The voyage command has no date argument, and today is before that departure. Completion raised `POST_TRIP_CALL` (`post-trip-call:2`). Mateo’s survey form listed Markus, Julia, and Leon with cabins and no passport fields. Score 6 for Markus showed `Post-trip survey recorded — score 6 · alert sent to guest experience`. `NPS_REPLY` (`nps-reply:1`) stayed open. The call notes on that response auto-closed the post-trip call, which is the existing close rule. Score 9 for Julia (not the contact) showed `Post-trip survey recorded — score 9 · no marketing consent on record for this guest`. The History tab shows both sentences. The NPS panel: average 7.5, 2 responses, 1 alert below 7, 0 review requests; pills `p-canc` for 6 and `p-conf` for 9. The CRM contacts list shows The Brandt Family with NPS 6.
+
+Task 12 will exercise this screen as `GX-01` (engine questionnaire → `ANSWERED` from the guest link), `GX-02` (staff accessibility, restricted for Lucía), `GX-03` (brief with and without accessibility), `GX-04` (expired questionnaire token), `NPS-01` (score 6, alert and reply task), `NPS-02` (score 9 without marketing consent), and `NPS-03` (CRM contact shows the latest score).
+
+### Git
+Not run.
+
+```bash
+# anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/GuestExperienceController.php \
+  app/Http/Controllers/Rms/GuestResponseController.php \
+  app/Http/Resources/Rms/GuestExperienceDepartureResource.php \
+  app/Http/Resources/Rms/SurveyGuestResource.php \
+  app/Support/GuestExperience/DepartureList.php \
+  app/Support/GuestExperience/SurveyGuests.php \
+  routes/api/rms.php \
+  tests/Feature/GuestExperience/GuestExperienceListsTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Add the guest-experience departure picker and survey guest list.
+
+The picker stays off the manifests list, and the survey form does not load passport or notes.
+EOF
+)"
+```
+
+```bash
+# anakata-ui
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  app/types/api.d.ts \
+  app/types/guests.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the guest-experience lists.
+
+The departure picker and the survey guest list are aliases only.
+EOF
+)"
+```
+
+`v0.12.0` does not contain these shapes. Do not move that tag. A later release tag is what a fresh clone without this overlay would pin.
+
+```bash
+# anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/components/bookings/BookingPanel.vue \
+  app/components/guest-experience \
+  app/components/history/describe.ts \
+  app/pages/rms/operations/guest-experience.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/describe.test.ts \
+  tests/unit/guestExperienceHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the Guest Experience page and the post-trip survey form.
+
+Scores and restricted fields follow the API, and the history line is the recorded sentence.
+EOF
+)"
+```

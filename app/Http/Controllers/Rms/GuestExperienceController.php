@@ -10,6 +10,7 @@ use App\Enums\PreferenceSource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\UpdateGuestPreferencesRequest;
 use App\Http\Resources\Rms\DepartureGuestExperienceResource;
+use App\Http\Resources\Rms\GuestExperienceDepartureResource;
 use App\Http\Resources\Rms\GuestPreferencesResource;
 use App\Http\Resources\Rms\PreferenceQuestionResource;
 use App\Models\Departure;
@@ -17,6 +18,7 @@ use App\Models\Guest;
 use App\Models\GuestPreference;
 use App\Models\User;
 use App\Support\GuestExperience\DepartureGuestExperience;
+use App\Support\GuestExperience\DepartureList;
 use App\Support\GuestExperience\HotelManagerBrief;
 use App\Support\GuestExperience\PreferenceHistory;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
@@ -25,6 +27,14 @@ use Illuminate\Http\Response;
 
 final class GuestExperienceController extends Controller
 {
+    #[DocumentedResponse(status: 200, type: GuestExperienceDepartureResource::class)]
+    public function departures(): AnonymousResourceCollection
+    {
+        $this->authorize('viewAny', GuestPreference::class);
+
+        return GuestExperienceDepartureResource::collection(DepartureList::withPassengers());
+    }
+
     #[DocumentedResponse(status: 200, type: PreferenceQuestionResource::class)]
     public function questions(): AnonymousResourceCollection
     {
