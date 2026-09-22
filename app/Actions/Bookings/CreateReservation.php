@@ -15,6 +15,7 @@ use App\Enums\ConfigKind;
 use App\Enums\MainChannel;
 use App\Enums\OfferType;
 use App\Enums\ReferenceType;
+use App\Events\BookingCreated;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Agency;
 use App\Models\Booking;
@@ -258,6 +259,8 @@ final class CreateReservation extends Action
         }
 
         History::record($booking, 'booking.created', after: $createdAfter);
+
+        BookingCreated::dispatch($booking);
 
         if ($commission !== null && $commission['over_cap']) {
             $cap = $this->config->businessRules()->commission->capPct;

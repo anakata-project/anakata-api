@@ -34,6 +34,36 @@ final class PaymentsKpis
     }
 
     /**
+     * @return array{collected: int, pending: int, overdue_amount: int}
+     */
+    public static function ledger(): array
+    {
+        $row = self::aggregate(true, null, null, null);
+
+        return [
+            'collected' => (int) ($row->collected ?? 0),
+            'pending' => (int) ($row->pending ?? 0),
+            'overdue_amount' => (int) ($row->overdue_amount ?? 0),
+        ];
+    }
+
+    public static function scheduledIn(): int
+    {
+        [$balanceSql, $paid] = Booking::balanceSql();
+        $statuses = [
+            BookingStatus::Confirmed->value,
+            BookingStatus::FullyPaid->value,
+        ];
+
+        $value = Booking::query()
+            ->whereIn('status', $statuses)
+            ->selectRaw('COALESCE(SUM(GREATEST(('.$balanceSql.'), 0)), 0) as scheduled', $paid)
+            ->value('scheduled');
+
+        return (int) $value;
+    }
+
+    /**
      * @return array{
      *     collected: int,
      *     deposits: int,
@@ -54,7 +84,8 @@ final class PaymentsKpis
     {
         $config = app(CurrentConfig::class);
         $terms = $config->rates()->terms;
-        $row = self::aggregate($actor, $from, $to);
+        $viewAll = $actor->hasPermission(Permission::BookingsViewAll);
+        $row = self::aggregate($viewAll, $viewAll ? null : $actor->id, $from, $to);
 
         return [
             'collected' => (int) ($row->collected ?? 0),
@@ -73,9 +104,8 @@ final class PaymentsKpis
         ];
     }
 
-    private static function aggregate(User $actor, ?string $from, ?string $to): stdClass
+    private static function aggregate(bool $viewAll, ?int $ownerId, ?string $from, ?string $to): stdClass
     {
-        $viewAll = $actor->hasPermission(Permission::BookingsViewAll);
         [$balanceSql, $paid] = Booking::balanceSql();
         [$cruiseSql, $cruisePaid] = Booking::cruiseOutstandingSql();
         $owing = self::owingStatuses();
@@ -99,10 +129,10 @@ final class PaymentsKpis
         $pendingWhen = 'bookings.status IN ('.$owingIn.') AND ('.$balanceSql.') > 0';
         $overdueWhen = 'bookings.status IN ('.$overdueIn.') AND ('.$cruiseSql.') > 0 AND ? > '.$dueSql;
 
-        $collected = self::paidSumQuery($actor, $viewAll, $from, $to, depositsOnly: false);
-        $deposits = self::paidSumQuery($actor, $viewAll, $from, $to, depositsOnly: true);
+        $collected = self::paidSumQuery($viewAll, $ownerId, $from, $to, depositsOnly: false);
+        $deposits = self::paidSumQuery($viewAll, $ownerId, $from, $to, depositsOnly: true);
 
-        $row = self::visibleBookings($actor, $viewAll, $from, $to)
+        $row = self::visibleBookings($viewAll, $ownerId, $from, $to)
             ->toBase()
             ->selectRaw(
                 '('.$collected->toSql().') as collected, '.
@@ -140,12 +170,12 @@ final class PaymentsKpis
     /**
      * @return Builder<Booking>
      */
-    private static function visibleBookings(User $actor, bool $viewAll, ?string $from, ?string $to): Builder
+    private static function visibleBookings(bool $viewAll, ?int $ownerId, ?string $from, ?string $to): Builder
     {
         return Booking::query()
             ->when(
-                ! $viewAll,
-                fn (Builder $query) => $query->where('bookings.owner_id', $actor->id),
+                ! $viewAll && $ownerId !== null,
+                fn (Builder $query) => $query->where('bookings.owner_id', $ownerId),
             )
             ->when(
                 $from !== null,
@@ -167,8 +197,8 @@ final class PaymentsKpis
      * @return Builder<Payment>
      */
     private static function paidSumQuery(
-        User $actor,
         bool $viewAll,
+        ?int $ownerId,
         ?string $from,
         ?string $to,
         bool $depositsOnly,
@@ -176,9 +206,9 @@ final class PaymentsKpis
         return Payment::query()
             ->whereHas(
                 'booking',
-                function (Builder $booking) use ($actor, $viewAll): void {
-                    if (! $viewAll) {
-                        $booking->where('owner_id', $actor->id);
+                function (Builder $booking) use ($viewAll, $ownerId): void {
+                    if (! $viewAll && $ownerId !== null) {
+                        $booking->where('owner_id', $ownerId);
                     }
                 },
             )

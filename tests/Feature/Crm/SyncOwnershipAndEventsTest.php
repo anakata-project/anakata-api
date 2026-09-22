@@ -39,7 +39,8 @@ test('ownership is the implemented contract, not a mirror table', function (): v
     expect($guest['code'])->toBe('App\\Support\\SensitiveFields');
 
     $deals = $rows->firstWhere('object', 'Deal & pipeline');
-    expect($deals['rule'])->toContain('Not built');
+    expect($deals['rule'])->toContain('Stages 1–4 are stored');
+    expect($deals['code'])->toBe('App\\Models\\Deal');
 });
 
 test('the event catalogue lists every domain event and behavioural name', function (): void {

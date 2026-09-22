@@ -14,6 +14,7 @@ use App\Enums\HoldRule;
 use App\Enums\HoldType;
 use App\Enums\PreferredChannel;
 use App\Enums\ReferenceType;
+use App\Events\BookingCreated;
 use App\Exceptions\CabinUnavailableException;
 use App\Models\Booking;
 use App\Models\BookingRequest;
@@ -174,6 +175,8 @@ final class CreateBookingRequest extends Action
                 'sla_due_at' => $submittedAt->copy()->addHours($rules->sla->responseHours),
                 'hold_rule' => HoldRule::from($hold->rule),
             ]);
+
+            BookingCreated::dispatch($booking);
 
             History::record($booking, 'booking.requested', after: [
                 'request_reference' => $booking->request_reference,

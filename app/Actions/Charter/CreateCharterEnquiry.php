@@ -10,6 +10,7 @@ use App\Actions\Contacts\StitchEngineIdentity;
 use App\Enums\CharterEnquirySource;
 use App\Enums\CharterEnquiryStatus;
 use App\Enums\ContactType;
+use App\Events\CharterEnquiryReceived;
 use App\Mail\CharterEnquiryMail;
 use App\Models\CharterEnquiry;
 use App\Support\History\History;
@@ -47,6 +48,8 @@ final class CreateCharterEnquiry extends Action
                 'source' => CharterEnquirySource::Engine,
                 'status' => CharterEnquiryStatus::New,
             ]);
+
+            CharterEnquiryReceived::dispatch($enquiry);
 
             History::record($enquiry, 'charter_enquiry.created', after: [
                 'guests' => $enquiry->guests,

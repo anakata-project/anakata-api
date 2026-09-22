@@ -22,6 +22,7 @@ use App\Enums\HoldType;
 use App\Enums\MainChannel;
 use App\Enums\PreferredChannel;
 use App\Enums\ReferenceType;
+use App\Events\BookingCreated;
 use App\Exceptions\ConflictException;
 use App\Exceptions\PriceChangedException;
 use App\Models\Booking;
@@ -233,7 +234,7 @@ final class SubmitEngineCheckout extends Action
 
         $tctCollected = (bool) ($data['tct_collected'] ?? false);
 
-        return Booking::query()->create([
+        $booking = Booking::query()->create([
             'reference' => null,
             'request_reference' => $this->references->next(ReferenceType::Request),
             'type' => BookingType::Cabin,
@@ -269,6 +270,10 @@ final class SubmitEngineCheckout extends Action
                 ? $this->config->engineSettings()->fees->tctPp
                 : null,
         ]);
+
+        BookingCreated::dispatch($booking);
+
+        return $booking;
     }
 
     private function resolveGroup(ReservationQuote $quote, Contact $contact, Departure $departure): ?Group

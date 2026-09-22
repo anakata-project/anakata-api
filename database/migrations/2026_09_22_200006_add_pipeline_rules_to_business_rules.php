@@ -24,46 +24,40 @@ return new class extends Migration
 
         $document = $current->document;
         $crm = is_array($document['crm'] ?? null) ? $document['crm'] : [];
+        $pipeline = is_array($crm['pipeline'] ?? null) ? $crm['pipeline'] : [];
 
         $defaults = [
-            'segment_high_ltv' => 20000,
-            'segment_mid_ltv' => 8000,
+            'sla_new_lead_business_hours' => 4,
+            'sla_qualifying_business_days' => 5,
+            'sla_negotiation_business_days' => 7,
+            'probability_new_lead' => 5,
+            'probability_qualifying' => 15,
+            'probability_quoted' => 35,
+            'probability_negotiation' => 55,
+            'probability_deposit_pending' => 80,
         ];
 
         $added = false;
 
         foreach ($defaults as $key => $value) {
-            if (! array_key_exists($key, $crm)) {
-                $crm[$key] = $value;
+            if (! array_key_exists($key, $pipeline)) {
+                $pipeline[$key] = $value;
                 $added = true;
             }
-        }
-
-        if (! array_key_exists('pipeline', $crm)) {
-            $crm['pipeline'] = [
-                'sla_new_lead_business_hours' => 4,
-                'sla_qualifying_business_days' => 5,
-                'sla_negotiation_business_days' => 7,
-                'probability_new_lead' => 5,
-                'probability_qualifying' => 15,
-                'probability_quoted' => 35,
-                'probability_negotiation' => 55,
-                'probability_deposit_pending' => 80,
-            ];
-            $added = true;
         }
 
         if (! $added) {
             return;
         }
 
+        $crm['pipeline'] = $pipeline;
         $document['crm'] = $crm;
 
         app(ConfigPublisher::class)->publish(
             ConfigKind::BusinessRules,
             $document,
             $current->version,
-            'Sprint 9: crm.segment_high_ltv (20000) and crm.segment_mid_ltv (8000) added (PENDING CLIENT, source L2 / prototype segOf)',
+            'Sprint 10: crm.pipeline SLAs and probabilities added (defaults 4h / 5d / 7d and 5 / 15 / 35 / 55 / 80, source M4, PENDING CLIENT)',
             null,
         );
     }
