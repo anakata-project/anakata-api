@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Events\PaymentAwaitingWire;
 use App\Events\PaymentSettled;
 use App\Models\Booking;
 use App\Models\User;
@@ -70,6 +71,10 @@ final class RecordPayment extends Action
 
             if ($payment->status === PaymentStatus::Settled && $payment->amount > 0) {
                 PaymentSettled::dispatch($booking, $payment);
+            }
+
+            if ($payment->status === PaymentStatus::AwaitingWire) {
+                PaymentAwaitingWire::dispatch($payment);
             }
 
             return new RecordedPayment($payment, $booking, $warnings);

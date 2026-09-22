@@ -22,7 +22,7 @@ docker compose exec app sh -c "php artisan tinker --execute=\"Illuminate\\\\Supp
 
 ## Expected
 - [ ] E1 · Fresh seed KPIs: **Jobs failing** `0`, **Failures open** `0`, **Merges this month** `0`. Failures empty: `No failed jobs or deliveries.` ⚠ UNVERIFIED — `SyncJobsTest` (null outcomes) + task 07 browser after a manufactured failure.
-- [ ] E2 · Jobs include `inventory:release-expired-holds` and `engine:expire-stripe-checkouts` (`* * * * *`); `anakata:flag-overdue`, `anakata:retention`, `anakata:events-retention`, `anakata:documents-due` (`0 0 * * *` · `Pacific/Galapagos`). Last run / outcome `—`. Next run is a timestamp, not `—`. `telescope:prune --hours=48` only if Telescope is installed.
+- [ ] E2 · Jobs include `inventory:release-expired-holds` and `engine:expire-stripe-checkouts` (`* * * * *`); `anakata:crm-tasks` (`*/5 * * * *`); `anakata:flag-overdue`, `anakata:retention`, `anakata:events-retention`, `anakata:documents-due` (`0 0 * * *` · `Pacific/Galapagos`). Last run / outcome `—`. Next run is a timestamp, not `—`. `telescope:prune --hours=48` only if Telescope is installed.
 - [ ] E3 · After the insert: Failures shows kind `job`, name `App\Listeners\SendOnPaymentSettled`, detail `RuntimeException: Stripe timeout`. Failures open `1`. **Retry** is shown (Admin has `sync.retry`).
 - [ ] E4 · Retry: the clicked button disables while pending. Toast `Retry queued`. The row leaves. Failures open returns to `0`.
 

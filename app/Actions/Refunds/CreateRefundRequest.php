@@ -6,6 +6,7 @@ namespace App\Actions\Refunds;
 
 use App\Actions\Action;
 use App\Enums\RefundRequestStatus;
+use App\Events\RefundRequested;
 use App\Models\Booking;
 use App\Models\RefundRequest;
 use App\Models\User;
@@ -64,6 +65,8 @@ final class CreateRefundRequest extends Action
                 'status' => RefundRequestStatus::Pending,
                 'due_by' => $dueBy,
             ]);
+
+            RefundRequested::dispatch($request);
 
             History::record($booking, 'refund.requested', after: [
                 'band_min_days' => $band['min_days'],
