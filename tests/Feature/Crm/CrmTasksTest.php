@@ -13,8 +13,10 @@ use App\Enums\Permission;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Events\BookingCreated;
+use App\Events\BookingStatusChanged;
 use App\Events\PaymentAwaitingWire;
 use App\Events\RefundRequested;
+use App\Listeners\RaiseTasksOnBookingStatusChanged;
 use App\Models\Booking;
 use App\Models\CharterEnquiry;
 use App\Models\Contact;
@@ -27,6 +29,7 @@ use App\Models\User;
 use App\Support\BusinessTime;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Crm\TaskDue;
+use App\Support\Crm\TaskSweep;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
@@ -153,6 +156,31 @@ test('a cleared booking auto-closes the task and does not reopen it', function (
     expect(CrmTask::query()->where('idempotency_key', 'request:'.$booking->id)->count())->toBe(1);
     expect(Booking::query()->count())->toBe($before);
     expect($booking->fresh()?->status)->toBe(BookingStatus::Confirmed);
+});
+
+test('releasing a request closes its response task without the sweep', function (): void {
+    $actor = managerUser();
+    $departure = ReservationFixtures::anamaraDeparture('2027-11-28');
+    $booking = app(CreateBookingRequest::class)->handle(
+        ReservationFixtures::requestPayload($departure, [
+            'cabins' => [['cabin_code' => 'S2', 'adults' => 2, 'children' => 0]],
+            'client' => ['email' => 'task-release@anakata.test'],
+        ]),
+        $actor,
+    );
+
+    app(TaskSweep::class)->onBookingStatusChanged($booking, BookingStatus::Waitlisted, BookingStatus::Requested);
+
+    $task = CrmTask::query()->where('idempotency_key', 'request:'.$booking->id)->firstOrFail();
+    expect($task->status)->toBe(TaskStatus::Open);
+
+    $booking->forceFill(['status' => BookingStatus::Released])->save();
+    app(RaiseTasksOnBookingStatusChanged::class)->handle(
+        new BookingStatusChanged($booking, BookingStatus::Requested, BookingStatus::Released),
+    );
+
+    expect($task->fresh()?->status)->toBe(TaskStatus::AutoClosed);
+    expect($task->fresh()?->outcome)->toBe('Resolved in the RMS');
 });
 
 test('visibility follows ownership and needs_permission', function (): void {

@@ -204,6 +204,23 @@ test('the stage projection follows the booking and a mixed group uses the furthe
     $pending = $make(BookingStatus::PendingPayment, 'S7');
     $held = $make(BookingStatus::OnHoldAgency, 'S8');
     $cancelled = $make(BookingStatus::Cancelled, 'OWNER');
+    $releasedDeparture = ReservationFixtures::anamaraDeparture('2027-12-12');
+    $releasedBooking = Booking::factory()->create([
+        'departure_id' => $releasedDeparture->id,
+        'cabin_id' => $releasedDeparture->yacht->cabins->firstWhere('code', 'S1')?->id,
+        'contact_id' => $contact->id,
+        'status' => BookingStatus::Released,
+        'reference' => 'ANK-REL-RELEASED',
+    ]);
+    $released = Deal::query()->create([
+        'contact_id' => $contact->id,
+        'owner_id' => $releasedBooking->owner_id,
+        'title' => 'Released',
+        'type' => DealType::Fit,
+        'stage' => null,
+        'stage_entered_at' => now(),
+        'booking_id' => $releasedBooking->id,
+    ]);
 
     $group = Group::factory()->create(['departure_id' => $departure->id, 'coordinator_contact_id' => $contact->id]);
     Booking::factory()->create([
@@ -231,7 +248,7 @@ test('the stage projection follows the booking and a mixed group uses the furthe
 
     $json = pipelineJson();
 
-    expect(pipelineDealIds($json, 'LOST'))->toContain($lost->id, $cancelled->id);
+    expect(pipelineDealIds($json, 'LOST'))->toContain($lost->id, $cancelled->id, $released->id);
     expect(pipelineDealIds($json, 'WON_COMPLETED'))->toContain($completed->id);
     expect(pipelineDealIds($json, 'BOOKING_CONFIRMED'))->toContain($confirmed->id, $onBoard->id, $overdue->id, $fullyPaid->id);
     expect(pipelineDealIds($json, 'DEPOSIT_PENDING'))->toContain($requested->id, $pending->id, $held->id, $mixed->id);

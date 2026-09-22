@@ -136,6 +136,11 @@ final class ContactController extends Controller
         ]);
     }
 
+    #[DocumentedResponse(
+        status: 409,
+        description: 'Email belongs to another contact',
+        type: 'array{message: string, conflicting_contact: array{id: int, name: string}}',
+    )]
     public function update(UpdateContactRequest $request, Contact $contact, UpdateContact $action): ContactResource
     {
         $this->authorize('update', $contact);
