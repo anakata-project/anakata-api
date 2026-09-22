@@ -21,7 +21,7 @@ final class NpsDashboard
     /**
      * @return array{
      *     kpis: array{average_score: string|null, responses: int, alerts_below: int, review_requests_sent: int},
-     *     responses: list<array{booking_reference: string, guest: string, score: int, score_class: string, recommend: int|null, best: string|null, better: string|null, crew: string|null}>,
+     *     responses: list<array{booking_reference: string, guest: string, score: int, score_class: 'low'|'neutral'|'high', recommend: int|null, best: string|null, better: string|null, crew: string|null}>,
      *     facts: array{first_expected_survey_on: string|null, survey_hours_after_return: int, alert_below: int, review_request_from: int}
      * }
      */
@@ -59,6 +59,9 @@ final class NpsDashboard
         ];
     }
 
+    /**
+     * @return 'low'|'neutral'|'high'
+     */
     public static function scoreClass(int $score, NpsRules $rules): string
     {
         if ($score < $rules->alertBelow) {

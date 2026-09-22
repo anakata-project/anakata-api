@@ -70,6 +70,8 @@ test('engine OpenAPI schemas have properties', function (): void {
         'CompleteBookingResource',
         'CompleteGuestResource',
         'EngineEventsAcceptedResource',
+        'QuestionnaireResource',
+        'SurveyResource',
     ] as $name) {
         engineOpenApiSchema($spec, $name);
     }
@@ -153,4 +155,12 @@ test('engine OpenAPI schemas have properties', function (): void {
     $eventName = $storeEvents['properties']['events']['items']['properties']['name']['enum'] ?? [];
     expect($eventName)->not->toBeEmpty();
     expect($eventName)->not->toContain('identity.stitched');
+
+    $questionnaire = $spec['components']['schemas']['UpdateQuestionnaireRequest'] ?? null;
+    expect($questionnaire)->toBeArray();
+    expect($questionnaire['properties'] ?? null)->toHaveKey('answers');
+
+    $survey = $spec['components']['schemas']['StoreSurveyResponseRequest'] ?? null;
+    expect($survey)->toBeArray();
+    expect($survey['properties'] ?? null)->toHaveKeys(['score', 'recommend', 'why', 'best', 'better', 'crew']);
 });

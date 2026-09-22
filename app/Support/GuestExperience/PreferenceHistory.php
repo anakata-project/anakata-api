@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\GuestExperience;
 
+use App\Enums\PreferenceSource;
 use App\Models\Guest;
 use App\Models\GuestPreference;
 use App\Support\Iso;
@@ -11,7 +12,34 @@ use App\Support\Iso;
 final class PreferenceHistory
 {
     /**
-     * @return array{current: array<string, mixed>|null, versions: list<array<string, mixed>>}
+     * @return array{
+     *     current: array{
+     *         id: int,
+     *         version: int,
+     *         source: PreferenceSource,
+     *         answered_at: string|null,
+     *         purged_at: string|null,
+     *         recorded_by: array{id: int, name: string|null}|null,
+     *         answers: array<string, string>,
+     *         accessibility_provided: bool,
+     *         emergency_contact_provided: bool,
+     *         accessibility?: string|null,
+     *         emergency_contact?: string|null
+     *     }|null,
+     *     versions: list<array{
+     *         id: int,
+     *         version: int,
+     *         source: PreferenceSource,
+     *         answered_at: string|null,
+     *         purged_at: string|null,
+     *         recorded_by: array{id: int, name: string|null}|null,
+     *         answers: array<string, string>,
+     *         accessibility_provided: bool,
+     *         emergency_contact_provided: bool,
+     *         accessibility?: string|null,
+     *         emergency_contact?: string|null
+     *     }>
+     * }
      */
     public static function forGuest(Guest $guest, bool $sensitive): array
     {
@@ -29,14 +57,26 @@ final class PreferenceHistory
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     version: int,
+     *     source: PreferenceSource,
+     *     answered_at: string|null,
+     *     purged_at: string|null,
+     *     recorded_by: array{id: int, name: string|null}|null,
+     *     answers: array<string, string>,
+     *     accessibility_provided: bool,
+     *     emergency_contact_provided: bool,
+     *     accessibility?: string|null,
+     *     emergency_contact?: string|null
+     * }
      */
     private static function version(GuestPreference $preference, bool $sensitive): array
     {
         $row = [
             'id' => $preference->id,
             'version' => $preference->version,
-            'source' => $preference->source->value,
+            'source' => $preference->source,
             'answered_at' => Iso::utc($preference->answered_at),
             'purged_at' => Iso::utc($preference->purged_at),
             'recorded_by' => $preference->recorded_by === null ? null : [

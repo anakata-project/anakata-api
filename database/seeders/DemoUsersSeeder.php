@@ -29,6 +29,7 @@ final class DemoUsersSeeder extends Seeder
             Permission::PaymentsRecord,
             Permission::PaymentsMarkWireReceived,
             Permission::RefundsExecute,
+            Permission::CommissionsRecordPayout,
         ];
 
         $externalFinance = Role::query()->firstOrCreate(

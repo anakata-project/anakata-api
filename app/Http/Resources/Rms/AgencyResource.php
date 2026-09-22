@@ -11,6 +11,7 @@ use App\Support\Agencies\AgencyBookingWindow;
 use App\Support\Agencies\AgencySla;
 use App\Support\Agencies\PortalPreview;
 use App\Support\BusinessHours;
+use App\Support\Commissions\Accrual;
 use App\Support\Iso;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -69,7 +70,7 @@ class AgencyResource extends JsonResource
      *     commission_accrued: int,
      *     bookings_count: int,
      *     held_bookings_count: int,
-     *     bookings: list<array{id: int, reference: string|null, status: string, total: int, commission_pct: int|null, commission_amount: int, commission_approved: bool, departure_date: string, client: string}>,
+     *     bookings: list<array{id: int, reference: string|null, status: string, total: int, commission_pct: int|null, commission_amount: int, commission_approved: bool, departure_date: string, client: string, payable_date: string, accrual_status: string, payout: array{amount: int, paid_on: string, bank_reference: string}|null}>,
      *     portal_preview: array{commission_pct: int, net_rates: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>}
      * }
      */
@@ -122,7 +123,7 @@ class AgencyResource extends JsonResource
             return $payload;
         }
 
-        $this->resource->loadMissing(['bookings.contact']);
+        $this->resource->loadMissing(['bookings.contact', 'bookings.departure.itinerary', 'bookings.commissionPayout']);
 
         $bookings = $this->bookings;
         $payload['bookings'] = $bookings->map(fn (Booking $booking): array => [
@@ -135,6 +136,9 @@ class AgencyResource extends JsonResource
             'commission_approved' => $booking->commission_approved,
             'departure_date' => $booking->departure->date->toDateString(),
             'client' => $booking->contact->name,
+            'payable_date' => Accrual::payableDate($booking, $rules)->toDateString(),
+            'accrual_status' => Accrual::status($booking, $rules)->value,
+            'payout' => $booking->commissionPayout?->toArrayForApi(),
         ])->values()->all();
         $payload['portal_preview'] = PortalPreview::for($this->resource, $config->rates());
 

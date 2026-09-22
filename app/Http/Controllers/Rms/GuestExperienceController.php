@@ -9,6 +9,8 @@ use App\Actions\GuestExperience\RecordGuestPreferences;
 use App\Enums\PreferenceSource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\UpdateGuestPreferencesRequest;
+use App\Http\Resources\Rms\DepartureGuestExperienceResource;
+use App\Http\Resources\Rms\GuestPreferencesResource;
 use App\Http\Resources\Rms\PreferenceQuestionResource;
 use App\Models\Departure;
 use App\Models\Guest;
@@ -18,7 +20,6 @@ use App\Support\GuestExperience\DepartureGuestExperience;
 use App\Support\GuestExperience\HotelManagerBrief;
 use App\Support\GuestExperience\PreferenceHistory;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -32,30 +33,30 @@ final class GuestExperienceController extends Controller
         return PreferenceQuestionResource::collection(PreferenceQuestionResource::questions());
     }
 
-    public function show(Departure $departure, DepartureGuestExperience $experience): JsonResponse
+    public function show(Departure $departure, DepartureGuestExperience $experience): DepartureGuestExperienceResource
     {
         $this->authorize('viewAny', GuestPreference::class);
 
-        return new JsonResponse([
-            'data' => $experience->forDeparture($departure, $this->sensitive()),
-        ]);
+        return new DepartureGuestExperienceResource(
+            $experience->forDeparture($departure, $this->sensitive()),
+        );
     }
 
-    public function preferences(Guest $guest): JsonResponse
+    public function preferences(Guest $guest): GuestPreferencesResource
     {
         $this->authorize('viewAny', GuestPreference::class);
         $this->authorize('view', $guest);
 
-        return new JsonResponse([
-            'data' => PreferenceHistory::forGuest($guest, $this->sensitive()),
-        ]);
+        return new GuestPreferencesResource(
+            PreferenceHistory::forGuest($guest, $this->sensitive()),
+        );
     }
 
     public function update(
         UpdateGuestPreferencesRequest $request,
         Guest $guest,
         RecordGuestPreferences $action,
-    ): JsonResponse {
+    ): GuestPreferencesResource {
         $this->authorize('view', $guest);
         $actor = $request->user();
         assert($actor instanceof User);
@@ -68,9 +69,9 @@ final class GuestExperienceController extends Controller
             $actor,
         );
 
-        return new JsonResponse([
-            'data' => PreferenceHistory::forGuest($guest, $this->sensitive()),
-        ]);
+        return new GuestPreferencesResource(
+            PreferenceHistory::forGuest($guest, $this->sensitive()),
+        );
     }
 
     public function brief(

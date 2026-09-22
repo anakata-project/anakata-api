@@ -45,7 +45,7 @@ final class AgencyBookingWindow
             'bookings_count' => $bookings->count(),
             'revenue' => (int) $bookings->sum('total'),
             'commission_accrued' => (int) $bookings
-                ->filter(fn (Booking $booking): bool => $booking->commission_approved)
+                ->filter(fn (Booking $booking): bool => $booking->commission_approved && ! $booking->hasCommissionPayout())
                 ->sum(fn (Booking $booking): int => $booking->commissionAmount()),
             'held_bookings_count' => $bookings
                 ->filter(fn (Booking $booking): bool => $booking->status === BookingStatus::OnHoldAgency)

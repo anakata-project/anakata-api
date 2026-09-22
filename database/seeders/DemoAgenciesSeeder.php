@@ -121,9 +121,10 @@ final class DemoAgenciesSeeder extends Seeder
     {
         return match (strtolower($status)) {
             'active' => AgencyUserStatus::Active,
-            'invited', 'invite sent' => AgencyUserStatus::Invited,
+            'invited', 'invite sent', 'invite on portal launch' => AgencyUserStatus::InviteOnPortalLaunch,
             'disabled' => AgencyUserStatus::Disabled,
-            default => AgencyUserStatus::Pending,
+            'invite on approval', 'pending' => AgencyUserStatus::InviteOnApproval,
+            default => AgencyUserStatus::InviteOnApproval,
         };
     }
 

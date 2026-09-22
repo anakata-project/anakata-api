@@ -274,6 +274,8 @@ test('panel-read OpenAPI schemas have properties', function (): void {
         'registrations_to_review',
         'agency_revenue',
         'commission_accrued',
+        'commission_payable',
+        'commission_paid',
         'agency_approval_business_days',
         'commission_payable_days',
         'commission_cap_pct',
@@ -783,3 +785,153 @@ test('panel-read OpenAPI schemas have properties', function (): void {
     expect($completeLink['properties'])->toHaveKey('url');
     expect($completeLink['properties']['url']['type'] ?? null)->toBe('string');
 });
+
+test('sprint 11 response schemas name their enums and optional preference fields', function (): void {
+    Gate::define('viewApiDocs', fn (): bool => true);
+
+    $response = $this->withoutMiddleware(RestrictedDocsAccess::class)
+        ->getJson('/docs/api.json')
+        ->assertOk();
+
+    /** @var array<string, mixed> $spec */
+    $spec = $response->json();
+
+    foreach ([
+        'AlertKind',
+        'AlertSeverity',
+        'AlertNotificationStatus',
+        'ManifestKind',
+        'ManifestReason',
+        'PreferenceSource',
+        'PreferenceStatus',
+        'PreferenceQuestionType',
+        'GuestResponseSource',
+        'CommissionAccrualStatus',
+    ] as $enum) {
+        $schema = $spec['components']['schemas'][$enum] ?? null;
+        expect($schema)->toBeArray("schema {$enum} is missing");
+        expect($schema['enum'] ?? null)->toBeArray("schema {$enum} is not an enum")->not->toBeEmpty();
+    }
+
+    $alert = openApiSchema($spec, 'AlertResource');
+    expect($alert['properties'])->toHaveKeys(['kind', 'severity', 'subject', 'notifications', 'may_acknowledge']);
+    expect(sprint11SchemaRef($alert['properties']['kind']))->toContain('AlertKind');
+    expect(sprint11SchemaRef($alert['properties']['severity']))->toContain('AlertSeverity');
+    $notification = $alert['properties']['notifications']['items']['properties'] ?? [];
+    expect(sprint11SchemaRef($notification['status'] ?? []))->toContain('AlertNotificationStatus');
+
+    $list = openApiSchema($spec, 'AlertListResource');
+    expect($list['properties']['meta']['properties']['counts']['properties'] ?? [])
+        ->toHaveKeys(['INFO', 'WARN', 'CRITICAL']);
+    $alertItem = $list['properties']['data']['items'] ?? [];
+    $alertItemRef = sprint11SchemaRef($alertItem);
+    if ($alertItemRef !== '') {
+        expect($alertItemRef)->toContain('AlertResource');
+    } else {
+        expect(sprint11SchemaRef($alertItem['properties']['kind'] ?? []))->toContain('AlertKind');
+        expect(sprint11SchemaRef($alertItem['properties']['severity'] ?? []))->toContain('AlertSeverity');
+    }
+
+    $kind = openApiSchema($spec, 'AlertKindResource');
+    expect(sprint11SchemaRef($kind['properties']['kind']))->toContain('AlertKind');
+    expect(sprint11SchemaRef($kind['properties']['severity']))->toContain('AlertSeverity');
+
+    $version = openApiSchema($spec, 'ManifestVersionResource');
+    expect(sprint11SchemaRef($version['properties']['kind']))->toContain('ManifestKind');
+    expect(sprint11SchemaRef($version['properties']['reason']))->toContain('ManifestReason');
+
+    $issued = openApiSchema($spec, 'ManifestIssuedResource');
+    expect($issued['properties'])->toHaveKeys(['created', 'message', 'data']);
+    expect(sprint11SchemaRef($issued['properties']['data']))->toContain('ManifestVersionResource');
+
+    $generate = $spec['paths']['/rms/departures/{departure}/manifests/{kind}']['post']
+        ?? $spec['paths']['/api/rms/departures/{departure}/manifests/{kind}']['post']
+        ?? null;
+    expect($generate)->toBeArray();
+    foreach (['200', '201'] as $status) {
+        $body = $generate['responses'][$status]['content']['application/json']['schema'] ?? [];
+        expect(sprint11SchemaRef($body))->toContain('ManifestIssuedResource');
+    }
+
+    openApiSchema($spec, 'ManifestDepartureResource');
+
+    $experience = openApiSchema($spec, 'DepartureGuestExperienceResource');
+    $guest = $experience['properties']['guests']['items'] ?? [];
+    expect($guest['properties'] ?? [])->toHaveKeys([
+        'accessibility_provided',
+        'emergency_contact_provided',
+        'accessibility',
+        'emergency_contact',
+        'status',
+        'source',
+    ]);
+    expect($guest['required'] ?? [])->not->toContain('accessibility');
+    expect($guest['required'] ?? [])->not->toContain('emergency_contact');
+    expect(sprint11SchemaRef($guest['properties']['status']))->toContain('PreferenceStatus');
+    expect(sprint11SchemaRef($guest['properties']['source']))->toContain('PreferenceSource');
+
+    $preferences = openApiSchema($spec, 'GuestPreferencesResource');
+    $current = $preferences['properties']['current'] ?? [];
+    $currentProps = $current['properties'] ?? $current['anyOf'][0]['properties'] ?? [];
+    $currentRequired = $current['required'] ?? $current['anyOf'][0]['required'] ?? [];
+    expect($currentProps)->toHaveKeys(['accessibility_provided', 'accessibility', 'source']);
+    expect($currentRequired)->not->toContain('accessibility');
+    expect($currentRequired)->not->toContain('emergency_contact');
+    expect(sprint11SchemaRef($currentProps['source'] ?? []))->toContain('PreferenceSource');
+
+    $question = openApiSchema($spec, 'PreferenceQuestionResource');
+    expect(sprint11SchemaRef($question['properties']['type']))->toContain('PreferenceQuestionType');
+
+    $nps = openApiSchema($spec, 'NpsViewResource');
+    expect($nps['properties'])->toHaveKeys(['kpis', 'responses', 'facts']);
+    expect($nps['properties']['responses']['items']['properties'] ?? [])->toHaveKeys([
+        'booking_reference',
+        'guest',
+        'score',
+        'score_class',
+    ]);
+
+    $staff = openApiSchema($spec, 'GuestResponseResource');
+    expect($staff['properties'])->toHaveKeys(['id', 'guest_id', 'score', 'source']);
+    expect(sprint11SchemaRef($staff['properties']['source']))->toContain('GuestResponseSource');
+
+    $commission = openApiSchema($spec, 'CommissionResource');
+    expect($commission['properties']['payout'] ?? null)->toBeArray();
+    expect(sprint11SchemaRef($commission['properties']['status']))->toContain('CommissionAccrualStatus');
+
+    $preview = openApiSchema($spec, 'AgencyPortalPreviewResource');
+    expect($preview['properties'])->toHaveKeys(['bookings', 'commissions', 'net_rates', 'sales_materials']);
+    $previewCommission = $preview['properties']['commissions']['items']['properties']['status'] ?? [];
+    expect(sprint11SchemaRef($previewCommission))->toContain('CommissionAccrualStatus');
+
+    $agency = openApiSchema($spec, 'AgencyResource');
+    expect($agency['properties'])->toHaveKey('users');
+});
+
+/**
+ * @param  array<string, mixed>  $node
+ */
+function sprint11SchemaRef(array $node): string
+{
+    $ref = $node['$ref'] ?? $node['allOf'][0]['$ref'] ?? null;
+
+    if (is_string($ref)) {
+        return $ref;
+    }
+
+    foreach (['anyOf', 'oneOf'] as $union) {
+        foreach ($node[$union] ?? [] as $arm) {
+            if (! is_array($arm)) {
+                continue;
+            }
+
+            $nested = sprint11SchemaRef($arm);
+
+            if ($nested !== '') {
+                return $nested;
+            }
+        }
+    }
+
+    return '';
+}

@@ -89,6 +89,7 @@ use Illuminate\Support\Facades\DB;
  * @property-read Group|null $group
  * @property-read User $owner
  * @property-read Agency|null $agency
+ * @property-read CommissionPayout|null $commissionPayout
  * @property-read User|null $commissionApprovedBy
  * @property-read RateVersion $ratesVersion
  * @property-read CheckoutSession|null $checkoutSession
@@ -235,6 +236,23 @@ class Booking extends Model
     public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class);
+    }
+
+    /**
+     * @return HasOne<CommissionPayout, $this>
+     */
+    public function commissionPayout(): HasOne
+    {
+        return $this->hasOne(CommissionPayout::class);
+    }
+
+    public function hasCommissionPayout(): bool
+    {
+        if ($this->relationLoaded('commissionPayout')) {
+            return $this->commissionPayout !== null;
+        }
+
+        return $this->commissionPayout()->exists();
     }
 
     /**

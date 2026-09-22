@@ -24,7 +24,7 @@ final readonly class PreferenceQuestion
      * @return array{
      *     key: string,
      *     label: string,
-     *     type: string,
+     *     type: PreferenceQuestionType,
      *     options: list<string>,
      *     restricted: bool,
      *     required: bool
@@ -35,7 +35,7 @@ final readonly class PreferenceQuestion
         return [
             'key' => $this->key,
             'label' => $this->label,
-            'type' => $this->type->value,
+            'type' => $this->type,
             'options' => $this->options,
             'restricted' => $this->restricted,
             'required' => $this->required,

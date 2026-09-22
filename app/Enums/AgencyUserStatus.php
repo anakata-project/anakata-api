@@ -6,8 +6,8 @@ namespace App\Enums;
 
 enum AgencyUserStatus: string
 {
-    case Pending = 'PENDING';
-    case Invited = 'INVITED';
+    case InviteOnApproval = 'INVITE_ON_APPROVAL';
+    case InviteOnPortalLaunch = 'INVITE_ON_PORTAL_LAUNCH';
     case Active = 'ACTIVE';
     case Disabled = 'DISABLED';
 }

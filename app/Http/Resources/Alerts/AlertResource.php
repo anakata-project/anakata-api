@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Alerts;
 
+use App\Enums\AlertKind;
+use App\Enums\AlertNotificationStatus;
+use App\Enums\AlertSeverity;
 use App\Models\Alert;
 use App\Models\AlertNotification;
 use App\Models\User;
@@ -19,7 +22,30 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class AlertResource extends JsonResource
 {
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     kind: AlertKind,
+     *     kind_label: string,
+     *     severity: AlertSeverity,
+     *     title: string,
+     *     sentence: string,
+     *     state: 'open'|'acknowledged'|'resolved',
+     *     raised_at: string|null,
+     *     acknowledged_at: string|null,
+     *     resolved_at: string|null,
+     *     resolution: string|null,
+     *     subject: array{type: string, id: int|null, reference: string, href: string},
+     *     task: array{id: int, title: string, href: string}|null,
+     *     may_acknowledge: bool,
+     *     notifications: list<array{
+     *         user_id: int,
+     *         user_name: string,
+     *         status: AlertNotificationStatus,
+     *         error: string|null,
+     *         sent_at: string|null,
+     *         attempts: int
+     *     }>
+     * }
      */
     public function toArray(Request $request): array
     {
@@ -27,12 +53,24 @@ class AlertResource extends JsonResource
         $actor = $request->user();
         $subject = AlertSubject::describe($this->resource);
         $task = $this->crmTask;
+        $notifications = [];
+
+        foreach ($this->notifications as $row) {
+            $notifications[] = [
+                'user_id' => (int) $row->user_id,
+                'user_name' => $row->user->name,
+                'status' => $this->notificationStatus($row),
+                'error' => $this->notificationError($row),
+                'sent_at' => Iso::utc($row->sent_at),
+                'attempts' => (int) $row->attempts,
+            ];
+        }
 
         return [
             'id' => $this->id,
-            'kind' => $this->kind->value,
+            'kind' => $this->kind,
             'kind_label' => $definition->label(),
-            'severity' => $this->severity->value,
+            'severity' => $this->severity,
             'title' => $this->title,
             'sentence' => $this->sentence,
             'state' => $this->state(),
@@ -46,17 +84,25 @@ class AlertResource extends JsonResource
                 'title' => $task->title,
                 'href' => '/crm/sales/tasks',
             ],
-            'may_acknowledge' => $this->state() === 'open'
-                && $actor instanceof User
-                && AlertRegistry::sees($actor, $this->kind),
-            'notifications' => $this->notifications->map(fn (AlertNotification $row): array => [
-                'user_id' => $row->user_id,
-                'user_name' => $row->user->name,
-                'status' => $row->status->value,
-                'error' => $row->error,
-                'sent_at' => Iso::utc($row->sent_at),
-                'attempts' => $row->attempts,
-            ])->all(),
+            'may_acknowledge' => $this->mayAcknowledge($actor),
+            'notifications' => $notifications,
         ];
+    }
+
+    private function mayAcknowledge(mixed $actor): bool
+    {
+        return $this->state() === 'open'
+            && $actor instanceof User
+            && AlertRegistry::sees($actor, $this->kind);
+    }
+
+    private function notificationStatus(AlertNotification $row): AlertNotificationStatus
+    {
+        return $row->status;
+    }
+
+    private function notificationError(AlertNotification $row): ?string
+    {
+        return $row->error;
     }
 }

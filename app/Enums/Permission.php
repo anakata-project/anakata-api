@@ -58,6 +58,7 @@ enum Permission: string
 
     case RefundsApprove = 'refunds.approve';
     case CommissionsOverrideCap = 'commissions.override_cap';
+    case CommissionsRecordPayout = 'commissions.record_payout';
     case BookingsOverdueDecision = 'bookings.overdue_decision';
 
     case PrivacyManage = 'privacy.manage';
@@ -102,6 +103,7 @@ enum Permission: string
             self::RefundsExecute => 'Execute refunds',
             self::RefundsApprove => 'Approve refunds',
             self::CommissionsOverrideCap => 'Approve commission above cap',
+            self::CommissionsRecordPayout => 'Record a commission payout',
             self::BookingsOverdueDecision => 'OPS-007 overdue decisions',
             self::PrivacyManage => 'Manage subject requests',
         };
@@ -144,7 +146,8 @@ enum Permission: string
             self::SyncRetry => 'crm',
             self::PaymentsRecord,
             self::PaymentsMarkWireReceived,
-            self::RefundsExecute => 'finance',
+            self::RefundsExecute,
+            self::CommissionsRecordPayout => 'finance',
             self::RefundsApprove,
             self::CommissionsOverrideCap,
             self::BookingsOverdueDecision => 'director',

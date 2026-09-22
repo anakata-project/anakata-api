@@ -44,7 +44,7 @@ test('a manager can register an agency and a sales exec cannot', function (): vo
         ->assertCreated()
         ->assertJsonPath('status', AgencyStatus::Pending->value)
         ->assertJsonPath('commission_pct', 10)
-        ->assertJsonPath('users.0.status', AgencyUserStatus::Pending->value)
+        ->assertJsonPath('users.0.status', AgencyUserStatus::InviteOnApproval->value)
         ->assertJsonPath('sla_breached', false);
 
     expect(ChangeHistory::query()->where('event', 'agency.registered')->count())->toBe(1);
@@ -84,7 +84,7 @@ test('approval invites users and rejection requires a reason', function (): void
     $agency->users()->create([
         'name' => $agency->contact,
         'email' => $agency->email,
-        'status' => AgencyUserStatus::Pending,
+        'status' => AgencyUserStatus::InviteOnApproval,
     ]);
 
     $this->actingAs(managerUser())
@@ -99,7 +99,7 @@ test('approval invites users and rejection requires a reason', function (): void
         ])
         ->assertOk()
         ->assertJsonPath('status', AgencyStatus::Approved->value)
-        ->assertJsonPath('users.0.status', AgencyUserStatus::Invited->value);
+        ->assertJsonPath('users.0.status', AgencyUserStatus::InviteOnPortalLaunch->value);
 
     expect(ChangeHistory::query()->where('event', 'agency.approved')->count())->toBe(1);
 });

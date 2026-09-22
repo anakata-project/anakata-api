@@ -43,7 +43,7 @@ test('demo agencies seed is idempotent and attaches the prototype fixtures', fun
 
     $pending = Agency::query()->where('reference', 'AG-003')->firstOrFail();
     expect($pending->status)->toBe(AgencyStatus::Pending);
-    expect($pending->users()->firstOrFail()->status)->toBe(AgencyUserStatus::Pending);
+    expect($pending->users()->firstOrFail()->status)->toBe(AgencyUserStatus::InviteOnApproval);
 
     $held = Booking::query()->where('reference', 'ANK-2026-0021')->firstOrFail();
     expect($held->status)->toBe(BookingStatus::OnHoldAgency);

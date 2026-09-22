@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\GuestExperience;
 
+use App\Enums\PreferenceQuestionType;
 use App\Models\BookingAccessToken;
 use App\Models\Guest;
 use App\Models\GuestPreference;
@@ -15,7 +16,7 @@ final class QuestionnairePage
      *     reference: string,
      *     departure_date: string,
      *     itinerary_name: string,
-     *     questions: list<array{key: string, label: string, type: string, options: list<string>, restricted: bool, required: bool}>,
+     *     questions: list<array{key: string, label: string, type: PreferenceQuestionType, options: list<string>, restricted: bool, required: bool}>,
      *     guests: list<array{id: int, first_name: string, cabin: string, answers: array<string, string>}>
      * }
      */

@@ -6,8 +6,9 @@ namespace App\Enums;
 
 enum CommissionAccrualStatus: string
 {
-    case Accrued = 'ACCRUED';
+    case EarnedOnCompletion = 'EARNED_ON_COMPLETION';
     case Payable = 'PAYABLE';
+    case Paid = 'PAID';
     case Blocked = 'BLOCKED';
     case Cancelled = 'CANCELLED';
 }

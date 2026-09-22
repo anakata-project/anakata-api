@@ -58,7 +58,7 @@ final class RegisterAgency extends Action
                 'agency_id' => $agency->id,
                 'name' => $contactName,
                 'email' => $data['email'],
-                'status' => AgencyUserStatus::Pending,
+                'status' => AgencyUserStatus::InviteOnApproval,
             ]);
 
             $this->contacts->handle([
@@ -74,6 +74,11 @@ final class RegisterAgency extends Action
                 'email' => $agency->email,
                 'commission_pct' => $agency->commission_pct,
                 'status' => $agency->status->value,
+                'user' => [
+                    'name' => $contactName,
+                    'email' => $data['email'],
+                    'status' => AgencyUserStatus::InviteOnApproval->value,
+                ],
             ], actor: $actor);
 
             return $agency->fresh(['users']) ?? $agency;

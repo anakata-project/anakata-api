@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Rms;
 
 use App\Actions\Commissions\DecideCommissionCap;
+use App\Actions\Commissions\RecordCommissionPayout;
 use App\Enums\CommissionAccrualStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\CommissionApprovalRequest;
 use App\Http\Requests\Rms\IndexCommissionsRequest;
+use App\Http\Requests\Rms\StoreCommissionPayoutRequest;
 use App\Http\Resources\Rms\BookingResource;
 use App\Http\Resources\Rms\CommissionResource;
 use App\Models\Booking;
@@ -16,6 +18,7 @@ use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\Commissions\Accrual;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class CommissionController extends Controller
@@ -31,7 +34,7 @@ final class CommissionController extends Controller
 
         $bookings = Booking::query()
             ->whereNotNull('agency_id')
-            ->with(['agency', 'departure'])
+            ->with(['agency', 'departure.itinerary', 'commissionPayout'])
             ->when(
                 $request->filled('from') || $request->filled('to'),
                 function (Builder $query) use ($request): void {
@@ -66,5 +69,27 @@ final class CommissionController extends Controller
         }
 
         return new BookingResource($action->handle($booking, $request->validated(), $actor));
+    }
+
+    public function payout(
+        StoreCommissionPayoutRequest $request,
+        Booking $booking,
+        RecordCommissionPayout $action,
+    ): JsonResponse {
+        $this->authorize('recordPayout', $booking);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        /** @var array{amount: int, paid_on: string, bank_reference: string} $data */
+        $data = $request->validated();
+        $data['amount'] = (int) $data['amount'];
+
+        $updated = $action->handle($booking, $data, $actor);
+
+        return (new CommissionResource($updated))->response()->setStatusCode(201);
     }
 }

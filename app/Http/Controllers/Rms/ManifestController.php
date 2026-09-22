@@ -11,11 +11,13 @@ use App\Enums\ManifestKind;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\ManifestIndexRequest;
 use App\Http\Resources\Rms\ManifestDepartureResource;
+use App\Http\Resources\Rms\ManifestIssuedResource;
 use App\Http\Resources\Rms\ManifestVersionResource;
 use App\Models\Departure;
 use App\Models\Manifest;
 use App\Models\User;
 use App\Support\Manifests\ManifestIndex;
+use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Storage;
@@ -46,6 +48,8 @@ final class ManifestController extends Controller
         return ManifestVersionResource::collection($versions);
     }
 
+    #[DocumentedResponse(status: 200, type: ManifestIssuedResource::class)]
+    #[DocumentedResponse(status: 201, type: ManifestIssuedResource::class)]
     public function store(Departure $departure, string $kind, IssueManifest $issue): JsonResponse
     {
         $this->authorize('generate', Manifest::class);
@@ -53,12 +57,13 @@ final class ManifestController extends Controller
         $manifestKind = ManifestKind::tryFrom($kind) ?? abort(404);
         $actor = $this->actor();
         $result = $issue->request($departure, $manifestKind, $actor);
+        $created = $result['created'];
 
-        return response()->json([
-            'created' => $result['created'],
-            'message' => $result['created'] ? 'Manifest issued.' : 'This manifest is unchanged.',
-            'data' => new ManifestVersionResource($result['manifest']->load('generatedBy')),
-        ], $result['created'] ? 201 : 200);
+        return (new ManifestIssuedResource([
+            'created' => $created,
+            'message' => $created ? 'Manifest issued.' : 'This manifest is unchanged.',
+            'manifest' => $result['manifest']->load('generatedBy'),
+        ]))->response()->setStatusCode($created ? 201 : 200);
     }
 
     public function file(

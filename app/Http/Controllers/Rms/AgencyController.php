@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Rms;
 
+use App\Actions\Agencies\CreateAgencyUser;
 use App\Actions\Agencies\DecideAgency;
 use App\Actions\Agencies\RegisterAgency;
 use App\Actions\Agencies\UpdateAgency;
+use App\Actions\Agencies\UpdateAgencyUser;
 use App\Enums\AgencyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\DecideAgencyRequest;
 use App\Http\Requests\Rms\IndexAgenciesRequest;
 use App\Http\Requests\Rms\StoreAgencyRequest;
+use App\Http\Requests\Rms\StoreAgencyUserRequest;
 use App\Http\Requests\Rms\UpdateAgencyRequest;
+use App\Http\Requests\Rms\UpdateAgencyUserRequest;
+use App\Http\Resources\Rms\AgencyPortalPreviewResource;
 use App\Http\Resources\Rms\AgencyResource;
 use App\Models\Agency;
+use App\Models\AgencyUser;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\Agencies\AgencyBookingWindow;
+use App\Support\Commissions\CommissionKpis;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +34,7 @@ final class AgencyController extends Controller
 {
     #[DocumentedResponse(
         status: 200,
-        type: 'array{data: list<App\\Http\\Resources\\Rms\\AgencyResource>, meta: array{kpis: array{approved_agencies: int, registrations_to_review: int, agency_revenue: int, commission_accrued: int, agency_approval_business_days: int, commission_payable_days: int, commission_cap_pct: int, commission_default_pct: int}}}',
+        type: 'array{data: list<App\\Http\\Resources\\Rms\\AgencyResource>, meta: array{kpis: array{approved_agencies: int, registrations_to_review: int, agency_revenue: int, commission_accrued: int, commission_payable: int, commission_paid: int, agency_approval_business_days: int, commission_payable_days: int, commission_cap_pct: int, commission_default_pct: int}}}',
     )]
     public function index(IndexAgenciesRequest $request, CurrentConfig $config): AnonymousResourceCollection
     {
@@ -38,7 +45,7 @@ final class AgencyController extends Controller
         $to = self::dateQuery($request->validated('to'));
 
         $agencies = Agency::query()
-            ->with(['users', 'decidedBy', 'bookings.departure'])
+            ->with(['users', 'decidedBy', 'bookings.departure', 'bookings.commissionPayout'])
             ->when(
                 $request->filled('status'),
                 fn (Builder $query) => $query->where('status', AgencyStatus::from((string) $request->validated('status'))),
@@ -65,6 +72,7 @@ final class AgencyController extends Controller
                 fn (Agency $agency) => AgencyBookingWindow::inRange($agency->bookings, $from, $to),
             ),
         );
+        $commission = CommissionKpis::forApproved($from, $to, $rules);
 
         return AgencyResource::collection($agencies)->additional([
             'meta' => [
@@ -72,7 +80,9 @@ final class AgencyController extends Controller
                     'approved_agencies' => $approved->count(),
                     'registrations_to_review' => Agency::query()->where('status', AgencyStatus::Pending)->count(),
                     'agency_revenue' => $totals['revenue'],
-                    'commission_accrued' => $totals['commission_accrued'],
+                    'commission_accrued' => $commission['commission_accrued'],
+                    'commission_payable' => $commission['commission_payable'],
+                    'commission_paid' => $commission['commission_paid'],
                     'agency_approval_business_days' => $rules->sla->agencyApprovalBusinessDays,
                     'commission_payable_days' => $rules->commission->payableDaysAfterCruise,
                     'commission_cap_pct' => $rules->commission->capPct,
@@ -136,5 +146,52 @@ final class AgencyController extends Controller
         }
 
         return new AgencyResource($action->handle($agency, $request->validated(), $actor));
+    }
+
+    public function storeUser(StoreAgencyUserRequest $request, Agency $agency, CreateAgencyUser $action): JsonResponse
+    {
+        $this->authorize('manageUsers', $agency);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        /** @var array{name: string, email: string} $data */
+        $data = $request->validated();
+
+        return (new AgencyResource($action->handle($agency, $data, $actor)))->response()->setStatusCode(201);
+    }
+
+    public function updateUser(
+        UpdateAgencyUserRequest $request,
+        Agency $agency,
+        AgencyUser $user,
+        UpdateAgencyUser $action,
+    ): AgencyResource {
+        $this->authorize('manageUsers', $agency);
+
+        if ($user->agency_id !== $agency->id) {
+            abort(404);
+        }
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        /** @var array{name?: string, status?: string} $data */
+        $data = $request->validated();
+
+        return new AgencyResource($action->handle($agency, $user, $data, $actor));
+    }
+
+    public function portalPreview(Agency $agency): AgencyPortalPreviewResource
+    {
+        $this->authorize('viewPortalPreview', $agency);
+
+        return new AgencyPortalPreviewResource($agency);
     }
 }

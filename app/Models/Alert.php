@@ -92,6 +92,9 @@ class Alert extends Model
         throw new LogicException('Alerts are not deleted.');
     }
 
+    /**
+     * @return 'open'|'acknowledged'|'resolved'
+     */
     public function state(): string
     {
         if ($this->resolved_at !== null) {

@@ -4,11 +4,28 @@ declare(strict_types=1);
 
 namespace App\Support\Agencies;
 
+use App\Enums\CommissionAccrualStatus;
 use App\Models\Agency;
+use App\Models\Booking;
+use App\Models\Guest;
+use App\Support\Commissions\Accrual;
+use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\RatesDocument;
+use App\Support\Rounding;
 
 final class PortalPreview
 {
+    /** @var list<string> */
+    public const MATERIALS = [
+        'Fact sheet',
+        'Brand deck',
+        'High-res photography',
+        'Itinerary PDFs',
+        'Video',
+    ];
+
+    public const MATERIALS_NOTE = 'assets pending upload';
+
     /**
      * @return array{commission_pct: int, net_rates: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>}
      */
@@ -18,7 +35,7 @@ final class PortalPreview
 
         foreach ($rates->years as $year) {
             $net[] = [
-                'year' => $year->year,
+                'year' => (int) $year->year,
                 'suite_pp' => $agency->netOf($year->suitePp),
                 'owner_pp' => $agency->netOf($year->ownerPp),
                 'charter_week' => $agency->netOf($year->charterWeek),
@@ -29,5 +46,89 @@ final class PortalPreview
             'commission_pct' => $agency->commission_pct,
             'net_rates' => $net,
         ];
+    }
+
+    /**
+     * What the agency will see. Public rates are not included.
+     * Net due follows the prototype: balance × (100 − frozen commission %) / 100.
+     *
+     * @return array{
+     *     commission_pct: int,
+     *     net_rates: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>,
+     *     bookings: list<array{reference: string|null, lead_guest: string, departure_date: string, status: string, net_due: int}>,
+     *     commissions: list<array{reference: string|null, rate: int|null, commission_amount: int, payable_date: string, status: CommissionAccrualStatus}>,
+     *     sales_materials: array{items: list<string>, note: string}
+     * }
+     */
+    public static function view(Agency $agency, RatesDocument $rates, BusinessRulesDocument $rules): array
+    {
+        $agency->loadMissing([
+            'bookings.departure.itinerary',
+            'bookings.contact',
+            'bookings.guests',
+            'bookings.commissionPayout',
+        ]);
+
+        $preview = self::for($agency, $rates);
+        $bookings = [];
+        $commissions = [];
+
+        foreach ($agency->bookings as $booking) {
+            $bookings[] = [
+                'reference' => $booking->reference,
+                'lead_guest' => self::leadGuestName($booking),
+                'departure_date' => $booking->departure->date->toDateString(),
+                'status' => $booking->status->value,
+                'net_due' => self::netDue($booking),
+            ];
+            $commissions[] = [
+                'reference' => self::nullableString($booking->reference),
+                'rate' => self::nullableInt($booking->commission_pct),
+                'commission_amount' => $booking->commissionAmount(),
+                'payable_date' => Accrual::payableDate($booking, $rules)->toDateString(),
+                'status' => Accrual::status($booking, $rules),
+            ];
+        }
+
+        return [
+            'commission_pct' => $preview['commission_pct'],
+            'net_rates' => $preview['net_rates'],
+            'bookings' => $bookings,
+            'commissions' => $commissions,
+            'sales_materials' => [
+                'items' => self::MATERIALS,
+                'note' => self::MATERIALS_NOTE,
+            ],
+        ];
+    }
+
+    private static function nullableString(?string $value): ?string
+    {
+        return $value;
+    }
+
+    private static function nullableInt(?int $value): ?int
+    {
+        return $value;
+    }
+
+    private static function leadGuestName(Booking $booking): string
+    {
+        $named = fn (Guest $guest): bool => $guest->first_name !== '' || $guest->last_name !== '';
+        $lead = $booking->guests->first(fn (Guest $guest): bool => $guest->is_lead && $named($guest))
+            ?? $booking->guests->first($named);
+
+        return $lead instanceof Guest ? $lead->displayName() : $booking->contact->name;
+    }
+
+    /**
+     * Prototype formula. Commission is on the cabin total, so this also discounts
+     * extras and fees, and it drifts once part of the balance has been paid.
+     */
+    private static function netDue(Booking $booking): int
+    {
+        $pct = $booking->commission_pct ?? 0;
+
+        return Rounding::halfUp($booking->balance() * (100 - $pct) / 100);
     }
 }

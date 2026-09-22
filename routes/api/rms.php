@@ -187,11 +187,15 @@ Route::get('offers/{offer}/history', [OfferController::class, 'history'])->where
 
 Route::get('agencies', [AgencyController::class, 'index']);
 Route::post('agencies', [AgencyController::class, 'store']);
+Route::get('agencies/{agency}/portal-preview', [AgencyController::class, 'portalPreview'])->whereNumber('agency');
+Route::post('agencies/{agency}/users', [AgencyController::class, 'storeUser'])->whereNumber('agency');
+Route::patch('agencies/{agency}/users/{user}', [AgencyController::class, 'updateUser'])->whereNumber('agency')->whereNumber('user');
 Route::get('agencies/{agency}', [AgencyController::class, 'show'])->whereNumber('agency');
 Route::patch('agencies/{agency}', [AgencyController::class, 'update'])->whereNumber('agency');
 Route::post('agencies/{agency}/decide', [AgencyController::class, 'decide'])->whereNumber('agency');
 
 Route::get('commissions', [CommissionController::class, 'index']);
+Route::post('commissions/{booking}/payout', [CommissionController::class, 'payout'])->whereNumber('booking');
 
 Route::get('refunds', [RefundController::class, 'index']);
 Route::post('refunds/{refund}/decide', [RefundController::class, 'decide'])->whereNumber('refund');

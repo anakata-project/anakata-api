@@ -93,6 +93,7 @@ function externalFinanceUser(array $attributes = []): User
             Permission::PaymentsRecord,
             Permission::PaymentsMarkWireReceived,
             Permission::RefundsExecute,
+            Permission::CommissionsRecordPayout,
         ],
     ]);
 

@@ -202,6 +202,8 @@ test('crm OpenAPI schemas have properties', function (): void {
     expect($jobs)->toBeArray();
     $jobKpis = $jobs['responses']['200']['content']['application/json']['schema']['properties']['meta']['properties']['kpis']['properties'] ?? [];
     expect($jobKpis)->toHaveKeys(['jobs_failing', 'failures_open', 'merges_this_month']);
+    $catalogue = $jobs['responses']['200']['content']['application/json']['schema']['properties']['meta']['properties']['catalogue']['items']['properties'] ?? [];
+    expect($catalogue)->toHaveKeys(['job', 'command', 'sentence']);
 
     $events = $spec['paths']['/crm/sync/events']['get']
         ?? $spec['paths']['/api/crm/sync/events']['get']

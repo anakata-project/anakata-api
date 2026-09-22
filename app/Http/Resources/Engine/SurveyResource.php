@@ -10,10 +10,24 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin BookingAccessToken
+ * @property array{
+ *     reference: string,
+ *     departure_date: string,
+ *     itinerary_name: string,
+ *     guests: list<array{id: int, first_name: string, last_name: string, responded: bool}>
+ * } $resource
  */
 class SurveyResource extends JsonResource
 {
+    public function __construct(mixed $resource)
+    {
+        if ($resource instanceof BookingAccessToken) {
+            $resource = SurveyPage::forToken($resource);
+        }
+
+        parent::__construct($resource);
+    }
+
     /**
      * @return array{
      *     reference: string,
@@ -24,6 +38,6 @@ class SurveyResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return SurveyPage::forToken($this->resource);
+        return $this->resource;
     }
 }

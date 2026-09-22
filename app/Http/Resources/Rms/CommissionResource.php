@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Rms;
 
+use App\Enums\CommissionAccrualStatus;
 use App\Models\Booking;
 use App\Services\Config\CurrentConfig;
 use App\Support\Commissions\Accrual;
@@ -25,13 +26,14 @@ class CommissionResource extends JsonResource
      *     commission_pct: int|null,
      *     commission_amount: int,
      *     payable_date: string,
-     *     status: string,
+     *     status: CommissionAccrualStatus,
+     *     payout: array{amount: int, paid_on: string, bank_reference: string}|null,
      *     departure_date: string
      * }
      */
     public function toArray(Request $request): array
     {
-        $this->resource->loadMissing(['agency', 'departure']);
+        $this->resource->loadMissing(['agency', 'departure.itinerary', 'commissionPayout']);
         $rules = app(CurrentConfig::class)->businessRules();
 
         return [
@@ -45,7 +47,8 @@ class CommissionResource extends JsonResource
             'commission_pct' => $this->commission_pct,
             'commission_amount' => $this->commissionAmount(),
             'payable_date' => Accrual::payableDate($this->resource, $rules)->toDateString(),
-            'status' => Accrual::status($this->resource, $rules)->value,
+            'status' => Accrual::status($this->resource, $rules),
+            'payout' => $this->commissionPayout?->toArrayForApi(),
             'departure_date' => $this->departure->date->toDateString(),
         ];
     }

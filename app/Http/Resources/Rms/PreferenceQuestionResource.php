@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Rms;
 
+use App\Enums\PreferenceQuestionType;
 use App\Support\GuestExperience\PreferenceQuestion;
 use App\Support\GuestExperience\PreferenceQuestions;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class PreferenceQuestionResource extends JsonResource
 {
     /**
-     * @return array{key: string, label: string, type: string, options: list<string>, restricted: bool, required: bool}
+     * @return array{key: string, label: string, type: PreferenceQuestionType, options: list<string>, restricted: bool, required: bool}
      */
     public function toArray(Request $request): array
     {

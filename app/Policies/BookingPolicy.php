@@ -117,6 +117,11 @@ final class BookingPolicy extends Policy
         return $actor->hasPermission(Permission::BookingsViewAll);
     }
 
+    public function recordPayout(User $actor, Booking $booking): bool
+    {
+        return $actor->hasPermission(Permission::CommissionsRecordPayout);
+    }
+
     public function recordConsent(User $actor, Booking $booking): Response
     {
         return $this->ownsOrMayActOnAny($actor, $booking)

@@ -545,3 +545,274 @@ A missing score still renders as a dash.
 EOF
 )"
 ```
+
+## Task 06 · Agent portal, RMS side
+
+The RMS can now keep agency users, show exactly what an agency will see, and record a commission payout. The agent portal itself is still later (N10). Nothing is emailed.
+
+### Payable date
+`Accrual::payableDate` now adds `commission.payable_days_after_cruise` to `Departure::returnDate()` (itinerary nights, or 7 when nights is 0). It used to add those days to the departure date, so every payable date shown so far was 7 days early. `ANK-2026-0007` departs 2027-11-14, returns 2027-11-21, and is payable on **2027-12-21**. On the running database that booking is `EARNED_ON_COMPLETION`. PAY-06 now expects `21 Dec 2027`. The pill sentence stays `ACCRUED — PAYS AT COMPLETED` because the panel maps the new status onto the existing accrued label.
+
+A completed booking is still earned on the day before the payable date and payable on that date.
+
+### Statuses
+`ACCRUED` was never stored. The API value is now `EARNED_ON_COMPLETION`. `PAID` is new. `Accrual::status` is the only computation, in this order: `CANCELLED`, `BLOCKED` (percent above the cap and not approved), `PAID` (a payout row exists), `PAYABLE` (`COMPLETED` and today is on or after the payable date), otherwise `EARNED_ON_COMPLETION`. The agencies KPI query uses the same `CASE`. A payout is refused unless the status is already `PAYABLE`, so a cancelled or blocked booking is not paid through the API.
+
+### Payouts
+`commission_payouts` is one row per booking: amount, `paid_on`, `bank_reference`, `recorded_by`, audit columns. Triggers refuse every update and every delete. `POST /api/rms/commissions/{booking}/payout` needs `commissions.record_payout` (finance). Admin already has every permission. The migration grants it to an existing `external-finance` role; `DemoUsersSeeder` includes it for a role created later. Manager and Sales Exec do not have it.
+
+The amount must equal `Booking::commissionAmount()`: half-up of cabin `total` times the frozen `commission_pct`. That is the same figure as the payments KPI (`ROUND(bookings.total * bookings.commission_pct / 100)`), not the charges total. A mismatch is 422. Partial payouts and later corrections stay PENDING CLIENT. The booking's total, rate, approval, and status do not change. History is `booking.commission_paid` and `agency.commission_paid`. Cap decisions stay `booking.commission_approved` / `booking.commission_rejected`.
+
+`CommissionResource` and the agency show's booking rows include `payout` (`amount`, `paid_on`, `bank_reference`) so task 11 can render a paid row. The agent preview does not include the bank reference.
+
+### KPIs
+The agencies list `meta.kpis` adds `commission_payable` and `commission_paid`. All three commission figures are SQL over approved agencies, with the same departure `from` / `to` window as the rest of the list. Accrued is approved commissions with no payout (payable amounts stay in accrued until paid). Payable is the sum of amounts whose status is `PAYABLE`. Paid is the sum of payout amounts. Each partner row's `commission_accrued` excludes a paid booking. The Payments & Revenue KPI query is unchanged.
+
+### Users
+Stored `PENDING` becomes `INVITE_ON_APPROVAL` and `INVITED` becomes `INVITE_ON_PORTAL_LAUNCH`. `ACTIVE` and `DISABLED` stay. Email is unique per agency.
+
+`POST /api/rms/agencies/{agency}/users` (`agencies.manage`) sets `INVITE_ON_PORTAL_LAUNCH` when the agency is approved and `INVITE_ON_APPROVAL` otherwise. Registration creates its contact user as `INVITE_ON_APPROVAL`. `PATCH …/users/{user}` accepts name and only `ACTIVE` or `DISABLED`; the user must belong to that agency. Approving an agency moves every user to `INVITE_ON_PORTAL_LAUNCH` and records that on the existing `agency.approved` row. New events are `agency.user_created` and `agency.user_updated`. No mail and no delivery.
+
+### Portal preview
+`GET /api/rms/agencies/{agency}/portal-preview` (`agencies.manage`) returns net rates for each published year (Suite per person, Owner's Suite per person, Charter per week, via `Agency::netOf`), that agency's bookings (reference, lead guest name, departure date, status, net due), commissions (reference, frozen rate, amount, payable date, status), and the fixed sales-materials list with `assets pending upload`. The agency show still embeds the net-rate block the current panel reads. A test walks the preview JSON and fails if any published suite, owner, or charter rate appears, and it checks the other agency's booking is absent.
+
+### Payments & Revenue pills
+`payments.vue` maps `EARNED_ON_COMPLETION` to the existing accrued label and `p-pend` pill, and `PAID` to "Paid" and `p-full`. The `ACCRUED` arm stays. `api.d.ts` is not regenerated. The B2B page and the agency drawer do not read the accrual status; they still use `commission_approved`.
+
+### Checks
+`composer check`: 1189 tests, Pint, Larastan, no errors. Panel `pnpm lint` and `pnpm typecheck` passed. The IDE browser could not open the panel (connection error; the dev server listens on localhost only), so the pill was not clicked through. The seeded booking's API status is `EARNED_ON_COMPLETION`, which the payments page maps to the existing accrued label.
+
+### Open questions
+- How should an agent's net due be calculated when the balance includes extras or fees, or when part of the balance has been paid? The preview uses the prototype formula, balance × (100 − frozen commission %) / 100. Commission itself is still on the cabin total only, so this takes the percentage off extras and fees as well, and it is wrong once some of the balance is paid. Settle this before anyone builds the agent portal on that number.
+- `commissions.record_payout` was given to external finance because that role already marks wires received. Confirm the CFO is who should record payouts.
+
+### Notes for later
+Task 07 regenerates types (`EARNED_ON_COMPLETION`, `PAID`, the new routes and KPI fields). Task 11 builds the drawer, the payout modal, and the full status labels; the pill map in `payments.vue` is only the bridge. Partial payouts and payout corrections stay out. The local database was migrated so the running API has `commission_payouts`.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Agencies/CreateAgencyUser.php app/Actions/Agencies/DecideAgency.php \
+  app/Actions/Agencies/RegisterAgency.php app/Actions/Agencies/UpdateAgencyUser.php \
+  app/Actions/Commissions/RecordCommissionPayout.php \
+  app/Enums/AgencyUserStatus.php app/Enums/CommissionAccrualStatus.php app/Enums/Permission.php \
+  app/Http/Controllers/Rms/AgencyController.php app/Http/Controllers/Rms/CommissionController.php \
+  app/Http/Requests/Rms/StoreAgencyUserRequest.php app/Http/Requests/Rms/StoreCommissionPayoutRequest.php \
+  app/Http/Requests/Rms/UpdateAgencyUserRequest.php \
+  app/Http/Resources/Rms/AgencyPortalPreviewResource.php app/Http/Resources/Rms/AgencyResource.php \
+  app/Http/Resources/Rms/CommissionResource.php \
+  app/Models/Booking.php app/Models/CommissionPayout.php \
+  app/Policies/AgencyPolicy.php app/Policies/BookingPolicy.php \
+  app/Support/Agencies/AgencyBookingWindow.php app/Support/Agencies/PortalPreview.php \
+  app/Support/Commissions/Accrual.php app/Support/Commissions/CommissionKpis.php \
+  app/Support/Roles/GrantCommissionsRecordPayout.php \
+  database/migrations/2026_09_22_250001_create_commission_payouts_table.php \
+  database/migrations/2026_09_22_250002_remap_agency_user_statuses.php \
+  database/migrations/2026_09_22_250003_grant_commissions_record_payout.php \
+  database/seeders/DemoAgenciesSeeder.php database/seeders/DemoUsersSeeder.php \
+  routes/api/rms.php tests/Pest.php \
+  tests/Feature/Agencies/AgencyEndpointsTest.php tests/Feature/Agencies/AgencyPortalTest.php \
+  tests/Feature/Agencies/CommissionAccrualTest.php tests/Feature/Agencies/DemoAgenciesSeederTest.php \
+  tests/Feature/Auth/GrantCommissionsRecordPayoutTest.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/e2e/scenarios/payments/PAY-06-payments-revenue.md \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record commission payouts and preview what an agency will see.
+
+Payable dates count from the return date, and finance can mark a payable commission paid without changing the booking.
+EOF
+)"
+
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add app/pages/rms/commercial/payments.vue i18n/locales/en.json
+git commit -m "$(cat <<'EOF'
+Keep earned commissions on the accrued pill until the portal screen lands.
+
+Paid rows get their own pill so they are not shown as cancelled.
+EOF
+)"
+```
+
+## Task 07 — Regenerate types, release v0.12.0
+
+Types only. The layer is `0.11.0` → `0.12.0`. `pnpm types:api` regenerated `app/types/api.d.ts` from `http://localhost:8000/docs/api.json`. That file was not edited by hand.
+
+### Prelude
+Responses that were still `array<string, mixed>` or a raw JSON body now have a resource whose `@return` names the enum class, so Scramble emits a named schema. `toArray()` returns the typed array the constructor stored, which is what keeps nested rows from collapsing.
+
+- Alerts: `AlertResource`, `AlertKindResource`, `AlertListResource` (`meta.counts`, the subject `{type, id, reference, href}`, notification rows). `kind` and `severity` are `AlertKind` and `AlertSeverity`. Notification `status` is `AlertNotificationStatus`.
+- Manifests: `ManifestDepartureResource`, `ManifestVersionResource` (`ManifestKind`, `ManifestReason`), and `ManifestIssuedResource` for generate (`created`, `message`, `data`). Generate has no body; the kind is the path.
+- Guest experience: `DepartureGuestExperienceResource` and `GuestPreferencesResource`. `PreferenceQuestionResource.type` is `PreferenceQuestionType`. Row `status` is `PreferenceStatus`. Row and version `source` is `PreferenceSource`.
+- NPS and the staff response: `NpsViewResource` keeps the task 05 row. `GuestResponseResource` adds `source: GuestResponseSource` on the 201.
+- Commissions: `CommissionResource.status` and the portal-preview commission rows are `CommissionAccrualStatus` (`BLOCKED`, `EARNED_ON_COMPLETION`, `PAYABLE`, `PAID`, `CANCELLED`). The portal preview returns the typed array, so year, rate, and amounts stay numbers.
+- Engine: `QuestionnaireResource` and `SurveyResource` return the page array, so questions and guests are objects.
+
+`PanelResponseSchemasTest`, `CrmResponseSchemasTest`, and `EngineResponseSchemasTest` assert the properties. The named enums are non-empty. `accessibility` and `emergency_contact` are properties and are not required.
+
+### Preference shape
+On the departure guest row and each preference version, always:
+
+- `accessibility_provided: bool`
+- `emergency_contact_provided: bool`
+
+Only when the caller has `guests.view_sensitive` does PHP add `accessibility: string|null` and `emergency_contact: string|null`. The PHPDoc marks those two optional (`'accessibility'?:`, `'emergency_contact'?:`), the same form as `locks?:` on `DepartureResource`. Scramble emits them as optional properties. There is no TypeScript overlay. Task 10 reads the booleans for the flag and the strings for the values.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 13022 | 14448 |
+| `app/types/alerts.ts` | — | 11 |
+| `app/types/documents.ts` | 61 | 66 |
+| `app/types/guests.ts` | 101 | 120 |
+| `app/types/payments.ts` | 161 | 167 |
+| `app/types/crm.ts` | 230 | 232 |
+| `app/types/engine.ts` | 354 | 370 |
+| `app/types/index.ts` | 330 | 359 |
+
+### Schema → alias
+
+`crm.ts` imports only `./api`. `engine.ts` aliases come only from `/api/engine` schemas. No runtime list of kinds, statuses, or questions.
+
+| Alias | Source |
+|---|---|
+| `Alert` | `AlertResource` |
+| `AlertKind` / `AlertSeverity` | named enums |
+| `AlertKindRow` | `AlertKindResource` |
+| `AlertCounts` | `AlertListResource.meta.counts` |
+| `ManifestRow` | `ManifestDepartureResource` |
+| `ManifestVersion` | `ManifestVersionResource` |
+| `ManifestKind` | named `ManifestKind` |
+| `ManifestIssued` | `ManifestIssuedResource` |
+| `PreferenceQuestion` | `PreferenceQuestionResource` |
+| `DepartureGuestExperience` | `DepartureGuestExperienceResource` |
+| `GuestPreferences` | `GuestPreferencesResource` |
+| `GuestResponse` | `GuestResponseResource` |
+| `NpsView` | `NpsViewResource` |
+| `GuestPreferencesInput` | `UpdateGuestPreferencesRequest`, `answers` overlaid |
+| `GuestResponseInput` | `StoreGuestResponseRequest` |
+| `CommissionPayout` | non-null `CommissionResource.payout` |
+| `CommissionPayoutInput` | `StoreCommissionPayoutRequest` |
+| `PortalPreview` | `AgencyPortalPreviewResource` |
+| `AgencyUserInput` / `AgencyUserUpdate` | `StoreAgencyUserRequest` / `UpdateAgencyUserRequest` |
+| `ScheduledJobCatalogueRow` | `sync.jobs` `meta.catalogue` item `{job, command, sentence}` |
+| `QuestionnaireView` | `QuestionnaireResource` |
+| `QuestionnaireAnswersInput` | `UpdateQuestionnaireRequest`, `answers` overlaid |
+| `SurveyView` | `SurveyResource` |
+| `SurveyInput` | `StoreSurveyResponseRequest` |
+
+`CommissionStatus` stays `CommissionAccrualStatus`. `AgencyUser` stays the existing alias.
+
+### Leftovers
+`GuestPreferencesInput.answers` and `QuestionnaireAnswersInput.answers` are `Record<string, string>`. Scramble types a PHP associative `answers` array as `string[]`. The validator accepts question key → value.
+
+`AgencyUser.status` stays the existing leftover union (`PENDING`, `INVITED`, `ACTIVE`, `DISABLED`). The list row's status is still a plain string, and there is no named `AgencyUserStatus` schema. `AgencyUserUpdate` takes the inline `ACTIVE | DISABLED` enum from `UpdateAgencyUserRequest`.
+
+`Alert.subject` is the generated union of `AlertSubject::describe` branches. It is not a hand-written union.
+
+### Checks
+Schema tests: 4 passed (1108 assertions). Pint and Larastan passed on the prelude resources. Layer lint, typecheck, test (35) and build passed. Panel and engine typecheck and build passed against the sibling layer.
+
+The regenerated `AgenciesKpis` now requires `commission_payable` and `commission_paid`. The B2B empty fallback in `b2b.vue` includes both as `0`. The page does not render them.
+
+Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}`, working trees overlaid. The ui clone is **0.12.0** and has **no** `app/types/nuxt.d.ts`.
+
+- ui / panel / engine: typecheck pass
+- panel / engine: build pass
+- **OVERLAY CLONE OK**
+
+The tag is not pushed. Repeat the clone after the commands below, checking out `anakata-ui` at `v0.12.0` with no overlay.
+
+### Git commands
+Do not run these in the agent. Explicit paths only. Run in this order.
+
+Task 06 is still uncommitted. Run its commands above first, and omit from that `git add` the five paths that also carry this prelude: `app/Http/Resources/Rms/AgencyPortalPreviewResource.php`, `app/Support/Agencies/PortalPreview.php`, `app/Http/Resources/Rms/CommissionResource.php`, `tests/Feature/OpenApi/PanelResponseSchemasTest.php`, `docs/sprints/sprint-11/REPORT.md`. They belong in the prelude commit.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Models/Alert.php \
+  app/Http/Resources/Alerts/AlertResource.php \
+  app/Http/Resources/Alerts/AlertKindResource.php \
+  app/Http/Resources/Alerts/AlertListResource.php \
+  app/Http/Controllers/Rms/ManifestController.php \
+  app/Http/Resources/Rms/ManifestDepartureResource.php \
+  app/Http/Resources/Rms/ManifestVersionResource.php \
+  app/Http/Resources/Rms/ManifestIssuedResource.php \
+  app/Http/Resources/Rms/PreferenceQuestionResource.php \
+  app/Http/Resources/Rms/CommissionResource.php \
+  app/Http/Resources/Rms/AgencyPortalPreviewResource.php \
+  app/Http/Resources/Rms/DepartureGuestExperienceResource.php \
+  app/Http/Resources/Rms/GuestPreferencesResource.php \
+  app/Http/Resources/Rms/GuestResponseResource.php \
+  app/Http/Resources/Rms/NpsViewResource.php \
+  app/Http/Controllers/Rms/GuestExperienceController.php \
+  app/Http/Controllers/Rms/GuestResponseController.php \
+  app/Http/Resources/Engine/QuestionnaireResource.php \
+  app/Http/Resources/Engine/SurveyResource.php \
+  app/Support/GuestExperience/DepartureGuestExperience.php \
+  app/Support/GuestExperience/PreferenceHistory.php \
+  app/Support/GuestExperience/PreferenceQuestion.php \
+  app/Support/GuestExperience/QuestionnairePage.php \
+  app/Support/GuestExperience/NpsDashboard.php \
+  app/Support/Agencies/PortalPreview.php \
+  tests/Feature/OpenApi/PanelResponseSchemasTest.php \
+  tests/Feature/OpenApi/CrmResponseSchemasTest.php \
+  tests/Feature/OpenApi/EngineResponseSchemasTest.php \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Type the Sprint 11 responses so the OpenAPI spec names their enums.
+
+Scramble was emitting empty alert, manifest, guest-experience, and survey shapes.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/index.ts \
+  app/types/alerts.ts \
+  app/types/documents.ts \
+  app/types/guests.ts \
+  app/types/payments.ts \
+  app/types/crm.ts \
+  app/types/engine.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the Sprint 11 alert, manifest, and guest responses.
+
+Aliases point at the generated schemas. Restricted preference strings stay optional properties.
+EOF
+)"
+git tag v0.12.0
+git push origin HEAD
+git push origin v0.12.0
+```
+
+```bash
+# 3. pin the panel and the engine
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add nuxt.config.ts README.md app/pages/rms/commercial/b2b.vue
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.12.0.
+
+The agency KPI fallback includes the payable and paid totals the spec now requires.
+EOF
+)"
+
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add nuxt.config.ts README.md
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.12.0.
+EOF
+)"
+```

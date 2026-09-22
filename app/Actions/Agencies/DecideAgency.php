@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\AgencyStatus;
 use App\Enums\AgencyUserStatus;
 use App\Models\Agency;
+use App\Models\AgencyUser;
 use App\Models\User;
 use App\Support\History\History;
 use Illuminate\Validation\ValidationException;
@@ -50,16 +51,32 @@ final class DecideAgency extends Action
             $agency->decision_reason = $reason !== '' ? $reason : null;
             $agency->save();
 
+            $usersBefore = $agency->users->map(fn (AgencyUser $user): array => [
+                'id' => $user->id,
+                'status' => $user->status->value,
+            ])->values()->all();
+
             if ($decision === AgencyStatus::Approved) {
-                $agency->users()->update(['status' => AgencyUserStatus::Invited->value]);
+                $agency->users()->update(['status' => AgencyUserStatus::InviteOnPortalLaunch->value]);
             }
 
             $event = $decision === AgencyStatus::Approved ? 'agency.approved' : 'agency.rejected';
+            $usersAfter = $decision === AgencyStatus::Approved
+                ? array_map(
+                    fn (array $user): array => [
+                        'id' => $user['id'],
+                        'status' => AgencyUserStatus::InviteOnPortalLaunch->value,
+                    ],
+                    $usersBefore,
+                )
+                : $usersBefore;
 
             History::record($agency, $event, before: [
                 'status' => AgencyStatus::Pending->value,
+                'users' => $usersBefore,
             ], after: [
                 'status' => $decision->value,
+                'users' => $usersAfter,
             ], reason: $reason !== '' ? $reason : null, actor: $actor);
 
             return $agency->fresh(['users', 'decidedBy', 'bookings']) ?? $agency;

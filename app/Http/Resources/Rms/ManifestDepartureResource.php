@@ -14,7 +14,22 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class ManifestDepartureResource extends JsonResource
 {
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     departure_id: int,
+     *     reference: string,
+     *     date: string,
+     *     yacht: string,
+     *     charter: bool,
+     *     passengers: int,
+     *     complete: int,
+     *     dpng_due: string,
+     *     dpng_offset_days: int,
+     *     captain_due: string,
+     *     captain_offset_days: int,
+     *     status: string,
+     *     dpng: ManifestVersionResource|null,
+     *     captain: ManifestVersionResource|null
+     * }
      */
     public function toArray(Request $request): array
     {
