@@ -939,3 +939,90 @@ Token paths are redacted before a page view is queued, and a restricted answer i
 EOF
 )"
 ```
+
+## Task 09 · Alerts inbox and departure manifests
+
+### v0.12.0
+Case 1. The tag exists locally and on `origin` at `62bb70534782b5588291e7698269b2c97b14b088` and contains `Alert`, `AlertKindRow`, `AlertCounts`, `ManifestRow`, `ManifestIssued`, and `ScheduledJobCatalogueRow`. It was not moved. `SurveyQuestion` stays on the unpushed layer commit ahead of that tag.
+
+The fresh-clone check ran. `anakata-ui` was checked out at that tag with no source overlay, beside a clone of `anakata-panel` with this task's working tree copied on. `pnpm install` in both, then `pnpm typecheck` and `pnpm build` in the panel, passed. The optional manifests query is not part of the tag; the panel builds that query string itself.
+
+### Manifest bounds
+`GET /api/rms/manifests` treats a missing `from` or `to` as unbounded on that side. A present value still has to be `Y-m-d`, and `to` must be on or after `from` only when both are present. `ManifestsTest` covers both bounds, `from` only, `to` only, neither, and a reversed pair (422). Pint and Larastan on the three PHP files reported no issues. The feature test is 14 passed.
+
+### Panel
+The topbar bell sums `meta.counts` from `GET /api/alerts` with no section. Coral (`p-canc`) when `CRITICAL > 0`, amber (`p-hold`) when only `WARN > 0`. It is hidden when the signed-in user matches none of the audience permissions on `GET /api/alerts/kinds`. It refreshes on route change, when the user changes, and every 60 seconds while the tab is visible. RMS links to `/rms/operations/alerts`; CRM links to `/crm/engine/alerts`.
+
+`AlertsInbox` is mounted at both routes. RMS Operations has an Alerts item (glyph ▲, sprint 11, `panel.rms`). Tabs are Open, Acknowledged, and Resolved. Filters are severity and the kinds for that section. Acknowledge posts, then reloads the list and the bell. The kinds legend sits under the list.
+
+Departure manifests replace the documents placeholder. All dates omits `from` and `to`. Columns and the notice offsets come from `ManifestRow`. Generate posts DPNG and CAPTAIN and toasts each API message. Downloads use `downloadDocumentFile` and stay hidden until that version exists. Without `guests.view_sensitive` the actions cell is “Manifests contain passport and health data.”
+
+Sync renders `meta.catalogue` joined to a scheduled run by command, keyed by `job`. The two `not needed` rows share that command and show the API sentence with no run. Scheduled commands that are not in the catalogue stay after those rows, so the existing jobs are not dropped.
+
+Helpers, with Vitest: `alertSeverityClass`, `alertBadgeClass`, `seesAnyAlert`, `manifestStatusClass`, `manifestNoticeOffsets`, `offsetLabel`, `manifestBarWidth`.
+
+Panel `pnpm lint`, `typecheck`, `test` (264), and `build` passed.
+
+### Browser
+After `reset.sh` on the running `anakata-api` project, then `anakata:alerts`. Dark was the starting theme; light was toggled on Documents (ivory page, manifests table, amber badge).
+
+The seeded `ANK-2026-0018` is the prototype OVERDUE row, but its departure is 2027-12-12, so `scopeOverdue()` is empty on 2026-09-22 and the sweep raised only `COMMISSION_CAP`. For the pay path, `balance_due_date_override` was set to 2026-09-01 and the sweep was run again. That override is data for this pass, not a product change.
+
+- Carolina: bell `1` amber on the commission-cap alert, then `2` after the overdue alert. Inbox rows, subject link, and kinds legend. Acknowledge moved `OVERDUE_BALANCE` to Acknowledged and the bell back to `1`. Recording the USD 23,940 balance set the booking to `FULLY PAID`. The row is on Resolved with “the overdue flag cleared”. The bell then read `5` amber because the payment raised other open alerts; the RMS Open tab no longer lists the overdue row.
+- Lucía: no bell. Alerts page is empty of rows. Manifests show statuses and the permission line on every row, with no Generate or downloads.
+- Mateo: bell `0`, class `pill` only.
+- The CFO was not signed in. The registry puts him in an audience, so the bell would show; no wire, departure, or ledger alert was open.
+
+Manifests, All dates, no date parameters sent. Statuses included `READY`, `2 PASSENGERS PENDING`, `1 PASSENGER PENDING`, and `16 PASSENGERS PENDING`, with charter `T−30` and FIT `T−15`. Generate on 7 Nov 2027 issued DPNG v1 and Captain v1. Generate again toasted “This manifest is unchanged.” and the versions modal listed both as `REQUESTED`. DPNG PDF, CSV, and XLSX and the captain PDF returned 200 (`application/pdf`, `text/csv`, spreadsheet). Sync lists Segment recompute and Consent sweep with their “Not needed” sentences, then the scheduled commands.
+
+Task 12 will script `ALRT-01`, `ALRT-02`, `ALRT-03`, `MAN-01`, `MAN-02`, and `MAN-03`. No scenarios were written.
+
+### Git
+Not run.
+
+```bash
+# anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Rms/ManifestController.php \
+  app/Http/Requests/Rms/ManifestIndexRequest.php \
+  app/Support/Manifests/ManifestIndex.php \
+  tests/Feature/Operations/ManifestsTest.php \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Make manifest index dates optional.
+
+An omitted from or to is unbounded, so Documents can request every departure without sentinel dates.
+EOF
+)"
+```
+
+```bash
+# anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/assets/css/shell.css \
+  app/components/alerts \
+  app/components/documents/DepartureManifests.vue \
+  app/components/documents/ManifestVersionsModal.vue \
+  app/components/documents/manifestHelpers.ts \
+  app/composables/useAlertCounts.ts \
+  app/layouts/default.vue \
+  app/navigation/rms.ts \
+  app/pages/crm/engine/alerts.vue \
+  app/pages/crm/system/sync.vue \
+  app/pages/rms/operations/alerts.vue \
+  app/pages/rms/operations/documents.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/alertHelpers.test.ts \
+  tests/unit/guards.test.ts \
+  tests/unit/manifestHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the alerts bell, inbox, and departure manifests.
+
+The badge follows the caller's audience counts, and manifest actions stay behind the sensitive-guest permission.
+EOF
+)"
+```

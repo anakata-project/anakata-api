@@ -124,6 +124,34 @@ test('due dates follow fit or charter and the list status follows live completen
     );
 });
 
+test('an omitted manifest bound is unbounded and a reversed pair is rejected', function (): void {
+    $early = manifestDeparture('2026-07-05');
+    $earlyBooking = manifestBooking($early, BookingStatus::Confirmed, manifestCabin($early, 1, 'E1', 'Suite 01'), 'ANK-2026-7111');
+    manifestGuest($earlyBooking);
+
+    $late = manifestDeparture('2026-08-16');
+    $lateBooking = manifestBooking($late, BookingStatus::Confirmed, manifestCabin($late, 1, 'L1', 'Suite 01'), 'ANK-2026-7112');
+    manifestGuest($lateBooking);
+
+    $refs = function (string $query): array {
+        return collect(
+            $this->actingAs(salesExecUser())
+                ->getJson('/api/rms/manifests'.$query)
+                ->assertOk()
+                ->json('data'),
+        )->pluck('reference')->all();
+    };
+
+    expect($refs('?from=2026-07-01&to=2026-07-31'))->toBe([$early->reference])
+        ->and($refs('?from=2026-08-01'))->toBe([$late->reference])
+        ->and($refs('?to=2026-07-31'))->toBe([$early->reference])
+        ->and($refs(''))->toBe([$early->reference, $late->reference]);
+
+    $this->actingAs(salesExecUser())
+        ->getJson('/api/rms/manifests?from=2026-08-01&to=2026-07-01')
+        ->assertUnprocessable();
+});
+
 test('the daily job issues first once until the departure date and then only resolves', function (): void {
     $departure = manifestDeparture('2026-07-05');
     $booking = manifestBooking($departure, BookingStatus::Confirmed, manifestCabin($departure, 1, 'J1', 'Suite 01'), 'ANK-2026-7201');

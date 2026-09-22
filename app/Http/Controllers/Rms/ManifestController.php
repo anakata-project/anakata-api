@@ -29,8 +29,14 @@ final class ManifestController extends Controller
     {
         $this->authorize('viewAny', Manifest::class);
 
+        $from = $request->validated('from');
+        $to = $request->validated('to');
+
         return ManifestDepartureResource::collection(
-            ManifestIndex::between($request->validated('from'), $request->validated('to')),
+            ManifestIndex::between(
+                is_string($from) ? $from : null,
+                is_string($to) ? $to : null,
+            ),
         );
     }
 

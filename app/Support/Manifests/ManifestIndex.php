@@ -16,7 +16,7 @@ final class ManifestIndex
     /**
      * @return Collection<int, ManifestRow>
      */
-    public static function between(string $from, string $to): Collection
+    public static function between(?string $from, ?string $to): Collection
     {
         $today = BusinessTime::now()->toDateString();
         $departures = self::departures($from, $to);
@@ -43,17 +43,25 @@ final class ManifestIndex
     /**
      * @return Collection<int, Departure>
      */
-    private static function departures(string $from, string $to): Collection
+    private static function departures(?string $from, ?string $to): Collection
     {
         $statuses = array_map(
             fn (BookingStatus $status): string => $status->value,
             ManifestRoster::COUNTED,
         );
 
-        return Departure::query()
-            ->with(['yacht', 'itinerary'])
-            ->where('date', '>=', $from)
-            ->where('date', '<=', $to)
+        $query = Departure::query()
+            ->with(['yacht', 'itinerary']);
+
+        if ($from !== null) {
+            $query->where('date', '>=', $from);
+        }
+
+        if ($to !== null) {
+            $query->where('date', '<=', $to);
+        }
+
+        return $query
             ->whereExists(function (Builder $query) use ($statuses): void {
                 $query->selectRaw('1')
                     ->from('bookings')
