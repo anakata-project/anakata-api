@@ -11,6 +11,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
 use App\Support\BusinessTime;
+use App\Support\Payments\WireWindow;
 use Carbon\CarbonImmutable;
 use Database\Factories\PaymentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -101,6 +102,19 @@ class Payment extends Model
     public function scopeCountingAsPaid(Builder $query): void
     {
         $query->whereIn('status', PaymentStatus::paidValues());
+    }
+
+    /**
+     * Awaiting-wire payments whose window has passed.
+     * Matches WireWindow::endsAtFor() < now(): calendar hours from created_at, not business hours.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopePastWireWindow(Builder $query): void
+    {
+        $query
+            ->where('payments.status', PaymentStatus::AwaitingWire->value)
+            ->where('payments.created_at', '<', now()->subHours(WireWindow::hours()));
     }
 
     public function historyLabel(): string

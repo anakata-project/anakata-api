@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\GuardCrmAlertSection;
 use App\Http\Middleware\GuardCrmSensitiveData;
 use App\Http\Middleware\NoindexResponse;
 use App\Http\Middleware\RequirePermission;
@@ -34,6 +35,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->prefix('api/privacy')
                 ->group(base_path('routes/api/privacy.php'));
 
+            Route::middleware(['api', 'auth:sanctum', 'active', 'alerts.crm'])
+                ->prefix('api')
+                ->group(base_path('routes/api/alerts.php'));
+
             Route::middleware(['api', 'throttle:engine'])
                 ->prefix('api/engine')
                 ->group(base_path('routes/api/engine.php'));
@@ -58,6 +63,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $middleware->alias([
             'crm.sensitive' => GuardCrmSensitiveData::class,
+            'alerts.crm' => GuardCrmAlertSection::class,
             'active' => EnsureUserIsActive::class,
             'permission' => RequirePermission::class,
             'noindex' => NoindexResponse::class,

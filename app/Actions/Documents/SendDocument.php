@@ -8,6 +8,7 @@ use App\Actions\Action;
 use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
 use App\Enums\DeliveryTriggeredBy;
+use App\Events\DeliveryOutcomeRecorded;
 use App\Jobs\SendDeliveryJob;
 use App\Models\Booking;
 use App\Models\Delivery;
@@ -41,7 +42,7 @@ final class SendDocument extends Action
                 : DeliveryTriggeredBy::User;
 
             if (! $recipients->usable()) {
-                return $this->record->handle([
+                $delivery = $this->record->handle([
                     'booking_id' => $booking->id,
                     'document_id' => $document->id,
                     'kind' => $kind,
@@ -53,6 +54,12 @@ final class SendDocument extends Action
                     'blocked_reason' => $recipients->blockedReason,
                     'triggered_by' => $triggeredBy,
                 ]);
+
+                if ($delivery->wasRecentlyCreated) {
+                    DeliveryOutcomeRecorded::dispatch($delivery);
+                }
+
+                return $delivery;
             }
 
             $existing = Delivery::query()->where('idempotency_key', $firstKey)->first();

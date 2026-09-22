@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Events\BookingOverdueFlagged;
 use App\Models\Booking;
 use App\Support\History\History;
 use Illuminate\Console\Command;
@@ -39,6 +40,8 @@ final class FlagOverdueCommand extends Command
                         'overdue_days' => $booking->overdueDays(),
                         'balance' => $booking->cruiseOutstanding(),
                     ], system: true);
+
+                    BookingOverdueFlagged::dispatch($booking);
                 });
 
                 $flagged++;

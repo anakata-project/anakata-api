@@ -35,6 +35,12 @@ final class AnakataSchedule
         );
 
         RecordScheduledRuns::attach(
+            $schedule->command('anakata:alerts')
+                ->everyFiveMinutes()
+                ->withoutOverlapping(),
+        );
+
+        RecordScheduledRuns::attach(
             $schedule->command('anakata:flag-overdue')
                 ->daily()
                 ->timezone(BusinessTime::zone())

@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Enums\DeliveryStatus;
 use App\Enums\DeliveryTriggeredBy;
+use App\Events\DeliveryOutcomeRecorded;
 use App\Mail\Documents\DeliveryMailFactory;
 use App\Models\Delivery;
 use App\Models\User;
@@ -60,6 +61,7 @@ final class SendDeliveryJob implements ShouldQueue
             $fresh->save();
 
             $this->writeHistory($fresh, sent: true);
+            DeliveryOutcomeRecorded::dispatch($fresh);
         });
     }
 
@@ -83,6 +85,7 @@ final class SendDeliveryJob implements ShouldQueue
             $fresh->save();
 
             $this->writeHistory($fresh, sent: false);
+            DeliveryOutcomeRecorded::dispatch($fresh);
         });
     }
 

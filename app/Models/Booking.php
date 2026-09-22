@@ -685,6 +685,16 @@ class Booking extends Model
     }
 
     /**
+     * Galápagos due date: the override, or the departure date minus balance days.
+     */
+    public static function dueDateSql(): string
+    {
+        return 'COALESCE(bookings.balance_due_date_override, DATE_SUB((
+            SELECT departures.date FROM departures WHERE departures.id = bookings.departure_id
+        ), INTERVAL bookings.balance_days DAY))';
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     public function scopeOverdue(Builder $query): void
@@ -698,12 +708,7 @@ class Booking extends Model
                 BookingStatus::OnHoldAgency->value,
             ])
             ->whereRaw('('.$cruiseSql.') > 0', $paid)
-            ->whereRaw(
-                '? > COALESCE(bookings.balance_due_date_override, DATE_SUB((
-                    SELECT departures.date FROM departures WHERE departures.id = bookings.departure_id
-                ), INTERVAL bookings.balance_days DAY))',
-                [$today],
-            );
+            ->whereRaw('? > '.self::dueDateSql(), [$today]);
     }
 
     public function depositAmount(): int

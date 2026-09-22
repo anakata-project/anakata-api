@@ -11,6 +11,8 @@ use App\Actions\Bookings\TransitionBooking;
 use App\Actions\Charter\CreateCharterEnquiry;
 use App\Actions\Checkout\SubmitEngineCheckout;
 use App\Actions\Contacts\StitchEngineIdentity;
+use App\Actions\Documents\SendDocument;
+use App\Actions\Documents\SendPaymentRequest;
 use App\Actions\Engine\IngestBehaviouralEvents;
 use App\Actions\Extras\AddBookingExtra;
 use App\Actions\Extras\RemoveBookingExtra;
@@ -22,23 +24,33 @@ use App\Actions\Payments\MarkWireReceived;
 use App\Actions\Payments\RecordPayment;
 use App\Actions\Payments\SettleGatewayPayment;
 use App\Actions\Refunds\CreateRefundRequest;
+use App\Console\Commands\FlagOverdueCommand;
 use App\Enums\BehaviouralEventName;
 use App\Events\AvailabilityChanged;
 use App\Events\BookingChargesChanged;
 use App\Events\BookingCreated;
+use App\Events\BookingOverdueFlagged;
 use App\Events\BookingStatusChanged;
 use App\Events\CharterEnquiryReceived;
 use App\Events\ConfigPublished;
+use App\Events\DeliveryOutcomeRecorded;
 use App\Events\HoldExpired;
 use App\Events\PaymentAwaitingWire;
 use App\Events\PaymentSettled;
 use App\Events\RefundRequested;
+use App\Jobs\SendDeliveryJob;
 use App\Listeners\BumpEngineFeedVersion;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\ExpireWebCheckoutSession;
 use App\Listeners\MarkRequestHoldExpired;
 use App\Listeners\OpenDealOnBookingCreated;
 use App\Listeners\OpenDealOnCharterEnquiryReceived;
+use App\Listeners\RaiseAlertsOnBookingCreated;
+use App\Listeners\RaiseAlertsOnBookingOverdueFlagged;
+use App\Listeners\RaiseAlertsOnBookingStatusChanged;
+use App\Listeners\RaiseAlertsOnDeliveryOutcome;
+use App\Listeners\RaiseAlertsOnPaymentAwaitingWire;
+use App\Listeners\RaiseAlertsOnPaymentSettled;
 use App\Listeners\RaiseTasksOnBookingCreated;
 use App\Listeners\RaiseTasksOnBookingStatusChanged;
 use App\Listeners\RaiseTasksOnCharterEnquiry;
@@ -139,6 +151,7 @@ final class EventCatalogue
                 'listeners' => [
                     self::short(OpenDealOnBookingCreated::class),
                     self::short(RaiseTasksOnBookingCreated::class),
+                    self::short(RaiseAlertsOnBookingCreated::class),
                 ],
             ],
             [
@@ -160,7 +173,7 @@ final class EventCatalogue
                 'class' => PaymentAwaitingWire::class,
                 'name' => 'PaymentAwaitingWire',
                 'producer' => self::short(RecordPayment::class),
-                'listeners' => [self::short(RaiseTasksOnPaymentAwaitingWire::class)],
+                'listeners' => [self::short(RaiseTasksOnPaymentAwaitingWire::class), self::short(RaiseAlertsOnPaymentAwaitingWire::class)],
             ],
             [
                 'class' => BookingStatusChanged::class,
@@ -169,6 +182,7 @@ final class EventCatalogue
                 'listeners' => [
                     self::short(SendOnBookingStatusChanged::class),
                     self::short(RaiseTasksOnBookingStatusChanged::class),
+                    self::short(RaiseAlertsOnBookingStatusChanged::class),
                 ],
             ],
             [
@@ -179,7 +193,10 @@ final class EventCatalogue
                     self::short(MarkWireReceived::class),
                     self::short(SettleGatewayPayment::class),
                 ]),
-                'listeners' => [self::short(SendOnPaymentSettled::class)],
+                'listeners' => [
+                    self::short(SendOnPaymentSettled::class),
+                    self::short(RaiseAlertsOnPaymentSettled::class),
+                ],
             ],
             [
                 'class' => BookingChargesChanged::class,
@@ -194,6 +211,22 @@ final class EventCatalogue
                     self::short(MoveBooking::class),
                 ]),
                 'listeners' => [self::short(SendOnBookingChargesChanged::class)],
+            ],
+            [
+                'class' => BookingOverdueFlagged::class,
+                'name' => 'BookingOverdueFlagged',
+                'producer' => self::short(FlagOverdueCommand::class),
+                'listeners' => [self::short(RaiseAlertsOnBookingOverdueFlagged::class)],
+            ],
+            [
+                'class' => DeliveryOutcomeRecorded::class,
+                'name' => 'DeliveryOutcomeRecorded',
+                'producer' => implode(', ', [
+                    self::short(SendDocument::class),
+                    self::short(SendPaymentRequest::class),
+                    self::short(SendDeliveryJob::class),
+                ]),
+                'listeners' => [self::short(RaiseAlertsOnDeliveryOutcome::class)],
             ],
             [
                 'class' => AvailabilityChanged::class,

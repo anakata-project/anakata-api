@@ -9,9 +9,11 @@ use App\Enums\Permission;
 use App\Events\AvailabilityChanged;
 use App\Events\BookingChargesChanged;
 use App\Events\BookingCreated;
+use App\Events\BookingOverdueFlagged;
 use App\Events\BookingStatusChanged;
 use App\Events\CharterEnquiryReceived;
 use App\Events\ConfigPublished;
+use App\Events\DeliveryOutcomeRecorded;
 use App\Events\HoldExpired;
 use App\Events\PaymentAwaitingWire;
 use App\Events\PaymentSettled;
@@ -22,6 +24,12 @@ use App\Listeners\ExpireWebCheckoutSession;
 use App\Listeners\MarkRequestHoldExpired;
 use App\Listeners\OpenDealOnBookingCreated;
 use App\Listeners\OpenDealOnCharterEnquiryReceived;
+use App\Listeners\RaiseAlertsOnBookingCreated;
+use App\Listeners\RaiseAlertsOnBookingOverdueFlagged;
+use App\Listeners\RaiseAlertsOnBookingStatusChanged;
+use App\Listeners\RaiseAlertsOnDeliveryOutcome;
+use App\Listeners\RaiseAlertsOnPaymentAwaitingWire;
+use App\Listeners\RaiseAlertsOnPaymentSettled;
 use App\Listeners\RaiseTasksOnBookingCreated;
 use App\Listeners\RaiseTasksOnBookingStatusChanged;
 use App\Listeners\RaiseTasksOnCharterEnquiry;
@@ -31,6 +39,7 @@ use App\Listeners\SendOnBookingChargesChanged;
 use App\Listeners\SendOnBookingStatusChanged;
 use App\Listeners\SendOnPaymentSettled;
 use App\Models\Agency;
+use App\Models\Alert;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
@@ -213,6 +222,7 @@ class AppServiceProvider extends ServiceProvider
             'contact' => Contact::class,
             'deal' => Deal::class,
             'crm_task' => CrmTask::class,
+            'alert' => Alert::class,
             'campaign' => Campaign::class,
             'subject_request' => SubjectRequest::class,
             'contact_activity' => ContactActivity::class,
@@ -278,12 +288,18 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
         Event::listen(BookingCreated::class, OpenDealOnBookingCreated::class);
         Event::listen(BookingCreated::class, RaiseTasksOnBookingCreated::class);
+        Event::listen(BookingCreated::class, RaiseAlertsOnBookingCreated::class);
         Event::listen(CharterEnquiryReceived::class, OpenDealOnCharterEnquiryReceived::class);
         Event::listen(CharterEnquiryReceived::class, RaiseTasksOnCharterEnquiry::class);
         Event::listen(BookingStatusChanged::class, RaiseTasksOnBookingStatusChanged::class);
+        Event::listen(BookingStatusChanged::class, RaiseAlertsOnBookingStatusChanged::class);
+        Event::listen(BookingOverdueFlagged::class, RaiseAlertsOnBookingOverdueFlagged::class);
         Event::listen(RefundRequested::class, RaiseTasksOnRefundRequested::class);
         Event::listen(PaymentAwaitingWire::class, RaiseTasksOnPaymentAwaitingWire::class);
+        Event::listen(PaymentAwaitingWire::class, RaiseAlertsOnPaymentAwaitingWire::class);
         Event::listen(PaymentSettled::class, SendOnPaymentSettled::class);
+        Event::listen(PaymentSettled::class, RaiseAlertsOnPaymentSettled::class);
+        Event::listen(DeliveryOutcomeRecorded::class, RaiseAlertsOnDeliveryOutcome::class);
         Event::listen(BookingChargesChanged::class, SendOnBookingChargesChanged::class);
 
         $this->app->afterResolving(Schedule::class, function (Schedule $schedule): void {

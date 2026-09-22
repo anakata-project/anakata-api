@@ -9,6 +9,7 @@ use App\Actions\Complete\IssueCompleteAccessToken;
 use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
 use App\Enums\DeliveryTriggeredBy;
+use App\Events\DeliveryOutcomeRecorded;
 use App\Jobs\SendDeliveryJob;
 use App\Models\Booking;
 use App\Models\Delivery;
@@ -52,7 +53,7 @@ final class SendPaymentRequest extends Action
                 : DeliverySubject::forPaymentLink($booking, $link ?? throw new InvalidArgumentException('A payment-link send needs a link.'));
 
             if (! $recipients->usable()) {
-                return $this->record->handle([
+                $delivery = $this->record->handle([
                     'booking_id' => $booking->id,
                     'document_id' => null,
                     'kind' => $kind,
@@ -64,6 +65,12 @@ final class SendPaymentRequest extends Action
                     'blocked_reason' => $recipients->blockedReason,
                     'triggered_by' => $triggeredBy,
                 ]);
+
+                if ($delivery->wasRecentlyCreated) {
+                    DeliveryOutcomeRecorded::dispatch($delivery);
+                }
+
+                return $delivery;
             }
 
             $existing = Delivery::query()->where('idempotency_key', $firstKey)->first();
