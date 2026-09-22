@@ -46,6 +46,8 @@ enum SystemRole: string
                 Permission::PipelineMoveStage,
                 Permission::ContactsManage,
                 Permission::ContactsMerge,
+                Permission::ConsentsRecord,
+                Permission::CampaignsManage,
                 Permission::GuestsViewSensitive,
             ]),
             self::SalesExec => collect([

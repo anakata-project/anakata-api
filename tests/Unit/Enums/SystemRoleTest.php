@@ -24,6 +24,8 @@ test('manager default permissions match the sprint list', function (): void {
         Permission::PipelineMoveStage->value,
         Permission::ContactsManage->value,
         Permission::ContactsMerge->value,
+        Permission::ConsentsRecord->value,
+        Permission::CampaignsManage->value,
         Permission::GuestsViewSensitive->value,
     ]);
 });

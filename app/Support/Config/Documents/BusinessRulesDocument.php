@@ -29,6 +29,7 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly LegalEntityRules $legalEntity,
         public readonly DocumentsRules $documents,
         public readonly CrmRules $crm,
+        public readonly PrivacyRules $privacy,
         public readonly array $bands,
     ) {}
 
@@ -90,6 +91,7 @@ final class BusinessRulesDocument extends ConfigDocument
                     'privacy' => 'v2026.1 (pending LEG-002)',
                     'insurance' => 'OPS-005 v1',
                     'marketing' => 'v1',
+                    'analytics' => 'v1 (pending LEG-002)',
                 ],
             ],
             'legal_entity' => [
@@ -116,6 +118,19 @@ final class BusinessRulesDocument extends ConfigDocument
             'crm' => [
                 'segment_high_ltv' => 20000,
                 'segment_mid_ltv' => 8000,
+                'pipeline' => [
+                    'sla_new_lead_business_hours' => 4,
+                    'sla_qualifying_business_days' => 5,
+                    'sla_negotiation_business_days' => 7,
+                    'probability_new_lead' => 5,
+                    'probability_qualifying' => 15,
+                    'probability_quoted' => 35,
+                    'probability_negotiation' => 55,
+                    'probability_deposit_pending' => 80,
+                ],
+            ],
+            'privacy' => [
+                'request_sla_days' => 30,
             ],
             'cancellation' => [
                 'bands' => [
@@ -146,6 +161,8 @@ final class BusinessRulesDocument extends ConfigDocument
         $bank = is_array($legalEntity['bank'] ?? null) ? $legalEntity['bank'] : [];
         $documents = is_array($data['documents'] ?? null) ? $data['documents'] : [];
         $crm = is_array($data['crm'] ?? null) ? $data['crm'] : [];
+        $pipeline = is_array($crm['pipeline'] ?? null) ? $crm['pipeline'] : [];
+        $privacy = is_array($data['privacy'] ?? null) ? $data['privacy'] : [];
         $cancellation = is_array($data['cancellation'] ?? null) ? $data['cancellation'] : [];
 
         $reminders = [];
@@ -224,6 +241,7 @@ final class BusinessRulesDocument extends ConfigDocument
                 is_string($consentVersions['privacy'] ?? null) ? $consentVersions['privacy'] : '',
                 is_string($consentVersions['insurance'] ?? null) ? $consentVersions['insurance'] : '',
                 is_string($consentVersions['marketing'] ?? null) ? $consentVersions['marketing'] : '',
+                is_string($consentVersions['analytics'] ?? null) ? $consentVersions['analytics'] : '',
             ),
             new LegalEntityRules(
                 is_string($legalEntity['name'] ?? null) ? $legalEntity['name'] : '',
@@ -246,6 +264,19 @@ final class BusinessRulesDocument extends ConfigDocument
             new CrmRules(
                 (int) ($crm['segment_high_ltv'] ?? 0),
                 (int) ($crm['segment_mid_ltv'] ?? 0),
+                new PipelineRules(
+                    (int) ($pipeline['sla_new_lead_business_hours'] ?? 0),
+                    (int) ($pipeline['sla_qualifying_business_days'] ?? 0),
+                    (int) ($pipeline['sla_negotiation_business_days'] ?? 0),
+                    (int) ($pipeline['probability_new_lead'] ?? 0),
+                    (int) ($pipeline['probability_qualifying'] ?? 0),
+                    (int) ($pipeline['probability_quoted'] ?? 0),
+                    (int) ($pipeline['probability_negotiation'] ?? 0),
+                    (int) ($pipeline['probability_deposit_pending'] ?? 0),
+                ),
+            ),
+            new PrivacyRules(
+                (int) ($privacy['request_sla_days'] ?? 0),
             ),
             $bands,
         );
@@ -262,10 +293,11 @@ final class BusinessRulesDocument extends ConfigDocument
      *     manifests: array{dpng_fit_days: int, dpng_charter_days: int},
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
      *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int, behavioural_raw_months: int, behavioural_unstitched_days: int},
-     *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string}},
+     *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string, analytics: string}},
      *     legal_entity: array{name: string, address_lines: list<string>, email: string, website: string, ein: string, bank: array{bank_name: string, account_name: string, account_number: string, routing: string, swift: string}},
      *     documents: array{pretrip_days_before: int, voucher_days_before: int},
-     *     crm: array{segment_high_ltv: int, segment_mid_ltv: int},
+     *     crm: array{segment_high_ltv: int, segment_mid_ltv: int, pipeline: array{sla_new_lead_business_hours: int, sla_qualifying_business_days: int, sla_negotiation_business_days: int, probability_new_lead: int, probability_qualifying: int, probability_quoted: int, probability_negotiation: int, probability_deposit_pending: int}},
+     *     privacy: array{request_sla_days: int},
      *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
      * }
      */
@@ -287,6 +319,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal_entity' => $this->legalEntity->toArray(),
             'documents' => $this->documents->toArray(),
             'crm' => $this->crm->toArray(),
+            'privacy' => $this->privacy->toArray(),
             'cancellation' => [
                 'bands' => array_map(
                     fn (CancellationBand $band): array => $band->toArray(),
@@ -349,6 +382,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal.consent_versions.privacy' => ['required', 'string', 'min:1', 'max:120'],
             'legal.consent_versions.insurance' => ['required', 'string', 'min:1', 'max:120'],
             'legal.consent_versions.marketing' => ['required', 'string', 'min:1', 'max:120'],
+            'legal.consent_versions.analytics' => ['required', 'string', 'min:1', 'max:120'],
             'legal_entity' => ['required', 'array'],
             'legal_entity.name' => ['required', 'string', 'min:1', 'max:180'],
             'legal_entity.address_lines' => ['required', 'array', 'min:1', 'max:6'],
@@ -368,6 +402,17 @@ final class BusinessRulesDocument extends ConfigDocument
             'crm' => ['required', 'array'],
             'crm.segment_high_ltv' => ['required', 'integer', 'min:1', 'max:1000000'],
             'crm.segment_mid_ltv' => ['required', 'integer', 'min:0', 'max:1000000'],
+            'crm.pipeline' => ['required', 'array'],
+            'crm.pipeline.sla_new_lead_business_hours' => ['required', 'integer', 'min:1', 'max:168'],
+            'crm.pipeline.sla_qualifying_business_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'crm.pipeline.sla_negotiation_business_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'crm.pipeline.probability_new_lead' => ['required', 'integer', 'min:0', 'max:100'],
+            'crm.pipeline.probability_qualifying' => ['required', 'integer', 'min:0', 'max:100'],
+            'crm.pipeline.probability_quoted' => ['required', 'integer', 'min:0', 'max:100'],
+            'crm.pipeline.probability_negotiation' => ['required', 'integer', 'min:0', 'max:100'],
+            'crm.pipeline.probability_deposit_pending' => ['required', 'integer', 'min:0', 'max:100'],
+            'privacy' => ['required', 'array'],
+            'privacy.request_sla_days' => ['required', 'integer', 'min:1', 'max:365'],
             'cancellation' => ['required', 'array'],
             'cancellation.bands' => ['required', 'array', 'min:1', 'max:6', new BusinessRulesConstraint('bands')],
             'cancellation.bands.*.min_days' => ['required', 'integer', 'min:0', 'max:999'],
@@ -415,6 +460,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal.consent_versions.privacy' => 'LEG-002 · Privacy policy version',
             'legal.consent_versions.insurance' => 'OPS-005 · Travel insurance declaration version',
             'legal.consent_versions.marketing' => 'LEG-002 · Marketing consent version',
+            'legal.consent_versions.analytics' => 'LEG-002 · Analytics consent version',
             'legal_entity.name' => 'Decision 8 · Invoicing entity',
             'legal_entity.address_lines' => 'Decision 8 · Invoicing entity address',
             'legal_entity.email' => 'Decision 8 · Invoicing entity email',
@@ -429,6 +475,15 @@ final class BusinessRulesDocument extends ConfigDocument
             'documents.voucher_days_before' => 'J7 · Transfer voucher days before departure',
             'crm.segment_high_ltv' => 'L2 · CRM segment HIGH lifetime-value threshold',
             'crm.segment_mid_ltv' => 'L2 · CRM segment MID lifetime-value threshold',
+            'crm.pipeline.sla_new_lead_business_hours' => 'M4 · New lead SLA',
+            'crm.pipeline.sla_qualifying_business_days' => 'M4 · Qualifying SLA',
+            'crm.pipeline.sla_negotiation_business_days' => 'M4 · Negotiation SLA',
+            'crm.pipeline.probability_new_lead' => 'M4 · New lead probability',
+            'crm.pipeline.probability_qualifying' => 'M4 · Qualifying probability',
+            'crm.pipeline.probability_quoted' => 'M4 · Quoted probability',
+            'crm.pipeline.probability_negotiation' => 'M4 · Negotiation probability',
+            'crm.pipeline.probability_deposit_pending' => 'M4 · Deposit pending probability',
+            'privacy.request_sla_days' => 'M7 · Subject request SLA',
             'cancellation.bands' => '§4.1.5 · Cabin cancellation penalty bands',
         ];
     }
@@ -534,6 +589,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'legal.consent_versions.privacy' => 'v2026.1 (pending LEG-002)',
             'legal.consent_versions.insurance' => 'OPS-005 v1',
             'legal.consent_versions.marketing' => 'v1',
+            'legal.consent_versions.analytics' => 'v1 (pending LEG-002)',
             'legal_entity.name' => 'PONTOS LLC (a limited liability company)',
             'legal_entity.address_lines' => '430 Grand Bay Drive, Apt 1108 · Key Biscayne, FL 33149, United States',
             'legal_entity.email' => 'info@anakata.co',
@@ -548,6 +604,15 @@ final class BusinessRulesDocument extends ConfigDocument
             'documents.voucher_days_before' => '7 days (J7 / prototype T−7)',
             'crm.segment_high_ltv' => 'USD 20,000 (PENDING CLIENT, prototype segOf)',
             'crm.segment_mid_ltv' => 'USD 8,000 (PENDING CLIENT, prototype segOf)',
+            'crm.pipeline.sla_new_lead_business_hours' => '4 business hours (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.sla_qualifying_business_days' => '5 business days (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.sla_negotiation_business_days' => '7 business days (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.probability_new_lead' => '5% (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.probability_qualifying' => '15% (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.probability_quoted' => '35% (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.probability_negotiation' => '55% (PENDING CLIENT, prototype pipeline)',
+            'crm.pipeline.probability_deposit_pending' => '80% (PENDING CLIENT, prototype pipeline)',
+            'privacy.request_sla_days' => '30 calendar days (PENDING LEG-002)',
             'cancellation.bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100%',
             default => $path,
         };

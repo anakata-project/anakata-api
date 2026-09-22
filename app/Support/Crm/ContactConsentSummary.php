@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Support\Crm;
 
-use App\Enums\ConsentDocument;
-use App\Models\Consent;
+use App\Enums\ConsentPurpose;
 use App\Models\Contact;
+use App\Models\ContactConsent;
 
 final class ContactConsentSummary
 {
     /**
-     * Latest MARKETING consent across the contact's bookings. Sprint 10 replaces this with the register.
+     * Latest MARKETING row in the contact consent register.
      *
      * @return array{marketing: bool, transactional: true}
      */
@@ -24,17 +24,15 @@ final class ContactConsentSummary
             ];
         }
 
-        $latest = Consent::query()
-            ->select('consents.*')
-            ->join('bookings', 'bookings.id', '=', 'consents.booking_id')
-            ->where('bookings.contact_id', $contact->id)
-            ->whereNull('bookings.deleted_at')
-            ->where('consents.document', ConsentDocument::Marketing)
-            ->orderByDesc('consents.id')
+        $latest = ContactConsent::query()
+            ->where('contact_id', $contact->id)
+            ->where('purpose', ConsentPurpose::Marketing)
+            ->orderByDesc('captured_at')
+            ->orderByDesc('id')
             ->first();
 
         return [
-            'marketing' => $latest instanceof Consent && ! $latest->withdrawn,
+            'marketing' => $latest instanceof ContactConsent && $latest->granted,
             'transactional' => true,
         ];
     }

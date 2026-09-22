@@ -2,19 +2,54 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Crm\CampaignController;
+use App\Http\Controllers\Crm\ContactConsentController;
 use App\Http\Controllers\Crm\ContactController;
 use App\Http\Controllers\Crm\ContactMergeController;
 use App\Http\Controllers\Crm\ContactTimelineController;
+use App\Http\Controllers\Crm\DealController;
+use App\Http\Controllers\Crm\DeliveryController;
 use App\Http\Controllers\Crm\EngineActivityController;
 use App\Http\Controllers\Crm\SyncController;
+use App\Http\Controllers\Crm\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => response()->json(['ok' => true]));
+
+Route::get('tasks', [TaskController::class, 'index']);
+Route::post('tasks', [TaskController::class, 'store']);
+Route::patch('tasks/{task}', [TaskController::class, 'update']);
+Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);
+Route::post('tasks/{task}/cancel', [TaskController::class, 'cancel']);
+Route::post('contacts/{contact}/activities', [TaskController::class, 'storeActivity']);
+
+Route::get('campaigns', [CampaignController::class, 'index']);
+Route::get('campaigns/offers-without-campaign', [CampaignController::class, 'offersWithoutCampaign']);
+Route::get('campaigns/attribution-model', [CampaignController::class, 'attributionModel']);
+Route::post('campaigns', [CampaignController::class, 'store']);
+Route::patch('campaigns/{campaign}', [CampaignController::class, 'update']);
+Route::post('campaigns/{campaign}/archive', [CampaignController::class, 'archive']);
+Route::get('campaigns/{campaign}/bookings', [CampaignController::class, 'bookings']);
+
+Route::get('deliveries', [DeliveryController::class, 'index']);
+
+Route::get('pipeline', [DealController::class, 'pipeline']);
+Route::get('pipeline/stage-map', [DealController::class, 'stageMap']);
+Route::post('deals', [DealController::class, 'store']);
+Route::get('deals/{deal}', [DealController::class, 'show']);
+Route::post('deals/{deal}/assign', [DealController::class, 'assign']);
+Route::post('deals/{deal}/bind', [DealController::class, 'bind']);
+Route::patch('deals/{deal}/stage', [DealController::class, 'stage']);
+
+Route::get('consents/register', [ContactConsentController::class, 'register']);
+Route::get('consents/data-map', [ContactConsentController::class, 'dataMap']);
 
 Route::get('contacts', [ContactController::class, 'index']);
 Route::get('contacts/duplicates', [ContactController::class, 'duplicates']);
 Route::get('contacts/{contact}', [ContactController::class, 'show']);
 Route::get('contacts/{contact}/timeline', ContactTimelineController::class);
+Route::get('contacts/{contact}/consents', [ContactConsentController::class, 'show']);
+Route::post('contacts/{contact}/consents', [ContactConsentController::class, 'store']);
 Route::patch('contacts/{contact}', [ContactController::class, 'update']);
 Route::post('contacts/{contact}/merge', [ContactController::class, 'merge']);
 

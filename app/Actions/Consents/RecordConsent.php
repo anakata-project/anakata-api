@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Actions\Consents;
 
 use App\Actions\Action;
+use App\Actions\Crm\RecordContactConsent;
+use App\Enums\ConsentCapturePoint;
 use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ConsentSource;
 use App\Models\Booking;
 use App\Models\Consent;
+use App\Models\Contact;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\History\History;
@@ -30,6 +34,7 @@ final class RecordConsent extends Action
         ?string $version = null,
         ?User $actor = null,
         ?string $actorLabel = null,
+        bool $withdrawn = false,
     ): Consent {
         if ($source === ConsentSource::Staff && ($howObtained === null || $howObtained === '')) {
             throw ValidationException::withMessages([
@@ -49,6 +54,7 @@ final class RecordConsent extends Action
             $version,
             $actor,
             $actorLabel,
+            $withdrawn,
         ): Consent {
             $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
@@ -59,7 +65,8 @@ final class RecordConsent extends Action
                 ->first();
 
             if (
-                $latest instanceof Consent
+                ! $withdrawn
+                && $latest instanceof Consent
                 && ! $latest->withdrawn
                 && $latest->version === $version
             ) {
@@ -79,8 +86,30 @@ final class RecordConsent extends Action
                 ? $actor->id
                 : null;
             $consent->how_obtained = $source === ConsentSource::Staff ? $howObtained : null;
-            $consent->withdrawn = false;
+            $consent->withdrawn = $withdrawn;
             $consent->save();
+
+            if ($document === ConsentDocument::Marketing) {
+                $contact = Contact::query()->find($locked->contact_id);
+
+                if ($contact instanceof Contact) {
+                    app(RecordContactConsent::class)->handle(
+                        $contact,
+                        ConsentPurpose::Marketing,
+                        granted: ! $withdrawn,
+                        version: $version,
+                        capturePoint: match ($source) {
+                            ConsentSource::Staff => ConsentCapturePoint::Staff,
+                            ConsentSource::Engine, ConsentSource::PaymentLink => ConsentCapturePoint::EngineForm,
+                        },
+                        capturedAt: $consent->accepted_at,
+                        ip: $consent->ip,
+                        recordedBy: $actor,
+                        howObtained: $howObtained,
+                        sourceConsentId: $consent->id,
+                    );
+                }
+            }
 
             History::record($locked, 'consent.recorded', after: [
                 'document' => $document->value,

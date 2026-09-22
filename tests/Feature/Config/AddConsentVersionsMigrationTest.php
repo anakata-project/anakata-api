@@ -67,6 +67,7 @@ test('config-verify fails on a latest document missing consent versions, then th
     expect($v2->document['legal']['consent_versions']['privacy'])->toBe('v2026.1 (pending LEG-002)');
     expect($v2->document['legal']['consent_versions']['insurance'])->toBe('OPS-005 v1');
     expect($v2->document['legal']['consent_versions']['marketing'])->toBe('v1');
+    expect($v2->document['legal']['consent_versions']['analytics'])->toBe('v1 (pending LEG-002)');
     expect($v2->document['retention']['passport_months_after_cruise'])->toBe(24);
 
     $history = ChangeHistory::query()
@@ -108,6 +109,7 @@ test('the migration adds only the missing consent-version keys', function (): vo
     expect($v2->document['legal']['consent_versions']['terms'])->toBe('custom-terms');
     expect($v2->document['legal']['consent_versions']['privacy'])->toBe('v2026.1 (pending LEG-002)');
     expect($v2->document['legal']['consent_versions']['marketing'])->toBe('v1');
+    expect($v2->document['legal']['consent_versions']['analytics'])->toBe('v1 (pending LEG-002)');
 });
 
 test('the migration is a no-op when the five consent versions are already present', function (): void {

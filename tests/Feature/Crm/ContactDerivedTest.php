@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\AgencyStatus;
 use App\Enums\BookingStatus;
+use App\Enums\ConsentCapturePoint;
 use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ConsentSource;
 use App\Enums\ContactLifecycle;
 use App\Enums\ContactSegment;
@@ -13,6 +15,7 @@ use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\Consent;
 use App\Models\Contact;
+use App\Models\ContactConsent;
 use App\Support\BusinessTime;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
@@ -115,6 +118,14 @@ test('lifecycle covers each branch including date windows and precedence', funct
         'source' => ConsentSource::Engine,
         'withdrawn' => false,
     ]);
+    $register = new ContactConsent;
+    $register->contact_id = $mql->id;
+    $register->purpose = ConsentPurpose::Marketing;
+    $register->granted = true;
+    $register->version = 'v1';
+    $register->captured_at = now();
+    $register->capture_point = ConsentCapturePoint::EngineForm;
+    $register->save();
     expect(crmDerived($mql)->lifecycle)->toBe(ContactLifecycle::Mql->value);
 
     $agent = Contact::factory()->create([

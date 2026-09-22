@@ -38,7 +38,8 @@ class EngineSettingsResource extends JsonResource
      *             cancellation: string,
      *             privacy: string,
      *             insurance: string,
-     *             marketing: string
+     *             marketing: string,
+     *             analytics: string
      *         }
      *     },
      *     calendar: array{

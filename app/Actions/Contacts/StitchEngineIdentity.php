@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace App\Actions\Contacts;
 
 use App\Actions\Action;
+use App\Actions\Crm\RecordContactConsent;
 use App\Enums\BehaviouralEventName;
+use App\Enums\ConsentCapturePoint;
+use App\Enums\ConsentPurpose;
 use App\Models\BehaviouralEvent;
 use App\Models\Contact;
+use App\Services\Config\CurrentConfig;
 use App\Support\Crm\AttributionTouch;
 use App\Support\History\History;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 final class StitchEngineIdentity extends Action
@@ -59,6 +64,8 @@ final class StitchEngineIdentity extends Action
             ], system: true);
         }
 
+        $this->recordAnalyticsConsent($contact, $sessionId);
+
         if ($contact->engine_identified_at === null) {
             Contact::query()
                 ->whereKey($contact->id)
@@ -70,6 +77,28 @@ final class StitchEngineIdentity extends Action
 
             $contact->refresh();
         }
+    }
+
+    private function recordAnalyticsConsent(Contact $contact, string $sessionId): void
+    {
+        $earliest = BehaviouralEvent::query()
+            ->where('session_id', $sessionId)
+            ->where('name', '!=', BehaviouralEventName::IdentityStitched->value)
+            ->min('occurred_at');
+
+        $capturedAt = is_string($earliest) && $earliest !== ''
+            ? Carbon::parse($earliest)
+            : now();
+
+        app(RecordContactConsent::class)->handle(
+            $contact,
+            ConsentPurpose::Analytics,
+            granted: true,
+            version: app(CurrentConfig::class)->businessRules()->consentVersions->analytics,
+            capturePoint: ConsentCapturePoint::EngineBanner,
+            capturedAt: $capturedAt,
+            sessionId: $sessionId,
+        );
     }
 
     /**

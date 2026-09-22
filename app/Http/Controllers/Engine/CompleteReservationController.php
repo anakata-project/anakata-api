@@ -92,6 +92,17 @@ final class CompleteReservationController extends Controller
             );
         }
 
+        foreach ($request->withdrawn() as $document) {
+            $action->handle(
+                $booking,
+                $document,
+                ConsentSource::PaymentLink,
+                ip: $request->ip(),
+                actorLabel: CompleteAccess::ACTOR_LABEL,
+                withdrawn: true,
+            );
+        }
+
         $fresh = $booking->fresh() ?? $booking;
         $this->stitch($fresh, $request->validated('session_id'));
 

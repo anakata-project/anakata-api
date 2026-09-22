@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support\Crm;
 
+use App\Enums\ActivityKind;
 use App\Enums\BehaviouralEventName;
 use App\Enums\BookingStatus;
+use App\Enums\ConsentCapturePoint;
 use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ConsentSource;
 use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
@@ -38,8 +41,13 @@ final class ContactTimeline
             ->unionAll(self::payments($contact->id))
             ->unionAll(self::deliveries($contact->id))
             ->unionAll(self::consents($contact->id))
+            ->unionAll(self::registerConsents($contact->id))
             ->unionAll(self::behavioural($contact->id))
-            ->unionAll(self::merges($contact->id));
+            ->unionAll(self::merges($contact->id))
+            ->unionAll(self::deals($contact->id))
+            ->unionAll(self::tasks($contact->id))
+            ->unionAll(self::activities($contact->id))
+            ->unionAll(self::subjectRequests($contact->id));
 
         /** @var Paginator<int, object> $rows */
         $rows = DB::query()
@@ -136,6 +144,7 @@ final class ContactTimeline
         return DB::table('consents')
             ->join('bookings', 'bookings.id', '=', 'consents.booking_id')
             ->where('bookings.contact_id', $contactId)
+            ->where('consents.document', '!=', ConsentDocument::Marketing->value)
             ->select([
                 DB::raw('consents.accepted_at as `at`'),
                 DB::raw("'consent' as kind"),
@@ -149,6 +158,25 @@ final class ContactTimeline
                 DB::raw('bookings.id as link_id'),
                 DB::raw('COALESCE(bookings.reference, bookings.request_reference) as link_reference'),
                 DB::raw("CONCAT('consent-', consents.id) as sort_key"),
+            ]);
+    }
+
+    private static function registerConsents(int $contactId): Builder
+    {
+        return DB::table('contact_consents')
+            ->where('contact_id', $contactId)
+            ->select([
+                DB::raw('contact_consents.captured_at as `at`'),
+                DB::raw("'register' as kind"),
+                DB::raw("JSON_OBJECT(
+                    'purpose', contact_consents.purpose,
+                    'granted', contact_consents.granted = 1,
+                    'capture_point', contact_consents.capture_point
+                ) as payload"),
+                DB::raw('CAST(NULL AS CHAR) as link_type'),
+                DB::raw('CAST(NULL AS UNSIGNED) as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('register-', contact_consents.id) as sort_key"),
             ]);
     }
 
@@ -175,6 +203,106 @@ final class ContactTimeline
                 DB::raw('CAST(NULL AS UNSIGNED) as link_id'),
                 DB::raw('CAST(NULL AS CHAR) as link_reference'),
                 DB::raw("CONCAT('behavioural-', behavioural_events.id) as sort_key"),
+            ]);
+    }
+
+    private static function tasks(int $contactId): Builder
+    {
+        return DB::table('change_history')
+            ->join('crm_tasks', function ($join): void {
+                $join->on('crm_tasks.id', '=', 'change_history.subject_id')
+                    ->where('change_history.subject_type', '=', 'crm_task');
+            })
+            ->where('crm_tasks.contact_id', $contactId)
+            ->where(function ($query): void {
+                $query->whereIn('change_history.event', ['task.completed', 'task.auto_closed'])
+                    ->orWhere(function ($raised): void {
+                        $raised->where('change_history.event', 'task.raised')
+                            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.source')) = 'SYSTEM'");
+                    });
+            })
+            ->select([
+                DB::raw('change_history.created_at as `at`'),
+                DB::raw("'task' as kind"),
+                DB::raw("JSON_OBJECT(
+                    'event', change_history.event,
+                    'title', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.title')),
+                    'fact', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.fact')),
+                    'outcome', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.outcome'))
+                ) as payload"),
+                DB::raw("'task' as link_type"),
+                DB::raw('crm_tasks.id as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('task-', change_history.id) as sort_key"),
+            ]);
+    }
+
+    private static function activities(int $contactId): Builder
+    {
+        return DB::table('contact_activities')
+            ->where('contact_id', $contactId)
+            ->select([
+                DB::raw('contact_activities.occurred_at as `at`'),
+                DB::raw("'activity' as kind"),
+                DB::raw("JSON_OBJECT(
+                    'kind', contact_activities.kind,
+                    'body', contact_activities.body
+                ) as payload"),
+                DB::raw('CAST(NULL AS CHAR) as link_type'),
+                DB::raw('CAST(NULL AS UNSIGNED) as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('activity-', contact_activities.id) as sort_key"),
+            ]);
+    }
+
+    private static function subjectRequests(int $contactId): Builder
+    {
+        return DB::table('change_history')
+            ->join('subject_requests', function ($join): void {
+                $join->on('subject_requests.id', '=', 'change_history.subject_id')
+                    ->where('change_history.subject_type', '=', 'subject_request');
+            })
+            ->where('subject_requests.contact_id', $contactId)
+            ->whereIn('change_history.event', ['subject_request.received', 'subject_request.closed'])
+            ->select([
+                DB::raw('change_history.created_at as `at`'),
+                DB::raw("'subject_request' as kind"),
+                DB::raw("JSON_OBJECT(
+                    'event', change_history.event,
+                    'type', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.type')),
+                    'outcome', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.outcome'))
+                ) as payload"),
+                DB::raw("'subject_request' as link_type"),
+                DB::raw('subject_requests.id as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('subject-', change_history.id) as sort_key"),
+            ]);
+    }
+
+    private static function deals(int $contactId): Builder
+    {
+        return DB::table('change_history')
+            ->join('deals', function ($join): void {
+                $join->on('deals.id', '=', 'change_history.subject_id')
+                    ->where('change_history.subject_type', '=', 'deal');
+            })
+            ->where('deals.contact_id', $contactId)
+            ->whereIn('change_history.event', ['deal.created', 'deal.bound', 'deal.stage_changed'])
+            ->select([
+                DB::raw('change_history.created_at as `at`'),
+                DB::raw("'deal' as kind"),
+                DB::raw("JSON_OBJECT(
+                    'event', change_history.event,
+                    'from', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.from')),
+                    'to', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.to')),
+                    'title', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.title')),
+                    'reason', change_history.reason,
+                    'reference', JSON_UNQUOTE(JSON_EXTRACT(change_history.after, '$.reference'))
+                ) as payload"),
+                DB::raw("'deal' as link_type"),
+                DB::raw('deals.id as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('deal-', change_history.id) as sort_key"),
             ]);
     }
 
@@ -219,6 +347,11 @@ final class ContactTimeline
             'payment' => self::paymentCopy($payload),
             'delivery' => self::deliveryCopy($payload),
             'consent' => self::consentCopy($payload),
+            'register' => self::registerCopy($payload),
+            'deal' => self::dealCopy($payload),
+            'task' => self::taskCopy($payload),
+            'activity' => self::activityCopy($payload),
+            'subject_request' => self::subjectRequestCopy($payload),
             'behavioural' => self::behaviouralCopy($payload),
             'merge' => self::mergeCopy($payload),
             default => ['Event', ''],
@@ -358,6 +491,114 @@ final class ContactTimeline
         ];
 
         return ['Consent', implode(' · ', array_values(array_filter($parts, fn (string $part): bool => $part !== '')))];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function dealCopy(array $payload): array
+    {
+        $event = is_string($payload['event'] ?? null) ? $payload['event'] : '';
+        $to = is_string($payload['to'] ?? null) ? $payload['to'] : '';
+        $from = is_string($payload['from'] ?? null) ? $payload['from'] : '';
+        $reason = is_string($payload['reason'] ?? null) ? $payload['reason'] : '';
+        $reference = is_string($payload['reference'] ?? null) ? $payload['reference'] : '';
+
+        if ($event === 'deal.created') {
+            $title = is_string($payload['title'] ?? null) ? $payload['title'] : '';
+
+            return ['Deal opened', $title];
+        }
+
+        if ($event === 'deal.bound') {
+            return ['Deal bound', $reference];
+        }
+
+        if ($event === 'deal.stage_changed' && $to === 'LOST') {
+            return ['Marked lost', $reason];
+        }
+
+        $detail = $from !== '' ? $from.' → '.$to : $to;
+
+        return ['Stage changed', $detail];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function taskCopy(array $payload): array
+    {
+        $event = is_string($payload['event'] ?? null) ? $payload['event'] : '';
+        $title = is_string($payload['title'] ?? null) ? $payload['title'] : '';
+        $fact = is_string($payload['fact'] ?? null) ? $payload['fact'] : '';
+        $outcome = is_string($payload['outcome'] ?? null) ? $payload['outcome'] : '';
+
+        return match ($event) {
+            'task.completed' => ['Task completed', $outcome],
+            'task.auto_closed' => ['Task auto-closed', $fact !== '' ? $fact : $outcome],
+            default => ['Task raised', $title],
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function subjectRequestCopy(array $payload): array
+    {
+        $event = is_string($payload['event'] ?? null) ? $payload['event'] : '';
+        $type = is_string($payload['type'] ?? null) ? $payload['type'] : '';
+        $outcome = is_string($payload['outcome'] ?? null) ? $payload['outcome'] : '';
+
+        if ($event === 'subject_request.closed') {
+            return ['Subject request closed', trim($type.' '.$outcome)];
+        }
+
+        return ['Subject request received', $type];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function activityCopy(array $payload): array
+    {
+        $kind = is_string($payload['kind'] ?? null) ? $payload['kind'] : '';
+        $body = is_string($payload['body'] ?? null) ? $payload['body'] : '';
+        $label = ActivityKind::tryFrom($kind)?->label() ?? 'Activity';
+
+        return [$label, $body];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function registerCopy(array $payload): array
+    {
+        $purpose = ConsentPurpose::tryFrom(is_string($payload['purpose'] ?? null) ? $payload['purpose'] : '');
+        $point = ConsentCapturePoint::tryFrom(is_string($payload['capture_point'] ?? null) ? $payload['capture_point'] : '');
+        $granted = (bool) ($payload['granted'] ?? false);
+
+        $pointLabel = $point instanceof ConsentCapturePoint
+            ? $point->label()
+            : (string) ($payload['capture_point'] ?? '');
+        $detail = $granted ? 'granted' : 'withdrawn';
+
+        if ($pointLabel !== '') {
+            $detail .= ' · '.$pointLabel;
+        }
+
+        return [
+            $purpose instanceof ConsentPurpose ? $purpose->label() : 'Consent',
+            $detail,
+        ];
     }
 
     /**

@@ -32,6 +32,7 @@ return new class extends Migration
             'privacy' => 'v2026.1 (pending LEG-002)',
             'insurance' => 'OPS-005 v1',
             'marketing' => 'v1',
+            'analytics' => 'v1 (pending LEG-002)',
         ];
 
         $added = false;

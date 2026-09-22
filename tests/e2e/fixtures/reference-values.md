@@ -98,12 +98,12 @@ Source: `EngineSettingsDocument::initial()` → `fees` (FIN-004).
 
 Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON after Sprint 9). On-screen KPI and chip numbers are ⚠ UNVERIFIED — Pest counts, not a reset screen in this task.
 
-- **71** rows total. ⚠ UNVERIFIED
-- After a fresh seed exactly **25** flagged: 24 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
-- Breakdown: `here` 46 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
-- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 71 / 46 / 15 / 10 / 25. ⚠ UNVERIFIED
+- **72** rows total. ⚠ UNVERIFIED
+- After a fresh seed exactly **26** flagged: 25 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
+- Breakdown: `here` 47 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
+- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 81 / 56 / 15 / 10 / 35. ⚠ UNVERIFIED
 
-Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
+Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. Sprint 10 adds `consent-analytics` (PENDING CLIENT, LEG-002), eight `crm-pipeline-*` rows (PENDING CLIENT, M4) and `privacy-request-sla` (PENDING LEG-002, M7), which is why the counts are 81 / 56 / 15 / 10 / 35. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
 
 Flagged rows:
 
@@ -128,6 +128,7 @@ Flagged rows:
 | consent-privacy | PENDING CLIENT | LEG-002 default |
 | consent-insurance | PENDING CLIENT | OPS-005 default |
 | consent-marketing | PENDING CLIENT | LEG-002 default |
+| consent-analytics | PENDING CLIENT | LEG-002 default |
 | legal-entity-bank-name | PENDING CLIENT | LEG-004 default |
 | legal-entity-account-name | PENDING CLIENT | LEG-004 default |
 | legal-entity-account-number | PENDING CLIENT | LEG-004 default |
@@ -362,7 +363,7 @@ Source: Sprint 8 task 08 browser notes against the running feed. ⚠ UNVERIFIED 
 
 Suites from **USD 13,300**. Default search window NOV 2027—JAN 2028 · 2 adults.
 
-Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Sprint 9 recount is **71 / 46 / 15 / 10 / 25** (see Registry facts).
+Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Sprint 10 recount is **81 / 56 / 15 / 10 / 35** (see Registry facts).
 
 ## CRM contacts (Sprint 9)
 
@@ -388,6 +389,7 @@ Source: `routes/console.php` and `tests/Feature/Crm/SyncJobsTest.php`. On-screen
 |---|---|---|
 | `inventory:release-expired-holds` | every minute (`* * * * *`) | — |
 | `engine:expire-stripe-checkouts` | every minute (`* * * * *`) | — |
+| `anakata:crm-tasks` | every five minutes (`*/5 * * * *`) | — |
 | `anakata:flag-overdue` | daily (`0 0 * * *`) | `Pacific/Galapagos` |
 | `anakata:retention` | daily | `Pacific/Galapagos` |
 | `anakata:events-retention` | daily | `Pacific/Galapagos` |

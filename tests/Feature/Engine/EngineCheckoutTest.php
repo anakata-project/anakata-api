@@ -7,7 +7,9 @@ use App\Enums\CabinCategory;
 use App\Enums\CheckoutPath;
 use App\Enums\CheckoutSessionStatus;
 use App\Enums\ClaimKind;
+use App\Enums\ConsentCapturePoint;
 use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ConsentSource;
 use App\Enums\DepartureStatus;
 use App\Enums\HoldType;
@@ -21,6 +23,7 @@ use App\Models\CabinClaim;
 use App\Models\ChangeHistory;
 use App\Models\CheckoutSession;
 use App\Models\Consent;
+use App\Models\ContactConsent;
 use App\Models\Departure;
 use App\Models\Offer;
 use App\Services\Stripe\FakeStripeGateway;
@@ -345,6 +348,7 @@ test('pay later creates requested bookings, a group, guests, consents and conver
         $documents = Consent::query()->where('booking_id', $booking->id)->pluck('document');
         expect($documents)->toContain(ConsentDocument::Privacy, ConsentDocument::Insurance);
         expect($documents)->not->toContain(ConsentDocument::Terms, ConsentDocument::Marketing);
+        expect(ContactConsent::query()->where('contact_id', $booking->contact_id)->where('purpose', ConsentPurpose::Marketing)->count())->toBe(0);
         expect(Consent::query()->where('booking_id', $booking->id)->value('source'))->toBe(ConsentSource::Engine);
         expect(Consent::query()->where('booking_id', $booking->id)->value('ip'))->toBe('127.0.0.1');
     }
@@ -369,8 +373,17 @@ test('pay later records marketing only when it is explicitly true', function ():
     )->assertOk();
 
     $booking = Booking::query()->firstOrFail();
-    $documents = Consent::query()->where('booking_id', $booking->id)->pluck('document');
-    expect($documents)->toContain(ConsentDocument::Marketing);
+    $documents = Consent::query()->where('booking_id', $booking->id)->where('document', ConsentDocument::Marketing)->get();
+    expect($documents)->toHaveCount(1);
+
+    $register = ContactConsent::query()
+        ->where('contact_id', $booking->contact_id)
+        ->where('purpose', ConsentPurpose::Marketing)
+        ->get();
+    expect($register)->toHaveCount(1);
+    expect($register->first()?->granted)->toBeTrue();
+    expect($register->first()?->capture_point)->toBe(ConsentCapturePoint::EngineForm);
+    expect($register->first()?->source_consent_id)->toBe($documents->first()?->id);
 });
 
 test('pay deposit requires the remaining declarations', function (): void {

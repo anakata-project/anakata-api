@@ -24,6 +24,8 @@ class RecordCompleteDeclarationsRequest extends FormRequest
         return [
             'documents' => ['required', 'array', 'min:1'],
             'documents.*' => ['required', 'string', Rule::enum(ConsentDocument::class), 'distinct'],
+            'withdrawn' => ['sometimes', 'array'],
+            'withdrawn.*' => ['required', 'string', Rule::enum(ConsentDocument::class), 'distinct'],
             'session_id' => EngineSessionId::rules(),
         ];
     }
@@ -34,6 +36,23 @@ class RecordCompleteDeclarationsRequest extends FormRequest
     public function documents(): array
     {
         $values = $this->validated('documents');
+
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (mixed $value): ConsentDocument => ConsentDocument::from((string) $value),
+            $values,
+        ));
+    }
+
+    /**
+     * @return list<ConsentDocument>
+     */
+    public function withdrawn(): array
+    {
+        $values = $this->validated('withdrawn');
 
         if (! is_array($values)) {
             return [];

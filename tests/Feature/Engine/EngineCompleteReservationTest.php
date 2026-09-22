@@ -6,7 +6,9 @@ use App\Actions\Complete\IssueCompleteAccessToken;
 use App\Actions\Consents\RecordConsent;
 use App\Enums\BookingAccessTokenPurpose;
 use App\Enums\BookingStatus;
+use App\Enums\ConsentCapturePoint;
 use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ConsentSource;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
@@ -14,6 +16,7 @@ use App\Models\Booking;
 use App\Models\BookingAccessToken;
 use App\Models\ChangeHistory;
 use App\Models\Consent;
+use App\Models\ContactConsent;
 use App\Models\Group;
 use App\Models\Guest;
 use App\Models\PaymentLink;
@@ -345,4 +348,33 @@ test('complete endpoints are rate limited per token', function (): void {
     }
 
     $this->getJson('/api/engine/complete/'.$token)->assertStatus(429);
+});
+
+test('a complete-page marketing withdrawal is granted false in the log and the register', function (): void {
+    $booking = completeBooking();
+    $token = completeTokenFor($booking);
+
+    $this->postJson('/api/engine/complete/'.$token.'/declarations', [
+        'documents' => [ConsentDocument::Terms->value],
+        'withdrawn' => [ConsentDocument::Marketing->value],
+    ])->assertOk();
+
+    $log = Consent::query()
+        ->where('booking_id', $booking->id)
+        ->where('document', ConsentDocument::Marketing)
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log?->withdrawn)->toBeTrue();
+    expect($log?->source)->toBe(ConsentSource::PaymentLink);
+
+    $register = ContactConsent::query()
+        ->where('contact_id', $booking->contact_id)
+        ->where('purpose', ConsentPurpose::Marketing)
+        ->get();
+
+    expect($register)->toHaveCount(1);
+    expect($register->first()?->granted)->toBeFalse();
+    expect($register->first()?->capture_point)->toBe(ConsentCapturePoint::EngineForm);
+    expect($register->first()?->source_consent_id)->toBe($log?->id);
 });

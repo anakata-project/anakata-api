@@ -6,7 +6,7 @@ namespace App\Support\Crm;
 
 use App\Enums\AgencyStatus;
 use App\Enums\BookingStatus;
-use App\Enums\ConsentDocument;
+use App\Enums\ConsentPurpose;
 use App\Enums\ContactLifecycle;
 use App\Enums\ContactSegment;
 use App\Enums\ContactType;
@@ -148,13 +148,11 @@ final class ContactDerived
     public static function marketingConsentSql(): string
     {
         return 'COALESCE((
-            SELECT CASE WHEN consents.withdrawn = 0 THEN 1 ELSE 0 END
-            FROM consents
-            INNER JOIN bookings ON bookings.id = consents.booking_id
-            WHERE bookings.contact_id = contacts.id
-              AND bookings.deleted_at IS NULL
-              AND consents.document = \''.ConsentDocument::Marketing->value.'\'
-            ORDER BY consents.id DESC
+            SELECT CASE WHEN contact_consents.granted = 1 THEN 1 ELSE 0 END
+            FROM contact_consents
+            WHERE contact_consents.contact_id = contacts.id
+              AND contact_consents.purpose = \''.ConsentPurpose::Marketing->value.'\'
+            ORDER BY contact_consents.captured_at DESC, contact_consents.id DESC
             LIMIT 1
         ), 0)';
     }

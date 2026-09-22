@@ -14,6 +14,7 @@ final readonly class ConsentVersions
         public string $privacy,
         public string $insurance,
         public string $marketing,
+        public string $analytics,
     ) {}
 
     public function for(ConsentDocument $document): string
@@ -28,7 +29,7 @@ final readonly class ConsentVersions
     }
 
     /**
-     * @return array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string}
+     * @return array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string, analytics: string}
      */
     public function toArray(): array
     {
@@ -38,6 +39,7 @@ final readonly class ConsentVersions
             'privacy' => $this->privacy,
             'insurance' => $this->insurance,
             'marketing' => $this->marketing,
+            'analytics' => $this->analytics,
         ];
     }
 }

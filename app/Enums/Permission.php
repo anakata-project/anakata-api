@@ -47,6 +47,8 @@ enum Permission: string
     case PipelineMoveStage = 'pipeline.move_stage';
     case ContactsManage = 'contacts.manage';
     case ContactsMerge = 'contacts.merge';
+    case ConsentsRecord = 'consents.record';
+    case CampaignsManage = 'campaigns.manage';
     case SyncRetry = 'sync.retry';
 
     case PaymentsRecord = 'payments.record';
@@ -56,6 +58,8 @@ enum Permission: string
     case RefundsApprove = 'refunds.approve';
     case CommissionsOverrideCap = 'commissions.override_cap';
     case BookingsOverdueDecision = 'bookings.overdue_decision';
+
+    case PrivacyManage = 'privacy.manage';
 
     public function label(): string
     {
@@ -88,6 +92,8 @@ enum Permission: string
             self::PipelineMoveStage => 'Move lead stage',
             self::ContactsManage => 'Manage contacts',
             self::ContactsMerge => 'Merge contacts',
+            self::ConsentsRecord => 'Record contact consent',
+            self::CampaignsManage => 'Manage campaigns',
             self::SyncRetry => 'Retry failed sync work',
             self::PaymentsRecord => 'Record a payment',
             self::PaymentsMarkWireReceived => 'Mark wire received',
@@ -95,6 +101,7 @@ enum Permission: string
             self::RefundsApprove => 'Approve refunds',
             self::CommissionsOverrideCap => 'Approve commission above cap',
             self::BookingsOverdueDecision => 'OPS-007 overdue decisions',
+            self::PrivacyManage => 'Manage subject requests',
         };
     }
 
@@ -129,6 +136,8 @@ enum Permission: string
             self::PipelineMoveStage,
             self::ContactsManage,
             self::ContactsMerge,
+            self::ConsentsRecord,
+            self::CampaignsManage,
             self::SyncRetry => 'crm',
             self::PaymentsRecord,
             self::PaymentsMarkWireReceived,
@@ -136,6 +145,7 @@ enum Permission: string
             self::RefundsApprove,
             self::CommissionsOverrideCap,
             self::BookingsOverdueDecision => 'director',
+            self::PrivacyManage => 'admin',
         };
     }
 

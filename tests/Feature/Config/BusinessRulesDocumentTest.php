@@ -106,6 +106,7 @@ test('fromArray fills missing consent versions as empty strings', function (): v
 
     expect($lenient->consentVersions->terms)->toBe('');
     expect($lenient->consentVersions->marketing)->toBe('');
+    expect($lenient->consentVersions->analytics)->toBe('');
 });
 
 test('fromArray fills missing legal_entity bank fields as TBD', function (): void {

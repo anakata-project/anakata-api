@@ -21,6 +21,10 @@ final class ContactReferences
             ['table' => 'waitlist_entries', 'column' => 'contact_id'],
             ['table' => 'charter_enquiries', 'column' => 'contact_id'],
             ['table' => 'behavioural_events', 'column' => 'contact_id'],
+            ['table' => 'contact_consents', 'column' => 'contact_id'],
+            ['table' => 'deals', 'column' => 'contact_id'],
+            ['table' => 'crm_tasks', 'column' => 'contact_id'],
+            ['table' => 'contact_activities', 'column' => 'contact_id'],
         ];
     }
 

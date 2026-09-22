@@ -122,7 +122,7 @@ test('merge repoints every contact-bearing table, fills empty fields and keeps t
     expect(ChangeHistory::query()->where('event', 'contact.merged')->count())->toBe(2);
 
     $tables = array_column(ContactReferences::tables(), 'table');
-    expect($tables)->toBe(['bookings', 'groups', 'waitlist_entries', 'charter_enquiries', 'behavioural_events']);
+    expect($tables)->toBe(['bookings', 'groups', 'waitlist_entries', 'charter_enquiries', 'behavioural_events', 'contact_consents', 'deals', 'crm_tasks', 'contact_activities']);
 });
 
 test('merge moves behavioural events and unmerge restores them', function (): void {
