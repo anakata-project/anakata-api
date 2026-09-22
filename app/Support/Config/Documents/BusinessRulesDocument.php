@@ -73,6 +73,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'manifests' => [
                 'dpng_fit_days' => 15,
                 'dpng_charter_days' => 30,
+                'captain_days' => 7,
+                'chase_days_before_due' => 10,
             ],
             'alerts' => [
                 'low_occupancy_pct' => 40,
@@ -224,6 +226,8 @@ final class BusinessRulesDocument extends ConfigDocument
             new ManifestsRules(
                 (int) ($manifests['dpng_fit_days'] ?? 0),
                 (int) ($manifests['dpng_charter_days'] ?? 0),
+                (int) ($manifests['captain_days'] ?? 0),
+                (int) ($manifests['chase_days_before_due'] ?? 0),
             ),
             new AlertsRules(
                 (int) ($alerts['low_occupancy_pct'] ?? 0),
@@ -290,7 +294,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     discounts: array{online_deposit_discount_pct: int, max_total_discount_pct: int|null},
      *     holds: array{web_minutes: int, web_extension_minutes: int, near_term_business_hours: int, long_lead_business_days: int, business_days: list<int>, business_day_start: string, business_day_end: string, holidays: list<string>, near_term_max_days: int},
      *     sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
-     *     manifests: array{dpng_fit_days: int, dpng_charter_days: int},
+     *     manifests: array{dpng_fit_days: int, dpng_charter_days: int, captain_days: int, chase_days_before_due: int},
      *     alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
      *     retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int, behavioural_raw_months: int, behavioural_unstitched_days: int},
      *     legal: array{consent_versions: array{terms: string, cancellation: string, privacy: string, insurance: string, marketing: string, analytics: string}},
@@ -367,6 +371,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'manifests' => ['required', 'array'],
             'manifests.dpng_fit_days' => ['required', 'integer', 'min:1', 'max:90'],
             'manifests.dpng_charter_days' => ['required', 'integer', 'min:1', 'max:90'],
+            'manifests.captain_days' => ['required', 'integer', 'min:1', 'max:90'],
+            'manifests.chase_days_before_due' => ['required', 'integer', 'min:1', 'max:90'],
             'alerts' => ['required', 'array'],
             'alerts.low_occupancy_pct' => ['required', 'integer', 'min:1', 'max:100'],
             'alerts.low_occupancy_days_before' => ['required', 'integer', 'min:1', 'max:365'],
@@ -449,6 +455,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'sla.agency_approval_business_days' => '§5.5 · Agency approval SLA',
             'manifests.dpng_fit_days' => 'OPS-013 · DPNG manifest deadline — FIT / charter',
             'manifests.dpng_charter_days' => 'OPS-013 · DPNG manifest deadline — FIT / charter',
+            'manifests.captain_days' => 'N4 · Captain\'s manifest deadline',
+            'manifests.chase_days_before_due' => 'N5 · Passenger-data chaser — days before the DPNG due date',
             'alerts.low_occupancy_pct' => '§10 · Low-occupancy alert',
             'alerts.low_occupancy_days_before' => '§10 · Low-occupancy alert',
             'retention.passport_months_after_cruise' => '§6.4 · Passport retention',
@@ -579,6 +587,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'sla.refund_business_days' => '15 business days (confirmed 12 Sep 2026)',
             'sla.agency_approval_business_days' => '2 business days',
             'manifests.dpng_fit_days', 'manifests.dpng_charter_days' => '15 / 30 days',
+            'manifests.captain_days' => '7 days (N4 / prototype T−7)',
+            'manifests.chase_days_before_due' => '10 days (PENDING CLIENT, N5)',
             'alerts.low_occupancy_pct', 'alerts.low_occupancy_days_before' => '40% at 90 days',
             'retention.passport_months_after_cruise' => '24 months',
             'retention.medical_days_after_cruise' => '90 days',

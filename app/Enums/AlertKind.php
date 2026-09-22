@@ -15,6 +15,7 @@ enum AlertKind: string
     case LedgerDrift = 'LEDGER_DRIFT';
     case CommissionLeakage = 'COMMISSION_LEAKAGE';
     case LowOccupancy = 'LOW_OCCUPANCY';
+    case ManifestDataOverdue = 'MANIFEST_DATA_OVERDUE';
 
     public function label(): string
     {
@@ -28,6 +29,7 @@ enum AlertKind: string
             self::LedgerDrift => 'Ledger drift',
             self::CommissionLeakage => 'Commission leakage',
             self::LowOccupancy => 'Low occupancy',
+            self::ManifestDataOverdue => 'Manifest data overdue',
         };
     }
 }

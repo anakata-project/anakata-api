@@ -81,4 +81,9 @@ final class AlertKeys
     {
         return 'occupancy:'.$departureId;
     }
+
+    public static function manifestData(int $departureId): string
+    {
+        return 'manifest-data:'.$departureId;
+    }
 }

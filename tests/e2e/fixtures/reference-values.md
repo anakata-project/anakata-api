@@ -62,6 +62,8 @@ Source: `BusinessRulesDocument::initial()`.
 | sla.agency_approval_business_days | 2 |
 | manifests.dpng_fit_days | 15 |
 | manifests.dpng_charter_days | 30 |
+| manifests.captain_days | 7 |
+| manifests.chase_days_before_due | 10 |
 | alerts.low_occupancy_pct | 40 |
 | alerts.low_occupancy_days_before | 90 |
 | retention.passport_months_after_cruise | 24 |
@@ -101,9 +103,9 @@ Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTes
 - **81** rows total. ⚠ UNVERIFIED — `BusinessRulesEndpointsTest` (`registry` count 81), not a reset screen.
 - After a fresh seed exactly **35** flagged (`counts.differs_or_flagged`). ⚠ UNVERIFIED — same Pest assertion.
 - Breakdown: `here` 56 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED — same Pest assertion.
-- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 81 / 56 / 15 / 10 / 35. ⚠ UNVERIFIED
+- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 83 / 58 / 15 / 10 / 36. ⚠ UNVERIFIED
 
-Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. Sprint 10 adds `consent-analytics` (PENDING CLIENT, LEG-002), eight `crm-pipeline-*` rows (PENDING CLIENT, M4) and `privacy-request-sla` (PENDING LEG-002, M7), which is why the counts are 81 / 56 / 15 / 10 / 35. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
+Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. Sprint 10 adds `consent-analytics` (PENDING CLIENT, LEG-002), eight `crm-pipeline-*` rows (PENDING CLIENT, M4) and `privacy-request-sla` (PENDING LEG-002, M7). Sprint 11 adds `captain-manifest` (CONFIRMED, N4) and `manifest-chase` (PENDING CLIENT, N5), which is why the counts are 83 / 58 / 15 / 10 / 36. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
 
 Flagged rows:
 
@@ -372,7 +374,7 @@ Source: Sprint 8 task 08 browser notes against the running feed. ⚠ UNVERIFIED 
 
 Suites from **USD 13,300**. Default search window NOV 2027—JAN 2028 · 2 adults.
 
-Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Sprint 10 recount is **81 / 56 / 15 / 10 / 35** (see Registry facts).
+Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Sprint 11 recount is **83 / 58 / 15 / 10 / 36** (`captain-manifest` confirmed, `manifest-chase` pending client).
 
 ## CRM contacts (Sprint 9)
 
@@ -407,6 +409,7 @@ Source: `routes/console.php` and `tests/Feature/Crm/SyncJobsTest.php`. On-screen
 | `anakata:voyage-status` | daily at 00:15 (`15 0 * * *`) | `Pacific/Galapagos` |
 | `anakata:ledger-check` | nightly 02:00 (`0 2 * * *`) | `Pacific/Galapagos` |
 | `anakata:commission-scan` | nightly 02:30 (`30 2 * * *`) | `Pacific/Galapagos` |
+| `anakata:manifests-due` | daily at 06:00 (`0 6 * * *`) | `Pacific/Galapagos` |
 | `anakata:occupancy-check` | daily at 07:00 (`0 7 * * *`) | `Pacific/Galapagos` |
 | `anakata:document-check` | hourly (`0 * * * *`) | `Pacific/Galapagos` |
 | `telescope:prune --hours=48` | daily | — (only when Telescope is installed) |

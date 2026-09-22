@@ -204,3 +204,109 @@ Voyage dates move through TransitionBooking, and ledger, commission, occupancy, 
 EOF
 )"
 ```
+
+## Task 03 · Manifests
+
+DPNG and captain's manifests for one departure. Versions are immutable. The daily job stops at the departure date. Guest preferences, the panel table, and MAN-01–03 stay out.
+
+### Rules
+`manifests.captain_days` is **7**, status **CONFIRMED** (N4). `manifests.chase_days_before_due` is **10**, status **PENDING CLIENT** (N5). That is the only new flagged row. Registry rows sit beside `dpng-manifest`: `captain-manifest` and `manifest-chase`.
+
+The DML migration publishes through `ConfigPublisher` as System. Approval reference: `Sprint 11: manifests.captain_days added (default 7, source N4); manifests.chase_days_before_due added (default 10, source N5, PENDING CLIENT)`.
+
+Counts move from 81 / 56 / 15 / 10 / 35 to **83 / 58 / 15 / 10 / 36**.
+
+`anakata:config-verify` before the migration named the two missing paths on `business_rules` v2. After migrate, `business_rules` v3 is valid.
+
+Due dates are Galápagos calendar dates. DPNG is the departure date minus `dpng_charter_days` when any counted booking is a charter, otherwise minus `dpng_fit_days`. Captain is the departure date minus `captain_days`. Chase is the DPNG due date minus `chase_days_before_due`.
+
+### Who is on a manifest
+`ManifestRoster::passengers()` is the one query. Guests of bookings on that departure in `CONFIRMED`, `ON_HOLD_AGENCY`, `FULLY_PAID`, `ON_BOARD`, `COMPLETED`. Ordered by cabin `sort` (a charter with no cabin last), then `guests.position`. Completeness is `Guest::isComplete()` only.
+
+List status is live, not the stored version. Everyone complete is `READY`. DPNG due date on or before today with anyone incomplete is `OVERDUE DATA`, including after the yacht has sailed. Otherwise `{n} PASSENGER` or `{n} PASSENGERS PENDING`.
+
+### Schema
+Table `manifests`. Unique `(departure_id, kind, version)`. Morph alias `manifest`. Files live on a private disk `manifests` (`storage/app/manifests`, `throw => true`), not the financial `documents` disk.
+
+Delete is refused. Update is refused unless the only changes are `purged_at` (null to a timestamp) and the three paths (value to null), plus `updated_at` / `updated_by`. The model throws the same way before the trigger.
+
+### Versions
+`snapshot_hash` is sha256 of that kind's row payload. A dietary or medical change changes the captain hash only. A passport change changes both.
+
+`POST` with no prior version is `REQUESTED`. A different hash is `PASSENGER_CHANGE`. The same hash is 200, `created: false`, message `This manifest is unchanged.`, and no new row. An empty passenger set is 422. History `manifest.generated` records counts and reason only. The actor is the user, or `System · manifests` for the job. The job never writes `PASSENGER_CHANGE`.
+
+`FIRST` is written only while Galápagos today is on or after that kind's due date and today is on or before the departure date, and only when that kind has no version. A missed day still catches up once, through the departure date inclusive. The day after departure creates nothing, so the first run after deploy does not backfill long-sailed seed departures. Manual `POST` stays allowed after sailing.
+
+### Sailing cutoff
+`anakata:manifests-due` is `dailyAt('06:00')`, `Pacific/Galapagos`, `withoutOverlapping`, `onOneServer`, `RecordScheduledRuns`. It is not a doc 07 catalogue row. It shows on Sync because that list is every scheduled command (`0 6 * * *` in `SyncJobsTest`, `reference-values.md`, and CRM-09).
+
+The alert `MANIFEST_DATA_OVERDUE` is WARN, audience `guests.view_sensitive`, section `rms`, base key `manifest-data:{departure}`. It is raised only while today is on or after the DPNG due date, today is before the departure date, and a counted guest is incomplete. WARN does not email. On the departure date, and on any later run, an open alert resolves with `Departure sailed`. It also resolves earlier with `Passenger data is complete`. A departure-only alert points at `/rms/operations/documents`. The kinds list goes from 9 to 10.
+
+### Columns
+DPNG: `#`, Surname, Given names, Nationality (`Countries::name`), Passport, Expiry, DOB, Age (`Age::at` on the departure date), Cabin (`cabins.label`, or `Full yacht` when the booking is a charter with no cabin). The PDF header says Age. CSV and XLSX say **Age at departure**. Cell text is the same in all three: a missing passport is `MISSING`; every other missing value is `—`. Incomplete PDF rows use the prototype miss styling. CSV is UTF-8. XLSX is OpenSpout 4.32 (`openspout/openspout`). No PhpSpreadsheet.
+
+Captain: Cabin, Passenger (name, `(lead)`, booking reference), Nat. (code), Age, Passport, Emergency contact, Dietary, Medical / accessibility. `CaptainParticulars::for(Guest)` reads `dietary_note`, and `medical_note` · `accessibility_note`. Emergency is `—` until task 04. Task 04 is the only later edit of that method. The stored PDF always contains the health fields. The word “restricted” is not written into the file.
+
+### Chaser
+Same command, only while today is on or after the chase date and today is before the departure date. Each counted booking that still has an incomplete guest, once. Recipient is the summary rule: lead guest with an email, otherwise the group coordinator or client of record. The link comes from `IssueCompleteAccessToken`. `DeliveryKind::DataChaser` is `DATA_CHASER`, attaches no PDF, and is not a document kind. Idempotency key is exactly `chase:{booking}:{departure}`, including when the delivery is blocked, so a later run does not send. Not a marketing message. No manifest attachment. `DATA_CHASER` is not retried as a document.
+
+### Endpoints
+All under `/api/rms`, `panel.rms`. The list and the version list are counts and metadata for every RMS user. Generating and downloading need `guests.view_sensitive` (403 without it).
+
+- `GET /api/rms/manifests?from=&to=` — departures in range that have counted guests. No guest fields.
+- `GET /api/rms/departures/{departure}/manifests` — versions.
+- `POST /api/rms/departures/{departure}/manifests/{kind}` — allowed after sailing.
+- `GET /api/rms/departures/{departure}/manifests/{manifest}/file/{format}` — `pdf`, and for DPNG also `csv` and `xlsx`. Captain plus csv or xlsx is 404. A purged file is 404. Each download writes `manifest.downloaded`.
+
+### Retention
+Inside `anakata:retention`, after the guest pass. Every unpurged version of that departure and kind, whoever is in the file. CAPTAIN (dietary, medical, accessibility, plus passport) at the return date plus `retention.medical_days_after_cruise` (90). DPNG (passports, no health notes) at the return date plus `retention.passport_months_after_cruise` (24 months). The same `RetentionWindow::elapsed()` rule as I7: the day after the end date. Files are deleted, paths nulled, `purged_at` set. Rows stay. Dry run writes nothing and reports file counts per kind.
+
+### CRM
+`App\Http\Controllers\Crm` must not use `App\Actions\Manifests` or `App\Support\Manifests`. No `/api/crm` route contains `manifest`.
+
+`composer check` inside Docker: 1158 tests passed, Pint passed, Larastan passed.
+
+### Notes for later
+Task 04 fills emergency contact, and dietary or medical preferences, only inside `CaptainParticulars::for()`. A change there changes the captain hash.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add app/Actions/Crm/RetryFailedDelivery.php app/Actions/Manifests \
+  app/Console/Commands/ManifestsDueCommand.php app/Console/Commands/RetentionCommand.php \
+  app/Enums/AlertKind.php app/Enums/DeliveryKind.php app/Enums/ManifestFormat.php \
+  app/Enums/ManifestKind.php app/Enums/ManifestReason.php \
+  app/Http/Controllers/Rms/ManifestController.php app/Http/Requests/Rms/ManifestIndexRequest.php \
+  app/Http/Resources/Rms/BusinessRulesCurrentResource.php \
+  app/Http/Resources/Rms/ConfigVersionDetailResource.php \
+  app/Http/Resources/Rms/ManifestDepartureResource.php \
+  app/Http/Resources/Rms/ManifestVersionResource.php \
+  app/Mail/Documents/DataChaserMail.php app/Mail/Documents/DeliveryMailFactory.php \
+  app/Mail/Documents/DocumentMail.php app/Models/Alert.php app/Models/Manifest.php \
+  app/Policies/ManifestPolicy.php app/Providers/AppServiceProvider.php \
+  app/Support/Alerts/AlertKeys.php app/Support/Alerts/AlertRegistry.php \
+  app/Support/Alerts/AlertSubject.php app/Support/BusinessRules/Registry.php \
+  app/Support/Config/Documents/BusinessRulesDocument.php \
+  app/Support/Config/Documents/ManifestsRules.php \
+  app/Support/Documents/DeliverySubject.php app/Support/Documents/Recipients.php \
+  app/Support/Manifests app/Support/Operations/ManifestsDue.php \
+  app/Support/Schedule/AnakataSchedule.php composer.json composer.lock \
+  config/filesystems.php routes/api/rms.php \
+  database/migrations/2026_09_22_220001_add_manifest_deadlines_to_business_rules.php \
+  database/migrations/2026_09_22_220002_create_manifests_table.php \
+  resources/views/mail/documents/data-chaser.blade.php resources/views/manifests \
+  tests/Arch/ArchTest.php tests/Feature/Alerts/AlertsTest.php \
+  tests/Feature/Config/BusinessRulesDocumentTest.php \
+  tests/Feature/Config/BusinessRulesEndpointsTest.php tests/Feature/Crm/SyncJobsTest.php \
+  tests/Feature/Operations/ManifestsTest.php \
+  tests/e2e/fixtures/reference-values.md tests/e2e/scenarios/crm/CRM-09-sync-jobs-retry.md \
+  docs/sprints/sprint-11/REPORT.md
+git commit -m "$(cat <<'EOF'
+Issue immutable DPNG and captain manifests and chase missing passenger data.
+
+The daily job stops at the departure date, and captain files are purged on the medical window while DPNG files wait for the passport window.
+EOF
+)"
+```

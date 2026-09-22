@@ -61,6 +61,7 @@ use App\Models\Group;
 use App\Models\Guest;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
+use App\Models\Manifest;
 use App\Models\Offer;
 use App\Models\Payment;
 use App\Models\PaymentLink;
@@ -235,6 +236,7 @@ class AppServiceProvider extends ServiceProvider
             'checkout_session' => CheckoutSession::class,
             'charter_enquiry' => CharterEnquiry::class,
             'document' => Document::class,
+            'manifest' => Manifest::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
             'booking_request' => BookingRequest::class,

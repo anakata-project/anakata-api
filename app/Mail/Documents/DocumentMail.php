@@ -15,6 +15,7 @@ use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use InvalidArgumentException;
 
 final class DocumentMail extends Mailable
 {
@@ -46,6 +47,7 @@ final class DocumentMail extends Mailable
             DeliveryKind::Voucher => 'mail.documents.voucher',
             DeliveryKind::Pretrip => 'mail.documents.pretrip',
             DeliveryKind::WireInstructions => 'mail.documents.wire-instructions',
+            DeliveryKind::DataChaser => throw new InvalidArgumentException('A data chaser is not a document.'),
             default => 'mail.documents.invoice',
         };
 

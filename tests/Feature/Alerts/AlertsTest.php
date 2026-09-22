@@ -575,11 +575,11 @@ test('meta counts ignore section and equal the sum of the open section lists', f
 test('kinds lists the registry and a guest response id needs no foreign key', function (): void {
     $this->actingAs(adminUser())->getJson('/api/alerts/kinds')
         ->assertOk()
-        ->assertJsonCount(9, 'data')
+        ->assertJsonCount(10, 'data')
         ->assertJsonPath('data.0.emails', false)
         ->assertJsonPath('data.0.section', 'rms');
 
-    expect(AlertRegistry::all())->toHaveCount(9);
+    expect(AlertRegistry::all())->toHaveCount(10);
 
     $alert = Alert::factory()->create(['guest_response_id' => 424242]);
     expect($alert->fresh()?->guest_response_id)->toBe(424242);

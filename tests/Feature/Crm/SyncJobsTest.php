@@ -55,6 +55,7 @@ test('doc 07 jobs are catalogued and the new commands keep galapagos time and a 
         'anakata:ledger-check' => '0 2 * * *',
         'anakata:commission-scan' => '30 2 * * *',
         'anakata:occupancy-check' => '0 7 * * *',
+        'anakata:manifests-due' => '0 6 * * *',
         'anakata:document-check' => '0 * * * *',
     ];
 

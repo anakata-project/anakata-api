@@ -47,6 +47,10 @@ final class RetryFailedDelivery extends Action
             return $this->paymentRequests->handle($booking, DeliveryKind::Reminder, reminderDays: 1, actor: $actor, resend: true);
         }
 
+        if ($delivery->kind === DeliveryKind::DataChaser) {
+            throw new HttpException(422, 'That delivery has no document to resend.');
+        }
+
         $document = $delivery->document;
 
         if (! $document instanceof Document) {

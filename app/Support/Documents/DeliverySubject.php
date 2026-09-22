@@ -24,6 +24,7 @@ final class DeliverySubject
             DeliveryKind::Pretrip => 'Your expedition itinerary — '.$ref,
             DeliveryKind::WireInstructions => 'Wire transfer instructions — '.$ref,
             DeliveryKind::Reminder, DeliveryKind::PaymentLink => $kind->label().' — '.$ref,
+            DeliveryKind::DataChaser => 'Passenger details needed — '.$ref,
         };
     }
 

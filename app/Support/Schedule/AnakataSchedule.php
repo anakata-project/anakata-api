@@ -96,6 +96,15 @@ final class AnakataSchedule
         );
 
         RecordScheduledRuns::attach(
+            $schedule->command('anakata:manifests-due')
+                ->dailyAt('06:00')
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Issue due manifests and chase missing passenger data'),
+        );
+
+        RecordScheduledRuns::attach(
             $schedule->command('anakata:occupancy-check')
                 ->dailyAt('07:00')
                 ->timezone(BusinessTime::zone())

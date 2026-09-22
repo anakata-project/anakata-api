@@ -35,6 +35,11 @@ final class DeliveryMailFactory
                 self::paymentLink($delivery),
                 self::completePageUrl($delivery->booking),
             ),
+            DeliveryKind::DataChaser => new DataChaserMail(
+                $delivery,
+                $delivery->booking,
+                self::completePageUrl($delivery->booking),
+            ),
             default => self::documentMail($delivery, $pdfBytes),
         };
     }

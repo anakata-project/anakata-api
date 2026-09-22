@@ -89,6 +89,14 @@ final class AlertRegistry
                 'The sold percent is no longer below the threshold, or the departure has sailed.',
                 'rms',
             ),
+            new AlertKindDefinition(
+                AlertKind::ManifestDataOverdue,
+                AlertSeverity::Warn,
+                [Permission::GuestsViewSensitive],
+                'A departure is past its DPNG due date with incomplete passenger data, and has not yet sailed.',
+                'The passenger data is complete, or the departure has sailed.',
+                'rms',
+            ),
         ];
     }
 

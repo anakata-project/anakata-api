@@ -27,6 +27,7 @@ use App\Http\Controllers\Rms\GuestController;
 use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
+use App\Http\Controllers\Rms\ManifestController;
 use App\Http\Controllers\Rms\OfferController;
 use App\Http\Controllers\Rms\PaymentController;
 use App\Http\Controllers\Rms\PaymentLinkController;
@@ -109,6 +110,10 @@ Route::get('departures/{departure}', [DepartureController::class, 'show'])->wher
 Route::patch('departures/{departure}', [DepartureController::class, 'update'])->whereNumber('departure');
 Route::delete('departures/{departure}', [DepartureController::class, 'destroy'])->whereNumber('departure');
 Route::get('departures/{departure}/history', [DepartureController::class, 'history'])->whereNumber('departure');
+Route::get('manifests', [ManifestController::class, 'index']);
+Route::get('departures/{departure}/manifests', [ManifestController::class, 'versions'])->whereNumber('departure');
+Route::post('departures/{departure}/manifests/{kind}', [ManifestController::class, 'store'])->whereNumber('departure')->whereIn('kind', ['DPNG', 'CAPTAIN']);
+Route::get('departures/{departure}/manifests/{manifest}/file/{format}', [ManifestController::class, 'file'])->whereNumber(['departure', 'manifest'])->whereIn('format', ['pdf', 'csv', 'xlsx']);
 
 Route::get('payments', [PaymentController::class, 'index']);
 Route::get('payments/options', [PaymentController::class, 'options']);

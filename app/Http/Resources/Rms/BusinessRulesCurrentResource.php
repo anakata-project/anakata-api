@@ -20,7 +20,7 @@ class BusinessRulesCurrentResource extends ConfigCurrentResource
      *         discounts: array{online_deposit_discount_pct: int, max_total_discount_pct: int|null},
      *         holds: array{web_minutes: int, web_extension_minutes: int, near_term_business_hours: int, long_lead_business_days: int, business_days: list<int>, business_day_start: string, business_day_end: string, holidays: list<string>, near_term_max_days: int},
      *         sla: array{response_hours: int, refund_business_days: int, agency_approval_business_days: int},
-     *         manifests: array{dpng_fit_days: int, dpng_charter_days: int},
+     *         manifests: array{dpng_fit_days: int, dpng_charter_days: int, captain_days: int, chase_days_before_due: int},
      *         alerts: array{low_occupancy_pct: int, low_occupancy_days_before: int},
      *         retention: array{passport_months_after_cruise: int, medical_days_after_cruise: int},
      *         cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}

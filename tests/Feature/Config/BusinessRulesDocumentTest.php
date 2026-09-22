@@ -39,6 +39,8 @@ test('rules reject ranges, default above cap, reminder order and band shape', fu
         'manifests' => [
             'dpng_fit_days' => 0,
             'dpng_charter_days' => 91,
+            'captain_days' => 0,
+            'chase_days_before_due' => 91,
         ],
         'alerts' => [
             'low_occupancy_pct' => 0,
@@ -73,6 +75,8 @@ test('rules reject ranges, default above cap, reminder order and band shape', fu
     expect($errors->has('sla.agency_approval_business_days'))->toBeTrue();
     expect($errors->has('manifests.dpng_fit_days'))->toBeTrue();
     expect($errors->has('manifests.dpng_charter_days'))->toBeTrue();
+    expect($errors->has('manifests.captain_days'))->toBeTrue();
+    expect($errors->has('manifests.chase_days_before_due'))->toBeTrue();
     expect($errors->has('alerts.low_occupancy_pct'))->toBeTrue();
     expect($errors->has('alerts.low_occupancy_days_before'))->toBeTrue();
     expect($errors->has('retention.passport_months_after_cruise'))->toBeTrue();

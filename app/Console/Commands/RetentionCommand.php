@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\ManifestKind;
 use App\Models\Booking;
 use App\Models\Guest;
+use App\Models\Manifest;
 use App\Models\SubjectRequest;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
@@ -117,10 +119,12 @@ final class RetentionCommand extends Command
         });
 
         $exports = $this->expireExports($config, $dry);
+        $manifests = $this->purgeManifests($rules->passportMonthsAfterCruise, $rules->medicalDaysAfterCruise, $today, $dry);
 
         $verb = $dry ? 'Would change' : 'Changed';
         $this->info($verb.' '.$changedBookings.' booking(s): '.$passportGuests.' passport(s), '.$noteGuests.' note set(s).');
         $this->info(($dry ? 'Would delete ' : 'Deleted ').$exports.' access export(s).');
+        $this->info(($dry ? 'Would purge ' : 'Purged ').$manifests['captain'].' CAPTAIN file(s) and '.$manifests['dpng'].' DPNG file(s).');
 
         return self::SUCCESS;
     }
@@ -194,5 +198,57 @@ final class RetentionCommand extends Command
             });
 
         return $count;
+    }
+
+    /**
+     * @return array{captain: int, dpng: int}
+     */
+    private function purgeManifests(int $months, int $days, string $today, bool $dry): array
+    {
+        $captain = 0;
+        $dpng = 0;
+
+        Manifest::query()
+            ->whereNull('purged_at')
+            ->with('departure.itinerary')
+            ->orderBy('id')
+            ->each(function (Manifest $manifest) use ($months, $days, $today, $dry, &$captain, &$dpng): void {
+                $returnDate = $manifest->departure->returnDate();
+                $end = $manifest->kind === ManifestKind::Captain
+                    ? RetentionWindow::notesEndOn($returnDate, $days)
+                    : RetentionWindow::passportEndsOn($returnDate, $months);
+
+                if (! RetentionWindow::elapsed($end, $today)) {
+                    return;
+                }
+
+                $paths = array_values(array_filter(
+                    [$manifest->pdf_path, $manifest->csv_path, $manifest->xlsx_path],
+                    fn (?string $path): bool => is_string($path) && $path !== '',
+                ));
+
+                if ($manifest->kind === ManifestKind::Captain) {
+                    $captain += count($paths);
+                } else {
+                    $dpng += count($paths);
+                }
+
+                if ($dry) {
+                    return;
+                }
+
+                foreach ($paths as $path) {
+                    Storage::disk('manifests')->delete($path);
+                }
+
+                $manifest->forceFill([
+                    'pdf_path' => null,
+                    'csv_path' => null,
+                    'xlsx_path' => null,
+                    'purged_at' => now(),
+                ])->save();
+            });
+
+        return ['captain' => $captain, 'dpng' => $dpng];
     }
 }

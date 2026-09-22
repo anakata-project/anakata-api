@@ -16,7 +16,7 @@ final class Recipients
 
         $cc = [];
 
-        if ($kind === DeliveryKind::Summary) {
+        if ($kind === DeliveryKind::Summary || $kind === DeliveryKind::DataChaser) {
             $to = $this->usable($this->leadGuestEmail($booking));
             $role = 'lead guest';
 
