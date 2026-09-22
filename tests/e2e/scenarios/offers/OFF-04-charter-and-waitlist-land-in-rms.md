@@ -23,4 +23,4 @@ K10: waitlist and private-charter enquiries must arrive in the RMS with source E
 - `bin/db-check.sh 'App\Models\WaitlistEntry::query()->whereHas("contact", fn ($q) => $q->where("email","e2e.off04.wait@anakata.test"))->value("source")'` → `ENGINE`.
 
 ## Notes
-Waitlist overlay only where the feed says waitlist is on (FULL · WAITLIST / LIMITED / party-fit). Blocking ANATIVA 7 Nov is the reset-safe way to get that row. Guest context has no staff cookies.
+Waitlist overlay only where the feed says waitlist is on (FULL · WAITLIST / LIMITED / party-fit). Blocking ANATIVA 7 Nov is the reset-safe way to get that row. Guest context has no staff cookies. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

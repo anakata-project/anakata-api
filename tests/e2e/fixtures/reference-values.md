@@ -96,12 +96,14 @@ Source: `EngineSettingsDocument::initial()` → `fees` (FIN-004).
 
 ## Registry facts (fresh seed)
 
-Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON). On-screen KPI and chip numbers are ⚠ UNVERIFIED — task 02 report / Pest counts, not a reset screen.
+Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON after Sprint 9). On-screen KPI and chip numbers are ⚠ UNVERIFIED — Pest counts, not a reset screen in this task.
 
-- **65** rows total. ⚠ UNVERIFIED
-- After a fresh seed exactly **21** flagged: 20 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
-- Breakdown: `here` 40 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
-- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 65 / 40 / 15 / 10 / 21. ⚠ UNVERIFIED
+- **71** rows total. ⚠ UNVERIFIED
+- After a fresh seed exactly **25** flagged: 24 pending-status rows + OPS-006 (confirmed, but has a PRO-001 note). ⚠ UNVERIFIED
+- Breakdown: `here` 46 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED
+- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 71 / 46 / 15 / 10 / 25. ⚠ UNVERIFIED
+
+Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
 
 Flagged rows:
 
@@ -110,6 +112,10 @@ Flagged rows:
 | cancellation bands | TEXT IN DRAFTING | pending |
 | passport retention | PENDING LEGAL | pending |
 | medical retention | PENDING LEGAL | pending |
+| retention-behavioural-raw | PENDING LEGAL | L6 · Behavioural events raw retention |
+| retention-behavioural-unstitched | PENDING LEGAL | L6 · Unstitched anonymous events retention |
+| crm-segment-high-ltv | PENDING CLIENT | L2 · HIGH above USD 20,000 |
+| crm-segment-mid-ltv | PENDING CLIENT | L2 · MID from USD 8,000 |
 | online-deposit advantage | PENDING CLIENT | pending |
 | max total discount | PENDING CLIENT | pending |
 | hold-business-days | PENDING CLIENT | TEC-004 default |
@@ -356,4 +362,36 @@ Source: Sprint 8 task 08 browser notes against the running feed. ⚠ UNVERIFIED 
 
 Suites from **USD 13,300**. Default search window NOV 2027—JAN 2028 · 2 adults.
 
-Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). BR-01 leftovers (65 / 40 / 15 / 10 / 21) are unchanged here.
+Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Sprint 9 recount is **71 / 46 / 15 / 10 / 25** (see Registry facts).
+
+## CRM contacts (Sprint 9)
+
+Source: task 01 (`ContactDerived`), `BusinessRulesDocument::initial()` `crm.*`, seed people from `seed-data.json` + agency / waitlist / request seeders, and the task 06 browser notes. Nothing in this section was read off a screen in task 09.
+
+Thresholds (PENDING CLIENT): HIGH above **USD 20,000** lifetime value, MID from **USD 8,000**, else NEW. Lifecycle SQL order: AGENT → GUEST → BOOKED → SQL → PAST_GUEST → MQL → PROSPECT. LTV is `SUM` of sold charges (CONFIRMED, FULLY_PAID, ON_BOARD, COMPLETED, OVERDUE). A cancelled booking drops out by itself. NPS is `—` on every row. Consent: transactional **ALWAYS ON**; marketing **OPTED IN** / **NOT OPTED IN** (list pills `MKT ✓` / `TX ONLY`). Fresh seed has no duplicate pairs.
+
+Named seed people (do not invent a full LTV table): Harrison & Whitfield, The Brandt Family, M. Castellanos, Söderberg Party, J. & P. Okafor, Vandermeer Charter, R. Ellison, L. Alvear, S. & T. Ruiz, D. & A. Pereyra, A. Fontaine, E. Harmon, L. Moreau, S. Ferreira, T. Nakamura, P. Ibáñez, Lorena Alvear, Meridian Voyages hold, Anna Whitfield, K. Osei.
+
+The one row task 06 actually read after `reset.sh`:
+
+| Contact | Booking | LTV | Segment | Lifecycle | After cancel of that booking |
+|---|---|---|---|---|---|
+| A. Fontaine | ANK-2026-0018 | USD 26,600 | HIGH | BOOKED | LTV `—` · NEW · MQL |
+
+Opened as `?open=12` in that walk. ⚠ UNVERIFIED — Sprint 9 task 06 browser, not this task. Marketing consent is seeded on confirmed-or-later bookings except `ANK-2026-0007`.
+
+## Scheduled jobs (Sync & Field Ownership)
+
+Source: `routes/console.php` and `tests/Feature/Crm/SyncJobsTest.php`. On-screen last-run / next-run stamps are ⚠ UNVERIFIED — Pest, not a reset screen.
+
+| Command | Cadence (scheduler expression) | Timezone |
+|---|---|---|
+| `inventory:release-expired-holds` | every minute (`* * * * *`) | — |
+| `engine:expire-stripe-checkouts` | every minute (`* * * * *`) | — |
+| `anakata:flag-overdue` | daily (`0 0 * * *`) | `Pacific/Galapagos` |
+| `anakata:retention` | daily | `Pacific/Galapagos` |
+| `anakata:events-retention` | daily | `Pacific/Galapagos` |
+| `anakata:documents-due` | daily | `Pacific/Galapagos` |
+| `telescope:prune --hours=48` | daily | — (only when Telescope is installed) |
+
+Fresh seed: `last_outcome` is null so the Outcome / Last run cells are `—`; `next_run_at` is set. KPIs start at jobs failing **0**, failures open **0**, merges this month **0**. ⚠ UNVERIFIED

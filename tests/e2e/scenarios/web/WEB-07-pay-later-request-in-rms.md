@@ -29,4 +29,4 @@ Option 1 must land as a request the team can follow up — nationalities, fee ch
 - `bin/db-check.sh 'App\Models\Consent::query()->where("booking_id", App\Models\Booking::query()->where("request_reference","ANK-R-2026-0043")->value("id"))->get(["document","source","ip"])'` → two rows, source `ENGINE`, `ip` non-null.
 
 ## Notes
-Guest context has no staff cookies. Do not confirm or release 0043 here.
+Guest context has no staff cookies. Do not confirm or release 0043 here. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

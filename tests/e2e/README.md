@@ -73,6 +73,7 @@ tests/e2e/bin/replay-stripe-checkout.sh --expired ANK-R-2026-0043
 - **Time:** timestamps are shown in Galápagos time (UTC−6). Compare with that, not the machine's time zone.
 - **Don't wait blindly.** Wait for a visible condition (the text, the toast, the row), at most 15 s, then fail the step.
 - **Labels.** RMS fields use `label[for]` + control `id` (or `aria-label` on unlabeled table cells). Prefer `getByLabel` on Code, Max guests per cabin, Embark date, Child discounts per cabin, group-context, reason, and the new-reservation fields. Status pills are CSS-uppercase (`INVITED`); match case-insensitively.
+- **Engine analytics banner.** The engine shows a fixed bar at the bottom whenever analytics consent is unset, including when no GA measurement id is configured. It covers the lower edge of the page. On a fresh engine context, before any click, either click `Analytics off` or set `localStorage['anakata-engine-analytics']` to `refused` and reload. Use `accepted` only when the scenario is about behavioural events. Do not leave the bar up over footer actions.
 - **`/api/auth/me`.** Call `http://localhost:8000/api/auth/me` (JSON, 401 when signed out). Do not open `/api/auth/me` as a panel URL — that is HTML from Nuxt, not the API.
 - **Reports:**
   - write them to `runs/YYYY-MM-DD-HHMM-<slug>.md`

@@ -19,4 +19,4 @@ Festive itineraries are never eligible. B2B offers are never public (K2 / K3).
 - [ ] E3 · Seeded promo codes (`ANAKATA10`, `ADVISOR5`, `EARLY500`) are also absent from the feed (same as WEB-02).
 
 ## Notes
-Do not save a new offer unless needed to prove the festive tick is ignored — the disabled control is enough. Guest context has no staff cookies.
+Do not save a new offer unless needed to prove the festive tick is ignored — the disabled control is enough. Guest context has no staff cookies. Before any other click on the engine, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

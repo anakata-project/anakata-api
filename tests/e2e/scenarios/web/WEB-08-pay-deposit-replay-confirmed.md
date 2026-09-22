@@ -33,4 +33,4 @@ Money confirms (H7). Stripe is the authority; the e2e stack drives settlement wi
 - [ ] E4 · A second identical replay (the helper already posts twice) does not add a second receipt.
 
 ## Notes
-Never live-mode Stripe. Empty keys: FakeStripe + `replay-stripe-checkout.sh`. Record **replay** in the run report. Guest context has no staff cookies.
+Never live-mode Stripe. Empty keys: FakeStripe + `replay-stripe-checkout.sh`. Record **replay** in the run report. Guest context has no staff cookies. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

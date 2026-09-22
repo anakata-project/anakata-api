@@ -2,7 +2,7 @@
 
 Pick by **id**, **tag**, or **priority**. P1 first. Visual is P3 (on request).
 
-Sprint 8 `WEB-01`…`WEB-12` and `OFF-01`…`OFF-04` are written from seeders, i18n, Pest and Sprint 8 tasks 07–10 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by WEB-01 to WEB-08 and OFF-01. Sprint 7 `DOC-01`…`DOC-10` are written from the API plan, i18n and seeders — not yet walked on a cloud `reset.sh`. P1 grew by DOC-01 to DOC-05. Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
+Sprint 9 `CRM-01`…`CRM-10` are written from i18n, Pest, seeders and Sprint 9 tasks 06–07 browser notes — not walked on a `reset.sh` in this task. P1 grew by CRM-01 to CRM-06. Sprint 8 `WEB-01`…`WEB-12` and `OFF-01`…`OFF-04` are written from seeders, i18n, Pest and Sprint 8 tasks 07–10 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by WEB-01 to WEB-08 and OFF-01. Sprint 7 `DOC-01`…`DOC-10` are written from the API plan, i18n and seeders — not yet walked on a cloud `reset.sh`. P1 grew by DOC-01 to DOC-05. Sprint 6 `GST-01`…`GST-08` and `EXT-01`…`EXT-05` are written from seed / i18n / tasks 07–09 browser notes — not yet walked on a cloud `reset.sh`. P1 grew by GST-01, 02, 03, 06 and EXT-01, 02. Sprint 5 `PAY-01`…`PAY-12` were written from a `reset.sh` screen on 2026-09-21. BR-01 / BR-02 / INV-01 still have leftover Sprint 4 unverified markers.
 
 | ID | Title | Tags | Priority | Users | File |
 |---|---|---|---|---|---|
@@ -118,3 +118,13 @@ Sprint 8 `WEB-01`…`WEB-12` and `OFF-01`…`OFF-04` are written from seeders, i
 | OFF-02 | Pause a live offer — gone from the engine within 30 seconds | sprint-8, offers | P2 | Carolina + Guest | [offers/OFF-02-pause-live-offer-gone-in-30s.md](offers/OFF-02-pause-live-offer-gone-in-30s.md) |
 | OFF-03 | Festive itinerary cannot be selected; B2B never shows publicly | sprint-8, offers | P2 | Carolina + Guest | [offers/OFF-03-festive-blocked-b2b-never-public.md](offers/OFF-03-festive-blocked-b2b-never-public.md) |
 | OFF-04 | Charter enquiry and waitlist from the engine land in the RMS | sprint-8, offers | P2 | Guest + Carolina | [offers/OFF-04-charter-and-waitlist-land-in-rms.md](offers/OFF-04-charter-and-waitlist-land-in-rms.md) |
+| CRM-01 | Seeded contacts with lifecycle, value, segment and consent | sprint-9, crm | P1 | Carolina | [crm/CRM-01-seeded-contacts.md](crm/CRM-01-seeded-contacts.md) |
+| CRM-02 | Cancel a confirmed booking → contact value and segment change | sprint-9, crm | P1 | Carolina | [crm/CRM-02-cancel-moves-value.md](crm/CRM-02-cancel-moves-value.md) |
+| CRM-03 | Contact drawer: RMS bookings, timeline, no sensitive fields | sprint-9, crm | P1 | Carolina | [crm/CRM-03-drawer-timeline-no-sensitive.md](crm/CRM-03-drawer-timeline-no-sensitive.md) |
+| CRM-04 | Merge two duplicates; undo restores what moved | sprint-9, crm | P1 | Carolina | [crm/CRM-04-merge-undo.md](crm/CRM-04-merge-undo.md) |
+| CRM-05 | With consent: browse and submit stitches anonymous events | sprint-9, crm | P1 | Guest + Carolina | [crm/CRM-05-consent-stitch.md](crm/CRM-05-consent-stitch.md) |
+| CRM-06 | Without consent: no events, no identifier; the request still arrives | sprint-9, crm | P1 | Guest + Carolina | [crm/CRM-06-no-consent-no-events.md](crm/CRM-06-no-consent-no-events.md) |
+| CRM-07 | UTM landing is written once and cannot be changed | sprint-9, crm | P2 | Guest + Carolina | [crm/CRM-07-utm-frozen.md](crm/CRM-07-utm-frozen.md) |
+| CRM-08 | Edit email to another contact → conflict offers merge | sprint-9, crm | P2 | Carolina | [crm/CRM-08-email-conflict-offers-merge.md](crm/CRM-08-email-conflict-offers-merge.md) |
+| CRM-09 | Sync jobs show last runs; a failed job appears and retries | sprint-9, crm | P2 | Carolina | [crm/CRM-09-sync-jobs-retry.md](crm/CRM-09-sync-jobs-retry.md) |
+| CRM-10 | Sales Exec sees all contacts but cannot merge | sprint-9, crm | P2 | Lucía | [crm/CRM-10-sales-exec-no-merge.md](crm/CRM-10-sales-exec-no-merge.md) |

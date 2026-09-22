@@ -19,4 +19,4 @@ The engine cannot sell a cabin the RMS has taken. The 409 must name the cabin an
 - [ ] E3 · If the deck refreshed before Continue and Suite 01 is already `.taken`, that also passes the “engine names it” intent — the cabin is not selectable. Prefer the 409 path when the stale pick is still shown.
 
 ## Notes
-Target is 7 Nov ANATIVA so this does not collide with ANAMARA seed claims. Guest context has no staff cookies.
+Target is 7 Nov ANATIVA so this does not collide with ANAMARA seed claims. Guest context has no staff cookies. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

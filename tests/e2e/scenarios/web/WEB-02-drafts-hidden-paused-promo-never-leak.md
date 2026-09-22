@@ -22,4 +22,4 @@ Doc 04 rule 5: drafts never leak. A paused offer or a promo code on the public f
 - [ ] E4 · Guest pages (home, itineraries, any trip details opened) do not display those strings.
 
 ## Notes
-Wait up to 30 s (or hide the tab and show it) for the 15 s feed revalidate after pause / hide. Do not publish the draft. Guest context has no staff cookies.
+Wait up to 30 s (or hide the tab and show it) for the 15 s feed revalidate after pause / hide. Do not publish the draft. Guest context has no staff cookies. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

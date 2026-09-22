@@ -21,4 +21,4 @@ Contacts In is the commercial view of who is travelling. Value is `charges_total
 - [ ] E5 · A row opens the existing booking panel (ANK-2026-0003).
 
 ## Notes
-`GET /api/rms/contacts-in` + `/nationalities`. Named guests only (`Guest::scopeNamed`). Seeded Lucía still has `bookings.view_all`, so 🔒 may not show on her rows as Admin.
+`GET /api/rms/contacts-in` + `/nationalities`. Named guests only (`Guest::scopeNamed`). Seeded Lucía still has `bookings.view_all`, so 🔒 may not show on her rows as Admin. Contacts In stays the RMS commercial list; CRM people are `/crm/sales/contacts` (CRM-01).

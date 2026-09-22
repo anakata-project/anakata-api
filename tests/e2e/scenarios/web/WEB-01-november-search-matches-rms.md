@@ -20,4 +20,4 @@ The public engine must render only on-sale departures. If the guest list drifts 
 - [ ] E4 · OPENING-27 badge / dealbar on Nov–Dec WEST and NORTH if the feed lists it. If the badge is missing, classify **BUG** — do not drop the expectation. ⚠ UNVERIFIED — task 08/09 once saw `offers: []`.
 
 ## Notes
-Guest context has no panel session. Do not type a promo code on this page. Slugs after Select: `/itineraries/western-realm`, `/itineraries/northern-passage`, `/itineraries/festive-expeditions`.
+Guest context has no panel session. Do not type a promo code on this page. Slugs after Select: `/itineraries/western-realm`, `/itineraries/northern-passage`, `/itineraries/festive-expeditions`. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

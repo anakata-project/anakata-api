@@ -1015,3 +1015,100 @@ Record sprint 9 task 07.
 EOF
 )"
 ```
+
+## Task 09 · E2E scenarios for Sprint 9 (written only)
+
+Ten CRM browser scenarios, fixture notes and catalogue updates. **Neither P1 run was executed.** No `up.sh` / `reset.sh`, no cloud branch, no application-code change. Every new CRM figure and the registry recount is `⚠ UNVERIFIED` — nothing in this task was read off a screen.
+
+### Scenarios (`tests/e2e/scenarios/crm/`, tags `sprint-9`)
+
+| ID | P | File |
+|---|---|---|
+| CRM-01 | P1 | `CRM-01-seeded-contacts.md` |
+| CRM-02 | P1 | `CRM-02-cancel-moves-value.md` |
+| CRM-03 | P1 | `CRM-03-drawer-timeline-no-sensitive.md` |
+| CRM-04 | P1 | `CRM-04-merge-undo.md` |
+| CRM-05 | P1 | `CRM-05-consent-stitch.md` |
+| CRM-06 | P1 | `CRM-06-no-consent-no-events.md` |
+| CRM-07 | P2 | `CRM-07-utm-frozen.md` |
+| CRM-08 | P2 | `CRM-08-email-conflict-offers-merge.md` |
+| CRM-09 | P2 | `CRM-09-sync-jobs-retry.md` |
+| CRM-10 | P2 | `CRM-10-sales-exec-no-merge.md` |
+
+Wording from panel i18n (`crmContacts` / `crmActivity` / `crmSync`), Pest, seeders, and the task 06–07 browser notes. Fontaine’s `USD 26,600` / HIGH / BOOKED → `—` / NEW / MQL after cancelling `ANK-2026-0018` is the one row those notes actually read.
+
+CRM-07’s immutability probe and CRM-09’s failed-job insert use `docker compose exec app` tinker because `db-check.sh` refuses writes.
+
+### Revisited files
+
+- `INDEX.md` — ten rows; P1 grows by CRM-01–CRM-06.
+- `fixtures/reference-values.md` — CRM contacts, scheduled jobs, registry **71 / 46 / 15 / 10 / 25** plus two L6 retention rows and two L2 segment thresholds.
+- `config/BR-01-fresh-seed-registry.md` — those counts and the four new pending rows.
+- `guests/GST-08-contacts-in.md` — Notes only: Contacts In stays the RMS commercial list; CRM people are `/crm/sales/contacts`.
+- `web/WEB-01`…`WEB-12` and `offers/OFF-01`…`OFF-04` — Notes only: click **Analytics off** first; accepting now also posts `/api/engine/events`. Expectations and prices unchanged.
+
+### Runs
+
+Not run. No `runs/YYYY-MM-DD-HHMM-sprint9-p1.md` and no full P1 Sprints 1–9 file.
+
+### Marker split
+
+| | Count |
+|---|---|
+| Read off a screen this task | **0** |
+| New CRM / registry / job figures | all `⚠ UNVERIFIED` (Pest, i18n, task 06–07 notes) |
+| Leftover Sprint 4–8 unverified markers | unchanged (still waiting on a reset walk) |
+
+### Open questions
+
+Compiled from this sprint’s README and tasks 01–08 — do not read as “none”:
+
+- **Who sees which contacts (L1).** Default: every user with `panel.crm` sees every contact; bookings and money stay own-records. PENDING CLIENT.
+- **Segment thresholds.** HIGH above USD 20,000, MID from USD 8,000. Built as business rules, PENDING CLIENT.
+- **One consent for GA4 and CRM tracking (LEG-002).** The engine uses the same banner for both. Confirm, or say first-party CRM tracking needs its own choice.
+- The PATCH 409 body has no structured `conflicting_contact_id` — Review merge parses `contact #(\d+)`.
+- The activity stream has no `contact_id` — the panel resolves a drawer by display name.
+- The RMS booking panel does not render `utm_first` / `utm_last` (CRM-07 checks the payload and the insert-only trigger).
+- Still open outside the sprint: LEG-001 consent texts, LEG-004 bank details, Sprints 5–8 cloud P1 walks that ENV-stopped, `contacts.agency_id` if email match is too weak.
+
+### Notes for later
+
+Launch the runs from `anakata-api` alone (`e2e/sprint-09`, `GH_TOKEN`): `up.sh` → ALL UP, then Sprint 9 P1 + revisited files, then the full P1 set Sprints 1–9. Replace UNVERIFIED lines with values read off the screen. Do not loosen expectations. Do not change application code to make a scenario pass.
+
+### Merge steps for the user
+
+Do **not** run these in the agent. Explicit paths only (never `-A`). Do not merge as if the sprint P1 ran.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git checkout -B e2e/sprint-09
+git add tests/e2e/fixtures/reference-values.md
+git add tests/e2e/scenarios/INDEX.md
+git add tests/e2e/scenarios/crm
+git add tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md
+git add tests/e2e/scenarios/guests/GST-08-contacts-in.md
+git add tests/e2e/scenarios/web
+git add tests/e2e/scenarios/offers
+git add docs/sprints/sprint-09/REPORT.md
+git commit -m "$(cat <<'EOF'
+Write Sprint 9 CRM e2e scenarios.
+
+Ten CRM scripts, fixture rows and catalogue updates — not
+walked on a reset screen.
+EOF
+)"
+git push -u origin e2e/sprint-09
+```
+
+## Sprint 9 summary
+
+### What is done
+- **API (01–04):** contacts as CRM records with derived lifecycle, LTV, segment and consent; identity, aliases, merge and unmerge; attribution and behavioural events; timeline, activity and Sync read API.
+- **Layer (05):** types regenerated; `anakata-ui` `v0.10.0`.
+- **Panel (06–07):** CRM Contacts (list, drawer, merge, undo); Web & Engine Activity; Sync & Field Ownership.
+- **Engine (08):** consented events, session identifier, UTM capture (code is in anakata-engine; this report has no Task 08 section).
+- **E2E (09):** CRM-01…CRM-10 written. Sprint 9 P1 and the full P1 set (Sprints 1–9) **not run**.
+
+### What is still open outside the sprint
+Cloud P1 attachments for Sprints 5–9; the client questions above; pipeline, tasks, the consent register, campaigns and documents & delivery (Sprint 10); operational alerts (Sprint 11).
+

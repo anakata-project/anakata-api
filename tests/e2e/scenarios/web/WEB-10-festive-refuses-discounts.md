@@ -20,4 +20,4 @@ Festive departures never take offers, the online advantage, or promo codes. A fe
 - [ ] E4 · Network `POST /api/engine/promo/check` `valid` is false; `reason` is the festive sentence.
 
 ## Notes
-DEP-013 must not appear. Do not invent a festive discount. Guest context only.
+DEP-013 must not appear. Do not invent a festive discount. Guest context only. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

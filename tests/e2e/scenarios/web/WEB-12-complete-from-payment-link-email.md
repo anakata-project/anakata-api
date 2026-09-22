@@ -35,4 +35,4 @@ Read-only. Do **not** print a passport.
 - `bin/db-check.sh '(function(){$g=\App\Models\Guest::query()->where("booking_id",\App\Models\Booking::query()->where("reference","ANK-2026-0003")->value("id"))->whereNotNull("passport_no")->latest("id")->first();if($g===null){return["ciphertext"=>false];}$raw=\Illuminate\Support\Facades\DB::table("guests")->where("id",$g->id)->value("passport_no");$plain=$g->passport_no;$cipher=is_string($raw)&&$raw!==""&&$raw!==$plain;return["ciphertext"=>$cipher,"has_plain_column"=>$raw===$plain];})()'` → `{"ciphertext":true,"has_plain_column":false}`
 
 ## Notes
-Dummy passport only — never a real number, never in the report. 0003 deposit is already paid; use the **balance** link. Guest context has no staff cookies.
+Dummy passport only — never a real number, never in the report. 0003 deposit is already paid; use the **balance** link. Guest context has no staff cookies. Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.

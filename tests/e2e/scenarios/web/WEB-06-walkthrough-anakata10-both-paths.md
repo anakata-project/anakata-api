@@ -22,4 +22,4 @@ K7: the server’s price is the price. A local estimate that disagrees with `POS
 - [ ] E4 · Switching paths re-quotes. The panel never keeps the other path’s total.
 
 ## Notes
-Record the two quote bodies in the run report (no guest PII). Fixture walkthrough rows stay `⚠ UNVERIFIED` until a later reset reads the engine and the RMS booking (WEB-07 / WEB-08).
+Record the two quote bodies in the run report (no guest PII). Fixture walkthrough rows stay `⚠ UNVERIFIED` until a later reset reads the engine and the RMS booking (WEB-07 / WEB-08). Before any other click, click `Analytics off` (or set `localStorage['anakata-engine-analytics']` to `refused` and reload). Accepting analytics now also posts `POST /api/engine/events`. CRM-05 and CRM-06 own that behaviour.
