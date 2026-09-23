@@ -262,3 +262,62 @@ Pin the shared layer fallback to v0.14.0.
 EOF
 )"
 ```
+
+## Task 06 · The app: scaffold, sign-in, invitation and reset
+
+`anakata-portal` is a Nuxt 4 SPA on port 3002. It extends the sibling `anakata-ui` layer, and falls back to `github:anakata-project/anakata-ui#v0.14.0` when that sibling is absent. Scripts match the engine (`pnpm@12.4.1`: `dev`, `build`, `preview`, `postinstall`, `lint`, `typecheck`, `test`). `pnpm-workspace.yaml` matches the engine so install acknowledges the ignored native builds. There is no analytics id, no consent banner, and no permission helper. Session state is `useState` only. The only browser storage key after a sign-in is `nuxt-color-mode`.
+
+`github.com/anakata-project/anakata-portal` does not exist. The app is a directory beside the other four repos, not a git repository yet. The commands below initialise it. They were not run.
+
+**Session.** `usePortalSession` calls `GET /api/portal/auth/me` once, `POST /api/portal/auth/login`, and `POST /api/portal/auth/logout` through the layer's `useApi()` (CSRF and the cookie). A signed-out visit to an app page goes to `/login?redirect=…` and returns there after sign-in. The redirect must be a same-app path; auth pages and `//` are dropped. A signed-in visit to `/login` goes to `/rates`. A 401 while a session is in memory clears it and opens `/login?notice=session`, which shows "Please sign in again." A 401 with no session does nothing, so a signed-out visitor is not sent in a loop. Login failures are 422, not 401.
+
+**Pages.** `/login`, `/accept`, `/forgot`, `/reset-password`. Each shows the API sentence. Login, a disabled user, an unapproved agency, a suspended agency, a wrong password and an unknown address all show "These credentials do not match our records." A used invite shows "This password reset token is invalid." Forgot, including an unknown address, shows "We have emailed your password reset link." Reset shows "Your password has been reset." and does not start a session. The sixth login in a minute shows "Too Many Attempts." The layer's `ApiError` does not include 429, so the page reads that throttle body itself. Accepting an invite sets the session and opens `/rates`.
+
+**Route deviation.** The task names `/accept/[token]` and `/reset/[token]`. Task 01 already mails `/accept?token&email` and `/reset-password?token&email`. The pages are those URLs, so a Mailpit link opens. Both are `noindex` (`useHead` / `useSeoMeta`, and `X-Robots-Tag` plus `Cache-Control: no-store` on the route). The API was not changed.
+
+The signed-in shell has the agency name, the user's name, sign out, the theme toggle, and links for Rates, Availability, Bookings, Commissions and Materials. Those five pages say they are not ready yet. Requests stay off the nav until task 08.
+
+**Browser** (dark and light, API on port 8000, dev server on 3002). Mailpit's invite for `ada@portal.test` (Blue Latitude Travel, created in the local database for this pass, not a seeder) set a password, landed on Rates, and was still signed in after reload. Sign out returned to `/login`. The same invite link then showed the invalid-token sentence. A wrong password, and `pending@portal.test` on the pending agency Andes Luxe, both showed the credentials sentence. Six attempts for another address showed "Too Many Attempts." A signed-out visit to `/bookings` became `/login?redirect=/bookings` and returned there after sign-in. Forgot for an unknown address showed the emailed-link sentence. No analytics requests.
+
+**Quality.** `pnpm lint`, `typecheck`, `test` (10) and `build` passed in the app. A fresh pair of clones under `/tmp/anakata-portal-fresh` — `anakata-ui` checked out at local tag `v0.14.0` (`71d7131`), portal sources copied with no `node_modules` — typechecked and built after `pnpm install` in both. The GitHub pin was not fetched. Task 05 left that tag unpushed, so a machine without the sibling still cannot resolve `#v0.14.0` until the tag is pushed.
+
+### Git commands
+Do not run these in the agent. The portal remote does not exist yet; create it with the engine's visibility before the push.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-portal
+git init -b dev
+git add \
+  .cursor/rules/anakata-core.mdc \
+  .cursor/rules/nuxt-app.mdc \
+  .env.example \
+  .gitignore \
+  .nuxtrc \
+  README.md \
+  app \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  package.json \
+  pnpm-lock.yaml \
+  pnpm-workspace.yaml \
+  public/brand \
+  tests \
+  tsconfig.json \
+  vitest.config.ts
+git commit -m "$(cat <<'EOF'
+Add the agent portal sign-in, invitation and password reset.
+
+The session is the API cookie. Token pages follow the links the API already sends.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-13/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the portal app scaffold and sign-in.
+EOF
+)"
+```
