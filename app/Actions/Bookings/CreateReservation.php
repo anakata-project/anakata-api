@@ -6,24 +6,18 @@ namespace App\Actions\Bookings;
 
 use App\Actions\Action;
 use App\Actions\Contacts\ResolveContact;
-use App\Enums\AgencyStatus;
 use App\Enums\BookingStatus;
 use App\Enums\BookingType;
-use App\Enums\CabinCategory;
 use App\Enums\ClaimKind;
 use App\Enums\ConfigKind;
-use App\Enums\MainChannel;
-use App\Enums\OfferType;
 use App\Enums\ReferenceType;
 use App\Events\BookingCreated;
 use App\Exceptions\CabinUnavailableException;
-use App\Models\Agency;
 use App\Models\Booking;
 use App\Models\Cabin;
 use App\Models\Contact;
 use App\Models\Departure;
 use App\Models\Group;
-use App\Models\Offer;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Services\Inventory\ClaimService;
@@ -34,6 +28,7 @@ use App\Services\References\ReferenceService;
 use App\Support\Blocks\ConflictMessage;
 use App\Support\Bookings\ReservationCreated;
 use App\Support\Bookings\SoldOn;
+use App\Support\Commissions\FreezeCommission;
 use App\Support\History\History;
 use App\Support\Inventory\DepartureLocks;
 use App\Support\Money;
@@ -48,6 +43,7 @@ final class CreateReservation extends Action
         private ReferenceService $references,
         private ClaimService $claims,
         private CurrentConfig $config,
+        private FreezeCommission $commissions,
     ) {}
 
     /**
@@ -80,7 +76,7 @@ final class CreateReservation extends Action
             $bookings = new Collection;
 
             foreach ($quote->parties as $party) {
-                $commission = $this->resolveCommission(
+                $commission = $this->commissions->resolve(
                     $data,
                     $departure,
                     $party->cabin?->category,
@@ -262,89 +258,11 @@ final class CreateReservation extends Action
 
         BookingCreated::dispatch($booking);
 
-        if ($commission !== null && $commission['over_cap']) {
-            $cap = $this->config->businessRules()->commission->capPct;
-            $pct = $commission['commission_pct'];
-            $named = $commission['offer_codes'] === []
-                ? ''
-                : ' · '.implode(', ', $commission['offer_codes']);
-
-            History::record($booking, 'booking.commission_held', after: [
-                'what' => 'HELD — commission '.$pct.' % above '.$cap.' % cap'.$named.' · Director alert sent (FIN-005)',
-                'commission_pct' => $pct,
-                'cap_pct' => $cap,
-                'commission_offers' => $commission['offer_codes'],
-            ], system: true);
+        if ($commission !== null) {
+            $this->commissions->recordHold($booking, $commission);
         }
 
         return $booking;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array{agency_id: int, commission_pct: int, commission_approved: bool, over_cap: bool, offer_codes: list<string>}|null
-     */
-    private function resolveCommission(array $data, Departure $departure, ?CabinCategory $category): ?array
-    {
-        $agencyId = $data['agency_id'] ?? null;
-
-        if ($agencyId === null || $agencyId === '') {
-            return null;
-        }
-
-        $channel = $data['main_channel'] instanceof MainChannel
-            ? $data['main_channel']
-            : MainChannel::from((string) $data['main_channel']);
-
-        if (! $channel->isTrade()) {
-            throw ValidationException::withMessages([
-                'agency_id' => ['An agency can only be attached to a trade channel.'],
-            ]);
-        }
-
-        $agency = Agency::query()->find((int) $agencyId);
-
-        if (! $agency instanceof Agency) {
-            throw ValidationException::withMessages([
-                'agency_id' => ['The agency is not available.'],
-            ]);
-        }
-
-        if ($agency->status !== AgencyStatus::Approved) {
-            throw ValidationException::withMessages([
-                'agency_id' => ['The agency must be approved before it can be sold against.'],
-            ]);
-        }
-
-        $pct = isset($data['commission_pct']) && $data['commission_pct'] !== ''
-            ? (int) $data['commission_pct']
-            : $agency->commission_pct;
-        $offerCodes = [];
-
-        if ($category instanceof CabinCategory) {
-            $commOffers = Offer::applicableTo(
-                $departure,
-                $category,
-                $channel->segment(),
-                SoldOn::today(),
-            )->filter(fn (Offer $offer): bool => $offer->type === OfferType::Commission);
-
-            foreach ($commOffers as $offer) {
-                $pct += (int) $offer->value;
-                $offerCodes[] = $offer->code;
-            }
-        }
-
-        $cap = $this->config->businessRules()->commission->capPct;
-        $overCap = $pct > $cap;
-
-        return [
-            'agency_id' => $agency->id,
-            'commission_pct' => $pct,
-            'commission_approved' => ! $overCap,
-            'over_cap' => $overCap,
-            'offer_codes' => $offerCodes,
-        ];
     }
 
     /**

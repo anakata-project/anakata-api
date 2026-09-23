@@ -47,6 +47,7 @@ final class RequestController extends Controller
                 'contact',
                 'bookingRequest',
                 'claims',
+                'agency',
             ])
             ->where('bookings.status', BookingStatus::Requested)
             ->when(

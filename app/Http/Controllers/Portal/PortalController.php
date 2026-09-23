@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 abstract class PortalController extends Controller
 {
-    protected function agency(Request $request): Agency
+    protected function agencyUser(Request $request): AgencyUser
     {
         $agencyUser = $request->user('agency');
 
@@ -19,6 +19,11 @@ abstract class PortalController extends Controller
             abort(401);
         }
 
-        return $agencyUser->agency;
+        return $agencyUser;
+    }
+
+    protected function agency(Request $request): Agency
+    {
+        return $this->agencyUser($request)->agency;
     }
 }

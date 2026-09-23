@@ -31,7 +31,9 @@ class BookingRequestResource extends JsonResource
      *     estimated_value: int,
      *     hold: array{expires_at: string|null, rule: string, remaining_business_minutes: int, expired: bool},
      *     sla: array{due_at: string, remaining_minutes: int, breached: bool},
-     *     can_act: bool
+     *     can_act: bool,
+     *     source: string,
+     *     agency_name: string|null
      * }
      */
     public function toArray(Request $request): array
@@ -42,6 +44,7 @@ class BookingRequestResource extends JsonResource
             'contact',
             'bookingRequest',
             'activeClaims',
+            'agency',
         ]);
 
         $actor = $request->user();
@@ -84,6 +87,21 @@ class BookingRequestResource extends JsonResource
             'hold' => $hold,
             'sla' => $sla,
             'can_act' => $canAct,
+            'source' => $this->requestSource(),
+            'agency_name' => $this->agency?->name,
         ];
+    }
+
+    private function requestSource(): string
+    {
+        if ($this->checkout_session_id !== null) {
+            return 'engine';
+        }
+
+        if ($this->agency_id !== null) {
+            return 'portal';
+        }
+
+        return 'rms';
     }
 }
