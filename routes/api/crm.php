@@ -10,6 +10,7 @@ use App\Http\Controllers\Crm\ContactTimelineController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\DeliveryController;
 use App\Http\Controllers\Crm\EngineActivityController;
+use App\Http\Controllers\Crm\SegmentController;
 use App\Http\Controllers\Crm\SyncController;
 use App\Http\Controllers\Crm\TaskController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,12 @@ Route::patch('tasks/{task}', [TaskController::class, 'update']);
 Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);
 Route::post('tasks/{task}/cancel', [TaskController::class, 'cancel']);
 Route::post('contacts/{contact}/activities', [TaskController::class, 'storeActivity']);
+
+Route::get('segments', [SegmentController::class, 'index']);
+Route::get('segments/vocabulary', [SegmentController::class, 'vocabulary']);
+Route::post('segments', [SegmentController::class, 'store']);
+Route::get('segments/{segment}/contacts', [SegmentController::class, 'contacts']);
+Route::patch('segments/{segment}', [SegmentController::class, 'update']);
 
 Route::get('campaigns', [CampaignController::class, 'index']);
 Route::get('campaigns/offers-without-campaign', [CampaignController::class, 'offersWithoutCampaign']);

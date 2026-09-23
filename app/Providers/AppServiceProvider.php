@@ -72,6 +72,7 @@ use App\Models\ReportRun;
 use App\Models\ReportSubscription;
 use App\Models\Role;
 use App\Models\SalesMaterial;
+use App\Models\Segment;
 use App\Models\SubjectRequest;
 use App\Models\User;
 use App\Models\WaitlistEntry;
@@ -244,6 +245,7 @@ class AppServiceProvider extends ServiceProvider
             'report_run' => ReportRun::class,
             'report_subscription' => ReportSubscription::class,
             'sales_material' => SalesMaterial::class,
+            'segment' => Segment::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
             'booking_request' => BookingRequest::class,

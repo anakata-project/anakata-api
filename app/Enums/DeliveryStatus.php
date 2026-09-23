@@ -10,6 +10,7 @@ enum DeliveryStatus: string
     case Sent = 'SENT';
     case Failed = 'FAILED';
     case Blocked = 'BLOCKED';
+    case HardBounce = 'HARD_BOUNCE';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum DeliveryStatus: string
             self::Sent => 'Sent',
             self::Failed => 'Failed',
             self::Blocked => 'Blocked',
+            self::HardBounce => 'Hard bounce',
         };
     }
 }

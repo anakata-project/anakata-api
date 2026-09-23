@@ -435,7 +435,7 @@ final class DocumentPlan
         if ($delivery instanceof Delivery) {
             return match ($delivery->status) {
                 DeliveryStatus::Sent => DocumentPlanStatus::Sent,
-                DeliveryStatus::Failed => DocumentPlanStatus::Failed,
+                DeliveryStatus::Failed, DeliveryStatus::HardBounce => DocumentPlanStatus::Failed,
                 DeliveryStatus::Blocked => DocumentPlanStatus::Blocked,
                 DeliveryStatus::Queued => $fallback === DocumentPlanStatus::Waiting
                     ? DocumentPlanStatus::Due
