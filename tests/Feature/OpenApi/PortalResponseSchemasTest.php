@@ -104,6 +104,7 @@ test('portal OpenAPI schemas have properties and name their enums', function ():
         'SuspendAgencyPortalRequest',
         'ResumeAgencyPortalRequest',
         'StoreSalesMaterialRequest',
+        'CreatePortalPaymentLinkRequest',
     ] as $name) {
         portalOpenApiSchema($spec, $name);
     }
@@ -148,6 +149,19 @@ test('portal OpenAPI schemas have properties and name their enums', function ():
 
     expect(portalOpenApiSchema($spec, 'SuspendAgencyPortalRequest')['properties'])->toHaveKey('reason');
     expect(portalOpenApiSchema($spec, 'ResumeAgencyPortalRequest')['properties'])->toHaveKey('reason');
+
+    $paymentLink = $spec['paths']['/portal/bookings/{booking}/payment-link']['post']
+        ?? $spec['paths']['/api/portal/bookings/{booking}/payment-link']['post']
+        ?? null;
+    expect($paymentLink)->toBeArray();
+    portalSchemaRef(
+        $paymentLink['responses']['201']['content']['application/json']['schema'] ?? [],
+        'PaymentLinkResource',
+    );
+    portalSchemaRef(
+        portalOpenApiSchema($spec, 'CreatePortalPaymentLinkRequest')['properties']['kind'] ?? [],
+        'PaymentKind',
+    );
 
     foreach ([
         'AgencyStatus',

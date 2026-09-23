@@ -122,6 +122,8 @@ test('crm OpenAPI schemas have properties', function (): void {
         'AutomationAudience',
         'JourneyStepAction',
         'JourneyEnrolmentStatus',
+        'ConversationStatus',
+        'MessageDirection',
     ] as $enum) {
         expect($names)->toContain($enum);
         expect($spec['components']['schemas'][$enum]['enum'] ?? null)->toBeArray();
@@ -313,4 +315,52 @@ test('crm OpenAPI schemas have properties', function (): void {
     expect($spec['components']['schemas']['StoreTemplateDraftRequest']['properties'] ?? null)->toHaveKeys(['subject', 'body']);
     expect($spec['components']['schemas']['PublishTemplateVersionRequest']['properties'] ?? null)->toHaveKey('approval_reference');
     expect($spec['components']['schemas']['PreviewTemplateRequest']['properties'] ?? null)->toHaveKeys(['contact_id', 'booking_id', 'version']);
+
+    $conversation = crmOpenApiSchema($spec, 'CrmConversationResource');
+    crmSchemaRef($conversation['properties']['status'] ?? [], 'ConversationStatus');
+    crmSchemaRef($conversation['properties']['messages']['items'] ?? [], 'CrmMessageResource');
+
+    $message = crmOpenApiSchema($spec, 'CrmMessageResource');
+    crmSchemaRef($message['properties']['direction'] ?? [], 'MessageDirection');
+    expect($message['properties']['body_html']['type'] ?? null)->toBe('string');
+    expect($message['properties']['body_text']['type'] ?? null)->toBe('string');
+    expect($message['properties']['to']['items']['type'] ?? null)->toBe('string');
+
+    $partner = crmOpenApiSchema($spec, 'B2bPartnerResource');
+    expect($partner['properties'])->toHaveKeys(['contact', 'enrolment', 'deals', 'status', 'revenue', 'commission_accrued']);
+    crmSchemaRef($partner['properties']['status'] ?? [], 'AgencyStatus');
+    expect($partner['properties']['contact']['properties'] ?? null)->toHaveKeys(['id', 'name']);
+    crmSchemaRef($partner['properties']['deals']['items'] ?? [], 'DealResource');
+
+    $enrolmentArms = array_values(array_filter(
+        $partner['properties']['enrolment']['anyOf'] ?? [],
+        fn (mixed $arm): bool => is_array($arm) && isset($arm['properties']),
+    ));
+    expect($enrolmentArms)->toHaveCount(2);
+
+    foreach ($enrolmentArms as $arm) {
+        crmSchemaRef($arm['properties']['status'] ?? [], 'JourneyEnrolmentStatus');
+        expect($arm['properties']['step']['properties'] ?? null)->toHaveKey('name');
+    }
+
+    $fullEnrolment = collect($enrolmentArms)->first(
+        fn (array $arm): bool => isset($arm['properties']['sends']),
+    );
+    expect($fullEnrolment['properties']['sends']['items']['properties'] ?? null)->toHaveKeys([
+        'sent_at',
+        'template_key',
+        'catalogue_key',
+        'delivery_id',
+    ]);
+
+    $partnerArms = $spec['components']['schemas']['B2bPartnerResource']['anyOf'] ?? [];
+    $partnerKeys = array_map(
+        fn (mixed $arm): array => is_array($arm) ? array_keys($arm['properties'] ?? []) : [],
+        $partnerArms,
+    );
+    expect(collect($partnerKeys)->contains(fn (array $keys): bool => in_array('deals', $keys, true)))->toBeTrue();
+    expect(collect($partnerKeys)->contains(fn (array $keys): bool => ! in_array('deals', $keys, true)))->toBeTrue();
+
+    expect($spec['components']['schemas']['ReplyToConversationRequest']['properties'] ?? null)->toHaveKey('message');
+    expect($spec['components']['schemas']['LinkConversationContactRequest']['properties'] ?? null)->toHaveKey('contact_id');
 });

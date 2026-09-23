@@ -203,3 +203,121 @@ Let an agency user open a payment link for their own booking.
 EOF
 )"
 ```
+
+## Task 04 · Regenerate types, release v0.16.0
+
+Types only. `package.json` and the top changelog entry were both `0.15.0`, so the bump is `0.15.0` → `0.16.0`. Pins in the panel, engine, and portal were `#v0.15.0` in each `nuxt.config.ts` and `README.md`. All six now say `#v0.16.0`. The layer README example that still showed `#v0.12.0` now shows `#v0.16.0`. `pnpm types:api` regenerated `app/types/api.d.ts` from `http://localhost:8000/docs/api.json`. That file was not edited by hand.
+
+### Prelude
+
+Inspection of the live spec, before any edit:
+
+- `CrmConversationResource.messages` already `$ref`s `CrmMessageResource`. `body_html` and `body_text` are strings. `to` is `string[]`. Those were left alone.
+- `POST /api/portal/bookings/{booking}/payment-link` already returns `PaymentLinkResource` and validates `CreatePortalPaymentLinkRequest`. No portal payment-link resource.
+- The B2B schema name is `B2bPartnerResource`. There is no `CrmB2bPartnerResource`. The reply body is `ReplyToConversationRequest`. There is no `ReplyConversationRequest`.
+- `contact`, enrolment `step`, and enrolment `sends` already had real object shapes.
+
+The prelude only typed the gaps. JSON values are unchanged (backed enums encode as their string). Nested `DealResource` instances still serialise through `jsonSerialize`.
+
+- Conversation `status` is `ConversationStatus` (`OPEN` | `CLOSED`) via a private method, the same pattern as journey enrolment `status`. The schema already existed on `UpdateConversationRequest`. The resource was a plain string.
+- Message `direction` is `MessageDirection` (`IN` | `OUT`). That schema did not exist.
+- Partner `status` `$ref`s the existing `AgencyStatus`. Enrolment `status` on both the summary arm and the full arm `$ref`s the existing `JourneyEnrolmentStatus`.
+- Detail `deals` was `list<array<string, mixed>>`, which Scramble emitted as an array of empty arrays. It is now `list<DealResource>`. The list arm still has no `deals` key.
+
+`CrmResponseSchemasTest` and `PortalResponseSchemasTest` assert the new refs, the message body strings, both enrolment arms, and that one B2B arm has `deals` and the other does not. Those two tests, plus `B2bPartnersTest` and `ConversationsTest`: 18 passed (732 assertions). Pint passed on the five files. Larastan is clean on the three resources.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 17860 | 18374 |
+| `app/types/crm.ts` | 253 | 261 |
+| `app/types/portal.ts` | 25 | 26 |
+| `app/types/index.ts` | 435 | 443 |
+
+### Schema → alias
+
+| Alias | Source |
+|---|---|
+| `Conversation` | `CrmConversationResource` |
+| `ConversationMessage` | `Conversation['messages'][number]` |
+| `ConversationStatus` | named schema |
+| `MessageDirection` | named schema |
+| `ConversationReplyInput` | `ReplyToConversationRequest` |
+| `ConversationLinkInput` | `LinkConversationContactRequest` |
+| `B2bPartnerRow` | `B2bPartnerResource` |
+| `PortalPaymentLinkInput` | `CreatePortalPaymentLinkRequest` (`portal.ts`) |
+
+`ConversationLinkInput` is not in the task table. Task 05 posts link-contact, so the alias ships in this release. There is no export named `Message` or `Conversation`. `MessageTemplate` stays the template alias. The created link stays the existing `PaymentLink` alias in `payments.ts`. `portal.ts` does not import it.
+
+### Leftovers
+
+`messages` is required on `CrmConversationResource`. The index omits the key unless the relation is loaded. The PHPDoc already marks it optional (`messages?:`). Scramble still requires it. The show, reply, link, and status routes load the relation. No second type was written.
+
+`B2bPartnerRow` is the list/detail union. Only the detail arm has `deals`. `enrolment` is the full object, the summary object, or null. `enrolment_note` is the constant sentence or null, not a free string.
+
+`UpdateConversationRequest` exists (`status: ConversationStatus`). Task 05 does not close a thread, so it has no alias.
+
+`PaymentLinkResource.kind` and `status` stay strings. `PaymentLinkStatus` stays the hand-written union already in `payments.ts`.
+
+### Checks
+
+Layer `pnpm lint`, `pnpm typecheck`, `pnpm test` (35) and `pnpm build` passed. Panel, engine, and portal `pnpm typecheck` and `pnpm build` passed against the sibling layer.
+
+Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine,anakata-portal}`, working trees overlaid (no `node_modules`). The ui clone is **0.16.0**. Panel, engine, and portal resolve the sibling layer, so they do not fetch `#v0.16.0`. `pnpm typecheck` and `pnpm build` passed in all four.
+
+- ui / panel / engine / portal: typecheck pass
+- ui / panel / engine / portal: build pass
+- **OVERLAY CLONE OK**
+
+The tag is not pushed. The after-push clone was not run. Repeat the clone after the commands below, checking out `anakata-ui` at `v0.16.0` with no overlay.
+
+### Git
+
+Not run:
+
+```bash
+# anakata-api
+git add \
+  app/Http/Resources/Crm/B2bPartnerResource.php \
+  app/Http/Resources/Crm/CrmConversationResource.php \
+  app/Http/Resources/Crm/CrmMessageResource.php \
+  docs/sprints/sprint-15/REPORT.md \
+  tests/Feature/OpenApi/CrmResponseSchemasTest.php \
+  tests/Feature/OpenApi/PortalResponseSchemasTest.php
+
+git commit -m "$(cat <<'EOF'
+Type the inbox, B2B partner, and portal payment-link schemas.
+
+EOF
+)"
+
+# anakata-ui
+git add \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/crm.ts \
+  app/types/index.ts \
+  app/types/portal.ts \
+  package.json
+
+git commit -m "$(cat <<'EOF'
+Release v0.16.0 with inbox, B2B, and portal payment-link types.
+
+EOF
+)"
+
+git tag v0.16.0
+git push origin HEAD
+git push origin v0.16.0
+
+# anakata-panel, anakata-engine, anakata-portal
+git add README.md nuxt.config.ts
+
+git commit -m "$(cat <<'EOF'
+Pin anakata-ui v0.16.0.
+
+EOF
+)"
+```

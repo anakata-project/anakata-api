@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Crm;
 
+use App\Enums\AgencyStatus;
 use App\Enums\DealStage;
+use App\Enums\JourneyEnrolmentStatus;
 use App\Models\Agency;
 use App\Models\Contact;
 use App\Models\Deal;
@@ -41,19 +43,19 @@ class B2bPartnerResource extends JsonResource
      *     id: int,
      *     reference: string,
      *     name: string,
-     *     status: string,
+     *     status: AgencyStatus,
      *     commission_pct: int,
      *     contact: array{id: int, name: string}|null,
      *     revenue: int,
      *     commission_accrued: int,
-     *     enrolment: array{status: string, step: array{position: int, name: string}|null, next_due_at: string|null}|null,
+     *     enrolment: array{status: JourneyEnrolmentStatus, step: array{position: int, name: string}|null, next_due_at: string|null}|null,
      *     enrolment_note: string|null,
      *     open_deal_count: int
      * }|array{
      *     id: int,
      *     reference: string,
      *     name: string,
-     *     status: string,
+     *     status: AgencyStatus,
      *     commission_pct: int,
      *     contact: array{id: int, name: string}|null,
      *     revenue: int,
@@ -65,7 +67,7 @@ class B2bPartnerResource extends JsonResource
      *         booking: array{id: int, reference: string|null}|null,
      *         step: array{position: int, name: string, template_key: string}|null,
      *         next_due_at: string|null,
-     *         status: string,
+     *         status: JourneyEnrolmentStatus,
      *         exit_reason: string|null,
      *         enrolled_at: string|null,
      *         exited_at: string|null,
@@ -73,7 +75,7 @@ class B2bPartnerResource extends JsonResource
      *     }|null,
      *     enrolment_note: string|null,
      *     open_deal_count: int,
-     *     deals: list<array<string, mixed>>
+     *     deals: list<DealResource>
      * }
      */
     public function toArray(Request $request): array
@@ -93,7 +95,7 @@ class B2bPartnerResource extends JsonResource
             'id' => $agency->id,
             'reference' => $agency->reference,
             'name' => $agency->name,
-            'status' => $agency->status->value,
+            'status' => $this->agencyStatus($agency),
             'commission_pct' => $agency->commission_pct,
             'contact' => $contact instanceof Contact ? [
                 'id' => $contact->id,
@@ -110,20 +112,20 @@ class B2bPartnerResource extends JsonResource
             return $payload;
         }
 
-        $payload['deals'] = $this->dealHistory($agency, $request);
+        $payload['deals'] = $this->dealHistory($agency);
 
         return $payload;
     }
 
     /**
-     * @return array{status: string, step: array{position: int, name: string}|null, next_due_at: string|null}|array{
+     * @return array{status: JourneyEnrolmentStatus, step: array{position: int, name: string}|null, next_due_at: string|null}|array{
      *     id: int,
      *     journey_key: string,
      *     contact: array{id: int, name: string, email: string|null},
      *     booking: array{id: int, reference: string|null}|null,
      *     step: array{position: int, name: string, template_key: string}|null,
      *     next_due_at: string|null,
-     *     status: string,
+     *     status: JourneyEnrolmentStatus,
      *     exit_reason: string|null,
      *     enrolled_at: string|null,
      *     exited_at: string|null,
@@ -144,7 +146,7 @@ class B2bPartnerResource extends JsonResource
     }
 
     /**
-     * @return array{status: string, step: array{position: int, name: string}|null, next_due_at: string|null}
+     * @return array{status: JourneyEnrolmentStatus, step: array{position: int, name: string}|null, next_due_at: string|null}
      */
     private function enrolmentSummary(JourneyEnrolment $enrolment): array
     {
@@ -152,7 +154,7 @@ class B2bPartnerResource extends JsonResource
         $step = $enrolment->journey->steps->firstWhere('position', $enrolment->position);
 
         return [
-            'status' => $enrolment->status->value,
+            'status' => $this->enrolmentStatus($enrolment),
             'step' => $step instanceof JourneyStep ? [
                 'position' => $step->position,
                 'name' => $step->name,
@@ -169,7 +171,7 @@ class B2bPartnerResource extends JsonResource
      *     booking: array{id: int, reference: string|null}|null,
      *     step: array{position: int, name: string, template_key: string}|null,
      *     next_due_at: string|null,
-     *     status: string,
+     *     status: JourneyEnrolmentStatus,
      *     exit_reason: string|null,
      *     enrolled_at: string|null,
      *     exited_at: string|null,
@@ -179,7 +181,7 @@ class B2bPartnerResource extends JsonResource
     private function fullEnrolment(JourneyEnrolment $enrolment, Request $request): array
     {
         $resolved = (new CrmJourneyEnrolmentResource($enrolment))->resolve($request);
-        $resolved['status'] = $enrolment->status->value;
+        $resolved['status'] = $this->enrolmentStatus($enrolment);
 
         return $resolved;
     }
@@ -213,17 +215,27 @@ class B2bPartnerResource extends JsonResource
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<DealResource>
      */
-    private function dealHistory(Agency $agency, Request $request): array
+    private function dealHistory(Agency $agency): array
     {
         $rows = [];
 
         foreach ($this->dealsFor($agency)->orderByDesc('stage_entered_at')->orderByDesc('id')->get() as $deal) {
-            $rows[] = (new DealResource(DealDrawer::for($deal)))->resolve($request);
+            $rows[] = new DealResource(DealDrawer::for($deal));
         }
 
         return $rows;
+    }
+
+    private function agencyStatus(Agency $agency): AgencyStatus
+    {
+        return $agency->status;
+    }
+
+    private function enrolmentStatus(JourneyEnrolment $enrolment): JourneyEnrolmentStatus
+    {
+        return $enrolment->status;
     }
 
     /**

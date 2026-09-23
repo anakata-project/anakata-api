@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Crm;
 
+use App\Enums\MessageDirection;
 use App\Models\Message;
 use App\Support\Iso;
 use Dedoc\Scramble\Attributes\SchemaName;
@@ -22,7 +23,7 @@ class CrmMessageResource extends JsonResource
     /**
      * @return array{
      *     id: int,
-     *     direction: string,
+     *     direction: MessageDirection,
      *     from: string,
      *     to: list<string>,
      *     subject: string,
@@ -44,7 +45,7 @@ class CrmMessageResource extends JsonResource
 
         return [
             'id' => $message->id,
-            'direction' => $message->direction->value,
+            'direction' => $this->direction($message),
             'from' => $message->from,
             'to' => $message->to,
             'subject' => $message->subject,
@@ -55,5 +56,10 @@ class CrmMessageResource extends JsonResource
             'sent_at' => Iso::utc($message->sent_at),
             'staff_id' => $message->staff_id,
         ];
+    }
+
+    private function direction(Message $message): MessageDirection
+    {
+        return $message->direction;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Crm;
 
+use App\Enums\ConversationStatus;
 use App\Models\Conversation;
 use App\Support\Iso;
 use Dedoc\Scramble\Attributes\SchemaName;
@@ -30,7 +31,7 @@ class CrmConversationResource extends JsonResource
      *     preview: string,
      *     unread: bool,
      *     message_count: int,
-     *     status: string,
+     *     status: ConversationStatus,
      *     last_message_at: string|null,
      *     messages?: list<CrmMessageResource>
      * }
@@ -44,7 +45,7 @@ class CrmConversationResource extends JsonResource
      *     preview: string,
      *     unread: bool,
      *     message_count: int,
-     *     status: string,
+     *     status: ConversationStatus,
      *     last_message_at: string|null,
      *     messages?: AnonymousResourceCollection
      * }
@@ -66,7 +67,7 @@ class CrmConversationResource extends JsonResource
             'preview' => $conversation->preview(),
             'unread' => $conversation->unread,
             'message_count' => $this->messageCount($conversation),
-            'status' => $conversation->status->value,
+            'status' => $this->status($conversation),
             'last_message_at' => Iso::utc($conversation->last_message_at),
         ];
 
@@ -75,6 +76,11 @@ class CrmConversationResource extends JsonResource
         }
 
         return $row;
+    }
+
+    private function status(Conversation $conversation): ConversationStatus
+    {
+        return $conversation->status;
     }
 
     private function messageCount(Conversation $conversation): int
