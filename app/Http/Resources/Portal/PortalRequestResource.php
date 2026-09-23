@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Portal;
 
+use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Support\Agencies\PortalPreview;
 use App\Support\Portal\PortalRequestWords;
@@ -20,7 +21,7 @@ class PortalRequestResource extends JsonResource
     /**
      * @return array{
      *     reference: string|null,
-     *     status: string,
+     *     status: BookingStatus,
      *     lead_guest: string,
      *     next: string
      * }
@@ -31,9 +32,14 @@ class PortalRequestResource extends JsonResource
 
         return [
             'reference' => $this->displayReference(),
-            'status' => $this->status->value,
+            'status' => $this->bookingStatus(),
             'lead_guest' => PortalPreview::leadGuestName($this->resource),
             'next' => PortalRequestWords::forBooking($this->resource),
         ];
+    }
+
+    private function bookingStatus(): BookingStatus
+    {
+        return $this->status;
     }
 }

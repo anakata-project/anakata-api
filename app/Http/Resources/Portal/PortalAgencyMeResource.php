@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Portal;
 
+use App\Enums\AgencyStatus;
 use App\Models\AgencyUser;
 use App\Models\SalesMaterial;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class PortalAgencyMeResource extends JsonResource
 
     /**
      * @return array{
-     *     agency: array{name: string, reference: string, commission_pct: int, payment_terms: string, status: string},
+     *     agency: array{name: string, reference: string, commission_pct: int, payment_terms: string, status: AgencyStatus},
      *     user: array{id: int, name: string, email: string},
      *     materials_exist: bool
      * }
@@ -35,7 +36,7 @@ class PortalAgencyMeResource extends JsonResource
                 'reference' => $agency->reference,
                 'commission_pct' => $agency->commission_pct,
                 'payment_terms' => $agency->payment_terms,
-                'status' => $agency->status->value,
+                'status' => $agency->status,
             ],
             'user' => [
                 'id' => $this->id,

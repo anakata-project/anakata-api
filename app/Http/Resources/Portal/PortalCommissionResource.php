@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Portal;
 
+use App\Enums\CommissionAccrualStatus;
 use App\Models\Booking;
 use App\Models\CommissionPayout;
 use App\Services\Config\CurrentConfig;
@@ -24,7 +25,7 @@ class PortalCommissionResource extends JsonResource
      *     rate: int|null,
      *     commission_amount: int,
      *     payable_date: string,
-     *     status: string,
+     *     status: CommissionAccrualStatus,
      *     payout: array{paid_on: string, reference: string|null}|null
      * }
      */
@@ -37,7 +38,7 @@ class PortalCommissionResource extends JsonResource
             'rate' => $this->commission_pct,
             'commission_amount' => $this->resource->commissionAmount(),
             'payable_date' => Accrual::payableDate($this->resource, $rules)->toDateString(),
-            'status' => Accrual::status($this->resource, $rules)->value,
+            'status' => Accrual::status($this->resource, $rules),
             'payout' => $this->commissionPayout instanceof CommissionPayout ? [
                 'paid_on' => $this->commissionPayout->paid_on->toDateString(),
                 'reference' => $this->reference,

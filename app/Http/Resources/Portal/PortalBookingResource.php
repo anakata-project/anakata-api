@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Portal;
 
+use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Support\Agencies\PortalPreview;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class PortalBookingResource extends JsonResource
      *     reference: string|null,
      *     departure_date: string,
      *     itinerary: string,
-     *     status: string,
+     *     status: BookingStatus,
      *     lead_guest: string,
      *     net_due: int,
      *     payment_state: string
@@ -33,10 +34,15 @@ class PortalBookingResource extends JsonResource
             'reference' => $this->reference,
             'departure_date' => $this->departure->date->toDateString(),
             'itinerary' => $this->departure->itinerary->code,
-            'status' => $this->status->value,
+            'status' => $this->bookingStatus(),
             'lead_guest' => PortalPreview::leadGuestName($this->resource),
             'net_due' => PortalPreview::netDue($this->resource),
             'payment_state' => $this->resource->paymentStateWords(),
         ];
+    }
+
+    private function bookingStatus(): BookingStatus
+    {
+        return $this->status;
     }
 }

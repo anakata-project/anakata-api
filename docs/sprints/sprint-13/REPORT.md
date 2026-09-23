@@ -117,3 +117,148 @@ Git (not run):
 git add database/migrations/2026_09_23_140001_create_sales_materials_table.php app/Enums/SalesMaterialKind.php app/Models/SalesMaterial.php database/factories/SalesMaterialFactory.php config/filesystems.php app/Providers/AppServiceProvider.php app/Support/SalesMaterials/MaterialFile.php app/Rules/SalesMaterialUpload.php app/Actions/SalesMaterials/UploadSalesMaterial.php app/Actions/SalesMaterials/SetSalesMaterialPublished.php app/Actions/Portal/RecordMaterialDownload.php app/Policies/SalesMaterialPolicy.php app/Policies/AgencyPolicy.php app/Http/Requests/Rms/StoreSalesMaterialRequest.php app/Http/Requests/Rms/IndexSalesMaterialsRequest.php app/Http/Requests/Rms/IndexPortalActivityRequest.php app/Http/Resources/Rms/SalesMaterialResource.php app/Http/Resources/Rms/PortalActivityResource.php app/Http/Resources/Portal/PortalSalesMaterialResource.php app/Http/Resources/Portal/PortalAgencyMeResource.php app/Http/Controllers/Rms/SalesMaterialController.php app/Http/Controllers/Rms/AgencyController.php app/Http/Controllers/Portal/PortalSalesMaterialController.php app/Support/Portal/PortalActivity.php routes/api/rms.php routes/api/portal.php tests/Feature/Agencies/SalesMaterialsTest.php tests/Feature/Portal/PortalSalesMaterialsStubTest.php docs/sprints/sprint-13/REPORT.md
 git commit -m "Let staff publish sales materials and record every agent download."
 ```
+
+## Task 05 · Regenerate types, release v0.14.0
+
+Types only. The layer is `0.13.0` → `0.14.0`. `pnpm types:api` regenerated `app/types/api.d.ts` from `http://localhost:8000/docs/api.json`. That file was not edited by hand. `portal.ts` imports only `components` from `./api`.
+
+`anakata-portal` is not in this workspace. Its typecheck, build, and `#v0.14.0` pin stay with task 06.
+
+### Prelude
+Responses that were a raw JSON body, or a status Scramble typed as `string`, now name the enum. JSON values are unchanged (backed enums encode as their string).
+
+- Rates: `GET /api/portal/rates` returns `PortalNetRateResource::collection(...)`. The body stays `{ data: [{ year, suite_pp, owner_pp, charter_week }] }`.
+- Agency `me` status is `AgencyStatus`. Availability is shaped before `toArray` so Scramble reads `DepartureStatus`, `EngineLabelCode`, integer id and net rates, and a boolean `festive`. Tone is still omitted.
+- Booking, request, and created-request status is `BookingStatus`. Commission status is `CommissionAccrualStatus`. Material `kind` (portal and RMS) is `SalesMaterialKind`. A private method with that return type is what made Scramble emit the `$ref`; returning the mixin property was still inferred as `string`.
+- The created-request `references` list is built in a loop, and the empty-string status fallback is gone.
+- Forgot, reset, and the RMS invite stay inline `{ message }` objects. They already had properties. Invite has no body.
+
+`PortalResponseSchemasTest`: 1 passed (162 assertions). Portal feature tests: 49 passed. `SalesMaterialsTest`: 8 passed. Pint and Larastan are clean on the touched app files.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 15418 | 16715 |
+| `app/types/portal.ts` | — | 25 |
+| `app/types/payments.ts` | 161 | 167 |
+| `app/types/index.ts` | 388 | 411 |
+| `app/types/inventory.ts` | 253 | 252 |
+
+### Schema → alias
+
+| Alias | Source |
+|---|---|
+| `PortalSession` | `PortalMeResource` |
+| `PortalAgency` | `PortalAgencyMeResource` |
+| `PortalNetRates` | `PortalNetRateResource` |
+| `PortalAvailabilityRow` | `PortalAvailabilityResource` |
+| `PortalBooking` | `PortalBookingResource` |
+| `PortalCommission` | `PortalCommissionResource` |
+| `PortalMaterial` | `PortalSalesMaterialResource` |
+| `PortalRequest` | `PortalRequestResource` |
+| `PortalRequestCreated` | `PortalRequestCreatedResource` |
+| `PortalRequestInput` | `StorePortalRequestRequest` |
+| `AcceptPortalInviteInput` | `AcceptInviteRequest` |
+| `PortalLoginInput` | `PortalLoginRequest` |
+| `PortalForgotInput` | `PortalForgotPasswordRequest` |
+| `PortalResetInput` | `PortalResetPasswordRequest` |
+| `SalesMaterial` / `SalesMaterialKind` | `SalesMaterialResource` / named `SalesMaterialKind` (`payments.ts`) |
+| `StoreSalesMaterialInput` | `StoreSalesMaterialRequest` |
+| `PortalActivity` | `PortalActivityResource` |
+| `SuspendPortalInput` | `SuspendAgencyPortalRequest` |
+| `ResumePortalInput` | `ResumeAgencyPortalRequest` |
+| `EngineLabelCode` | named `EngineLabelCode` (`inventory.ts`; was a hand-written union) |
+
+### Leftovers
+`PortalBooking.payment_state` is the inline enum `"Paid in full" | "Awaiting deposit" | "Deposit received"`. Scramble did not emit a named schema. The alias uses that field.
+
+`PortalRequest.next` stays `string`. The sentence interpolates the SLA hours.
+
+`PortalActivity.event` stays `string`. The values are history event names.
+
+`POST /api/rms/agencies/{agency}/users/{user}/invite` has no body, so there is no invite input alias. The response is the same inline `{ message }` shape as forgot and reset.
+
+Portal and RMS material file routes are `application/octet-stream`. No JSON schema and no alias.
+
+`EngineLabelTone` is still a hand-written union. The portal label does not return tone, so Scramble still emits a string for it.
+
+`StorePortalRequestRequest.client_of_record` is Laravel's `accepted` union (`"yes" | "on" | "1" | 1 | "true" | true`), not a boolean.
+
+### Checks
+Layer lint, typecheck, test (35) and build passed. Panel and engine typecheck and build passed against the sibling layer.
+
+Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine}`, working trees overlaid (no `node_modules`). The ui clone is **0.14.0** and has **no** `app/types/nuxt.d.ts`. Panel and engine resolve the sibling layer, so they do not fetch `#v0.14.0`. `pnpm typecheck` and `pnpm build` passed in all three.
+
+- ui / panel / engine: typecheck pass
+- ui / panel / engine: build pass
+- **OVERLAY CLONE OK**
+
+The tag is not pushed. The after-push clone was not run. Repeat the clone after the commands below, checking out `anakata-ui` at `v0.14.0` with no overlay.
+
+### Git commands
+Do not run these in the agent. Explicit paths only. Run in this order.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Portal/PortalAgencyController.php \
+  app/Http/Resources/Portal/PortalAgencyMeResource.php \
+  app/Http/Resources/Portal/PortalAvailabilityResource.php \
+  app/Http/Resources/Portal/PortalBookingResource.php \
+  app/Http/Resources/Portal/PortalCommissionResource.php \
+  app/Http/Resources/Portal/PortalRequestCreatedResource.php \
+  app/Http/Resources/Portal/PortalRequestResource.php \
+  app/Http/Resources/Portal/PortalSalesMaterialResource.php \
+  app/Http/Resources/Portal/PortalNetRateResource.php \
+  app/Http/Resources/Rms/SalesMaterialResource.php \
+  tests/Feature/OpenApi/PortalResponseSchemasTest.php \
+  docs/sprints/sprint-13/REPORT.md
+git commit -m "$(cat <<'EOF'
+Type the Sprint 13 portal and sales-material responses.
+
+Scramble now names the portal status enums and the net-rate row.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/index.ts \
+  app/types/portal.ts \
+  app/types/payments.ts \
+  app/types/inventory.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for the Sprint 13 portal.
+
+Aliases point at the generated schemas. The request sentence and the activity event stay strings.
+EOF
+)"
+git tag v0.14.0
+git push origin HEAD
+git push origin v0.14.0
+```
+
+```bash
+# 3. pin the panel and the engine
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add nuxt.config.ts README.md
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.14.0.
+EOF
+)"
+
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add nuxt.config.ts README.md
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.14.0.
+EOF
+)"
+```

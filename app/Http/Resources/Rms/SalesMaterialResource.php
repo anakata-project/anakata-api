@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Rms;
 
+use App\Enums\SalesMaterialKind;
 use App\Models\SalesMaterial;
 use App\Support\Iso;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class SalesMaterialResource extends JsonResource
      * @return array{
      *     id: int,
      *     title: string,
-     *     kind: string,
+     *     kind: SalesMaterialKind,
      *     agency_id: int|null,
      *     version: int,
      *     bytes: int,
@@ -37,7 +38,7 @@ class SalesMaterialResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'kind' => $this->kind->value,
+            'kind' => $this->materialKind(),
             'agency_id' => $this->agency_id,
             'version' => $this->version,
             'bytes' => $this->bytes,
@@ -49,5 +50,10 @@ class SalesMaterialResource extends JsonResource
             ],
             'updated_at' => Iso::utc($this->updated_at),
         ];
+    }
+
+    private function materialKind(): SalesMaterialKind
+    {
+        return $this->kind;
     }
 }
