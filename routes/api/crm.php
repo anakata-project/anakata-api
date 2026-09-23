@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Crm\AutomationController;
+use App\Http\Controllers\Crm\B2bPartnerController;
 use App\Http\Controllers\Crm\CampaignController;
 use App\Http\Controllers\Crm\ContactConsentController;
 use App\Http\Controllers\Crm\ContactController;
@@ -39,6 +40,9 @@ Route::get('journeys', [JourneyController::class, 'index']);
 Route::get('journeys/{journey}/enrolments', [JourneyController::class, 'enrolments']);
 Route::patch('journeys/{journey}', [JourneyController::class, 'update']);
 Route::get('contacts/{contact}/journeys', [JourneyController::class, 'forContact']);
+
+Route::get('b2b-partners', [B2bPartnerController::class, 'index']);
+Route::get('b2b-partners/{agency}', [B2bPartnerController::class, 'show'])->whereNumber('agency');
 
 Route::get('automations', [AutomationController::class, 'index']);
 Route::patch('automations/{key}', [AutomationController::class, 'update'])->where('key', '[A-Za-z0-9:_-]+');

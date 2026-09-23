@@ -101,3 +101,59 @@ Add the CRM inbox: polled inbound mail, threaded conversations, and staff replie
 EOF
 )"
 ```
+
+## Task 02 · CRM B2B partners
+
+Read-only. No new tables. `GET /api/crm/b2b-partners` and `GET /api/crm/b2b-partners/{agency}`. Nothing writes `agencies`, `commission_pct`, or money. `Contact::viewAny` (`panel.crm`) authorises both. `AgencyPolicy` is `panel.rms` and is not used.
+
+`ContactDerived` did not resolve an agency to a contact. The matcher that enrols `b2b_partner_activation` was private `JourneyEngine::agencyContact()`. That body is now `ContactDerived::contactForAgency()`: `Contact::normalizeEmail()` on the agency email, then `LOWER(contacts.email)`. The engine calls it. A missing contact is not created. The Agent lifecycle SQL is unchanged.
+
+### Fields
+
+This page computes nothing new.
+
+| Field | Origin |
+|---|---|
+| `id`, `reference`, `name`, `status` | `agencies` |
+| `commission_pct` | `agencies.commission_pct` |
+| `contact.id`, `contact.name` | `contacts`, via `ContactDerived::contactForAgency()`. Null when no email match. |
+| `revenue` | `AgencyBookingWindow::stats()` on the agency's bookings. Sum of `bookings.total`. Same helper `AgencyResource` uses when no date window is set. |
+| `commission_accrued` | Same helper. Sum of `Booking::commissionAmount()` where `commission_approved` is true and there is no payout. |
+| `enrolment` | `journey_enrolments` for journey key `b2b_partner_activation` on the matched contact. Step name and position from `journey_steps`. `next_due_at` from the enrolment. The list returns status, step, and next due. Show returns `CrmJourneyEnrolmentResource` (sends, exit, booking). |
+| `enrolment_note` | Not a column. Set only when `contact` is null: "No CRM contact matches this agency, so b2b_partner_activation was not enrolled." |
+| `open_deal_count` | `deals` whose `booking_id`, or any booking in `group_id`, has `bookings.agency_id`. Projected stage is `DealStages::stageSql()`. Counted only when that stage is in `DealStage::open()` (`NEW_LEAD`, `QUALIFYING`, `QUOTED`, `NEGOTIATION`). `deals` has no `agency_id`. An unbound deal has no agency, so it does not count. |
+| `deals` (show) | That same agency link, newest `stage_entered_at` first, each row `DealDrawer::for()` through `DealResource`. |
+
+### No contact
+
+An agency with no matching CRM contact is on the list. Contact fields are null, enrolment is null, and `enrolment_note` says the journey never enrolled. Sprint 14 does not create a contact and does not enrol in that case. Hiding the row would hide the skip. A contact that exists but was never enrolled has `enrolment: null` and `enrolment_note: null`.
+
+### Production KPI
+
+Not built. The prototype's "2 producing partners" count has no rule. "Has a booking in the last 12 months" would be a guess. This waits on a business definition of producing, the same way Sprint 14 declined to invent journey conversion rates. Revenue and commission accrued stay the RMS ledger figures above. The list has no `meta.kpis`.
+
+### PATCH
+
+`PATCH /api/crm/b2b-partners/{agency}` is **405**, not 404 and not 403. The GET route occupies that URI, so Laravel reports the method as not allowed. `commission_pct` is unchanged. There is no write action on this controller.
+
+### Git
+
+Not run:
+
+```bash
+git add \
+  app/Http/Controllers/Crm/B2bPartnerController.php \
+  app/Http/Resources/Crm/B2bPartnerResource.php \
+  app/Support/Crm/ContactDerived.php \
+  app/Support/Journeys/JourneyEngine.php \
+  docs/sprints/sprint-15/REPORT.md \
+  routes/api/crm.php \
+  tests/Feature/Crm/B2bPartnersTest.php \
+  tests/Feature/OpenApi/CrmResponseSchemasTest.php
+
+git commit -m "$(cat <<'EOF'
+Add the CRM B2B partner read model.
+
+EOF
+)"
+```

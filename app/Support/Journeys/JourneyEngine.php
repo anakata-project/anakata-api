@@ -709,13 +709,7 @@ final class JourneyEngine
 
     private function agencyContact(Agency $agency): ?Contact
     {
-        $email = strtolower(trim($agency->email));
-
-        if ($email === '') {
-            return null;
-        }
-
-        return Contact::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+        return ContactDerived::contactForAgency($agency);
     }
 
     private function marketingAllowed(Contact $contact): bool

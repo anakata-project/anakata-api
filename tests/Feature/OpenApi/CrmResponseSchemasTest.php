@@ -104,6 +104,7 @@ test('crm OpenAPI schemas have properties', function (): void {
         'DeliveryIndexResource',
         'CrmConversationResource',
         'CrmMessageResource',
+        'B2bPartnerResource',
     ];
 
     foreach ($expected as $name) {

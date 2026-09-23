@@ -10,7 +10,9 @@ use App\Enums\ConsentPurpose;
 use App\Enums\ContactLifecycle;
 use App\Enums\ContactSegment;
 use App\Enums\ContactType;
+use App\Models\Agency;
 use App\Models\Booking;
+use App\Models\Contact;
 use App\Support\BusinessTime;
 use App\Support\Config\Documents\CrmRules;
 use InvalidArgumentException;
@@ -188,6 +190,21 @@ final class ContactDerived
             ORDER BY bookings.id ASC
             LIMIT 1
         )';
+    }
+
+    /**
+     * CRM contact whose email matches the agency. Same match the partner journey enrols.
+     * A missing contact is left missing.
+     */
+    public static function contactForAgency(Agency $agency): ?Contact
+    {
+        $email = Contact::normalizeEmail($agency->email);
+
+        if ($email === null) {
+            return null;
+        }
+
+        return Contact::query()->whereRaw('LOWER(email) = ?', [$email])->first();
     }
 
     /**
