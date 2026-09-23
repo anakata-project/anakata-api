@@ -16,6 +16,7 @@ The CRM list is the people record. If lifecycle, lifetime value, segment or cons
 6. Set **Lifecycle — All** to **BOOKED**. Read the remaining rows, then set it back to All.
 7. Set **Consent — All** to **Marketing opted in**, then **Transactional only**. Set it back to All.
 8. Open `http://localhost:3001/crm/system/consent`, then return to Contacts. Read Fontaine’s lifecycle again.
+9. Open **A. Fontaine**. Read the **Journeys** section.
 
 ## Expected
 - [ ] E1 · Notice: `The CRM is the system of record for people: identity, attribution, consent, lifecycle, segment, preferred channel, NPS. Passport, date of birth and medical data live only in the RMS and are never here.`
@@ -27,6 +28,7 @@ The CRM list is the people record. If lifecycle, lifetime value, segment or cons
 - [ ] E7 · Lifecycle **BOOKED** shrinks the list. Fontaine stays. L. Moreau (SQL) leaves. Clearing the filter restores the full list.
 - [ ] E8 · **Transactional only** includes M. Castellanos (`ANK-2026-0007` has no marketing consent). **Marketing opted in** includes Fontaine. ⚠ UNVERIFIED — `DemoConsentsSeeder`.
 - [ ] E9 · After opening the consent register, Fontaine’s lifecycle is still **BOOKED**. The register does not retype lifecycle.
+- [ ] E10 · The drawer has a **Journeys** heading. On a fresh seed it says `No enrolments.`
 
 ## Notes
 Values: `fixtures/reference-values.md` (CRM contacts). Do not type passport, date of birth or nationality onto this page.

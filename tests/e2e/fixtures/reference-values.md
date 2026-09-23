@@ -480,4 +480,58 @@ After reset the drawer says `No sales materials yet.` The portal Materials page 
 
 `portal.invite_valid_days` is 14, status PENDING CLIENT (`BusinessRulesEndpointsTest`). Sprint 14 adds `consent-checkout-marketing` (PENDING CLIENT, LEG-002). Counts: tracked **91**, adjusted here **66**, set in other tabs **15**, differs / flagged **42**. Locked stays **10**. ⚠ UNVERIFIED — Pest, not a reset screen.
 
+## Sprint 14 · segments, journeys, catalogue
+
+Checkout marketing version string: `v1 (pending LEG-002)`.
+
+### Nine segments
+
+Source: `SegmentsSeeder`. All nine are `system` and `active`. Marketing rows are AND-NOT suppression. `suppressed` is operational and last. Membership counts are ⚠ UNVERIFIED. They were not read from a fresh seed. Leave them blank until a read-only count on a fresh seed. Do not copy a live screen.
+
+| Key | Name | Kind | Sentence | Count |
+|---|---|---|---|---|
+| `warm_dreamers` | Warm dreamers | MARKETING | Viewed at least 2 itineraries and has not submitted a booking request. | |
+| `abandoned_checkout` | Abandoned checkout | MARKETING | Started checkout in the last 14 days and has not submitted a booking request. | |
+| `holding_not_paid` | Holding — not paid | OPERATIONAL | Has a booking in REQUESTED whose hold has not expired. | |
+| `festive_prospects` | Festive prospects | MARKETING | Viewed a festive departure. | |
+| `families_6_17` | Families 6–17 | MARKETING | A guest on one of their bookings is aged 6 to 17 at departure. | |
+| `past_guests_high_ltv` | Past guests — HIGH LTV | MARKETING | Past guest whose lifetime value is in the HIGH band. | |
+| `advisors_non_producing` | Advisors — non-producing | OPERATIONAL | Approved travel advisor with no booking in the last 90 days. | |
+| `dach_luxury` | DACH luxury | MARKETING | Country is Germany, Austria or Switzerland. | |
+| `suppressed` | Suppressed | OPERATIONAL | Marketing consent withdrawn or never given, an erasure, or a hard bounce. | |
+
+### Eight journeys
+
+Source: `JourneysSeeder`. All eight are `system` and `active` false on a fresh seed, so every step count on the card is 0. Step lists are the seeder, not a screen.
+
+| Key | Name | Kind | Steps |
+|---|---|---|---|
+| `nurture_to_request` | Nurture to Request — D2C | MARKETING | `lead`: 5 sends (day 0, 2, 6, 12, 21). `abandoned_checkout`: 3 sends (Cart recovery 1 at 24 h, Cart recovery 2 at 48 h, Cart recovery 3 at 7 days). |
+| `request_to_deposit` | Request to Deposit — confirm the booking | TRANSACTIONAL | 4. Send hour 0, task at 4 h, send day 1, send day 2. |
+| `payment_calendar` | Payment Calendar — automated | TRANSACTIONAL | 3 pointers. |
+| `extras_ancillaries` | Extras & Ancillaries | TRANSACTIONAL | 3 sends + 1 task. |
+| `ready_to_depart` | Ready to Depart — pre-trip | TRANSACTIONAL | 5. Pointers: `pretrip` (keys `pretrip` and `questionnaire`), `data_chaser`, `manifest_data_overdue` at rule `dpng_due` (not T−21). Sends: `questionnaire_reminder` (T−14), `arrival_instructions` (T−3). The exit sentence still says “ops alert at T−21”. |
+| `reengagement` | Re-engagement — book again | MARKETING | 3 sends. |
+| `b2b_partner_activation` | B2B Partner Activation | TRANSACTIONAL | 1 pointer + 2 sends + 1 repeating task. |
+| `winback` | Win-back — lost and expired | MARKETING | 3 sends. |
+
+Trigger line for turning Request to Deposit on: `The booking request they submitted.` Nurture trigger line: `engine: lead.captured · abandon_cart — marketing consent required`.
+
+### Catalogue
+
+`tests/Feature/Crm/AutomationsTest.php` asserts **58** rows, **54** built, **4** not built. Not a screen.
+
+Not built, grey, `not_built_note`, no toggle:
+
+| Key | Name | Note |
+|---|---|---|
+| `wire_instructions` | Wire instructions | Staff send wire instructions from the RMS. Nothing sends them on a timer. |
+| `overdue_client` | Overdue — day 1 | No client overdue email. The flag, the OVERDUE_BALANCE alert and the overdue task are separate rows. |
+| `escalation_review` | Escalation — manual review | OPS-007 is a person's decision. No escalation email is sent. |
+| `high_value_lead` | High-value new lead | No alert kind. The charter enquiry email is its own row. |
+
+`portal_invite` (Welcome — partner approved) is built and not switchable. `locked_reason`: `The rule behind this message must not depend on a switch.`
+
+`balance_reminder_21` is switchable. Name: Balance reminder — 21 days.
+
 

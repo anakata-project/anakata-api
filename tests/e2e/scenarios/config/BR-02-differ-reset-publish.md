@@ -14,6 +14,6 @@ Changing a sourced value must flag the row; Reset must restore; publish must wri
 4. Set `15` again. In the top bar, approval `E2E-BR-02`. `Save & publish`. Confirm `Publish these changes?` Scroll to **Rules publish history** (below the fold).
 
 ## Expected
-- [ ] E1 · At 15 (before reset), the FIN-005 row shows `≠ differs from source`. **Differs / flagged** KPI is **42** (41 seeded flags + this differ). ⚠ UNVERIFIED — 41 from `BusinessRulesEndpointsTest` + one differ; not a reset screen.
-- [ ] E2 · `Reset to source` returns the value to `12`, the differs mark is gone, KPI is **41**, and `Reset to source` is no longer offered on that row. ⚠ UNVERIFIED — same seeded-flag count.
+- [ ] E1 · At 15 (before reset), the FIN-005 row shows `≠ differs from source`. **Differs / flagged** KPI is **43** (42 seeded flags + this differ). ⚠ UNVERIFIED — 42 from `BusinessRulesEndpointsTest` + one differ; not a reset screen.
+- [ ] E2 · `Reset to source` returns the value to `12`, the differs mark is gone, KPI is **42**, and `Reset to source` is no longer offered on that row. ⚠ UNVERIFIED — same seeded-flag count.
 - [ ] E3 · After publish of 15: history sentence includes `FIN-005 · Max agency commission: 12% → 15%` (or the same numbers in the Item / Change columns). Approval `E2E-BR-02`. State `● PUBLISHED — V2 · … · Carolina M.` ⚠ UNVERIFIED — version label V2 assumes fresh-seed current is v1 (`initial()` now includes holds).

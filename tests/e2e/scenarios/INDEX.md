@@ -155,3 +155,16 @@ The latest result for every P1 is [`runs/LEDGER.md`](../runs/LEDGER.md).
 | PREQ-03 | A departure that cannot be requested does not hold a cabin | sprint-13, portal | P1 | B17 | Ada Agent | [portal/PREQ-03-sold-out-refused.md](portal/PREQ-03-sold-out-refused.md) |
 | PREQ-04 | Portal activity names the user | sprint-13, portal | P2 | B17 | Carolina + Ada | [portal/PREQ-04-activity-names-the-user.md](portal/PREQ-04-activity-names-the-user.md) |
 | PORT-07 | Staff and agent sessions stay on their own apps | sprint-13, portal | P2 | B17 | Carolina + Ada | [portal/PORT-07-staff-and-agent-sessions.md](portal/PORT-07-staff-and-agent-sessions.md) |
+| SEG-01 | The nine segment counts match their lists | sprint-14, crm | P1 | B18 | Carolina | [crm/SEG-01-fresh-seed-counts.md](crm/SEG-01-fresh-seed-counts.md) |
+| SEG-02 | A vocabulary segment moves when a contact changes | sprint-14, crm | P1 | B18 | Carolina | [crm/SEG-02-vocabulary-count-moves.md](crm/SEG-02-vocabulary-count-moves.md) |
+| SEG-03 | A hard bounce enters suppression and leaves marketing segments | sprint-14, crm | P1 | B18 | Carolina | [crm/SEG-03-withdrawal-suppresses.md](crm/SEG-03-withdrawal-suppresses.md) |
+| AUTO-01 | The catalogue lists every built message and marks the rest | sprint-14, crm | P1 | B18 | Carolina | [crm/AUTO-01-catalogue-built-and-not.md](crm/AUTO-01-catalogue-built-and-not.md) |
+| AUTO-02 | Switching a message off stops the mail, not the alert or the task | sprint-14, crm | P1 | B18 | Carolina | [crm/AUTO-02-switch-stops-mail-only.md](crm/AUTO-02-switch-stops-mail-only.md) |
+| JRN-01 | An engine request enrols in Request to Deposit | sprint-14, crm | P1 | B19 | Guest + Carolina | [crm/JRN-01-request-enrols-step-one.md](crm/JRN-01-request-enrols-step-one.md) |
+| JRN-02 | journey-due sends the next step and records the template version | sprint-14, crm | P1 | B19 | Carolina | [crm/JRN-02-journey-due-advances.md](crm/JRN-02-journey-due-advances.md) |
+| JRN-03 | Paying the deposit exits Request to Deposit | sprint-14, crm | P1 | B19 | Guest + Carolina | [crm/JRN-03-deposit-exits.md](crm/JRN-03-deposit-exits.md) |
+| JRN-04 | A published template version is what the next send uses | sprint-14, crm | P1 | B19 | Carolina | [crm/JRN-04-publish-template-version.md](crm/JRN-04-publish-template-version.md) |
+| JRN-05 | Turning a journey off stops new enrolments | sprint-14, crm | P2 | B19 | Carolina | [crm/JRN-05-off-stops-new-enrolments.md](crm/JRN-05-off-stops-new-enrolments.md) |
+| UNSUB-01 | The unsubscribe link withdraws, suppresses, and exits | sprint-14, crm | P1 | B19 | Guest + Carolina | [crm/UNSUB-01-link-withdraws.md](crm/UNSUB-01-link-withdraws.md) |
+| CART-01 | A ticked checkout abandon keeps the contact and enrols recovery | sprint-14, crm | P1 | B19 | Guest + Carolina | [crm/CART-01-tick-and-abandon.md](crm/CART-01-tick-and-abandon.md) |
+| CART-02 | Abandon without the tick stores nothing | sprint-14, crm | P1 | B19 | Guest | [crm/CART-02-abandon-without-tick.md](crm/CART-02-abandon-without-tick.md) |

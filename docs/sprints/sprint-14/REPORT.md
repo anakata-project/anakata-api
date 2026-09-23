@@ -1078,3 +1078,126 @@ Record the CRM segments and automations pages.
 EOF
 )"
 ```
+
+## Task 10 · E2E scenarios, batches B18 and B19
+
+Scenarios, setup helpers, and fixture facts only. No application code. Written against the local trees, not a cloud gate: anakata-api `5b63e79`, anakata-ui `v0.15.0` (`28bd60f`), anakata-panel `eb3f322`, anakata-engine `38fc8da`, anakata-portal `26c24a9`.
+
+### Helpers
+
+`tests/e2e/bin/setup.sh` keeps the portal commands and adds three. Each prints `E2E_JSON`. They call existing actions and `php artisan` only.
+
+- `journey-due <enrolment-id>` sets that row's `next_due_at` one minute in the past, runs `anakata:journeys` once, and prints id, status, position, branch, and the latest `journey_sends.template_version` (null when the step did not send). One call advances only steps that are due after the move.
+- `abandoned-checkout <email@anakata.test>` refuses any other domain. As Carolina it turns `nurture_to_request` on, captures the lead with the published checkout-marketing version and a session id (that call already stitches and enrols `lead`), records one `abandon_cart` on that session, then runs `anakata:journeys` so the sweep enrols `abandoned_checkout`. It refuses a contact that already has a booking. It prints the contact id and both enrolment ids.
+- `hard-bounce <email|ANK-reference>` needs a contact who already has a booking. An email must be `@anakata.test`. `PrepareIssueDocument` (or the latest invoice) and `SendDocument` with `resend` queue a delivery. The queue is faked so Horizon does not send it. In the same process `Mail::send` throws `TransportException` `550 5.1.1 user unknown` and `SendDeliveryJob::handle` runs. The helper prints `HARD_BOUNCE` and whether one `contact.suppressed` row exists with reason `HARD_BOUNCE`. It exits with an error when the contact has no booking.
+
+`tests/e2e/README.md` documents the three commands next to the portal helpers.
+
+### Fixtures
+
+`tests/e2e/fixtures/reference-values.md` gains **Sprint 14 · segments, journeys, catalogue**.
+
+The nine segment membership counts are blank. They are ⚠ UNVERIFIED until a read-only count on a fresh seed. The database used while writing this was not a fresh seed, so no number was copied off a screen.
+
+Journey step lists are cited from `JourneysSeeder`. All eight seed `active` false, so the strip counts are 0. `ready_to_depart` is 5 steps: three pointers and two sends. Pointer 3 is `manifest_data_overdue` at rule `dpng_due`, not a T−21 step. The exit sentence in the seeder still says “ops alert at T−21”.
+
+The catalogue is 58 rows, 54 built, 4 not built, as `AutomationsTest.php` asserts. The four not-built names are Wire instructions, Overdue — day 1, Escalation — manual review, and High-value new lead. Registry counts stay 91 / 66 / 15 / 10 locked / 42 flagged. Checkout marketing version is `v1 (pending LEG-002)`.
+
+### Revisits
+
+- BR-01 was left as it is: 91 / 66 / 15 / 42, locked 10. No Journeys text was added.
+- BR-02: while FIN-005 differs, Differs / flagged is **43**. After Reset to source it returns to **42**. The old 41 was the stale seeded-flag count.
+- CRM-01 and CRM-03: the contact drawer has heading **Journeys**. A fresh seed shows `No enrolments.`
+- PRIV-02: Nurture is turned on, then `abandoned-checkout` for `e2e.priv02@anakata.test` (no booking). `anakata:journeys` is not run again before Complete. After Complete, `journey-due` on each still-active nurture enrolment expects status `SUPPRESSED` and exit reason `Marketing consent withdrawn.`, and no marketing mail after Complete. `CompleteSubjectRequest` does not call `exitUnsubscribed`. Unsubscribe remains the immediate `unsubscribed` exit. The Action was not patched.
+- CRM-09 lists `anakata:journeys` (`*/15 * * * *`, `Pacific/Galapagos`). Last run and outcome stay `—`. The fixture table already had that row.
+
+### Scenarios
+
+Thirteen files under `tests/e2e/scenarios/crm/`, tag `sprint-14`, and thirteen rows in `tests/e2e/scenarios/INDEX.md`.
+
+B18: `SEG-01`, `SEG-02`, `SEG-03`, `AUTO-01`, `AUTO-02`.
+
+B19: `JRN-01` through `JRN-05`, `UNSUB-01`, `CART-01`, `CART-02`. `JRN-05` is P2 and stays in B19.
+
+`journey_sends.template_version` is asserted with `db-check.sh`. The drawer shows `template_key` and `Sent {when}`.
+
+### Runs
+
+Not run. `up.sh` was not started. B18, B19, and the revisited batches were not run. `bin/batch.sh --check` was not run. `bin/ledger.sh` was not run. There is no Sprints 1–14 ledger result, no open-`BUG` count, and no *Pending scenario fixes* list from this task.
+
+`bin/batch.sh`, `bin/ledger.sh`, and `bin/gate.sh` are not on this branch. This pass does not add that harness. The INDEX still has the Batch column.
+
+### Marker split
+
+| | Count |
+|---|---|
+| Read off a screen this task | **0** |
+| Sprint 14 segment membership counts | 9 blank cells, one ⚠ UNVERIFIED note. Not a fresh-seed tinker |
+| Journey step lists and catalogue 58 / 54 / 4 | cited from `JourneysSeeder` and `AutomationsTest.php`. Not marked unverified |
+| New BR-02 figures | 43 and 42, both ⚠ UNVERIFIED (Pest 42 plus one differ). Not a reset screen |
+
+### Open questions
+
+From the sprint README. Still for the client:
+
+- **LEG-002.** Consent text versions for the checkout marketing tick and the unsubscribe page, and whether a single opt-in (no confirmation email) is acceptable in the markets Anakata sells to.
+- **Which journeys may run.** The eight are built. Which are switched on at go-live, and who owns each one?
+- **Sender identity.** Which address marketing email comes from, and whether it differs from the transactional one.
+- **Frequency.** A cap on marketing messages per contact per month? The default is none. Suppression and consent are the only limits.
+- **Journey copy.** Who writes the step text, and who approves a template version before it sends.
+- **Paid audiences.** Should segments ever be pushed to Meta or Google? The default is no, and it needs its own consent decision.
+- **Cart recovery timing.** The prototype says 24 h, 48 h, and day 7. Confirm, given that these only reach people who ticked the box.
+
+### Still unbuilt
+
+After this sprint the product items still not built are the shared inbox, agents paying through the portal, Spanish internal screens, and an e-signature provider. Go-live readiness has not been planned: performance, backups, monitoring, the data migration, and the runbooks.
+
+### Deviations
+
+`hard-bounce` accepts an `ANK-` booking reference as well as an email. Seeded A. Fontaine (`ANK-2026-0018`) has no guest email, and SEG-03 uses that reference. An email argument is still refused unless it is `@anakata.test`. The throwing mailer means the helper does not deliver.
+
+SEG-03 is a hard bounce, as the plan specifies. The task table's word “withdrawal” is PRIV-02 (consent), not this scenario.
+
+CART-01's user line is Guest + Carolina. Carolina has to turn Nurture on before the guest ticks the box. The task table names only the guest.
+
+JRN-05's user line stays Carolina. A second browser context creates the two requests, because staff cannot create a REQUESTED booking from the panel.
+
+`ready_to_depart` is recorded as 5 steps. A 4-step reading drops the DPNG pointer.
+
+### Git commands
+
+Do not run these in the agent. Only anakata-api changed. anakata-ui, anakata-panel, anakata-engine, and anakata-portal have no task 10 diff.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  docs/sprints/sprint-14/REPORT.md \
+  tests/e2e/README.md \
+  tests/e2e/bin/setup.sh \
+  tests/e2e/fixtures/reference-values.md \
+  tests/e2e/scenarios/INDEX.md \
+  tests/e2e/scenarios/config/BR-02-differ-reset-publish.md \
+  tests/e2e/scenarios/crm/AUTO-01-catalogue-built-and-not.md \
+  tests/e2e/scenarios/crm/AUTO-02-switch-stops-mail-only.md \
+  tests/e2e/scenarios/crm/CART-01-tick-and-abandon.md \
+  tests/e2e/scenarios/crm/CART-02-abandon-without-tick.md \
+  tests/e2e/scenarios/crm/CRM-01-seeded-contacts.md \
+  tests/e2e/scenarios/crm/CRM-03-drawer-timeline-no-sensitive.md \
+  tests/e2e/scenarios/crm/CRM-09-sync-jobs-retry.md \
+  tests/e2e/scenarios/crm/JRN-01-request-enrols-step-one.md \
+  tests/e2e/scenarios/crm/JRN-02-journey-due-advances.md \
+  tests/e2e/scenarios/crm/JRN-03-deposit-exits.md \
+  tests/e2e/scenarios/crm/JRN-04-publish-template-version.md \
+  tests/e2e/scenarios/crm/JRN-05-off-stops-new-enrolments.md \
+  tests/e2e/scenarios/crm/PRIV-02-objection-withdraws-marketing.md \
+  tests/e2e/scenarios/crm/SEG-01-fresh-seed-counts.md \
+  tests/e2e/scenarios/crm/SEG-02-vocabulary-count-moves.md \
+  tests/e2e/scenarios/crm/SEG-03-withdrawal-suppresses.md \
+  tests/e2e/scenarios/crm/UNSUB-01-link-withdraws.md
+git commit -m "$(cat <<'EOF'
+Add the Sprint 14 journey and segment scenarios.
+
+The batches and the ledger were not run.
+EOF
+)"
+```

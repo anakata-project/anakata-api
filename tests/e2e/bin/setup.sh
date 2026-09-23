@@ -6,6 +6,9 @@
 #   setup.sh portal-suspend <AG-reference>
 #   setup.sh portal-resume <AG-reference>
 #   setup.sh agency-over-cap <AG-reference>
+#   setup.sh journey-due <enrolment-id>
+#   setup.sh abandoned-checkout <email@anakata.test>
+#   setup.sh hard-bounce <email|ANK-reference>
 set -euo pipefail
 
 # shellcheck source=./_lib.sh
@@ -15,7 +18,7 @@ PASSWORD="password"
 ACTOR_EMAIL="carolina@anakata.test"
 
 usage() {
-  die "usage: setup.sh portal-user|portal-invite|portal-suspend|portal-resume|agency-over-cap <AG-reference>"
+  die "usage: setup.sh portal-user|portal-invite|portal-suspend|portal-resume|agency-over-cap <AG-reference> | journey-due <enrolment-id> | abandoned-checkout <email@anakata.test> | hard-bounce <email|ANK-reference>"
 }
 
 run_tinker() {
@@ -318,6 +321,260 @@ PHP
   printf '%s\n' "${line}"
 }
 
+require_anakata_email() {
+  local email="${1:-}"
+  if ! printf '%s' "${email}" | grep -Eq '^[^@[:space:]]+@anakata\.test$'; then
+    die "email must be @anakata.test"
+  fi
+  printf '%s' "${email}"
+}
+
+cmd_journey_due() {
+  local id="$1"
+  local code output line
+  if ! printf '%s' "${id}" | grep -Eq '^[0-9]+$'; then
+    die "enrolment must be a numeric id"
+  fi
+  code="$(cat <<PHP
+\$enrolment = App\\Models\\JourneyEnrolment::query()->find(${id});
+if (! \$enrolment instanceof App\\Models\\JourneyEnrolment) {
+    echo "E2E_JSON:".json_encode(['error' => 'unknown enrolment ${id}'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$enrolment->next_due_at = now()->subMinute();
+\$enrolment->save();
+echo "E2E_JSON:".json_encode(['id' => \$enrolment->id, 'moved' => true], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "journey-due failed: ${line:-no E2E_JSON}"
+  fi
+  in_app "php artisan anakata:journeys"
+  code="$(cat <<PHP
+\$enrolment = App\\Models\\JourneyEnrolment::query()->with('sends')->find(${id});
+if (! \$enrolment instanceof App\\Models\\JourneyEnrolment) {
+    echo "E2E_JSON:".json_encode(['error' => 'enrolment ${id} disappeared'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$send = \$enrolment->sends->sortByDesc('id')->first();
+echo "E2E_JSON:".json_encode([
+    'id' => \$enrolment->id,
+    'status' => \$enrolment->status->value,
+    'position' => \$enrolment->position,
+    'branch' => \$enrolment->branch,
+    'template_version' => \$send?->template_version,
+], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "journey-due read failed: ${line:-no E2E_JSON}"
+  fi
+  printf '%s\n' "${line}"
+}
+
+cmd_abandoned_checkout() {
+  local email first code output line
+  email="$(require_anakata_email "${1:-}")"
+  first="$(printf '%s' "${email}" | cut -d@ -f1 | tr -cd '[:alnum:]')"
+  if [ -z "${first}" ]; then
+    first="E2E"
+  fi
+  code="$(cat <<PHP
+\$email = '${email}';
+\$actor = App\\Models\\User::query()->where('email', '${ACTOR_EMAIL}')->first();
+if (! \$actor instanceof App\\Models\\User) {
+    echo "E2E_JSON:".json_encode(['error' => 'missing ${ACTOR_EMAIL}'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$journey = App\\Models\\Journey::query()->where('key', 'nurture_to_request')->first();
+if (! \$journey instanceof App\\Models\\Journey) {
+    echo "E2E_JSON:".json_encode(['error' => 'missing nurture_to_request'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+app(App\\Actions\\Crm\\UpdateJourney::class)->handle(\$journey, true, \$actor);
+\$version = app(App\\Services\\Config\\CurrentConfig::class)->businessRules()->consentVersions->checkoutMarketing;
+\$session = (string) Illuminate\\Support\\Str::uuid();
+app(App\\Actions\\Engine\\CaptureMarketingLead::class)->handle([
+    'email' => \$email,
+    'first_name' => '${first}',
+    'version' => \$version,
+    'session_id' => \$session,
+], null);
+\$contact = App\\Models\\Contact::query()->whereRaw('LOWER(TRIM(email)) = ?', [strtolower(\$email)])->first();
+if (! \$contact instanceof App\\Models\\Contact) {
+    echo "E2E_JSON:".json_encode(['error' => 'contact was not created'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+if (App\\Models\\Booking::query()->where('contact_id', \$contact->id)->exists()) {
+    echo "E2E_JSON:".json_encode(['error' => 'contact already has a booking'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$departure = App\\Models\\Departure::query()->with('itinerary')->orderBy('id')->first();
+if (! \$departure instanceof App\\Models\\Departure) {
+    echo "E2E_JSON:".json_encode(['error' => 'no departure'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+app(App\\Actions\\Engine\\IngestBehaviouralEvents::class)->handle([
+    'session_id' => \$session,
+    'events' => [[
+        'event_id' => (string) Illuminate\\Support\\Str::uuid(),
+        'name' => 'abandon_cart',
+        'occurred_at' => now()->toIso8601String(),
+        'params' => [
+            'itinerary_code' => (string) (\$departure->itinerary->code ?? 'WEST'),
+            'departure_id' => \$departure->id,
+            'step' => 'details',
+            'cabin_count' => 1,
+        ],
+    ]],
+]);
+echo "E2E_JSON:".json_encode(['contact_id' => \$contact->id, 'session_id' => \$session], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "abandoned-checkout failed: ${line:-no E2E_JSON}"
+  fi
+  in_app "php artisan anakata:journeys"
+  code="$(cat <<PHP
+\$email = '${email}';
+\$contact = App\\Models\\Contact::query()->whereRaw('LOWER(TRIM(email)) = ?', [strtolower(\$email)])->first();
+if (! \$contact instanceof App\\Models\\Contact) {
+    echo "E2E_JSON:".json_encode(['error' => 'contact missing after sweep'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$rows = App\\Models\\JourneyEnrolment::query()->where('contact_id', \$contact->id)->get();
+echo "E2E_JSON:".json_encode([
+    'contact_id' => \$contact->id,
+    'enrolments' => \$rows->map(fn (\$row) => [
+        'id' => \$row->id,
+        'branch' => \$row->branch,
+        'status' => \$row->status->value,
+    ])->values(),
+], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "abandoned-checkout read failed: ${line:-no E2E_JSON}"
+  fi
+  printf '%s\n' "${line}"
+}
+
+cmd_hard_bounce() {
+  local arg="$1"
+  local code output line
+  if [ -z "${arg}" ]; then
+    die "hard-bounce needs an email or an ANK- reference"
+  fi
+  if ! printf '%s' "${arg}" | grep -Eq '^ANK-'; then
+    require_anakata_email "${arg}" >/dev/null
+  fi
+  code="$(cat <<PHP
+\$arg = '${arg}';
+\$booking = null;
+\$contact = null;
+if (str_starts_with(\$arg, 'ANK-')) {
+    \$booking = App\\Models\\Booking::query()->where('reference', \$arg)->first();
+    \$contact = \$booking?->contact;
+} else {
+    \$contact = App\\Models\\Contact::query()->whereRaw('LOWER(TRIM(email)) = ?', [strtolower(trim(\$arg))])->first();
+    if (\$contact instanceof App\\Models\\Contact) {
+        \$booking = App\\Models\\Booking::query()->where('contact_id', \$contact->id)->orderBy('id')->first();
+    }
+}
+if (! \$contact instanceof App\\Models\\Contact || ! \$booking instanceof App\\Models\\Booking) {
+    echo "E2E_JSON:".json_encode(['error' => 'contact with a booking was not found'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$actor = App\\Models\\User::query()->where('email', '${ACTOR_EMAIL}')->first();
+if (! \$actor instanceof App\\Models\\User) {
+    echo "E2E_JSON:".json_encode(['error' => 'missing ${ACTOR_EMAIL}'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+Illuminate\\Support\\Facades\\Queue::fake();
+\$document = App\\Models\\Document::query()
+    ->where('booking_id', \$booking->id)
+    ->where('kind', App\\Enums\\DocumentKind::Invoice)
+    ->orderByDesc('id')
+    ->first();
+if (! \$document instanceof App\\Models\\Document) {
+    \$document = app(App\\Actions\\Documents\\PrepareIssueDocument::class)->handle(
+        \$booking,
+        App\\Enums\\DocumentKind::Invoice,
+        null,
+        null,
+        \$actor,
+    );
+}
+\$delivery = app(App\\Actions\\Documents\\SendDocument::class)->handle(\$booking, \$document, \$actor, false, true);
+\$manager = app('mail.manager');
+\$manager->extend('e2e-hard-bounce', function () {
+    return new class implements Illuminate\\Contracts\\Mail\\Mailer {
+        public function to(\$users): Illuminate\\Mail\\PendingMail
+        {
+            throw new RuntimeException('unused');
+        }
+        public function cc(\$users): Illuminate\\Mail\\PendingMail
+        {
+            throw new RuntimeException('unused');
+        }
+        public function bcc(\$users): Illuminate\\Mail\\PendingMail
+        {
+            throw new RuntimeException('unused');
+        }
+        public function raw(\$text, \$callback): ?Illuminate\\Mail\\SentMessage
+        {
+            throw new RuntimeException('unused');
+        }
+        public function send(\$view, array \$data = [], \$callback = null): ?Illuminate\\Mail\\SentMessage
+        {
+            throw new Symfony\\Component\\Mailer\\Exception\\TransportException('550 5.1.1 user unknown');
+        }
+        public function sendNow(\$mailable, array \$data = [], \$callback = null): ?Illuminate\\Mail\\SentMessage
+        {
+            throw new Symfony\\Component\\Mailer\\Exception\\TransportException('550 5.1.1 user unknown');
+        }
+    };
+});
+\$manager->setDefaultDriver('e2e-hard-bounce');
+(new App\\Jobs\\SendDeliveryJob(\$delivery->id))->handle(app(App\\Support\\Automations\\AutomationGate::class));
+\$delivery->refresh();
+\$suppressed = App\\Models\\ChangeHistory::query()
+    ->where('subject_type', \$contact->getMorphClass())
+    ->where('subject_id', \$contact->id)
+    ->where('event', 'contact.suppressed')
+    ->where('reason', 'HARD_BOUNCE')
+    ->exists();
+echo "E2E_JSON:".json_encode([
+    'contact_id' => \$contact->id,
+    'booking' => \$booking->reference,
+    'delivery_id' => \$delivery->id,
+    'status' => \$delivery->status->value,
+    'contact_suppressed' => \$suppressed,
+], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "hard-bounce failed: ${line:-no E2E_JSON}"
+  fi
+  printf '%s\n' "${line}" | grep -q '"status":"HARD_BOUNCE"' || die "hard-bounce did not record HARD_BOUNCE: ${line}"
+  printf '%s\n' "${line}"
+}
+
 command="${1:-}"
 shift || true
 
@@ -327,5 +584,8 @@ case "${command}" in
   portal-suspend) cmd_portal_access suspend "${1:-}" ;;
   portal-resume) cmd_portal_access resume "${1:-}" ;;
   agency-over-cap) cmd_agency_over_cap "${1:-}" ;;
+  journey-due) cmd_journey_due "${1:-}" ;;
+  abandoned-checkout) cmd_abandoned_checkout "${1:-}" ;;
+  hard-bounce) cmd_hard_bounce "${1:-}" ;;
   *) usage ;;
 esac
