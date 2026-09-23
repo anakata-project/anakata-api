@@ -15,6 +15,7 @@ use App\Http\Controllers\Crm\JourneyController;
 use App\Http\Controllers\Crm\SegmentController;
 use App\Http\Controllers\Crm\SyncController;
 use App\Http\Controllers\Crm\TaskController;
+use App\Http\Controllers\Crm\TemplateController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => response()->json(['ok' => true]));
@@ -25,6 +26,13 @@ Route::patch('tasks/{task}', [TaskController::class, 'update']);
 Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);
 Route::post('tasks/{task}/cancel', [TaskController::class, 'cancel']);
 Route::post('contacts/{contact}/activities', [TaskController::class, 'storeActivity']);
+
+Route::get('templates', [TemplateController::class, 'index']);
+Route::get('templates/{template}/versions/{version}', [TemplateController::class, 'show'])->whereNumber('version');
+Route::post('templates/{template}/drafts', [TemplateController::class, 'storeDraft']);
+Route::post('templates/{template}/versions/{version}/publish', [TemplateController::class, 'publish'])->whereNumber('version');
+Route::post('templates/{template}/preview', [TemplateController::class, 'preview']);
+Route::post('templates/{template}/test-send', [TemplateController::class, 'testSend']);
 
 Route::get('journeys', [JourneyController::class, 'index']);
 Route::get('journeys/{journey}/enrolments', [JourneyController::class, 'enrolments']);

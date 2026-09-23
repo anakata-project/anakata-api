@@ -70,6 +70,7 @@ use App\Models\Itinerary;
 use App\Models\Journey;
 use App\Models\JourneyEnrolment;
 use App\Models\Manifest;
+use App\Models\MessageTemplate;
 use App\Models\Offer;
 use App\Models\Payment;
 use App\Models\PaymentLink;
@@ -254,6 +255,7 @@ class AppServiceProvider extends ServiceProvider
             'sales_material' => SalesMaterial::class,
             'segment' => Segment::class,
             'journey' => Journey::class,
+            'message_template' => MessageTemplate::class,
             'journey_enrolment' => JourneyEnrolment::class,
             'automation_setting' => AutomationSetting::class,
             'guest' => Guest::class,

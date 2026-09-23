@@ -378,3 +378,122 @@ Consent and suppression are checked again before every step, and the eight journ
 EOF
 )"
 ```
+
+## Task 04 · Templates, preview and test sends
+
+A journey send step now uses a published template version. The subject and body are no longer the step name. Pointer and task steps still do not render a template.
+
+### Schema and immutability
+
+`message_templates`: key, name, kind (`MARKETING` or `TRANSACTIONAL`, the journey’s kind), audit columns. `message_template_versions`: template, version (unique per template, from 1), subject, structured body, the variables it uses, `published`, `published_by`, `published_at`, `approval_reference`, audit columns. `template_test_sends`: version, staff user, the sample contact and optional booking, status, error, sent at, audit columns. Morph map key `message_template`.
+
+A version is inserted once. The only later write is the publish transition, and only while `published` is still false: `published`, `published_by`, `published_at`, `approval_reference`, and the audit timestamps. After that the model throws, and a trigger refuses the update. The trigger also refuses any change to subject, body, variables, version, or template id, and refuses delete. Publishing version N+1 leaves version N. One open draft per template; a second draft is 409.
+
+History, inside the action: `template.draft_created`, `template.published` (the approval reference is the reason), `template.test_sent`.
+
+`journey_sends.template_version` was already on the table. A real send now writes the version it used. A send with no published version does not create a delivery or a `journey_send`, and the enrolment stays due.
+
+### Variables
+
+The server extracts tokens. The fixed list is `first_name` (the first word of `contacts.name`), `booking_reference`, `departure_date`, `itinerary_name`, `balance_due_date`, `deposit_link` (an open payment link, when one exists), `complete_link` (an active complete-page token, when one exists), and `unsubscribe_link`.
+
+`unsubscribe_link` is `{engine_url}/unsubscribe/{hmac}` where the hmac is SHA-256 of the contact id with `APP_KEY`. No raw id and no email. The public page is task 05; this task only makes the variable resolve to a non-blank URL.
+
+An unknown token is refused at publish and at preview. A known token with no value for that contact or booking is refused, never left blank. Publish cannot see a contact, so its check is that every token is in the list and that the kind rule holds.
+
+### Unsubscribe rule
+
+Publishing a marketing version without `{{unsubscribe_link}}` is refused: “A marketing template must include {{unsubscribe_link}}.” Publishing a transactional version that contains it is refused: “A transactional template must not include {{unsubscribe_link}}.” The kind must match the journey that uses the key. An approval reference is required.
+
+### Preview and test send
+
+`GET /api/crm/templates` lists each template with its published version and its open draft. `GET …/versions/{version}` reads one version. `POST …/drafts` creates the next version. `POST …/versions/{version}/publish` publishes it. `POST …/preview` with a contact or booking id returns the rendered subject and HTML and does not send or store. `POST …/test-send` uses the same inputs and mails only the signed-in user’s own address.
+
+Reading, drafting, previewing, and test-sending need `panel.crm`. Publishing needs `rules.manage`, on the policy, the same split as automations. The route group already carries `panel.crm`; there is no extra middleware.
+
+A test send is a `template_test_sends` row plus `template.test_sent`. It is not a `deliveries` row, so it never goes to the contact. Staff mail stays off the customer ledger.
+
+Both kinds use one layout, the same shell as the transactional document mail (Anakata wordmark, Georgia, footer, reply-to). It does not extend that layout, because the document layout assumes a booking. The booking reference is added to the footer only when the sample has one. The old `mail/journeys/step` view, which printed the subject as the body, is removed.
+
+A rendered welcome (it declares only `first_name` and `unsubscribe_link`) was checked against the report walk’s sentinel guest: passport, date of birth, medical, dietary and accessibility notes, guest email, survey text, and the guest’s name. Those strings are absent. The contact’s first name is present. `GB` is stored on that guest and is not one of the asserted strings, as in the report test.
+
+### Seeded templates
+
+Twenty-one send steps. Version 1 is inserted already published, approval reference `Sprint 14: initial journey template`. `welcome_web_lead` is one key on purpose: the journey seeder writes it into both `template_key` and `catalogue_key`. The catalogue key is what the automation switch gates. The template key is the words. The same pairing is every send step.
+
+Nine subjects are the prototype `AUTOS` lines, with `[ID]` written as `{{booking_reference}}`:
+
+| Key | Subject |
+|---|---|
+| `welcome_web_lead` | Your Galápagos adventure begins here — Anakata |
+| `request_acknowledgement` | We have received your booking — {{booking_reference}} |
+| `deposit_link` | Complete your reservation — {{booking_reference}} |
+| `extras_offer` | Curated additions to your Galápagos expedition — Anakata |
+| `extras_closing` | Last call for additions — {{booking_reference}} |
+| `questionnaire_reminder` | 14 days to go — complete your questionnaire |
+| `arrival_instructions` | Almost time! Final instructions for your arrival in San Cristóbal |
+| `reengagement_6_months` | Back to Galápagos? A new expedition awaits you |
+| `winback` | Sorry we missed you — what changed? |
+
+These twelve have no `AUTOS` subject, so the subject is the step name: `nurture_story`, `nurture_itinerary`, `nurture_call`, `nurture_concierge`, `hold_expiry_reminder`, `extras_second_window`, `reengagement_month_7`, `reengagement_month_9`, `partner_positioning`, `partner_incentive`, `winback_day_30`, `winback_month_6`.
+
+Every body is one placeholder paragraph. Marketing versions add an unsubscribe call to action. None of the seeded copy uses `deposit_link` or `complete_link`, because those URLs are often absent and a blank is forbidden; both stay in the fixed list for a later draft. All body copy, and the twelve subjects above, are pending the client (who writes the step text, and who approves a version before it sends).
+
+### Tests
+
+`tests/Feature/Crm/TemplatesTest.php`. `composer check` inside the app container: 1311 tests passed, Pint passed, Larastan passed.
+
+### Open questions
+
+None for this task. The step text and who approves it are still the sprint README’s question for the client. The seeded approval reference is the sprint line, not a client approval.
+
+### Notes for later
+
+- Task 05 owns the unsubscribe page. It should verify the same HMAC (SHA-256 of the contact id, `APP_KEY`) and must not put anything but that token on the URL.
+- `deposit_link` and `complete_link` resolve only when the booking already has an open payment link or an active complete-page token. The deposit step still does not open a Stripe session.
+
+### Git
+
+Not run:
+
+```bash
+git add \
+  app/Actions/Crm/CreateTemplateDraft.php \
+  app/Actions/Crm/PublishTemplateVersion.php \
+  app/Actions/Crm/SendTemplateTest.php \
+  app/Enums/TemplateVariable.php \
+  app/Http/Controllers/Crm/TemplateController.php \
+  app/Http/Requests/Crm/PreviewTemplateRequest.php \
+  app/Http/Requests/Crm/PublishTemplateVersionRequest.php \
+  app/Http/Requests/Crm/StoreTemplateDraftRequest.php \
+  app/Http/Resources/Crm/CrmMessageTemplateResource.php \
+  app/Http/Resources/Crm/CrmMessageTemplateVersionResource.php \
+  app/Mail/Journeys/JourneyMail.php \
+  app/Mail/Templates/TemplateTestMail.php \
+  app/Models/MessageTemplate.php \
+  app/Models/MessageTemplateVersion.php \
+  app/Models/TemplateTestSend.php \
+  app/Policies/MessageTemplatePolicy.php \
+  app/Providers/AppServiceProvider.php \
+  app/Support/Journeys/JourneyEngine.php \
+  app/Support/Templates/RenderedTemplate.php \
+  app/Support/Templates/TemplateRenderer.php \
+  app/Support/Templates/TemplateTokens.php \
+  app/Support/Templates/TemplateVariableException.php \
+  app/Support/Templates/UnsubscribeLink.php \
+  database/migrations/2026_09_23_180001_create_message_templates_tables.php \
+  database/seeders/DatabaseSeeder.php \
+  database/seeders/MessageTemplatesSeeder.php \
+  docs/sprints/sprint-14/REPORT.md \
+  resources/views/mail/journeys/step.blade.php \
+  resources/views/mail/templates/message.blade.php \
+  routes/api/crm.php \
+  tests/Feature/Crm/TemplatesTest.php
+
+git commit -m "$(cat <<'EOF'
+Version the words a journey sends, and keep a test send off the customer.
+
+A published template is immutable, marketing copy must carry an unsubscribe link, and a test goes only to the staff user who asked for it.
+EOF
+)"
+```

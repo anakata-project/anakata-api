@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         $this->call(InventorySeeder::class);
         $this->call(SegmentsSeeder::class);
         $this->call(JourneysSeeder::class);
+        $this->call(MessageTemplatesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DemoUsersSeeder::class);

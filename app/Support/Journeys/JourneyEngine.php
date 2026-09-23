@@ -38,6 +38,7 @@ use App\Models\Journey;
 use App\Models\JourneyEnrolment;
 use App\Models\JourneySend;
 use App\Models\JourneyStep;
+use App\Models\MessageTemplateVersion;
 use App\Models\Payment;
 use App\Services\Config\CurrentConfig;
 use App\Support\Automations\AutomationGate;
@@ -46,6 +47,9 @@ use App\Support\Crm\ConsentGate;
 use App\Support\Crm\ContactDerived;
 use App\Support\Crm\Suppression;
 use App\Support\History\History;
+use App\Support\Templates\RenderedTemplate;
+use App\Support\Templates\TemplateRenderer;
+use App\Support\Templates\TemplateVariableException;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -63,6 +67,7 @@ final class JourneyEngine
         private readonly RecordDelivery $deliveries,
         private readonly RaiseTask $tasks,
         private readonly CurrentConfig $config,
+        private readonly TemplateRenderer $templates,
     ) {}
 
     public function run(): int
@@ -380,7 +385,13 @@ final class JourneyEngine
             return 'stay';
         }
 
-        $this->send($enrolment, $step);
+        $rendered = $this->rendered($enrolment, $step);
+
+        if (! $rendered instanceof RenderedTemplate) {
+            return 'stay';
+        }
+
+        $this->send($enrolment, $step, $rendered);
         $this->moveOn($enrolment, $step);
 
         return 'advanced';
@@ -470,7 +481,26 @@ final class JourneyEngine
         return $answered < $guestIds->count();
     }
 
-    private function send(JourneyEnrolment $enrolment, JourneyStep $step): void
+    private function rendered(JourneyEnrolment $enrolment, JourneyStep $step): ?RenderedTemplate
+    {
+        $version = MessageTemplateVersion::query()
+            ->where('published', true)
+            ->whereHas('template', fn ($query) => $query->where('key', $step->template_key))
+            ->orderByDesc('version')
+            ->first();
+
+        if (! $version instanceof MessageTemplateVersion) {
+            return null;
+        }
+
+        try {
+            return $this->templates->render($version, $enrolment->contact, $enrolment->booking);
+        } catch (TemplateVariableException) {
+            return null;
+        }
+    }
+
+    private function send(JourneyEnrolment $enrolment, JourneyStep $step, RenderedTemplate $rendered): void
     {
         $address = $this->address($enrolment->contact);
         $delivery = $this->deliveries->handle([
@@ -479,13 +509,13 @@ final class JourneyEngine
             'idempotency_key' => $this->deliveryKey($enrolment, $step),
             'to' => $address === null ? [] : [$address],
             'cc' => [],
-            'subject' => $step->name,
+            'subject' => $rendered->subject,
             'status' => $address === null ? DeliveryStatus::Blocked : DeliveryStatus::Queued,
             'blocked_reason' => $address === null ? 'No usable address.' : null,
             'triggered_by' => DeliveryTriggeredBy::System,
         ]);
 
-        $this->recordSend($enrolment, $step, $step->catalogue_key, $delivery);
+        $this->recordSend($enrolment, $step, $step->catalogue_key, $delivery, $rendered->version->version);
 
         if ($delivery->status === DeliveryStatus::Queued && $delivery->wasRecentlyCreated) {
             SendDeliveryJob::dispatch($delivery->id);
@@ -499,12 +529,13 @@ final class JourneyEngine
         }
     }
 
-    private function recordSend(JourneyEnrolment $enrolment, JourneyStep $step, ?string $catalogueKey, ?Delivery $delivery): void
+    private function recordSend(JourneyEnrolment $enrolment, JourneyStep $step, ?string $catalogueKey, ?Delivery $delivery, ?int $templateVersion = null): void
     {
         JourneySend::query()->create([
             'journey_enrolment_id' => $enrolment->id,
             'journey_step_id' => $step->id,
             'template_key' => $step->template_key,
+            'template_version' => $templateVersion,
             'catalogue_key' => $catalogueKey,
             'delivery_id' => $delivery?->id,
             'sent_at' => now(),
