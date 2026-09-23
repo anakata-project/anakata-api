@@ -7,6 +7,7 @@ namespace App\Support\Agencies;
 use App\Enums\CommissionAccrualStatus;
 use App\Models\Agency;
 use App\Models\Booking;
+use App\Models\CommissionPayout;
 use App\Models\Guest;
 use App\Support\Commissions\Accrual;
 use App\Support\Config\Documents\BusinessRulesDocument;
@@ -56,7 +57,7 @@ final class PortalPreview
      *     commission_pct: int,
      *     net_rates: list<array{year: int, suite_pp: int, owner_pp: int, charter_week: int}>,
      *     bookings: list<array{reference: string|null, lead_guest: string, departure_date: string, status: string, net_due: int}>,
-     *     commissions: list<array{reference: string|null, rate: int|null, commission_amount: int, payable_date: string, status: CommissionAccrualStatus}>,
+     *     commissions: list<array{reference: string|null, rate: int|null, commission_amount: int, payable_date: string, status: CommissionAccrualStatus, payout: array{paid_on: string, reference: string|null}|null}>,
      *     sales_materials: array{items: list<string>, note: string}
      * }
      */
@@ -87,6 +88,10 @@ final class PortalPreview
                 'commission_amount' => $booking->commissionAmount(),
                 'payable_date' => Accrual::payableDate($booking, $rules)->toDateString(),
                 'status' => Accrual::status($booking, $rules),
+                'payout' => $booking->commissionPayout instanceof CommissionPayout ? [
+                    'paid_on' => $booking->commissionPayout->paid_on->toDateString(),
+                    'reference' => $booking->reference,
+                ] : null,
             ];
         }
 
@@ -112,7 +117,7 @@ final class PortalPreview
         return $value;
     }
 
-    private static function leadGuestName(Booking $booking): string
+    public static function leadGuestName(Booking $booking): string
     {
         $named = fn (Guest $guest): bool => $guest->first_name !== '' || $guest->last_name !== '';
         $lead = $booking->guests->first(fn (Guest $guest): bool => $guest->is_lead && $named($guest))
@@ -125,7 +130,7 @@ final class PortalPreview
      * Prototype formula. Commission is on the cabin total, so this also discounts
      * extras and fees, and it drifts once part of the balance has been paid.
      */
-    private static function netDue(Booking $booking): int
+    public static function netDue(Booking $booking): int
     {
         $pct = $booking->commission_pct ?? 0;
 

@@ -737,6 +737,17 @@ class Booking extends Model
         return Rounding::halfUp($this->total * $this->deposit_pct / 100);
     }
 
+    public function paymentStateWords(): string
+    {
+        $balance = $this->balance();
+
+        return match (true) {
+            $balance <= 0 => 'Paid in full',
+            $balance >= $this->total => 'Awaiting deposit',
+            default => 'Deposit received',
+        };
+    }
+
     public function commissionAmount(): int
     {
         if ($this->commission_pct === null) {
