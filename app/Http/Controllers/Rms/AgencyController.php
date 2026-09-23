@@ -16,6 +16,7 @@ use App\Enums\AgencyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\DecideAgencyRequest;
 use App\Http\Requests\Rms\IndexAgenciesRequest;
+use App\Http\Requests\Rms\IndexPortalActivityRequest;
 use App\Http\Requests\Rms\ResumeAgencyPortalRequest;
 use App\Http\Requests\Rms\StoreAgencyRequest;
 use App\Http\Requests\Rms\StoreAgencyUserRequest;
@@ -24,12 +25,15 @@ use App\Http\Requests\Rms\UpdateAgencyRequest;
 use App\Http\Requests\Rms\UpdateAgencyUserRequest;
 use App\Http\Resources\Rms\AgencyPortalPreviewResource;
 use App\Http\Resources\Rms\AgencyResource;
+use App\Http\Resources\Rms\PortalActivityResource;
 use App\Models\Agency;
 use App\Models\AgencyUser;
+use App\Models\ChangeHistory;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\Agencies\AgencyBookingWindow;
 use App\Support\Commissions\CommissionKpis;
+use App\Support\Portal\PortalActivity;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -244,5 +248,36 @@ final class AgencyController extends Controller
         $action->handle($user, $actor);
 
         return response()->json(['message' => 'Invitation sent.']);
+    }
+
+    public function portalActivity(IndexPortalActivityRequest $request, Agency $agency): AnonymousResourceCollection
+    {
+        $this->authorize('viewPortalActivity', $agency);
+
+        $page = ChangeHistory::query()
+            ->where('subject_type', $agency->getMorphClass())
+            ->where('subject_id', $agency->id)
+            ->whereIn('event', PortalActivity::EVENTS)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 50));
+
+        $ids = [];
+
+        foreach ($page->getCollection() as $entry) {
+            $userId = PortalActivity::userId($entry->getAttribute('context'));
+
+            if ($userId !== null) {
+                $ids[] = $userId;
+            }
+        }
+
+        $users = AgencyUser::query()->whereIn('id', array_values(array_unique($ids)))->get()->keyBy('id');
+
+        $shaped = $page->through(
+            fn (ChangeHistory $entry): array => PortalActivity::present($entry, $users),
+        );
+
+        return PortalActivityResource::collection($shaped);
     }
 }

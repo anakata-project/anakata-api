@@ -11,7 +11,7 @@ beforeEach(function (): void {
     $this->seed(ConfigSeeder::class);
 });
 
-test('sales materials returns an empty list with its note, until task 04', function (): void {
+test('an empty sales materials list keeps the pending-upload note', function (): void {
     $user = agencyUser();
 
     $this->actingAs($user, 'agency')

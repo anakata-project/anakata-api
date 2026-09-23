@@ -49,4 +49,9 @@ final class AgencyPolicy extends Policy
     {
         return $actor->hasPermission(Permission::AgenciesManage);
     }
+
+    public function viewPortalActivity(User $actor, Agency $agency): bool
+    {
+        return $actor->hasPermission(Permission::AgenciesManage);
+    }
 }

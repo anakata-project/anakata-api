@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Portal;
 
 use App\Models\AgencyUser;
+use App\Models\SalesMaterial;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -41,7 +42,7 @@ class PortalAgencyMeResource extends JsonResource
                 'name' => $this->name,
                 'email' => $this->email,
             ],
-            'materials_exist' => false,
+            'materials_exist' => SalesMaterial::query()->visibleTo($agency)->exists(),
         ];
     }
 }

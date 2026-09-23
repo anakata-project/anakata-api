@@ -42,6 +42,7 @@ use App\Http\Controllers\Rms\ReportController;
 use App\Http\Controllers\Rms\ReportSubscriptionController;
 use App\Http\Controllers\Rms\RequestController;
 use App\Http\Controllers\Rms\RoleController;
+use App\Http\Controllers\Rms\SalesMaterialController;
 use App\Http\Controllers\Rms\UserController;
 use App\Http\Controllers\Rms\WaitlistController;
 use App\Http\Controllers\Rms\YachtController;
@@ -207,6 +208,7 @@ Route::get('offers/{offer}/history', [OfferController::class, 'history'])->where
 Route::get('agencies', [AgencyController::class, 'index']);
 Route::post('agencies', [AgencyController::class, 'store']);
 Route::get('agencies/{agency}/portal-preview', [AgencyController::class, 'portalPreview'])->whereNumber('agency');
+Route::get('agencies/{agency}/portal-activity', [AgencyController::class, 'portalActivity'])->whereNumber('agency');
 Route::post('agencies/{agency}/users', [AgencyController::class, 'storeUser'])->whereNumber('agency');
 Route::patch('agencies/{agency}/users/{user}', [AgencyController::class, 'updateUser'])->whereNumber('agency')->whereNumber('user');
 Route::get('agencies/{agency}', [AgencyController::class, 'show'])->whereNumber('agency');
@@ -215,6 +217,11 @@ Route::post('agencies/{agency}/decide', [AgencyController::class, 'decide'])->wh
 Route::post('agencies/{agency}/portal/suspend', [AgencyController::class, 'suspendPortal'])->whereNumber('agency');
 Route::post('agencies/{agency}/portal/resume', [AgencyController::class, 'resumePortal'])->whereNumber('agency');
 Route::post('agencies/{agency}/users/{user}/invite', [AgencyController::class, 'inviteUser'])->whereNumber('agency')->whereNumber('user');
+
+Route::get('sales-materials', [SalesMaterialController::class, 'index']);
+Route::post('sales-materials', [SalesMaterialController::class, 'store']);
+Route::patch('sales-materials/{material}', [SalesMaterialController::class, 'update'])->whereNumber('material');
+Route::get('sales-materials/{material}/file', [SalesMaterialController::class, 'file'])->whereNumber('material');
 
 Route::get('commissions', [CommissionController::class, 'index']);
 Route::post('commissions/{booking}/payout', [CommissionController::class, 'payout'])->whereNumber('booking');

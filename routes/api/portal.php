@@ -28,4 +28,5 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::post('/requests', [PortalRequestController::class, 'store']);
     Route::get('/commissions', [PortalCommissionController::class, 'index']);
     Route::get('/sales-materials', [PortalSalesMaterialController::class, 'index']);
+    Route::get('/sales-materials/{material}/file', [PortalSalesMaterialController::class, 'file'])->whereNumber('material');
 });
