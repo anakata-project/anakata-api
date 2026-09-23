@@ -374,3 +374,56 @@ Record the portal rates, availability, and materials pages.
 EOF
 )"
 ```
+
+## Task 08 · Bookings, commissions and the request form
+
+Three signed-in pages and the request form. Every figure and every next-step sentence is a field the portal API already returns. The form does not send a price, a discount, a commission, a promo code, or an agency id.
+
+**Bookings** (`/bookings`). `GET /api/portal/bookings`: reference, departure, itinerary, status pill, lead guest, net due (`AnkMoney`), and `payment_state` as sent (`Paid in full`, `Awaiting deposit`, `Deposit received`). A row opens a read-only slideover with those same fields. `GET /bookings` does not include request notes, so the drawer does not invent a notes block. No guest list, documents, or payment rows.
+
+**Commissions** (`/commissions`). `GET /api/portal/commissions`: reference, rate, amount, payable date, and the five accrual pills (BLOCKED, EARNED ON COMPLETION, PAYABLE, PAID, CANCELLED). A paid row adds `payout.paid_on` and `payout.reference`. The list payload has no page-level sentence, so the page does not write a FIN-005 line.
+
+**My requests** (`/requests`). `GET /api/portal/requests`: lead guest, reference, status, and `next` unchanged. The resource has no departure, category, or cabin, so those are not columns. Nav highlights Requests on `/requests/new` as well.
+
+**Request a booking** (`/requests/new`). Availability already links here with `departure_id`. The form posts `departure_id`, `category` (`SUITE` or `OWNER`), cabin parties, client name and email, notes when present, and `client_of_record: true`. An empty client email, or an unchecked acknowledgement, does not post. Success replaces the form with every reference, the status pill, and `message` unchanged (the no-hold sentence, plus the commission-cap sentence when the API says so). A 422 shows the API's field sentences. Lists load once; nothing polls.
+
+**Browser** (dark and light, API on 8000, portal on 3002, signed in as Ada at Blue Latitude Travel). Bookings shows `ANK-2026-0007`, 14 Nov 2027, NORTH, CONFIRMED, Mariana Castellanos, USD 19,140, `Deposit received`; the drawer repeats those fields. Commissions shows that booking at 10%, USD 2,328, payable 21 Dec 2027, EARNED ON COMPLETION. There is no paid row for this agency, and the status is not PAYABLE, so no payout was recorded. The five pills are the component test. A request from departure 1 (7 Nov 2027, ANAMARA, WEST, AVAILABLE) created `ANK-R-2026-0043` with “This request does not hold a cabin. The team will answer within 24 hours.” My requests shows that sentence. RMS Booking Requests lists the same reference for Task Guest, travel advisor, via email, and “HOLD EXPIRED — CABIN NOT HELD”. `GET /api/rms/requests` returns `source: portal` and `agency_name: Blue Latitude Travel`. The panel table still does not render those two fields. Ada's agency is under the cap, so this request is REQUESTED; the over-cap sentence is the component test, rendered from the API `message`. The local feed has no `FULL` departure. Departure 13 is `CHARTERED — NOT SHOWN` and the API answers 404 with an empty message; the form does not invent a refusal sentence. A 422 `FULL · WAITLIST` is the component test.
+
+**Quality.** `pnpm lint`, `typecheck`, `test` (34) and `build` passed. A fresh pair under `/tmp/anakata-portal-fresh` — `anakata-ui` at local `v0.14.0` (`71d7131`), portal sources copied — typechecked and built. The GitHub pin was not fetched. That tag is still unpushed.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-portal
+git add \
+  app/assets/css/portal.css \
+  app/layouts/default.vue \
+  app/navigation.ts \
+  app/pages/bookings.vue \
+  app/pages/commissions.vue \
+  app/pages/requests/index.vue \
+  app/pages/requests/new.vue \
+  app/types/api.ts \
+  app/utils/listPath.ts \
+  app/utils/portalStatus.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/components/portalBusiness.test.ts \
+  tests/unit/portalStatus.test.ts
+git commit -m "$(cat <<'EOF'
+Show an agent's bookings, commissions, and booking requests.
+
+The next step and the money are the portal API's own fields.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-13/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the portal bookings, commissions, and request form.
+EOF
+)"
+```
