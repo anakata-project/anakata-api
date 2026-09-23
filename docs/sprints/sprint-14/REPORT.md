@@ -886,3 +886,96 @@ Record the checkout marketing tick and the unsubscribe page.
 EOF
 )"
 ```
+
+## Task 08 · CRM Journeys
+
+Panel only. No API change and no `api.d.ts` edit. Types stay the `v0.15.0` aliases re-exported from `#anakata-ui/app/types`.
+
+### Page
+
+`/crm/marketing/journeys` replaces the CRM catch-all for that URL. The nav item is sprint 14. Segments and Automations stay `later`. `pageDecision` allows the path for `panel.crm`.
+
+Eight cards, API order. Each card shows name, goal, kind pill, trigger, contract when it is set, steps grouped by branch (nurture shows `lead` and `abandoned_checkout`), timing, action, and the step's `count` as “N enrolled”. Footer is `exit_sentence` and `suppression_sentence`. No conversion rate.
+
+The active checkbox is shown for `rules.manage`. Confirm quotes `contract` when it is non-empty, otherwise `trigger`. PATCH `{ active }` replaces that card. A step links a template only when `template_key` is in `GET /api/crm/templates`. Disabled catalogue switches match `step.catalogue_keys` against `GET /api/crm/automations` and link to `/crm/engine/automations`. They are not toggled from this page.
+
+### Enrolments and the contact drawer
+
+The enrolments drawer is the paginated list. The contact name goes to `/crm/sales/contacts?open={id}`. A booking reference goes to `/rms/reservations/bookings?open={reference}` only with `panel.rms`.
+
+The contact drawer loads `GET /api/crm/contacts/{id}/journeys` when the profile opens. Each row shows the journey key, status, step name, `next_due_at`, `exit_reason`, and each send's `sent_at` and `template_key`. A template key links to `/crm/marketing/journeys?template={key}`.
+
+`JourneyEnrolment.sends` on `v0.15.0` is `sent_at`, `template_key`, `catalogue_key`, `delivery_id`. There is no `template_version`. The drawer does not label the current published version as the version that was sent.
+
+### Templates
+
+The panel shows the published version and the open draft from the list. It does not walk older version numbers. Preview and test send use a contact from `GET /api/crm/contacts?q=` and an optional booking id. Preview HTML is a sandboxed iframe. A 422 shows the API message. Test send toasts the returned subject.
+
+Create draft (`POST …/drafts`) and publish (`POST …/versions/{version}/publish` with `approval_reference`) are only when `can('rules.manage')`. Versions are immutable and a second open draft is 409, so the form creates a draft only when `draft` is null. An existing draft is read-only plus the publish form. The template body is behind `can('panel.crm')`.
+
+### Checks
+
+`pnpm test` (48 files, 289 tests), `pnpm lint`, `pnpm typecheck`, and `pnpm build` passed against the sibling layer.
+
+Fresh clone of the panel with no sibling `anakata-ui` uses `github:anakata-project/anakata-ui#v0.15.0`. The `#anakata-ui` finder now matches a layer that contains `app/types/engine.ts`, because the GitHub extract path is `.c12/github_anakata_project_*` and does not contain the string `anakata-ui`. Generated `tsconfig` excludes `node_modules`, so the layer's `anakata-augment.d.ts` is not part of that compilation. `app/types/api-error-hook.d.ts` repeats the `anakata:api-error` hook so `useApi` typechecks. Fresh typecheck and build printed `FRESH_PANEL_OK`.
+
+`reset.sh` was not run. It targets compose project `anakata-e2e`. The browser pass used the running `anakata` stack.
+
+### Browser
+
+Signed in as Carolina (Admin). Dark theme, then light: eight cards, nurture shows both branches, the first lead step read “1 enrolled” after a lead tick.
+
+`POST /api/engine/marketing-leads` for `browser.journey@anakata.test` returned `{ accepted: true }` while nurture was on. After reload the welcome step count was 1. The enrolments drawer linked Journey to `/crm/sales/contacts?open=24`. The contact drawer Journeys section showed `nurture_to_request`, ACTIVE, step “Cart recovery 1”, due 23 Sep 2026, 09:30. That step name is what `GET /api/crm/contacts/24/journeys` returns. The journey list's count of 1 is on the lead welcome step, not on Cart recovery 1. The panel renders both payloads as they are.
+
+Preview of `welcome_web_lead` against Anna Whitfield returned the subject “Your Galápagos adventure begins here — Anakata”. Test send arrived in Mailpit at 15:28:08Z to `carolina@anakata.test`. A draft (version 2) was created and published with approval reference `Sprint 14 browser check`. The published row is now version 2; the open draft is gone.
+
+Turning nurture on quoted `engine: lead.captured · abandon_cart — marketing consent required`. Turning Request to Deposit on quoted `The booking request they submitted.` and was cancelled. Turning nurture off quoted the same trigger line. A second lead, `browser.journey.off@anakata.test`, created contact 25 and `GET /api/crm/contacts/25/journeys` returned `{ data: [] }`. Enrolments stayed at 1. Nurture was left inactive.
+
+`pretrip` and `questionnaire` were disabled through the automations API so the Ready to Depart step could show both switches. The card showed “Catalogue switch off” for Pre-trip package and Preferences questionnaire, each linking to `/crm/engine/automations`, with reason “Task 08 browser check”. Both were set back to enabled with reason “Task 08 browser check restore”.
+
+### Deviations
+
+Drafts cannot be replaced. `CreateTemplateDraft` returns 409 when an open draft exists, and versions are immutable except for publish. The form creates a draft only when none is open.
+
+### Notes for later
+
+The nurture welcome step's `count` and the enrolment's current step disagreed after one lead tick (count on the lead welcome step, current step “Cart recovery 1”). Worth a look on the API side. Task 09 still owns Segments and Automations.
+
+### Git commands
+
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/assets/css/crm.css \
+  app/components/crm/ContactDrawer.vue \
+  app/components/crm/JourneyEnrolmentsDrawer.vue \
+  app/components/crm/JourneyTemplatePanel.vue \
+  app/components/crm/journeyHelpers.ts \
+  app/navigation/crm.ts \
+  app/pages/crm/marketing/journeys.vue \
+  app/types/api-error-hook.d.ts \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  tests/unit/guards.test.ts \
+  tests/unit/journeyHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Add the CRM journeys page, template panel, and contact enrolments.
+
+Staff can read the eight journeys, confirm an active change, and publish a template draft.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-14/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the CRM journeys page.
+
+EOF
+)"
+```
