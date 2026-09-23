@@ -395,3 +395,82 @@ Record the CRM inbox page.
 EOF
 )"
 ```
+
+## Task 06 · CRM B2B Partners page
+
+Panel only. No API change. `B2bPartnerRow` is re-exported from `#anakata-ui/app/types`.
+
+### Page
+
+`/crm/sales/b2b-partners` replaces the CRM catch-all for that URL. The nav item is sprint 15. `pageDecision` allows the path for `panel.crm`. The Inbox guard test now expects B2B Partners at sprint 15 as well.
+
+The list is `table.list` inside `.panel`. One row per agency from `GET /api/crm/b2b-partners`. Columns are name, status, contact, rate (`{n}%`), revenue, commission accrued, open deal count, and the `b2b_partner_activation` summary. Revenue and commission accrued go through `useMoney()`. Nothing is summed and there is no KPI row. The prototype columns the API does not return (type, network, terms, pending to pay, leakage, producing partners) are absent.
+
+A row opens a `USlideover` that loads `GET /api/crm/b2b-partners/{id}`. Deal history is a read-only table of title, stage, `value_label`, and booking reference. The booking link is `/rms/reservations/bookings?open={reference}` and only when `can('panel.rms')`.
+
+### Reused
+
+`journeyHelpers.ts` groups journey-definition steps. It has no enrolment status, step, or next-due helper, so none was added. The list prints the same three fields the enrolments drawer prints: status pill, step name, `useDates().format(next_due_at, 'dateTime')`.
+
+The one-enrolment block (key, status, step, next due, exit, sends, template link) lived inline in `ContactDrawer.vue`. That block is now `JourneyEnrolmentDetail.vue`. The contact drawer and this slideover both use it. Sends still link to `/crm/marketing/journeys?template=`.
+
+"Open in RMS" is on each row and in the detail, only when `can('panel.rms')`. The target is `/rms/commercial/b2b?open={id}`, the same query the RMS agency screen and the contact drawer already use.
+
+### Relationship lines
+
+- Contact and enrolment: contact name links to `/crm/sales/contacts?open={id}`, plus status, step, and next due.
+- Contact, `enrolment` null, `enrolment_note` null: the contact link, plus "CRM contact matched. b2b_partner_activation is not enrolled."
+- No contact: the API sentence in `enrolment_note`, verbatim. No contact link.
+
+### Write actions
+
+None. No form, no approve, no rate edit, no `PATCH`.
+
+### Seed
+
+`DemoAgenciesSeeder` calls `ResolveContact` for every agency email, so every seeded agency has a CRM contact. The seeder does not dispatch `AgencyApproved`, so `b2b_partner_activation` is not enrolled from the fixture. After the current seed the page shows matched contacts and the not-enrolled line. It does not show `enrolment_note`. That row needs a later seed agency whose email matches no contact. No fixture was added in this task.
+
+### Checks
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (49 files, 296 tests), and `pnpm build` passed against the sibling layer.
+
+A fresh clone against `github:anakata-project/anakata-ui#v0.16.0` was not run. The pin in `nuxt.config.ts` is already `#v0.16.0`, used when `../anakata-ui` is absent.
+
+### Browser
+
+Signed in as Carolina (Admin). No seed reset. Dark and light.
+
+Andes Luxe Travel (PENDING, P. Ibáñez, 10%, USD 0), Blue Latitude Travel (APPROVED, S. Ferreira, 10%, USD 46,550, USD 4,656), and Meridian Voyages (APPROVED, T. Nakamura, 15%, USD 26,600, USD 0). Each journey cell says the contact is not enrolled. The Andes drawer shows no deals, the same not-enrolled line, and Open in RMS. That link lands on `/rms/commercial/b2b?open=3` with the Andes Luxe Travel agency drawer. Row links are `open=3`, `open=1`, and `open=2`. Contact links are `/crm/sales/contacts?open={id}`. No write control on the page. The no-contact sentence was not on screen, for the seed reason above.
+
+### Git commands
+
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/components/crm/B2bPartnerDrawer.vue \
+  app/components/crm/ContactDrawer.vue \
+  app/components/crm/JourneyEnrolmentDetail.vue \
+  app/navigation/crm.ts \
+  app/pages/crm/sales/b2b-partners.vue \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  tests/unit/guards.test.ts
+git commit -m "$(cat <<'EOF'
+Add the read-only CRM B2B Partners page.
+
+Staff can see each agency's contact, ledger figures, and activation journey, and open the RMS record.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-15/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the CRM B2B Partners page.
+
+EOF
+)"
+```
