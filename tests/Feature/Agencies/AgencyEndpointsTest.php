@@ -45,6 +45,12 @@ test('a manager can register an agency and a sales exec cannot', function (): vo
         ->assertJsonPath('status', AgencyStatus::Pending->value)
         ->assertJsonPath('commission_pct', 10)
         ->assertJsonPath('users.0.status', AgencyUserStatus::InviteOnApproval->value)
+        ->assertJsonPath('users.0.invite_sent_at', null)
+        ->assertJsonPath('users.0.invite_expires_at', null)
+        ->assertJsonPath('users.0.last_login_at', null)
+        ->assertJsonPath('portal_suspended_by', null)
+        ->assertJsonMissingPath('users.0.password')
+        ->assertJsonMissingPath('users.0.invite_token_hash')
         ->assertJsonPath('sla_breached', false);
 
     expect(ChangeHistory::query()->where('event', 'agency.registered')->count())->toBe(1);
@@ -93,13 +99,19 @@ test('approval invites users and rejection requires a reason', function (): void
         ])
         ->assertUnprocessable();
 
-    $this->actingAs(managerUser())
+    $approved = $this->actingAs(managerUser())
         ->postJson('/api/rms/agencies/'.$agency->id.'/decide', [
             'decision' => AgencyStatus::Approved->value,
         ])
         ->assertOk()
         ->assertJsonPath('status', AgencyStatus::Approved->value)
         ->assertJsonPath('users.0.status', AgencyUserStatus::InviteOnPortalLaunch->value);
+
+    $user = $approved->json('users.0');
+    expect($user['invite_sent_at'])->toBeString();
+    expect($user['invite_expires_at'])->toBeString();
+    expect($user['last_login_at'])->toBeNull();
+    expect($user)->not->toHaveKeys(['password', 'invite_token_hash', 'remember_token']);
 
     expect(ChangeHistory::query()->where('event', 'agency.approved')->count())->toBe(1);
 });

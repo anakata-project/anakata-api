@@ -427,3 +427,86 @@ Record the portal bookings, commissions, and request form.
 EOF
 )"
 ```
+
+## Task 09 · Portal access on the agency drawer
+
+The shared agency payload now carries the stored invitation and sign-in times, and who suspended the portal. `AgencyResource` (list and detail) adds `portal_suspended_by` as `{ id, name } | null`, loaded with `decidedBy`, and on each user `invite_sent_at`, `invite_expires_at` and `last_login_at` (`Iso::utc`, null when unset). No token, password hash or `remember_token`. No new route, and invite, suspend and resume behave as before. `AgencyEndpointsTest` asserts the three user timestamps (null on registration, sent and expiry set after approval, `last_login_at` still null) and that `password`, `invite_token_hash` and `remember_token` are absent. `PortalSuspensionTest` asserts `portal_suspended_by` on suspend and null after resume.
+
+`v0.14.0` is already tagged and pushed, so these fields are `0.14.1`. `pnpm types:api` regenerated `anakata-ui/app/types/api.d.ts` from the running API. `AgencyUser` in `payments.ts` is that user element, so no overlay was added. The panel fallback pin in `nuxt.config.ts` and the README layer line move to `#v0.14.1`. Engine and portal stay on `#v0.14.0`. A fresh clone pinned to `#v0.14.0` will not see the new fields. Panel `typecheck` and `build` were run against the sibling layer.
+
+The drawer keeps its existing sections. `agencies.invitesLater` and `agencies.approvedToast` now say approval sends the invitation, and a user added afterwards is invited from the drawer. The preview’s fixed materials line is unchanged. After invite, disable, enable, suspend and resume the drawer re-fetches `GET /api/rms/agencies/{id}`: invite returns only `{ message }`, and suspend and resume return the agency without `detailed`, which would drop bookings and the preview.
+
+Portal users read the new fields and do not derive a state or an expiry. `ACTIVE` is “Active”, plus the last sign-in when `last_login_at` is set. `DISABLED` is “Disabled”. `invite_sent_at` set (and not active or disabled) is “Invited”, with sent and expiry from `useDates`. Otherwise the row says it has not been invited. Buttons need `agencies.manage` and only appear when the payload allows them: Invite when there is no `invite_sent_at` and the user is not active or disabled; Re-send when `invite_sent_at` is set and the user is not active or disabled; Disable when `ACTIVE`; Enable when `DISABLED`.
+
+Portal access is one line: suspending stops sign-in and ends live sessions, and changes nothing about bookings or commissions. When suspended, the drawer shows the reason, `portal_suspended_by.name` and `portal_suspended_at`. Suspend and Resume use `ReasonModal` (`hint="required"`) and post `{ reason }`. Suspend only when access is open; Resume only when it is suspended.
+
+Sales materials, with `agencies.manage`: `GET /api/rms/sales-materials?agency_id=` (this agency plus shared). Each row shows title, kind, version, size from `bytes`, published, and “Shared” when `agency_id` is null. Upload is `FormData` (`title`, `kind`, `file`, `agency_id`) to `POST /api/rms/sales-materials`. The client does not pre-check type or the 50 MB limit; a 422 is `firstApiMessage`. Publish / Unpublish is `PATCH` with no body, labelled from `published`. Download uses `downloadDocumentFile` against `GET …/sales-materials/{id}/file`. A new upload is already published (`UploadSalesMaterial` sets `published` true), so the row arrives as Published / Unpublish.
+
+Portal activity, same permission: `GET …/portal-activity?page=` as `Paginated<PortalActivity>`. Columns are when, `agency_user.name`, and a label for `portal.signed_in`, `portal.sign_in_failed`, `portal.request_created` and `portal.material_downloaded`. Any other event is the raw string. A `references` entry is an `openBooking` link only when that reference is on `agency.bookings`; otherwise it is text. The pager matches the bookings list (`last_page > 1`).
+
+`SalesMaterial`, `SalesMaterialKind` and `PortalActivity` are re-exported from `anakata-panel/app/types/api.ts`. `portalUserActions`, `materialSizeLabel`, `materialKindKey` and `portalActivityKey` live in `agencyHelpers.ts` and are covered in `agencyHelpers.test.ts`. No password or token is in any string.
+
+On Booking Requests, a row with `source === 'portal'` shows `Portal · {agency}` (or `Portal` when `agency_name` is empty) on the contact cell. Other sources are unchanged.
+
+**Checks.** Inside the `app` container: Pint on `AgencyResource.php`, `AgencyEndpointsTest.php` and `PortalSuspensionTest.php`; Larastan on those files; the agency and suspension tests (11 passed, 98 assertions). Panel, against the sibling layer: `pnpm lint`, `typecheck`, `test` (47 files, 280 tests) and `build`.
+
+**Browser** (running local stack, dark and light; `reset.sh` was not run — it `migrate:fresh`s and only allows the `anakata-e2e` project unless `E2E_ALLOW_RESET=1`). Blue Latitude’s drawer shows the four sections in both themes. `ANK-R-2026-0043` shows “Portal · Blue Latitude Travel”; the email and WhatsApp rows do not. A user added from the drawer starts as “Not invited” with Invite. After Invite, the row is “Invited · sent 23 Sep 2026, 02:52 · expires 7 Oct 2026, 02:52” (the API’s expiry, 14 days on) and Mailpit has “Set your password”. Accepting sets Active. Last sign-in appears after a later sign-in (`LoginAgencyUser` writes `last_login_at`; accept does not): “Active · last sign-in 23 Sep 2026, 02:55”. Disable shows Disabled and Enable; Enable returns Active. Suspend with a reason shows Suspended, the time, Carolina M. and the reason. The open portal session’s next request is 401 `Unauthenticated.`, and sign-in is 422 with the neutral credentials message. Resume restores Open and Suspend. Uploading a PDF shows “Task 09 sheet · Fact sheet · v1 · 192 B · Published”, and the portal materials page lists it with Download. Activity shows a sign-in, a failed sign-in, “Request created · ANK-R-2026-0043” as text (that reference is not on `agency.bookings`) and material downloads.
+
+Local data left on Blue Latitude from this pass: portal user Browser Check (`browser-check-09@portal.test`), and published material “Task 09 sheet”. The agency is not suspended.
+
+### Git commands
+Do not run these in the agent. Explicit paths only. Run in this order. `v0.14.0` stays as it is; this tag is `v0.14.1`.
+
+```bash
+# 1. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  app/types/api.d.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for agency invitation and suspension fields.
+
+An agency user now includes the stored invite and last sign-in times, and an agency includes who suspended the portal.
+EOF
+)"
+git tag v0.14.1
+git push origin HEAD
+git push origin v0.14.1
+```
+
+```bash
+# 2. anakata-panel
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  README.md \
+  nuxt.config.ts \
+  app/components/agencies/AgencyDrawer.vue \
+  app/components/agencies/agencyHelpers.ts \
+  app/pages/rms/reservations/booking-requests.vue \
+  app/types/api.ts \
+  i18n/locales/en.json \
+  tests/unit/agencyHelpers.test.ts
+git commit -m "$(cat <<'EOF'
+Run portal users, access, materials and activity from the agency drawer.
+
+Pin the shared layer fallback to v0.14.1 so those payload fields typecheck.
+EOF
+)"
+```
+
+```bash
+# 3. anakata-api
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Resources/Rms/AgencyResource.php \
+  tests/Feature/Agencies/AgencyEndpointsTest.php \
+  tests/Feature/Portal/PortalSuspensionTest.php \
+  docs/sprints/sprint-13/REPORT.md
+git commit -m "$(cat <<'EOF'
+Expose stored invite times and who suspended an agency.
+
+The drawer reads those fields instead of inventing an expiry or a suspender.
+EOF
+)"
+```

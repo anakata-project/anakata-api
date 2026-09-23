@@ -24,10 +24,17 @@ test('suspending portal access requires a reason and the agencies.manage permiss
         ->assertStatus(422)
         ->assertJsonValidationErrors(['reason']);
 
-    $this->actingAs(managerUser())
+    $manager = managerUser();
+
+    $suspended = $this->actingAs($manager)
         ->postJson("/api/rms/agencies/{$agency->id}/portal/suspend", ['reason' => 'fraud review'])
         ->assertOk()
-        ->assertJsonPath('portal_suspended', true);
+        ->assertJsonPath('portal_suspended', true)
+        ->assertJsonPath('portal_suspended_by.id', $manager->id)
+        ->assertJsonPath('portal_suspended_by.name', $manager->name)
+        ->assertJsonPath('portal_suspend_reason', 'fraud review');
+
+    expect($suspended->json('portal_suspended_at'))->toBeString();
 
     $agency->refresh();
     expect($agency->isPortalSuspended())->toBeTrue();
@@ -101,7 +108,8 @@ test('resuming restores access and requires a reason', function (): void {
     $this->actingAs(managerUser())
         ->postJson("/api/rms/agencies/{$agency->id}/portal/resume", ['reason' => 'cleared'])
         ->assertOk()
-        ->assertJsonPath('portal_suspended', false);
+        ->assertJsonPath('portal_suspended', false)
+        ->assertJsonPath('portal_suspended_by', null);
 
     $agency->refresh();
     expect($agency->isPortalSuspended())->toBeFalse();

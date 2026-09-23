@@ -6,6 +6,7 @@ namespace App\Http\Resources\Rms;
 
 use App\Enums\AgencyUserStatus;
 use App\Models\Agency;
+use App\Models\AgencyUser;
 use App\Models\Booking;
 use App\Services\Config\CurrentConfig;
 use App\Support\Agencies\AgencyBookingWindow;
@@ -44,10 +45,11 @@ class AgencyResource extends JsonResource
      *     decision_reason: string|null,
      *     portal_suspended: bool,
      *     portal_suspended_at: string|null,
+     *     portal_suspended_by: array{id: int, name: string}|null,
      *     portal_suspend_reason: string|null,
      *     sla_business_days_elapsed: int,
      *     sla_breached: bool,
-     *     users: list<array{id: int, name: string, email: string, status: AgencyUserStatus}>,
+     *     users: list<array{id: int, name: string, email: string, status: AgencyUserStatus, invite_sent_at: string|null, invite_expires_at: string|null, last_login_at: string|null}>,
      *     bookings_count: int,
      *     revenue: int,
      *     commission_accrued: int,
@@ -69,10 +71,11 @@ class AgencyResource extends JsonResource
      *     decision_reason: string|null,
      *     portal_suspended: bool,
      *     portal_suspended_at: string|null,
+     *     portal_suspended_by: array{id: int, name: string}|null,
      *     portal_suspend_reason: string|null,
      *     sla_business_days_elapsed: int,
      *     sla_breached: bool,
-     *     users: list<array{id: int, name: string, email: string, status: AgencyUserStatus}>,
+     *     users: list<array{id: int, name: string, email: string, status: AgencyUserStatus, invite_sent_at: string|null, invite_expires_at: string|null, last_login_at: string|null}>,
      *     revenue: int,
      *     commission_accrued: int,
      *     bookings_count: int,
@@ -83,7 +86,7 @@ class AgencyResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $this->resource->loadMissing(['users', 'decidedBy']);
+        $this->resource->loadMissing(['users', 'decidedBy', 'portalSuspendedBy']);
 
         $config = app(CurrentConfig::class);
         $rules = $config->businessRules();
@@ -110,14 +113,21 @@ class AgencyResource extends JsonResource
             'decision_reason' => $this->decision_reason,
             'portal_suspended' => $this->resource->isPortalSuspended(),
             'portal_suspended_at' => $this->portal_suspended_at !== null ? Iso::utc($this->portal_suspended_at) : null,
+            'portal_suspended_by' => $this->portalSuspendedBy === null ? null : [
+                'id' => $this->portalSuspendedBy->id,
+                'name' => $this->portalSuspendedBy->name,
+            ],
             'portal_suspend_reason' => $this->portal_suspend_reason,
             'sla_business_days_elapsed' => $sla['sla_business_days_elapsed'],
             'sla_breached' => $sla['sla_breached'],
-            'users' => $this->users->map(fn ($user): array => [
+            'users' => $this->users->map(fn (AgencyUser $user): array => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'status' => $user->status,
+                'invite_sent_at' => Iso::utc($user->invite_sent_at),
+                'invite_expires_at' => Iso::utc($user->invite_expires_at),
+                'last_login_at' => Iso::utc($user->last_login_at),
             ])->values()->all(),
         ];
 
