@@ -800,3 +800,89 @@ Pin the shared layer fallback to v0.15.0.
 EOF
 )"
 ```
+
+## Task 07 · Checkout marketing tick and unsubscribe page
+
+Engine only. No API change, no layer edit. The pin stays `github:anakata-project/anakata-ui#v0.15.0`.
+
+### Details tick
+
+The submit checkbox is unchanged: `flow.marketing`, label `details.marketing`, sent as `marketing` on `POST /api/engine/checkout/{token}/submit`. A second box sits under the email field, bound to `flow.cartMarketing` (default `false`). Its label is `details.checkoutMarketing`: news and expedition ideas, stop any time from the link in those emails, unticking does not withdraw a request already sent, wording pending (LEG-002).
+
+The version is `settings.legal.consent_versions.checkout_marketing`, read off the hand-written five-key `EngineSettings` with `'checkout_marketing' in versions` and `typeof value === 'string'`. No cast and no widening. A missing or non-string key does not post.
+
+The post is `POST /api/engine/marketing-leads` with `fetch`, `keepalive: true`, `credentials: 'include'`, and JSON. It runs from successful `submit()`, from `back()`, and from `onHide` (`pagehide` and `visibilitychange`). Not on tick and not on keystroke. An in-flight flag is set synchronously before the await, because both hide events call `onHide`. `sessionStorage` `anakata-checkout-marketing-lead` is set only when the JSON is `{ accepted: true }`. Any other response clears the flag while the page is still alive. `session_id` is included only via `submitSessionId()` (analytics consent already accepted). `navigator.sendBeacon` is not used: it returns no body, and the posted flag has to follow `{ accepted: true }`.
+
+`marketingLeadBody` returns nothing when the box is unticked, when this session is already posted, when first name or version is empty, or when the email fails the same pattern as the form. Unticking after a successful post sends nothing. There is no toast.
+
+Ticking this box and the submit checkbox writes two register rows. They are different writes: this post is `ENGINE_FORM` through `marketing-leads`; the submit checkbox still rides only on checkout submit. The browser pass ticked only the new box, so the contact has one `ENGINE_FORM` row from that post.
+
+### Unsubscribe page
+
+`/unsubscribe/[token]` loads `GET /api/engine/unsubscribe/{token}`. A valid link that is not yet withdrawn shows one sentence and one button. The button `POST`s with no body. After that, and on a later visit when `already_unsubscribed` is set, the page shows the confirmation and the line that messages about an existing booking still arrive. No name, booking, or address. An unknown token (404) shows "This link is not valid." and does not echo the token. `already_unsubscribed` is `string` on `v0.15.0`; confirmation is `String(flag) === 'true'`. The page calls no `track()`.
+
+`noindex` is `useHead` and `useSeoMeta`, the same as survey and complete. The route rule for `/unsubscribe/**` is only `cache-control: no-store, private`, matching the other token rules. The task text says the route rule includes `noindex`; those four rules do not set that header, so this one does not either.
+
+### Privacy
+
+`redactPagePath` collapses `/unsubscribe/…` to `/unsubscribe/[token]`, query and hash stripped. `queuePageView` returns without enqueueing that path. `useAnalyticsConsent` does not call `loadGtag` while the route is that path, and loads it after the route leaves when consent is already accepted.
+
+### Tests
+
+`app/utils/marketingLead.ts` and `app/utils/unsubscribePage.ts`. Unit tests: unticked, one body, second call, untick after a post; prompt / confirmed / unknown; path redaction; a `page_view` whose path is an unsubscribe URL stores `/unsubscribe/[token]`; `queuePageView` does not enqueue the token.
+
+`pnpm test` (22 files, 84 tests), `pnpm lint`, `pnpm typecheck`, and `pnpm build` passed. Fresh clone of the engine against `anakata-ui` `v0.15.0` (`28bd60f`) typecheck and build printed `FRESH_ENGINE_OK`.
+
+### Browser
+
+Dark theme, details step, email `browser.tick@anakata.test`, first name Browser. The new box starts unticked, directly under Email, and the submit checkbox stays unticked. Filling the form while unticked produced no `marketing-leads` request. Ticking the new box and choosing Back to cabins posted once: access log `POST /api/engine/marketing-leads` 200 from the browser at 14:51:07. `sessionStorage` `anakata-checkout-marketing-lead` is `1`. Contact 23 has `MARKETING` / `granted` 1 / `v1 (pending LEG-002)` / `ENGINE_FORM`. No success toast.
+
+Local `nurture_to_request.active` is 0, and `JourneyEngine::enrol` returns null for an inactive journey, so this pass has no enrolment row. The withdraw therefore had no marketing enrolment to exit.
+
+`/unsubscribe/{token}` for that contact showed the prompt and the button. The click posted and replaced it with the confirmation and the transactional line, in the light theme (`html` class `light`). A reload showed the same confirmation and no button. A second `POST` returned `{ valid: true, already_unsubscribed: true }` and the consent count stayed 2. The withdraw row is `MARKETING` / `granted` 0 / `UNSUBSCRIBE` / the same version. Unknown token SSR is 200, `cache-control: no-store, private`, `robots` noindex, visible text "This link is not valid." The access log for the unsubscribe visit is the GET and the POST of that path, and no `/api/engine/events` line.
+
+Returning to `/book/details` after Back no longer renders the form, because Back releases the hold. The details checkbox was checked in the dark theme only.
+
+### Deviations
+
+`noindex` is page meta, not a route-rule header. The nurture enrolment in the browser check did not appear because that journey is inactive in this database.
+
+### Git commands
+
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add \
+  app/composables/useAnalyticsConsent.ts \
+  app/composables/useBookingFlow.ts \
+  app/pages/book/details.vue \
+  app/pages/unsubscribe/[token].vue \
+  app/types/api.ts \
+  app/utils/engineQueue.ts \
+  app/utils/marketingLead.ts \
+  app/utils/pagePath.ts \
+  app/utils/unsubscribePage.ts \
+  i18n/locales/en.json \
+  nuxt.config.ts \
+  tests/unit/engineEvents.test.ts \
+  tests/unit/engineQueue.test.ts \
+  tests/unit/marketingLead.test.ts \
+  tests/unit/pagePath.test.ts \
+  tests/unit/unsubscribePage.test.ts
+git commit -m "$(cat <<'EOF'
+Ask for a checkout address once, and add a public unsubscribe page.
+
+The tick posts on leave, and the token page sends no analytics.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-14/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the checkout marketing tick and the unsubscribe page.
+EOF
+)"
+```
