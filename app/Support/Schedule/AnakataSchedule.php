@@ -41,10 +41,37 @@ final class AnakataSchedule
         );
 
         RecordScheduledRuns::attach(
+            $schedule->command('anakata:reports-send')
+                ->everyFifteenMinutes()
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Email scheduled reports whose Galápagos moment has passed'),
+        );
+
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:waitlist-notify')
+                ->everyFifteenMinutes()
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Email waitlist entries when a cabin in their category is free'),
+        );
+
+        RecordScheduledRuns::attach(
             $schedule->command('anakata:flag-overdue')
                 ->daily()
                 ->timezone(BusinessTime::zone())
                 ->withoutOverlapping(),
+        );
+
+        RecordScheduledRuns::attach(
+            $schedule->command('anakata:charter-deposits')
+                ->daily()
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Warn when a charter deposit is unpaid after its due date'),
         );
 
         RecordScheduledRuns::attach(

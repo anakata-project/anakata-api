@@ -105,6 +105,22 @@ final class AlertRegistry
                 'The NPS reply task closes.',
                 'rms',
             ),
+            new AlertKindDefinition(
+                AlertKind::ReportFailed,
+                AlertSeverity::Warn,
+                [Permission::PanelRms],
+                'A scheduled report run fails.',
+                'A later run of that definition succeeds.',
+                'rms',
+            ),
+            new AlertKindDefinition(
+                AlertKind::CharterDepositDue,
+                AlertSeverity::Warn,
+                [Permission::BookingsOverdueDecision],
+                'A charter deposit is unpaid after its due date.',
+                'The deposit is settled, or the booking leaves PENDING_PAYMENT.',
+                'rms',
+            ),
         ];
     }
 

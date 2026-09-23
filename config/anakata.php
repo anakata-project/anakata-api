@@ -10,4 +10,6 @@ return [
 
     'business_timezone' => 'Pacific/Galapagos',
 
+    'report_attachment_bytes' => 7_340_032,
+
 ];

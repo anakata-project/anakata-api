@@ -17,6 +17,8 @@ enum AlertKind: string
     case LowOccupancy = 'LOW_OCCUPANCY';
     case ManifestDataOverdue = 'MANIFEST_DATA_OVERDUE';
     case NpsLow = 'NPS_LOW';
+    case ReportFailed = 'REPORT_FAILED';
+    case CharterDepositDue = 'CHARTER_DEPOSIT_DUE';
 
     public function label(): string
     {
@@ -32,6 +34,8 @@ enum AlertKind: string
             self::LowOccupancy => 'Low occupancy',
             self::ManifestDataOverdue => 'Manifest data overdue',
             self::NpsLow => 'NPS below threshold',
+            self::ReportFailed => 'Report failed',
+            self::CharterDepositDue => 'Charter deposit due',
         };
     }
 }
