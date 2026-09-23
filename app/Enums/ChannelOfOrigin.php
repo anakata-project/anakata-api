@@ -103,4 +103,20 @@ enum ChannelOfOrigin: string
             self::Unknown => ChannelOfOriginGroup::DistributionPartnersOther,
         };
     }
+
+    /**
+     * @return list<string>
+     */
+    public static function valuesInGroup(ChannelOfOriginGroup $group): array
+    {
+        $values = [];
+
+        foreach (self::cases() as $case) {
+            if ($case->group() === $group) {
+                $values[] = $case->value;
+            }
+        }
+
+        return $values;
+    }
 }

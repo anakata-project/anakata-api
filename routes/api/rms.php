@@ -30,6 +30,7 @@ use App\Http\Controllers\Rms\HoldController;
 use App\Http\Controllers\Rms\InternalBlockController;
 use App\Http\Controllers\Rms\ItineraryController;
 use App\Http\Controllers\Rms\ManifestController;
+use App\Http\Controllers\Rms\MetricsController;
 use App\Http\Controllers\Rms\OfferController;
 use App\Http\Controllers\Rms\PaymentController;
 use App\Http\Controllers\Rms\PaymentLinkController;
@@ -37,6 +38,8 @@ use App\Http\Controllers\Rms\PermissionController;
 use App\Http\Controllers\Rms\RatesController;
 use App\Http\Controllers\Rms\ReconciliationController;
 use App\Http\Controllers\Rms\RefundController;
+use App\Http\Controllers\Rms\ReportController;
+use App\Http\Controllers\Rms\ReportSubscriptionController;
 use App\Http\Controllers\Rms\RequestController;
 use App\Http\Controllers\Rms\RoleController;
 use App\Http\Controllers\Rms\UserController;
@@ -164,6 +167,19 @@ Route::get('documents/{document}/html', [DocumentController::class, 'issuedHtml'
 Route::get('documents/{document}/file', [DocumentController::class, 'file'])->whereNumber('document');
 Route::post('documents/{document}/send', [DocumentController::class, 'send'])->whereNumber('document');
 Route::delete('booking-extras/{extra}', [BookingExtraController::class, 'destroy'])->whereNumber('extra');
+Route::get('metrics', MetricsController::class);
+Route::get('reports', [ReportController::class, 'index']);
+Route::get('reports/runs', [ReportController::class, 'runs']);
+Route::post('reports/{key}/runs', [ReportController::class, 'store']);
+Route::get('reports/runs/{run}/file/{format}', [ReportController::class, 'file'])->whereNumber('run');
+Route::get('reports/subscriptions', [ReportSubscriptionController::class, 'index']);
+Route::patch('reports/subscriptions/{subscription}', [ReportSubscriptionController::class, 'update'])
+    ->whereNumber('subscription')
+    ->middleware('permission:rules.manage');
+Route::post('reports/subscriptions/{subscription}/run-now', [ReportSubscriptionController::class, 'runNow'])
+    ->whereNumber('subscription')
+    ->middleware('permission:rules.manage');
+
 Route::get('guest-experience/departures', [GuestExperienceController::class, 'departures']);
 Route::get('guest-experience/nps', [GuestResponseController::class, 'index']);
 Route::get('guest-experience/questions', [GuestExperienceController::class, 'questions']);
@@ -218,6 +234,7 @@ Route::get('holds', [HoldController::class, 'index']);
 
 Route::get('charter-enquiries', [CharterEnquiryController::class, 'index']);
 Route::patch('charter-enquiries/{enquiry}', [CharterEnquiryController::class, 'update'])->whereNumber('enquiry');
+Route::post('charter-enquiries/{enquiry}/proposal', [CharterEnquiryController::class, 'proposal'])->whereNumber('enquiry');
 
 Route::get('waitlist', [WaitlistController::class, 'index']);
 Route::post('waitlist', [WaitlistController::class, 'store']);

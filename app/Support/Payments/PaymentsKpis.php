@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Payments;
 
 use App\Enums\BookingStatus;
+use App\Enums\ChannelOfOrigin;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentStatus;
 use App\Enums\Permission;
@@ -13,6 +14,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
+use App\Support\Metrics\MetricScope;
 use Illuminate\Database\Eloquent\Builder;
 use stdClass;
 
@@ -80,12 +82,12 @@ final class PaymentsKpis
      *     wire_window_hours: int
      * }
      */
-    public static function for(User $actor, ?string $from, ?string $to): array
+    public static function for(User $actor, ?string $from, ?string $to, ?MetricScope $scope = null): array
     {
         $config = app(CurrentConfig::class);
         $terms = $config->rates()->terms;
         $viewAll = $actor->hasPermission(Permission::BookingsViewAll);
-        $row = self::aggregate($viewAll, $viewAll ? null : $actor->id, $from, $to);
+        $row = self::aggregate($viewAll, $viewAll ? null : $actor->id, $from, $to, $scope);
 
         return [
             'collected' => (int) ($row->collected ?? 0),
@@ -104,7 +106,49 @@ final class PaymentsKpis
         ];
     }
 
-    private static function aggregate(bool $viewAll, ?int $ownerId, ?string $from, ?string $to): stdClass
+    /**
+     * The same figures as for(), without an own-records cut. Scheduled reports use this.
+     *
+     * @return array{
+     *     collected: int,
+     *     deposits: int,
+     *     pending: int,
+     *     pending_count: int,
+     *     overdue_count: int,
+     *     overdue_amount: int,
+     *     commission_accrued: int,
+     *     cabin_deposit_pct: int,
+     *     charter_deposit_pct: int,
+     *     cabin_balance_days: int,
+     *     commission_payable_days: int,
+     *     commission_cap_pct: int,
+     *     wire_window_hours: int
+     * }
+     */
+    public static function across(?string $from, ?string $to, ?MetricScope $scope = null): array
+    {
+        $config = app(CurrentConfig::class);
+        $terms = $config->rates()->terms;
+        $row = self::aggregate(true, null, $from, $to, $scope);
+
+        return [
+            'collected' => (int) ($row->collected ?? 0),
+            'deposits' => (int) ($row->deposits ?? 0),
+            'pending' => (int) ($row->pending ?? 0),
+            'pending_count' => (int) ($row->pending_count ?? 0),
+            'overdue_count' => (int) ($row->overdue_count ?? 0),
+            'overdue_amount' => (int) ($row->overdue_amount ?? 0),
+            'commission_accrued' => (int) ($row->commission_accrued ?? 0),
+            'cabin_deposit_pct' => $terms->cabinDepositPct,
+            'charter_deposit_pct' => $terms->charterDepositPct,
+            'cabin_balance_days' => $terms->cabinBalanceDays,
+            'commission_payable_days' => $config->businessRules()->commission->payableDaysAfterCruise,
+            'commission_cap_pct' => $config->businessRules()->commission->capPct,
+            'wire_window_hours' => $config->businessRules()->payments->wireWindowHours,
+        ];
+    }
+
+    private static function aggregate(bool $viewAll, ?int $ownerId, ?string $from, ?string $to, ?MetricScope $scope = null): stdClass
     {
         [$balanceSql, $paid] = Booking::balanceSql();
         [$cruiseSql, $cruisePaid] = Booking::cruiseOutstandingSql();
@@ -129,10 +173,10 @@ final class PaymentsKpis
         $pendingWhen = 'bookings.status IN ('.$owingIn.') AND ('.$balanceSql.') > 0';
         $overdueWhen = 'bookings.status IN ('.$overdueIn.') AND ('.$cruiseSql.') > 0 AND ? > '.$dueSql;
 
-        $collected = self::paidSumQuery($viewAll, $ownerId, $from, $to, depositsOnly: false);
-        $deposits = self::paidSumQuery($viewAll, $ownerId, $from, $to, depositsOnly: true);
+        $collected = self::paidSumQuery($viewAll, $ownerId, $from, $to, depositsOnly: false, scope: $scope);
+        $deposits = self::paidSumQuery($viewAll, $ownerId, $from, $to, depositsOnly: true, scope: $scope);
 
-        $row = self::visibleBookings($viewAll, $ownerId, $from, $to)
+        $row = self::visibleBookings($viewAll, $ownerId, $from, $to, $scope)
             ->toBase()
             ->selectRaw(
                 '('.$collected->toSql().') as collected, '.
@@ -170,9 +214,9 @@ final class PaymentsKpis
     /**
      * @return Builder<Booking>
      */
-    private static function visibleBookings(bool $viewAll, ?int $ownerId, ?string $from, ?string $to): Builder
+    private static function visibleBookings(bool $viewAll, ?int $ownerId, ?string $from, ?string $to, ?MetricScope $scope = null): Builder
     {
-        return Booking::query()
+        $query = Booking::query()
             ->when(
                 ! $viewAll && $ownerId !== null,
                 fn (Builder $query) => $query->where('bookings.owner_id', $ownerId),
@@ -191,6 +235,10 @@ final class PaymentsKpis
                     fn (Builder $departure) => $departure->whereDate('date', '<=', $to),
                 ),
             );
+
+        self::constrainScope($query, $scope);
+
+        return $query;
     }
 
     /**
@@ -202,14 +250,17 @@ final class PaymentsKpis
         ?string $from,
         ?string $to,
         bool $depositsOnly,
+        ?MetricScope $scope = null,
     ): Builder {
         return Payment::query()
             ->whereHas(
                 'booking',
-                function (Builder $booking) use ($viewAll, $ownerId): void {
+                function (Builder $booking) use ($viewAll, $ownerId, $scope): void {
                     if (! $viewAll && $ownerId !== null) {
                         $booking->where('owner_id', $ownerId);
                     }
+
+                    self::constrainScope($booking, $scope);
                 },
             )
             ->whereIn('payments.status', PaymentStatus::paidValues())
@@ -230,5 +281,40 @@ final class PaymentsKpis
                 fn (Builder $query) => $query->whereDate('payments.paid_at', '<=', $to),
             )
             ->selectRaw('COALESCE(SUM(payments.amount), 0)');
+    }
+
+    /**
+     * @param  Builder<Booking>  $booking
+     */
+    private static function constrainScope(Builder $booking, ?MetricScope $scope): void
+    {
+        if (! $scope instanceof MetricScope) {
+            return;
+        }
+
+        $yachtId = $scope->yachtId;
+        $itineraryId = $scope->itineraryId;
+
+        if ($yachtId !== null || $itineraryId !== null) {
+            $booking->whereHas('departure', function (Builder $departure) use ($yachtId, $itineraryId): void {
+                if ($yachtId !== null) {
+                    $departure->where('yacht_id', $yachtId);
+                }
+
+                if ($itineraryId !== null) {
+                    $departure->where('itinerary_id', $itineraryId);
+                }
+            });
+        }
+
+        if ($scope->agencyId !== null) {
+            $booking->where('agency_id', $scope->agencyId);
+        }
+
+        $channel = $scope->channel;
+
+        if ($channel !== null) {
+            $booking->whereIn('channel_of_origin', ChannelOfOrigin::valuesInGroup($channel));
+        }
     }
 }

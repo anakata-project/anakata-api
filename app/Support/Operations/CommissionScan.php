@@ -60,6 +60,19 @@ final class CommissionScan
     }
 
     /**
+     * Name of {@see tradeChannels()}. Narrower than the trade-and-corporate channel group.
+     */
+    public static function tradeGroupName(): string
+    {
+        return 'Trade';
+    }
+
+    public static function isTradeChannel(ChannelOfOrigin $channel): bool
+    {
+        return in_array($channel, self::tradeChannels(), true);
+    }
+
+    /**
      * @return list<string>
      */
     private function tradeWithoutAgency(): array
