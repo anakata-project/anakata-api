@@ -12,6 +12,7 @@ use App\Mail\Documents\DocumentMail;
 use App\Models\Booking;
 use App\Models\ChangeHistory;
 use App\Models\Delivery;
+use App\Support\Automations\AutomationGate;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
@@ -113,19 +114,19 @@ test('a transport that fails twice then succeeds ends SENT with one mail', funct
     $job = new SendDeliveryJob($delivery->id);
 
     try {
-        $job->handle();
+        $job->handle(app(AutomationGate::class));
     } catch (TransportException) {
     }
     expect($delivery->fresh()?->status)->toBe(DeliveryStatus::Queued);
 
     try {
-        $job->handle();
+        $job->handle(app(AutomationGate::class));
     } catch (TransportException) {
     }
     expect($delivery->fresh()?->status)->toBe(DeliveryStatus::Queued);
     expect(ChangeHistory::query()->where('event', 'document.send_failed')->count())->toBe(0);
 
-    $job->handle();
+    $job->handle(app(AutomationGate::class));
 
     expect($delivery->fresh()?->status)->toBe(DeliveryStatus::Sent);
     expect($attempts)->toBe(3);
@@ -146,7 +147,7 @@ test('a transport that always fails ends FAILED after three attempts', function 
 
     foreach ([1, 2] as $ignored) {
         try {
-            $job->handle();
+            $job->handle(app(AutomationGate::class));
         } catch (TransportException) {
         }
         expect($delivery->fresh()?->status)->toBe(DeliveryStatus::Queued);
@@ -155,7 +156,7 @@ test('a transport that always fails ends FAILED after three attempts', function 
     expect(ChangeHistory::query()->where('event', 'document.send_failed')->count())->toBe(0);
 
     try {
-        $job->handle();
+        $job->handle(app(AutomationGate::class));
     } catch (TransportException $exception) {
         $job->failed($exception);
     }

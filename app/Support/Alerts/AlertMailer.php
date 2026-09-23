@@ -11,11 +11,15 @@ use App\Mail\Alerts\AlertMail;
 use App\Models\Alert;
 use App\Models\AlertNotification;
 use App\Models\User;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 final class AlertMailer
 {
+    public function __construct(private readonly AutomationGate $gate) {}
+
     public function sendOutstanding(): void
     {
         Alert::query()
@@ -90,6 +94,14 @@ final class AlertMailer
 
     private function attempt(Alert $alert, User $user, ?AlertNotification $existing): void
     {
+        $key = AutomationCatalogue::alertKey($alert->kind);
+
+        if (! $this->gate->allows($key)) {
+            $this->gate->recordSkip($alert, $key);
+
+            return;
+        }
+
         $attempts = $existing instanceof AlertNotification ? 2 : 1;
         $url = rtrim((string) config('anakata.panel_url'), '/').AlertSubject::href($alert);
 

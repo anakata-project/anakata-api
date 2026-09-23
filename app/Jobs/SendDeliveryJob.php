@@ -11,6 +11,8 @@ use App\Mail\Documents\DeliveryMailFactory;
 use App\Models\Booking;
 use App\Models\Delivery;
 use App\Models\User;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use App\Support\History\History;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -31,7 +33,7 @@ final class SendDeliveryJob implements ShouldQueue
 
     public function __construct(public int $deliveryId) {}
 
-    public function handle(): void
+    public function handle(AutomationGate $gate): void
     {
         $delivery = Delivery::query()
             ->with(['booking', 'document'])
@@ -42,6 +44,14 @@ final class SendDeliveryJob implements ShouldQueue
         }
 
         if ($delivery->status !== DeliveryStatus::Queued) {
+            return;
+        }
+
+        $key = AutomationCatalogue::keyForDelivery($delivery);
+
+        if (is_string($key) && ! $gate->allows($key)) {
+            $gate->blockDelivery($delivery, $key);
+
             return;
         }
 

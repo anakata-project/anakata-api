@@ -16,6 +16,7 @@ use App\Models\Booking;
 use App\Models\CrmTask;
 use App\Models\Delivery;
 use App\Models\Payment;
+use App\Support\Automations\AutomationGate;
 use App\Support\Crm\TaskSweep;
 use App\Support\Money;
 use App\Support\Payments\WireWindow;
@@ -377,7 +378,13 @@ final class AlertSweep
     private function failedDeliveries(): Builder
     {
         return Delivery::query()
-            ->whereIn('deliveries.status', [DeliveryStatus::Failed->value, DeliveryStatus::Blocked->value])
+            ->where(function ($status): void {
+                $status->where('deliveries.status', DeliveryStatus::Failed->value)
+                    ->orWhere(function ($blocked): void {
+                        $blocked->where('deliveries.status', DeliveryStatus::Blocked->value);
+                        AutomationGate::excludeSkips($blocked);
+                    });
+            })
             ->whereNotExists(function ($later): void {
                 $later->from('deliveries as sent')
                     ->where('sent.status', DeliveryStatus::Sent->value)

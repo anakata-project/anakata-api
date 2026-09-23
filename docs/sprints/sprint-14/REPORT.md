@@ -137,3 +137,116 @@ Audiences are definitions evaluated when asked for, and a suppressed contact is 
 EOF
 )"
 ```
+
+## Task 02 · The automation catalogue
+
+One PHP list of every automatic message, and a switch that stops only the email. Flags, alerts, tasks, issued documents and report files keep happening. The panel list is task 09 and is not built here. Journeys and cart recovery stay `not_built`.
+
+### Registry
+
+`AutomationCatalogue` is code, not a table. Each `AutomationDefinition` has `key`, prototype section `a`–`g` and heading, `name`, `subject`, `trigger`, `timing`, `location` (a class, an `anakata:` command, or `alert:{AlertKind}`), `audience` (`customer` or `staff`), `kind` (`MARKETING` or `TRANSACTIONAL`), `switchable`, `locked_reason`, `built`, `not_built_note`, `alert_kind`, `journey_key`.
+
+`journey_key` is null on every row. Task 03 fills it. Subjects for built rows are the real `DeliverySubject` or alert title. A not-built row keeps the prototype subject, has a note, and has no location.
+
+**46 rows: 30 built, 16 not built.** The only `MARKETING` row is `review_request`. `ConsentGate` is unchanged and is still checked.
+
+Switchable, because the record already exists and only the email stops:
+
+| Key | What stays when it is off |
+|---|---|
+| `booking_confirmation`, `booking_summary` | The invoice and summary PDFs |
+| `charter_proposal` | The issued proposal PDF |
+| `balance_reminder_21`, `balance_reminder_7` | Independent slots on `anakata:documents-due` |
+| `payment_receipt`, `final_invoice` | The receipt and the final invoice |
+| `pretrip`, `questionnaire`, `voucher` | The issued document, or the questionnaire row |
+| `survey` | The survey is transactional |
+| `review_request` | Marketing. Consent is still required |
+| `charter_enquiry` | The enquiry row, mail to the reservations mailbox |
+| `report_email` | The report run file (O3) |
+
+Not switchable. `locked_reason` is `The rule behind this message must not depend on a switch.` A settings row that says disabled is ignored:
+
+- `portal_invite` — the plaintext token exists only in that job.
+- `waitlist_offer` — `notified_at`, `waitlist.notified` and the follow-up task are the same transaction as the mail (O4).
+- `data_chaser` — the chase is the rule (N5).
+- One row per `AlertKind` (`alert:{value}`). Trigger and timing come from `AlertRegistry`. N1 emails only `CONFIRMED_AT_DEPARTURE`, `LEDGER_DRIFT` and `NPS_LOW`. The other kinds are inbox-only. Prototype names map onto kinds: overdue payment → `OVERDUE_BALANCE`, commission approval → `COMMISSION_CAP`, quote SLA → `SLA_BREACH`, low occupancy → `LOW_OCCUPANCY`, low NPS → `NPS_LOW`, sync failure → `DELIVERY_FAILED` (no bus, L5). Kinds the prototype does not list are still rows: wire, confirmed-at-departure, ledger drift, commission leakage, manifest data overdue, report failed, charter deposit due.
+
+Not built, and not switchable, so a switch would not be a lie: welcome web lead and cart recovery 1–3 (task 05 / Q6); request acknowledgement (J7 sends on CONFIRMED); deposit link and wire instructions (staff send them from the RMS); overdue client email and the escalation email (no client mail; OPS-007 is a person); extras offer, extras closing, re-engagement, win-back (task 03); questionnaire reminder at T−14; arrival instructions at T−3; high-value new lead (no `AlertKind`).
+
+### Switches
+
+`automation_settings`: `key` unique, `enabled`, `disabled_reason`, `disabled_by`, `disabled_at`, timestamps, audit columns. No seed. A missing row means enabled. Morph key `automation_setting`.
+
+`AutomationGate::allows(string $key)` is the only question a sender asks, once, immediately before `Mail::send`. Non-switchable keys always return true. A refused delivery-pipeline send sets the existing delivery to `BLOCKED` with `blocked_reason` equal to the disable reason, does not mail, does not retry, and does not dispatch `DeliveryOutcomeRecorded`. History event `automation.skipped` is written on the booking (or the enquiry, report run, alert, agency) with that reason, and `after.delivery_id` when there is a delivery. `AlertSweep` ignores a blocked delivery that has that history row, so a switch does not raise `DELIVERY_FAILED`. A blocked delivery with no skip history (no email address) still raises it. `FlagOverdueCommand`, `AlertSweep::raise` and `TaskSweep` do not call the gate. Re-enabling does not replay a skipped send; the idempotency key stays. A manual resend goes through `SendDeliveryJob` and hits the same gate. Payment-link and wire-instruction deliveries have no catalogue key, so the job allows them.
+
+### Endpoints
+
+On the existing CRM group (`panel.crm`, sensitive guard):
+
+- `GET /api/crm/automations` — every catalogue row plus `enabled`, `disabled_reason`, `disabled_by` (name), `disabled_at`. Prototype section order, then key.
+- `PATCH /api/crm/automations/{key}` — `enabled` (bool) and `reason` (required, max 1000). `rules.manage` via `AutomationSettingPolicy`. `UpdateAutomation` writes the row and one history entry (`automation.disabled` or `automation.enabled`) in one transaction.
+
+Unknown key is 404. A key that is not built, or not switchable, is 422 with message `This message enforces a rule and cannot be switched off.` A missing reason is a validation 422.
+
+### The overdue test
+
+With `balance_reminder_21` switched off, the 21-day reminder delivery is `BLOCKED` with that reason, nothing is mailed, and `automation.disabled` plus `automation.skipped` carry the reason. `anakata:flag-overdue` still writes `booking.overdue_flagged`, the `OVERDUE_BALANCE` alert still raises, the overdue task still raises, and `anakata:alerts` does not raise `DELIVERY_FAILED`. The 7-day reminder still sends. Switching off `pretrip` still issues the itinerary document. A review request with the switch on and marketing consent withdrawn does not send; with the switch off and consent granted it does not send. A forced-off data chaser and a forced-off critical alert email still send. Patching `alert:OVERDUE_BALANCE`, `data_chaser` or `welcome_web_lead` returns the refusal sentence.
+
+### Checks
+
+`composer check` inside the app container: 1296 tests passed, Pint passed, Larastan passed.
+
+### Deviations
+
+`SendDocumentTest` calls `SendDeliveryJob::handle()` directly, so it now passes `AutomationGate`. The queue still injects the gate.
+
+### Open questions
+
+None for this task.
+
+### Notes for later
+
+- Task 03 points journeys at catalogue keys and can turn a not-built row into a built one. Until then those keys stay unswitchable.
+- Task 05 owns welcome and cart recovery. Task 09 renders this list.
+- A skipped send is not replayed when the switch is turned back on.
+
+### Git
+
+Not run:
+
+```bash
+git add \
+  app/Actions/Charter/CreateCharterEnquiry.php \
+  app/Actions/Charter/IssueCharterProposal.php \
+  app/Actions/Crm/UpdateAutomation.php \
+  app/Actions/Waitlist/OfferWaitlistEntry.php \
+  app/Enums/AutomationAudience.php \
+  app/Enums/AutomationKind.php \
+  app/Http/Controllers/Crm/AutomationController.php \
+  app/Http/Requests/Crm/UpdateAutomationRequest.php \
+  app/Http/Resources/Crm/AutomationResource.php \
+  app/Jobs/SendDeliveryJob.php \
+  app/Jobs/SendPortalInviteMail.php \
+  app/Models/AutomationSetting.php \
+  app/Policies/AutomationSettingPolicy.php \
+  app/Providers/AppServiceProvider.php \
+  app/Support/Alerts/AlertMailer.php \
+  app/Support/Alerts/AlertSweep.php \
+  app/Support/Automations/AutomationCatalogue.php \
+  app/Support/Automations/AutomationDefinition.php \
+  app/Support/Automations/AutomationGate.php \
+  app/Support/Automations/AutomationRow.php \
+  app/Support/Reports/ReportMailer.php \
+  database/migrations/2026_09_23_160001_create_automation_settings_table.php \
+  docs/sprints/sprint-14/REPORT.md \
+  routes/api/crm.php \
+  tests/Feature/Crm/AutomationsTest.php \
+  tests/Feature/Documents/SendDocumentTest.php
+
+git commit -m "$(cat <<'EOF'
+Add a catalogue of automatic messages and a switch that stops only the email.
+
+A disabled message is blocked at the mail boundary, while flags, alerts, tasks and issued documents continue.
+EOF
+)"
+```

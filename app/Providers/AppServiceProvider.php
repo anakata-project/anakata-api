@@ -41,6 +41,7 @@ use App\Listeners\SendOnBookingStatusChanged;
 use App\Listeners\SendOnPaymentSettled;
 use App\Models\Agency;
 use App\Models\Alert;
+use App\Models\AutomationSetting;
 use App\Models\Booking;
 use App\Models\BookingRequest;
 use App\Models\BusinessRuleVersion;
@@ -246,6 +247,7 @@ class AppServiceProvider extends ServiceProvider
             'report_subscription' => ReportSubscription::class,
             'sales_material' => SalesMaterial::class,
             'segment' => Segment::class,
+            'automation_setting' => AutomationSetting::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
             'booking_request' => BookingRequest::class,

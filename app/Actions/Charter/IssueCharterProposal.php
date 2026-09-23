@@ -24,6 +24,8 @@ use App\Services\Documents\DocumentView;
 use App\Services\Documents\PdfRenderer;
 use App\Services\Pricing\ReservationQuoter;
 use App\Services\References\ReferenceService;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use App\Support\BusinessHours;
 use App\Support\BusinessTime;
 use App\Support\Config\Documents\CancellationBand;
@@ -42,6 +44,7 @@ final class IssueCharterProposal extends Action
         private readonly CurrentConfig $config,
         private readonly PdfRenderer $pdf,
         private readonly ReferenceService $references,
+        private readonly AutomationGate $gate,
     ) {}
 
     public function handle(CharterEnquiry $enquiry, User $actor, ?string $reason = null): Document
@@ -239,6 +242,18 @@ final class IssueCharterProposal extends Action
             'status' => DeliveryStatus::Queued,
             'triggered_by' => DeliveryTriggeredBy::System,
         ]);
+
+        if (! $this->gate->allows(AutomationCatalogue::CHARTER_PROPOSAL)) {
+            $delivery->status = DeliveryStatus::Blocked;
+            $delivery->blocked_reason = $this->gate->reason(AutomationCatalogue::CHARTER_PROPOSAL);
+            $delivery->save();
+            History::record($enquiry, AutomationGate::SKIPPED, after: [
+                'key' => AutomationCatalogue::CHARTER_PROPOSAL,
+                'delivery_id' => $delivery->id,
+            ], reason: $delivery->blocked_reason, system: true);
+
+            return;
+        }
 
         Mail::send(new CharterProposalMail($delivery, $pageUrl));
 

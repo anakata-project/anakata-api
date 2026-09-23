@@ -12,14 +12,24 @@ use App\Mail\Reports\ReportMail;
 use App\Models\ReportRun;
 use App\Models\ReportRunNotification;
 use App\Models\User;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 final class ReportMailer
 {
+    public function __construct(private readonly AutomationGate $gate) {}
+
     public function send(ReportRun $run): void
     {
+        if (! $this->gate->allows(AutomationCatalogue::REPORT_EMAIL)) {
+            $this->gate->recordSkip($run, AutomationCatalogue::REPORT_EMAIL);
+
+            return;
+        }
+
         $definition = ReportDefinitions::find($run->definition_key);
 
         if ($definition === null) {

@@ -13,6 +13,8 @@ use App\Enums\ContactType;
 use App\Events\CharterEnquiryReceived;
 use App\Mail\CharterEnquiryMail;
 use App\Models\CharterEnquiry;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use App\Support\History\History;
 use Illuminate\Support\Facades\Mail;
 
@@ -21,6 +23,7 @@ final class CreateCharterEnquiry extends Action
     public function __construct(
         private readonly ResolveContact $contacts,
         private readonly StitchEngineIdentity $identity,
+        private readonly AutomationGate $gate,
     ) {}
 
     /**
@@ -60,6 +63,12 @@ final class CreateCharterEnquiry extends Action
 
             return $enquiry->refresh()->load(['contact', 'departure']);
         });
+
+        if (! $this->gate->allows(AutomationCatalogue::CHARTER_ENQUIRY)) {
+            $this->gate->recordSkip($enquiry, AutomationCatalogue::CHARTER_ENQUIRY);
+
+            return $enquiry;
+        }
 
         Mail::to((string) config('mail.reservations'))->send(new CharterEnquiryMail($enquiry));
 

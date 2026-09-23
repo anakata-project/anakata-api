@@ -8,6 +8,8 @@ use App\Enums\DeliveryStatus;
 use App\Mail\Portal\PortalInviteMail;
 use App\Models\AgencyUser;
 use App\Models\Delivery;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +31,7 @@ final class SendPortalInviteMail implements ShouldQueue
         #[\SensitiveParameter] public string $token,
     ) {}
 
-    public function handle(): void
+    public function handle(AutomationGate $gate): void
     {
         $delivery = Delivery::query()->find($this->deliveryId);
 
@@ -40,6 +42,12 @@ final class SendPortalInviteMail implements ShouldQueue
         $agencyUser = AgencyUser::query()->with('agency')->find($this->agencyUserId);
 
         if (! $agencyUser instanceof AgencyUser) {
+            return;
+        }
+
+        if (! $gate->allows(AutomationCatalogue::PORTAL_INVITE)) {
+            $gate->blockDelivery($delivery, AutomationCatalogue::PORTAL_INVITE, $agencyUser->agency);
+
             return;
         }
 

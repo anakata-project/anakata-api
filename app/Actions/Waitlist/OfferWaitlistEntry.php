@@ -16,6 +16,8 @@ use App\Mail\Documents\DeliveryMailFactory;
 use App\Models\Delivery;
 use App\Models\WaitlistEntry;
 use App\Services\Config\CurrentConfig;
+use App\Support\Automations\AutomationCatalogue;
+use App\Support\Automations\AutomationGate;
 use App\Support\BusinessTime;
 use App\Support\Crm\TaskDue;
 use App\Support\History\History;
@@ -27,6 +29,7 @@ final class OfferWaitlistEntry extends Action
     public function __construct(
         private readonly RaiseTask $raiseTask,
         private readonly CurrentConfig $config,
+        private readonly AutomationGate $gate,
     ) {}
 
     /**
@@ -99,6 +102,18 @@ final class OfferWaitlistEntry extends Action
                 Permission::BookingsCreate,
                 contactId: $entry->contact_id,
             );
+
+            if (! $this->gate->allows(AutomationCatalogue::WAITLIST_OFFER)) {
+                $delivery->status = DeliveryStatus::Blocked;
+                $delivery->blocked_reason = $this->gate->reason(AutomationCatalogue::WAITLIST_OFFER);
+                $delivery->save();
+                History::record($entry, AutomationGate::SKIPPED, after: [
+                    'key' => AutomationCatalogue::WAITLIST_OFFER,
+                    'delivery_id' => $delivery->id,
+                ], reason: $delivery->blocked_reason, system: true);
+
+                return false;
+            }
 
             Mail::send(DeliveryMailFactory::make($delivery, null));
 

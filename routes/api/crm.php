@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Crm\AutomationController;
 use App\Http\Controllers\Crm\CampaignController;
 use App\Http\Controllers\Crm\ContactConsentController;
 use App\Http\Controllers\Crm\ContactController;
@@ -23,6 +24,9 @@ Route::patch('tasks/{task}', [TaskController::class, 'update']);
 Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);
 Route::post('tasks/{task}/cancel', [TaskController::class, 'cancel']);
 Route::post('contacts/{contact}/activities', [TaskController::class, 'storeActivity']);
+
+Route::get('automations', [AutomationController::class, 'index']);
+Route::patch('automations/{key}', [AutomationController::class, 'update'])->where('key', '[A-Za-z0-9:_-]+');
 
 Route::get('segments', [SegmentController::class, 'index']);
 Route::get('segments/vocabulary', [SegmentController::class, 'vocabulary']);
