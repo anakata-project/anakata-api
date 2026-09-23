@@ -52,6 +52,7 @@ final class DemoAgenciesSeeder extends Seeder
                 $this->seedAgency($row);
             }
 
+            $this->seedAcceptedPortalUser();
             $this->attachApprovedBooking();
             $this->seedBlockedBooking();
 
@@ -126,6 +127,37 @@ final class DemoAgenciesSeeder extends Seeder
             'invite on approval', 'pending' => AgencyUserStatus::InviteOnApproval,
             default => AgencyUserStatus::InviteOnApproval,
         };
+    }
+
+    /**
+     * One accepted portal login for the e2e scenarios. Not a staff user.
+     */
+    private function seedAcceptedPortalUser(): void
+    {
+        $agency = Agency::query()->where('reference', 'AG-001')->first();
+
+        if (! $agency instanceof Agency) {
+            return;
+        }
+
+        $user = AgencyUser::query()->firstOrCreate(
+            ['agency_id' => $agency->id, 'email' => 'ada@portal.test'],
+            [
+                'name' => 'Ada Agent',
+                'status' => AgencyUserStatus::Active,
+            ],
+        );
+
+        if ($user->password !== null && $user->accepted_at !== null && $user->status === AgencyUserStatus::Active) {
+            return;
+        }
+
+        $user->forceFill([
+            'name' => 'Ada Agent',
+            'status' => AgencyUserStatus::Active,
+            'password' => 'password',
+            'accepted_at' => $user->accepted_at ?? now(),
+        ])->save();
     }
 
     private function attachApprovedBooking(): void

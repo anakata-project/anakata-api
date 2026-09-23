@@ -8,18 +8,19 @@ Browser scenarios for a Cursor cloud agent. This does not replace Pest. Do not c
 tests/e2e/bin/up.sh
 ```
 
-Wait until the last line is `ALL UP`. If it fails, write an **ENV** failure with the log (`tests/e2e/runs/.logs/` and compose logs) and stop.
+Wait until the last line is `ALL UP`. That includes the agent portal (not the staff panel) at `http://localhost:3002`. If it fails, write an **ENV** failure with the log (`tests/e2e/runs/.logs/` and compose logs) and stop.
 
 `up.sh` is not the cloud `start` command. Always run it yourself and wait.
 
 ## 2. Accounts and URLs
 
-Demo users: [`fixtures/accounts.md`](fixtures/accounts.md). Password for all four: `password`.
+Demo users: [`fixtures/accounts.md`](fixtures/accounts.md). Password for all four staff users: `password`. The portal login is separate: an agency user, not a staff role.
 
 | What | URL |
 |---|---|
 | Panel | http://localhost:3001 |
 | Engine | http://localhost:3000 |
+| Portal | http://localhost:3002 |
 | Mailpit | http://localhost:8025 |
 | API docs | http://localhost:8000/docs/api |
 | API health | http://localhost:8000/api/health |
@@ -27,6 +28,8 @@ Demo users: [`fixtures/accounts.md`](fixtures/accounts.md). Password for all fou
 ## 3. Choosing scenarios
 
 Catalogue: [`scenarios/INDEX.md`](scenarios/INDEX.md).
+
+The portal is the agent site, not the staff panel. It listens on port **3002** (`http://localhost:3002`, sign-in at `http://localhost:3002/login`). Portal scenarios are batches **B16** and **B17** (written and walked in sprint 13 task 11).
 
 Pick by **id**, **tag** (`smoke`, `sprint-1`, `sprint-2`, `auth`, `visual`…) or **priority** (P1 first).
 
@@ -96,6 +99,6 @@ Volumes stay. `down.sh --wipe` deletes the `anakata-e2e` volumes only (refuses a
 
 If `.cursor/environment.json` + the Dockerfile do not produce a usable Build, use **agent-driven setup** in the Cursor Cloud Agents dashboard. Tell the setup agent:
 
-> Clone the four anakata repos as siblings, run `tests/e2e/bin/install.sh`, then `tests/e2e/bin/up.sh`, and confirm `tests/e2e/bin/status.sh` passes.
+> Clone the five anakata repos as siblings, run `tests/e2e/bin/install.sh`, then `tests/e2e/bin/up.sh`, and confirm `tests/e2e/bin/status.sh` passes.
 
 The only secret is `GH_TOKEN` (read access to `github.com/anakata-project`) if the repos are private. `api.env` holds test-only MySQL passwords. `APP_KEY` is generated at `up.sh` time.

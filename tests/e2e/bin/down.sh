@@ -38,6 +38,7 @@ stop_pid() {
 
 stop_pid panel
 stop_pid engine
+stop_pid portal
 
 if [ "${wipe}" -eq 1 ]; then
   say "docker compose down -v (wiping volumes for ${COMPOSE_PROJECT_NAME})"

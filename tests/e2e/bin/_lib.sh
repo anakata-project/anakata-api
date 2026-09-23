@@ -19,6 +19,7 @@ E2E_WAIT_SECS="${E2E_WAIT_SECS:-180}"
 PANEL_DIR="${ANAKATA_ROOT}/anakata-panel"
 ENGINE_DIR="${ANAKATA_ROOT}/anakata-engine"
 UI_DIR="${ANAKATA_ROOT}/anakata-ui"
+PORTAL_DIR="${ANAKATA_ROOT}/anakata-portal"
 
 PNPM_VERSION="12.4.1"
 
@@ -76,7 +77,7 @@ check_memory() {
   warn_at="${E2E_MIN_MEM_GB}"
 
   say "Memory available: ${avail} GiB (warn below ${warn_at} GiB, fail below ${E2E_FAIL_MEM_GB} GiB)"
-  say "This stack needs ~6 GiB for MySQL, Redis, Mailpit, PHP/Horizon and two Nuxt preview apps."
+  say "This stack needs ~6 GiB for MySQL, Redis, Mailpit, PHP/Horizon and three Nuxt preview apps (panel, engine, portal)."
 
   if awk -v a="${avail}" -v f="${E2E_FAIL_MEM_GB}" 'BEGIN { exit (a < f) ? 0 : 1 }'; then
     die "Only ${avail} GiB available. Need at least ${E2E_FAIL_MEM_GB} GiB free to start the e2e stack."
@@ -210,12 +211,13 @@ install_env() {
 
 print_heads() {
   local name dir sha subject
-  for name in api ui panel engine; do
+  for name in api ui panel engine portal; do
     case "${name}" in
       api) dir="${API_ROOT}" ;;
       ui) dir="${UI_DIR}" ;;
       panel) dir="${PANEL_DIR}" ;;
       engine) dir="${ENGINE_DIR}" ;;
+      portal) dir="${PORTAL_DIR}" ;;
     esac
     sha="$(git -C "${dir}" rev-parse HEAD)"
     subject="$(git -C "${dir}" log -1 --format=%s)"

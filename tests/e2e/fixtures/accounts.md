@@ -11,6 +11,14 @@ After sign-in the header who-menu shows `{NAME} — {ROLE}` **uppercased** (em d
 | Lucía B. | lucia@anakata.test | Sales Exec | `LUCÍA B. — SALES EXEC` |
 | CFO (external) | cfo@anakata.test | External finance | `CFO (EXTERNAL) — EXTERNAL FINANCE` |
 
+## Portal
+
+The agent site is not the staff panel. Sign in at `http://localhost:3002/login`. This account is an agency user on Blue Latitude Travel (AG-001). It has no staff role and no staff permission.
+
+| Name | Email | Agency | Password |
+|---|---|---|---|
+| Ada Agent | ada@portal.test | Blue Latitude Travel | `password` |
+
 ## What each should and should not see
 
 ### Carolina (Admin)

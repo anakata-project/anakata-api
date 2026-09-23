@@ -61,6 +61,13 @@ else
   line engine down "HTTP ${engine_code}"
 fi
 
+portal_code="$(probe_http http://localhost:3002/login)"
+if [ "${portal_code}" = "200" ]; then
+  line portal up "http://localhost:3002/login"
+else
+  line portal down "HTTP ${portal_code}"
+fi
+
 mail_code="$(probe_http http://localhost:8025/livez)"
 if [ "${mail_code}" = "200" ]; then
   line mailpit up "http://localhost:8025"

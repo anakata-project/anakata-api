@@ -510,3 +510,45 @@ The drawer reads those fields instead of inventing an expiry or a suspender.
 EOF
 )"
 ```
+
+## Task 10 · The e2e stack learns the portal
+
+`up.sh` now builds and starts a fourth app: the agent portal on port **3002**, preview mode, and waits for `http://localhost:3002/login`. The summary prints that URL. `status.sh` probes the same login page. `down.sh` stops the portal process with the panel and the engine. `install.sh` clones or updates `anakata-portal` with the same fetch-and-checkout rule and the same dirty-tree refusal (`E2E_PORTAL_REF`, default `dev`), then `pnpm install --frozen-lockfile`.
+
+The e2e API env (`tests/e2e/environment/api.env` and `api.testing.env`) now sets `FRONTEND_PORTAL_URL=http://localhost:3002` and adds `localhost:3002` to `SANCTUM_STATEFUL_DOMAINS`. `up.sh` copies those files onto `.env` and `.env.testing`, which is what CORS and the invitation links already read. The portal `.env` is the same frontend file as the panel and the engine (`NUXT_PUBLIC_API_BASE`).
+
+`DemoAgenciesSeeder` adds one accepted portal user on approved AG-001 (Blue Latitude Travel): Ada Agent, `ada@portal.test`, password `password`, status `ACTIVE`, `accepted_at` set. S. Ferreira is unchanged. There is no staff `users` row, no role, and no permission. The login is documented in `tests/e2e/fixtures/accounts.md` beside the staff accounts. The README still treats the four staff passwords as the staff set and says the portal login is separate.
+
+`reset.sh` is unchanged, including the assertion of four staff demo users. This tree has no snapshot key. The portal adds no seed file of its own, so the key hashes nothing new. The new login is a row inside the existing agencies seeder, which `migrate:fresh --seed` already runs.
+
+The memory check still runs, and its sentence now names three Nuxt preview apps (panel, engine, portal) plus the API stack. `E2E_MIN_MEM_GB` stays **6**. The stack was not started, so the threshold was not raised.
+
+`gate.sh`, `ledger.sh`, `batch.sh`, `lint-scenarios.sh` and `RUN_PROMPT.md` are not on this branch (Sprint 11 records them on `e2e/sprint-10`, unmerged). They cannot gain a fifth repository until that harness is present. The run template that does exist records a portal SHA as the fifth repository. There is no code-gate table in that template. The README names the portal, port 3002, and batches B16 and B17. Those scenario files are task 11. No scenario was written and the stack was not run.
+
+The local portal directory is not a git checkout, and `github.com/anakata-project/anakata-portal` does not exist. `ensure_sibling` still refuses a non-git directory. `install.sh` will refuse this machine’s portal folder until that repo exists. It was not initialised here.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  database/seeders/DemoAgenciesSeeder.php \
+  docs/sprints/sprint-13/REPORT.md \
+  tests/e2e/README.md \
+  tests/e2e/bin/_lib.sh \
+  tests/e2e/bin/down.sh \
+  tests/e2e/bin/install.sh \
+  tests/e2e/bin/status.sh \
+  tests/e2e/bin/up.sh \
+  tests/e2e/environment/api.env \
+  tests/e2e/environment/api.testing.env \
+  tests/e2e/fixtures/accounts.md \
+  tests/e2e/runs/_RUN_TEMPLATE.md
+git commit -m "$(cat <<'EOF'
+Bring the agent portal up with the e2e stack.
+
+The harness starts it on port 3002, and the agencies seeder provides one accepted login that is not a staff user.
+EOF
+)"
+```

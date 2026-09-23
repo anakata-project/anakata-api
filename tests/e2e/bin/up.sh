@@ -43,6 +43,7 @@ wait_horizon 60
 
 install_env "${E2E_ENV_DIR}/frontends.env" "${PANEL_DIR}/.env"
 install_env "${E2E_ENV_DIR}/frontends.env" "${ENGINE_DIR}/.env"
+install_env "${E2E_ENV_DIR}/frontends.env" "${PORTAL_DIR}/.env"
 
 print_heads
 
@@ -50,6 +51,7 @@ ensure_pnpm
 pnpm_frozen "${UI_DIR}"
 pnpm_frozen "${PANEL_DIR}"
 pnpm_frozen "${ENGINE_DIR}"
+pnpm_frozen "${PORTAL_DIR}"
 
 start_frontend() {
   local name="$1"
@@ -99,9 +101,11 @@ start_frontend() {
 
 start_frontend panel "${PANEL_DIR}" 3001
 start_frontend engine "${ENGINE_DIR}" 3000
+start_frontend portal "${PORTAL_DIR}" 3002
 
 wait_http "http://localhost:3001/login" "${E2E_WAIT_SECS}"
 wait_http "http://localhost:3000/" "${E2E_WAIT_SECS}"
+wait_http "http://localhost:3002/login" "${E2E_WAIT_SECS}"
 wait_http "http://localhost:8025/livez" 30
 
 "${E2E_BIN_DIR}/status.sh"
@@ -111,6 +115,7 @@ cat <<EOF
 URLs
   Panel     http://localhost:3001
   Engine    http://localhost:3000
+  Portal    http://localhost:3002
   API       http://localhost:8000
   API docs  http://localhost:8000/docs/api
   Mailpit   http://localhost:8025

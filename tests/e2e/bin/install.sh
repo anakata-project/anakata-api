@@ -14,10 +14,12 @@ ensure_pnpm
 ensure_sibling anakata-ui "${E2E_UI_REF:-dev}"
 ensure_sibling anakata-panel "${E2E_PANEL_REF:-dev}"
 ensure_sibling anakata-engine "${E2E_ENGINE_REF:-dev}"
+ensure_sibling anakata-portal "${E2E_PORTAL_REF:-dev}"
 
 pnpm_frozen "${UI_DIR}"
 pnpm_frozen "${PANEL_DIR}"
 pnpm_frozen "${ENGINE_DIR}"
+pnpm_frozen "${PORTAL_DIR}"
 
 # Compose interpolates MYSQL_* from .env. Copy e2e env if the developer has none.
 copy_if_missing "${E2E_ENV_DIR}/api.env" "${API_ROOT}/.env"
