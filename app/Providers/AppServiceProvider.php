@@ -57,6 +57,7 @@ use App\Models\Contact;
 use App\Models\ContactActivity;
 use App\Models\ContactAlias;
 use App\Models\ContactMerge;
+use App\Models\Conversation;
 use App\Models\CrmTask;
 use App\Models\Deal;
 use App\Models\Departure;
@@ -70,6 +71,7 @@ use App\Models\Itinerary;
 use App\Models\Journey;
 use App\Models\JourneyEnrolment;
 use App\Models\Manifest;
+use App\Models\Message;
 use App\Models\MessageTemplate;
 use App\Models\Offer;
 use App\Models\Payment;
@@ -96,6 +98,9 @@ use App\Support\Config\Documents\ExtrasDocument;
 use App\Support\Config\Documents\RatesDocument;
 use App\Support\Crm\CrmSync;
 use App\Support\Iso;
+use App\Support\Mail\GraphMailbox;
+use App\Support\Mail\MailboxReader;
+use App\Support\Mail\MailpitMailbox;
 use App\Support\Schedule\AnakataSchedule;
 use App\Support\Stripe\StripeGatewayBinding;
 use DateTimeInterface;
@@ -124,6 +129,13 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(CurrentConfig::class);
+        $this->app->bind(MailboxReader::class, function (Application $app): MailboxReader {
+            if (config('anakata.inbox.driver') === 'graph') {
+                return $app->make(GraphMailbox::class);
+            }
+
+            return $app->make(MailpitMailbox::class);
+        });
         $this->app->singleton(ConfigRegistry::class);
 
         $this->app->singleton(FakeStripeGateway::class);
@@ -260,6 +272,8 @@ class AppServiceProvider extends ServiceProvider
             'automation_setting' => AutomationSetting::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
+            'conversation' => Conversation::class,
+            'message' => Message::class,
             'booking_request' => BookingRequest::class,
             'waitlist_entry' => WaitlistEntry::class,
             'payment' => Payment::class,

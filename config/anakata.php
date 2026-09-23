@@ -14,4 +14,10 @@ return [
 
     'report_attachment_bytes' => 7_340_032,
 
+    'inbox' => [
+        'driver' => env('INBOX_DRIVER', 'mailpit'),
+        'mailpit_url' => env('MAILPIT_URL', 'http://mailpit:8025'),
+        'page_size' => 50,
+    ],
+
 ];

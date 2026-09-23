@@ -8,6 +8,7 @@ use App\Http\Controllers\Crm\ContactConsentController;
 use App\Http\Controllers\Crm\ContactController;
 use App\Http\Controllers\Crm\ContactMergeController;
 use App\Http\Controllers\Crm\ContactTimelineController;
+use App\Http\Controllers\Crm\ConversationController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\DeliveryController;
 use App\Http\Controllers\Crm\EngineActivityController;
@@ -57,6 +58,12 @@ Route::post('campaigns/{campaign}/archive', [CampaignController::class, 'archive
 Route::get('campaigns/{campaign}/bookings', [CampaignController::class, 'bookings']);
 
 Route::get('deliveries', [DeliveryController::class, 'index']);
+
+Route::get('conversations', [ConversationController::class, 'index']);
+Route::get('conversations/{conversation}', [ConversationController::class, 'show']);
+Route::post('conversations/{conversation}/reply', [ConversationController::class, 'reply']);
+Route::patch('conversations/{conversation}', [ConversationController::class, 'update']);
+Route::post('conversations/{conversation}/link-contact', [ConversationController::class, 'linkContact']);
 
 Route::get('pipeline', [DealController::class, 'pipeline']);
 Route::get('pipeline/stage-map', [DealController::class, 'stageMap']);

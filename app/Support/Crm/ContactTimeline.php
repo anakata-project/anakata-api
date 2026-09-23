@@ -48,7 +48,8 @@ final class ContactTimeline
             ->unionAll(self::tasks($contact->id))
             ->unionAll(self::activities($contact->id))
             ->unionAll(self::subjectRequests($contact->id))
-            ->unionAll(self::journeys($contact->id));
+            ->unionAll(self::journeys($contact->id))
+            ->unionAll(self::conversations($contact->id));
 
         /** @var Paginator<int, object> $rows */
         $rows = DB::query()
@@ -361,6 +362,25 @@ final class ContactTimeline
         return $enrolments->unionAll($sends);
     }
 
+    private static function conversations(int $contactId): Builder
+    {
+        return DB::table('messages')
+            ->join('conversations', 'conversations.id', '=', 'messages.conversation_id')
+            ->where('conversations.contact_id', $contactId)
+            ->select([
+                DB::raw('messages.sent_at as `at`'),
+                DB::raw("'conversation.message' as kind"),
+                DB::raw("JSON_OBJECT(
+                    'direction', messages.direction,
+                    'subject', messages.subject
+                ) as payload"),
+                DB::raw("'conversation' as link_type"),
+                DB::raw('conversations.id as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('conversation-message-', messages.id) as sort_key"),
+            ]);
+    }
+
     /**
      * @return array{
      *     at: string,
@@ -387,6 +407,7 @@ final class ContactTimeline
             'behavioural' => self::behaviouralCopy($payload),
             'merge' => self::mergeCopy($payload),
             'journey' => self::journeyCopy($payload),
+            'conversation.message' => self::conversationCopy($payload),
             default => ['Event', ''],
         };
 
@@ -448,6 +469,19 @@ final class ContactTimeline
         $status = is_string($payload['status'] ?? null) ? $payload['status'] : '';
 
         return ['Enrolled in '.$name, $status];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function conversationCopy(array $payload): array
+    {
+        $direction = is_string($payload['direction'] ?? null) ? $payload['direction'] : '';
+        $subject = is_string($payload['subject'] ?? null) ? $payload['subject'] : '';
+        $title = $direction === 'OUT' ? 'Reply sent' : 'Email received';
+
+        return [$title, $subject];
     }
 
     /**

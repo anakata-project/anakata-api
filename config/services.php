@@ -35,6 +35,13 @@ return [
         ],
     ],
 
+    'graph' => [
+        'tenant' => env('GRAPH_TENANT_ID'),
+        'client_id' => env('GRAPH_CLIENT_ID'),
+        'client_secret' => env('GRAPH_CLIENT_SECRET'),
+        'mailbox' => env('GRAPH_MAILBOX', env('MAIL_FROM_ADDRESS')),
+    ],
+
     'stripe' => [
         'secret' => env('STRIPE_SECRET'),
         'publishable' => env('STRIPE_PUBLISHABLE'),
