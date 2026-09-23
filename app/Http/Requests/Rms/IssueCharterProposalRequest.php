@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Rms;
 
-use App\Enums\CharterEnquiryStatus;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class UpdateCharterEnquiryRequest extends FormRequest
+class IssueCharterProposalRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,12 +14,11 @@ class UpdateCharterEnquiryRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, mixed>>
+     * @return array<string, array<int, string>>
      */
     public function rules(): array
     {
         return [
-            'status' => ['required', Rule::enum(CharterEnquiryStatus::class)],
             'reason' => ['nullable', 'string', 'max:2000'],
         ];
     }

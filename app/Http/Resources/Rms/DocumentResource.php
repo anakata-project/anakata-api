@@ -20,7 +20,7 @@ class DocumentResource extends JsonResource
     /**
      * @return array{
      *     id: int,
-     *     booking_id: int,
+     *     booking_id: int|null,
      *     kind: string,
      *     kind_label: string,
      *     number: string|null,

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Rms;
 
+use App\Actions\Charter\IssueCharterProposal;
 use App\Actions\Charter\UpdateCharterEnquiryStatus;
 use App\Enums\CharterEnquiryStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\IndexCharterEnquiriesRequest;
+use App\Http\Requests\Rms\IssueCharterProposalRequest;
 use App\Http\Requests\Rms\UpdateCharterEnquiryRequest;
 use App\Http\Resources\Rms\CharterEnquiryResource;
+use App\Http\Resources\Rms\DocumentResource;
 use App\Models\CharterEnquiry;
 use App\Models\User;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
@@ -55,6 +58,33 @@ final class CharterEnquiryController extends Controller
             ? $status
             : CharterEnquiryStatus::from((string) $status);
 
-        return new CharterEnquiryResource($action->handle($enquiry, $status, $actor));
+        $reason = $request->validated('reason');
+
+        return new CharterEnquiryResource($action->handle(
+            $enquiry,
+            $status,
+            $actor,
+            is_string($reason) ? $reason : null,
+        ));
+    }
+
+    #[DocumentedResponse(status: 201, type: DocumentResource::class)]
+    public function proposal(
+        IssueCharterProposalRequest $request,
+        CharterEnquiry $enquiry,
+        IssueCharterProposal $action,
+    ): DocumentResource {
+        $this->authorize('update', $enquiry);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        $reason = $request->validated('reason');
+        $document = $action->handle($enquiry, $actor, is_string($reason) ? $reason : null);
+
+        return new DocumentResource($document);
     }
 }

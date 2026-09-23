@@ -139,6 +139,7 @@ test('staff can list charter enquiries and move NEW to CONTACTED to CLOSED', fun
     $this->actingAs(managerUser())
         ->patchJson('/api/rms/charter-enquiries/'.$enquiry->id, [
             'status' => CharterEnquiryStatus::Closed->value,
+            'reason' => 'Guest withdrew',
         ])
         ->assertOk()
         ->assertJsonPath('status', CharterEnquiryStatus::Closed->value);

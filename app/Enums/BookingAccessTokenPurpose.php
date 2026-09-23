@@ -9,4 +9,5 @@ enum BookingAccessTokenPurpose: string
     case Complete = 'COMPLETE';
     case Questionnaire = 'QUESTIONNAIRE';
     case Survey = 'SURVEY';
+    case CharterProposal = 'CHARTER_PROPOSAL';
 }

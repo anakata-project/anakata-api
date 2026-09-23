@@ -13,6 +13,7 @@ enum DocumentKind: string
     case Voucher = 'VOUCHER';
     case Pretrip = 'PRETRIP';
     case WireInstructions = 'WIRE_INSTRUCTIONS';
+    case CharterProposal = 'CHARTER_PROPOSAL';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum DocumentKind: string
             self::Voucher => 'Transfer Voucher',
             self::Pretrip => 'Pre-trip Itinerary',
             self::WireInstructions => 'Wire Instructions',
+            self::CharterProposal => 'Charter proposal',
         };
     }
 

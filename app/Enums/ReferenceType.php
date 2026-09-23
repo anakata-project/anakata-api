@@ -14,11 +14,12 @@ enum ReferenceType: string
     case Offer = 'offer';
     case Agency = 'agency';
     case Invoice = 'invoice';
+    case Proposal = 'proposal';
 
     public function isYearly(): bool
     {
         return match ($this) {
-            self::Booking, self::Request, self::Invoice => true,
+            self::Booking, self::Request, self::Invoice, self::Proposal => true,
             default => false,
         };
     }
@@ -26,7 +27,7 @@ enum ReferenceType: string
     public function padWidth(): int
     {
         return match ($this) {
-            self::Booking, self::Request, self::Invoice => 4,
+            self::Booking, self::Request, self::Invoice, self::Proposal => 4,
             default => 3,
         };
     }
@@ -51,6 +52,7 @@ enum ReferenceType: string
             self::Offer => "OF-{$number}",
             self::Agency => "AG-{$number}",
             self::Invoice => "INV-{$year}-{$number}",
+            self::Proposal => "CP-{$year}-{$number}",
         };
     }
 }

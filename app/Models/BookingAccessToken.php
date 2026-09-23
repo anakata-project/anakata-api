@@ -17,7 +17,9 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $booking_id
+ * @property int|null $booking_id
+ * @property int|null $charter_enquiry_id
+ * @property int|null $document_id
  * @property int|null $guest_id
  * @property string $token_hash
  * @property BookingAccessTokenPurpose $purpose
@@ -34,6 +36,8 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'booking_id',
+    'charter_enquiry_id',
+    'document_id',
     'guest_id',
     'token_hash',
     'purpose',
@@ -74,6 +78,14 @@ class BookingAccessToken extends Model
     public function guest(): BelongsTo
     {
         return $this->belongsTo(Guest::class);
+    }
+
+    /**
+     * @return BelongsTo<Document, $this>
+     */
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(Document::class);
     }
 
     /**

@@ -25,6 +25,7 @@ final readonly class ConsentVersions
             ConsentDocument::Privacy => $this->privacy,
             ConsentDocument::Insurance => $this->insurance,
             ConsentDocument::Marketing => $this->marketing,
+            ConsentDocument::CharterProposal => '',
         };
     }
 

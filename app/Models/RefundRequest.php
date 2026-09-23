@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $cancelled_at
  * @property int $days_before_departure
  * @property int $band_min_days
+ * @property string|null $band_source
  * @property int $penalty_pct
  * @property int $penalty_amount
  * @property int $paid_at_cancellation
@@ -44,6 +45,7 @@ use Illuminate\Support\Carbon;
     'cancelled_at',
     'days_before_departure',
     'band_min_days',
+    'band_source',
     'penalty_pct',
     'penalty_amount',
     'paid_at_cancellation',

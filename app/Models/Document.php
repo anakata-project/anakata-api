@@ -17,7 +17,8 @@ use LogicException;
 
 /**
  * @property int $id
- * @property int $booking_id
+ * @property int|null $booking_id
+ * @property int|null $charter_enquiry_id
  * @property DocumentKind $kind
  * @property string|null $number
  * @property int $version
@@ -33,13 +34,15 @@ use LogicException;
  * @property int|null $updated_by
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property-read Booking $booking
+ * @property-read Booking|null $booking
+ * @property-read CharterEnquiry|null $charterEnquiry
  * @property-read Payment|null $payment
  * @property-read User|null $issuedBy
  * @property-read Collection<int, Delivery> $deliveries
  */
 #[Fillable([
     'booking_id',
+    'charter_enquiry_id',
     'kind',
     'number',
     'version',
@@ -100,6 +103,14 @@ class Document extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * @return BelongsTo<CharterEnquiry, $this>
+     */
+    public function charterEnquiry(): BelongsTo
+    {
+        return $this->belongsTo(CharterEnquiry::class);
     }
 
     /**

@@ -64,6 +64,7 @@ use Illuminate\Support\Facades\DB;
  * @property list<array{code: string, label: string, amount: int}> $price_lines
  * @property int $total
  * @property int $deposit_pct
+ * @property CarbonImmutable|null $deposit_due_on
  * @property int $balance_days
  * @property string|null $promo_code
  * @property bool $online_deposit
@@ -139,6 +140,7 @@ use Illuminate\Support\Facades\DB;
     'price_lines',
     'total',
     'deposit_pct',
+    'deposit_due_on',
     'balance_days',
     'promo_code',
     'online_deposit',
@@ -180,6 +182,7 @@ class Booking extends Model
             'price_lines' => 'array',
             'total' => 'integer',
             'deposit_pct' => 'integer',
+            'deposit_due_on' => CalendarDate::class,
             'balance_days' => 'integer',
             'online_deposit' => 'boolean',
             'sold_on' => CalendarDate::class,

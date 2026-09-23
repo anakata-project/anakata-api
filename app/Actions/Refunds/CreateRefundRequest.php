@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Refunds;
 
 use App\Actions\Action;
+use App\Enums\BookingType;
 use App\Enums\RefundRequestStatus;
 use App\Events\RefundRequested;
 use App\Models\Booking;
@@ -47,7 +48,9 @@ final class CreateRefundRequest extends Action
                 $cancelledAt->toDateString(),
                 $booking->departure->date->toDateString(),
             );
-            $band = CancellationPenalty::bandFor($days, $rules->bands);
+            $charter = $booking->type === BookingType::Charter;
+            $bandList = $charter ? $rules->charterBands : $rules->bands;
+            $band = CancellationPenalty::bandFor($days, $bandList);
             $penalty = CancellationPenalty::penalty($booking->total, $band['penalty_pct']);
             $refundDue = CancellationPenalty::refundDue($paid, $penalty);
             $hours = BusinessHours::fromDocument($rules);
@@ -58,6 +61,7 @@ final class CreateRefundRequest extends Action
                 'cancelled_at' => $cancelledAt,
                 'days_before_departure' => $days,
                 'band_min_days' => $band['min_days'],
+                'band_source' => $charter ? 'CHARTER' : 'CABIN',
                 'penalty_pct' => $band['penalty_pct'],
                 'penalty_amount' => $penalty,
                 'paid_at_cancellation' => $paid,
@@ -70,6 +74,7 @@ final class CreateRefundRequest extends Action
 
             History::record($booking, 'refund.requested', after: [
                 'band_min_days' => $band['min_days'],
+                'band_source' => $charter ? 'CHARTER' : 'CABIN',
                 'penalty_pct' => $band['penalty_pct'],
                 'penalty_amount' => $penalty,
                 'refund_due' => $refundDue,

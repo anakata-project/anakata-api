@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Engine\CharterEnquiryController;
+use App\Http\Controllers\Engine\CharterProposalController;
 use App\Http\Controllers\Engine\CheckoutController;
 use App\Http\Controllers\Engine\CompleteReservationController;
 use App\Http\Controllers\Engine\CountryController;
@@ -34,6 +35,9 @@ Route::post('waitlist', WaitlistController::class)->middleware('throttle:engine-
 Route::post('charter-enquiries', CharterEnquiryController::class)->middleware('throttle:engine-charter');
 
 Route::middleware(['throttle:engine-complete', 'noindex'])->group(function (): void {
+    Route::get('charter-proposal/{token}', [CharterProposalController::class, 'show']);
+    Route::post('charter-proposal/{token}/accept', [CharterProposalController::class, 'accept']);
+    Route::post('charter-proposal/{token}/decline', [CharterProposalController::class, 'decline']);
     Route::get('complete/{token}', [CompleteReservationController::class, 'show']);
     Route::put('complete/{token}/billing', [CompleteReservationController::class, 'updateBilling']);
     Route::put('complete/{token}/guests/{guest}', [CompleteReservationController::class, 'updateGuest'])->whereNumber('guest');

@@ -11,6 +11,7 @@ enum ConsentDocument: string
     case Privacy = 'PRIVACY';
     case Insurance = 'INSURANCE';
     case Marketing = 'MARKETING';
+    case CharterProposal = 'CHARTER_PROPOSAL';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum ConsentDocument: string
             self::Privacy => 'Privacy policy',
             self::Insurance => 'Travel insurance declaration',
             self::Marketing => 'Marketing (optional)',
+            self::CharterProposal => 'Charter proposal',
         };
     }
 
@@ -31,11 +33,26 @@ enum ConsentDocument: string
             self::Privacy => 'privacy',
             self::Insurance => 'insurance',
             self::Marketing => 'marketing',
+            self::CharterProposal => 'charter_proposal',
         };
     }
 
     public function required(): bool
     {
-        return $this !== self::Marketing;
+        return $this !== self::Marketing && $this !== self::CharterProposal;
+    }
+
+    /**
+     * The declarations a guest ticks on a booking. A charter proposal acceptance
+     * is recorded on its own booking and is not one of these.
+     *
+     * @return list<self>
+     */
+    public static function checklist(): array
+    {
+        return array_filter(
+            self::cases(),
+            fn (self $document): bool => $document !== self::CharterProposal,
+        );
     }
 }

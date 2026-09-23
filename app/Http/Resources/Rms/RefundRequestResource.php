@@ -59,7 +59,10 @@ class RefundRequestResource extends JsonResource
             'min_days' => $this->band_min_days,
             'penalty_pct' => $this->penalty_pct,
         ];
-        $label = CancellationPenalty::label($band, $rules->bands);
+        $label = CancellationPenalty::label(
+            $band,
+            $this->band_source === 'CHARTER' ? $rules->charterBands : $rules->bands,
+        );
         $actor = $request->user();
 
         return [
@@ -74,6 +77,7 @@ class RefundRequestResource extends JsonResource
             'cancelled_at' => Iso::utc($this->cancelled_at),
             'days_before_departure' => $this->days_before_departure,
             'band_min_days' => $this->band_min_days,
+            'band_source' => $this->band_source,
             'band_label' => $label,
             'penalty_pct' => $this->penalty_pct,
             'penalty_amount' => $this->penalty_amount,

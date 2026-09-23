@@ -18,6 +18,7 @@ final class DocumentView
             DocumentKind::Voucher => 'documents.voucher',
             DocumentKind::Pretrip => 'documents.pretrip',
             DocumentKind::WireInstructions => 'documents.wire-instructions',
+            DocumentKind::CharterProposal => 'documents.charter-proposal',
         };
     }
 }
