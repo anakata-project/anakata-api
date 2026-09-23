@@ -35,6 +35,21 @@ function crmSchemaRef(array $node, string $name): void
 {
     $ref = $node['$ref'] ?? $node['allOf'][0]['$ref'] ?? $node['items']['$ref'] ?? $node['items']['allOf'][0]['$ref'] ?? null;
 
+    if (! is_string($ref)) {
+        foreach (is_array($node['anyOf'] ?? null) ? $node['anyOf'] : [] as $arm) {
+            if (! is_array($arm)) {
+                continue;
+            }
+
+            $armRef = $arm['$ref'] ?? $arm['allOf'][0]['$ref'] ?? null;
+
+            if (is_string($armRef) && str_contains($armRef, $name)) {
+                $ref = $armRef;
+                break;
+            }
+        }
+    }
+
     expect($ref)->toBeString("{$name} is not a \$ref");
     expect($ref)->toContain($name);
 }
@@ -79,6 +94,9 @@ test('crm OpenAPI schemas have properties', function (): void {
         'CrmJourneyEnrolmentResource',
         'CrmSegmentResource',
         'CrmSegmentVocabularyResource',
+        'CrmAutomationResource',
+        'CrmMessageTemplateResource',
+        'CrmMessageTemplateVersionResource',
         'CampaignIndexResource',
         'CampaignOffersResource',
         'CampaignBookingPageResource',
@@ -91,7 +109,17 @@ test('crm OpenAPI schemas have properties', function (): void {
         crmOpenApiSchema($spec, $name);
     }
 
-    foreach (['ContactType', 'ContactLifecycle'] as $enum) {
+    foreach ([
+        'ContactType',
+        'ContactLifecycle',
+        'ContactSegment',
+        'SegmentKind',
+        'SegmentDimension',
+        'AutomationKind',
+        'AutomationAudience',
+        'JourneyStepAction',
+        'JourneyEnrolmentStatus',
+    ] as $enum) {
         expect($names)->toContain($enum);
         expect($spec['components']['schemas'][$enum]['enum'] ?? null)->toBeArray();
         expect($spec['components']['schemas'][$enum]['enum'])->not->toBeEmpty();
@@ -133,6 +161,7 @@ test('crm OpenAPI schemas have properties', function (): void {
         expect($contact['properties'])->not->toHaveKey($sensitive);
     }
     crmSchemaRef($contact['properties']['bookings'] ?? [], 'ContactBookingResource');
+    crmSchemaRef($contact['properties']['segment'] ?? [], 'ContactSegment');
 
     $touch = $contact['properties']['first_touch']['properties']
         ?? $contact['properties']['first_touch']['anyOf'][0]['properties']
@@ -229,4 +258,56 @@ test('crm OpenAPI schemas have properties', function (): void {
     $state = crmOpenApiSchema($spec, 'ContactConsentsResource');
     expect($state['properties'])->toHaveKeys(['current', 'history']);
     expect(json_encode($state))->not->toContain('"ip"');
+
+    $segment = crmOpenApiSchema($spec, 'CrmSegmentResource');
+    expect($segment['properties']['conditions']['properties']['items']['items']['properties'] ?? null)->toHaveKeys(['field', 'operator', 'value']);
+    expect($segment['properties']['conditions']['properties']['items']['items']['additionalProperties'] ?? false)->not->toBeTrue();
+    crmSchemaRef($segment['properties']['kind'] ?? [], 'SegmentKind');
+    crmSchemaRef($segment['properties']['dimensions']['items']['properties']['axis'] ?? [], 'SegmentDimension');
+
+    $vocabulary = crmOpenApiSchema($spec, 'CrmSegmentVocabularyResource');
+    expect($vocabulary['properties']['data']['properties']['fields']['items']['properties'] ?? null)->toHaveKeys(['field', 'label', 'operators', 'value']);
+    expect($vocabulary['properties']['data']['properties']['fields']['items']['additionalProperties'] ?? false)->not->toBeTrue();
+
+    $automation = crmOpenApiSchema($spec, 'CrmAutomationResource');
+    expect($automation)->not->toHaveKey('anyOf');
+    crmSchemaRef($automation['properties']['audience'] ?? [], 'AutomationAudience');
+    crmSchemaRef($automation['properties']['kind'] ?? [], 'AutomationKind');
+
+    $journey = crmOpenApiSchema($spec, 'CrmJourneyResource');
+    expect($journey['properties']['steps']['items']['properties'] ?? null)->toHaveKeys(['position', 'name', 'action', 'template_key']);
+    expect($journey['properties']['steps']['items']['type'] ?? null)->not->toBe('string');
+    crmSchemaRef($journey['properties']['kind'] ?? [], 'AutomationKind');
+    crmSchemaRef($journey['properties']['steps']['items']['properties']['action'] ?? [], 'JourneyStepAction');
+
+    $enrolment = crmOpenApiSchema($spec, 'CrmJourneyEnrolmentResource');
+    expect($enrolment['properties']['sends']['items']['properties'] ?? null)->toHaveKeys(['sent_at', 'template_key', 'catalogue_key', 'delivery_id']);
+    expect($enrolment['properties']['sends']['items']['type'] ?? null)->not->toBe('string');
+    crmSchemaRef($enrolment['properties']['status'] ?? [], 'JourneyEnrolmentStatus');
+
+    $template = crmOpenApiSchema($spec, 'CrmMessageTemplateResource');
+    crmSchemaRef($template['properties']['kind'] ?? [], 'AutomationKind');
+    crmSchemaRef($template['properties']['published'] ?? [], 'CrmMessageTemplateVersionResource');
+    crmSchemaRef($template['properties']['draft'] ?? [], 'CrmMessageTemplateVersionResource');
+
+    $version = crmOpenApiSchema($spec, 'CrmMessageTemplateVersionResource');
+    expect($version['properties']['body']['properties'] ?? null)->toHaveKeys(['paragraphs', 'list', 'cta']);
+    expect($version['properties']['body']['additionalProperties'] ?? false)->not->toBeTrue();
+
+    $testSend = $spec['paths']['/crm/templates/{template}/test-send']['post']
+        ?? $spec['paths']['/api/crm/templates/{template}/test-send']['post']
+        ?? null;
+    expect($testSend)->toBeArray();
+    crmSchemaRef(
+        $testSend['responses']['200']['content']['application/json']['schema']['properties']['status'] ?? [],
+        'AlertNotificationStatus',
+    );
+
+    expect($spec['components']['schemas']['StoreSegmentRequest']['properties'] ?? null)->toHaveKeys(['name', 'sentence', 'conditions', 'dimensions', 'kind', 'feeds']);
+    expect($spec['components']['schemas']['UpdateSegmentRequest']['properties'] ?? null)->toHaveKeys(['name', 'sentence', 'conditions', 'dimensions', 'kind', 'feeds', 'active']);
+    expect($spec['components']['schemas']['UpdateAutomationRequest']['properties'] ?? null)->toHaveKeys(['enabled', 'reason']);
+    expect($spec['components']['schemas']['UpdateJourneyRequest']['properties'] ?? null)->toHaveKey('active');
+    expect($spec['components']['schemas']['StoreTemplateDraftRequest']['properties'] ?? null)->toHaveKeys(['subject', 'body']);
+    expect($spec['components']['schemas']['PublishTemplateVersionRequest']['properties'] ?? null)->toHaveKey('approval_reference');
+    expect($spec['components']['schemas']['PreviewTemplateRequest']['properties'] ?? null)->toHaveKeys(['contact_id', 'booking_id', 'version']);
 });

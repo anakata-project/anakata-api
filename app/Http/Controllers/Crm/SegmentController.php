@@ -53,10 +53,7 @@ final class SegmentController extends Controller
         ]);
     }
 
-    #[DocumentedResponse(
-        status: 200,
-        type: 'array{data: array{fields: list<array<string, mixed>>, combinators: list<string>}}',
-    )]
+    #[DocumentedResponse(status: 200, type: SegmentVocabularyResource::class)]
     public function vocabulary(): SegmentVocabularyResource
     {
         $this->authorize('viewAny', Segment::class);

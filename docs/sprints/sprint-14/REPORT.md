@@ -636,3 +636,167 @@ Cart recovery is a branch of nurture, a hard bounce suppresses once, and an eras
 EOF
 )"
 ```
+
+## Task 06 · Regenerate types, release v0.15.0
+
+Types only. The layer is `0.14.1` → `0.15.0` (the task text said `0.14.0`; that release already shipped, and `0.14.1` is the agency-user patch). `pnpm types:api` regenerated `app/types/api.d.ts` from `http://localhost:8000/docs/api.json`. That file was not edited by hand. `crm.ts` still imports only `components` and `operations` from `./api`. `engine.ts` still imports only engine schemas.
+
+### Prelude
+
+The seven resources already had their top-level keys. The prelude only typed the gaps, and replaced `@return array<string, mixed>` on the files already being edited so Scramble drops the extra `anyOf` arm that is an array of strings. A missing row throws `LogicException` instead of returning `[]`. JSON values are unchanged (backed enums encode as their string).
+
+- Journey `steps` items are the step object (`position`, `branch`, `timing`, `name`, `template_key`, `catalogue_key`, `catalogue_keys`, `action`, `count`). Enrolment `sends` items are the send object (`sent_at`, `template_key`, `catalogue_key`, `delivery_id`). Scramble does not follow `array_map`, so each list is a `foreach` that calls a private method. `contact`, `booking`, and `step` on the enrolment were already objects and were not re-typed.
+- Template `published` and `draft` return `CrmMessageTemplateVersionResource|null` instead of `resolve()`, so they `$ref` the version. Version `body` is `paragraphs`, `list`, and `cta`. A `strings()` helper is what made the paragraph and list items `string[]`.
+- Segment condition items are `field`, `operator`, `value`, and `event` / `within_days` when those keys are present. `value` stays the heterogeneous union. Dimension `axis` is `SegmentDimension::from` inside a `foreach`, so the response points at the schema that already existed on the write requests. `kind` does the same for `SegmentKind`. Those two schemas were not created again.
+- Vocabulary `data.fields` items use the `describe()` shape (`field`, `label`, `operators`, `value`, optional `values` and `params`). The vocabulary route's documented response is `SegmentVocabularyResource`.
+- Automation's 20 keys were already on the object arm. The return type is that object. `audience()` and `kind()` return the enums.
+- Named schemas that were missing, emitted by a method whose native return type is the enum: `AutomationKind`, `AutomationAudience`, `JourneyStepAction`, `JourneyEnrolmentStatus`. `AutomationKind` is also journey `kind` and template `kind`.
+- Contact `segment` is `ContactSegment` via `@scramble-return`. The method still returns the SQL string. Booking embeds omit the derived column; returning the enum would have turned that empty string into `NEW`.
+- A template test send's `status` is `AlertNotificationStatus` (`SENT` | `FAILED`), which was already a schema on `TemplateTestSend`. The plan named `DeliveryStatus`. That name is the document-delivery union in the layer (`QUEUED` | `SENT` | `FAILED` | `BLOCKED`), so a second schema was not created.
+
+`alert_kind` stays `string | null`. `JourneySubject` is not a journey response field. `MarketingLeadResource` and `UnsubscribeResource` were not edited. There is no unsubscribe FormRequest.
+
+`CrmResponseSchemasTest` and `EngineResponseSchemasTest`: 2 passed (566 assertions). Pint passed. Larastan is clean on the touched files.
+
+### Line counts
+
+| File | Before | After |
+|---|---|---|
+| `app/types/api.d.ts` | 16729 | 17860 |
+| `app/types/crm.ts` | 232 | 253 |
+| `app/types/engine.ts` | 375 | 378 |
+| `app/types/index.ts` | 411 | 435 |
+
+### Schema → alias
+
+| Alias | Source |
+|---|---|
+| `ContactSegment` | named `ContactSegment` (was the hand-written band `'HIGH' \| 'MID' \| 'NEW'`) |
+| `Segment` | `CrmSegmentResource` |
+| `SegmentCondition` | `Segment['conditions']['items'][number]` |
+| `SegmentKind` / `SegmentDimension` | named schemas |
+| `SegmentVocabulary` | `CrmSegmentVocabularyResource` |
+| `SegmentInput` / `SegmentUpdate` | `StoreSegmentRequest` / `UpdateSegmentRequest` |
+| `AutomationRow` | `CrmAutomationResource` |
+| `AutomationKind` / `AutomationAudience` | named schemas |
+| `AutomationSwitchInput` | `UpdateAutomationRequest` |
+| `Journey` | `CrmJourneyResource` |
+| `JourneyStep` | `Journey['steps'][number]` |
+| `JourneyStepAction` | named schema |
+| `JourneyEnrolment` | `CrmJourneyEnrolmentResource` |
+| `JourneyEnrolmentStatus` | named schema |
+| `JourneyUpdate` | `UpdateJourneyRequest` |
+| `MessageTemplate` | `CrmMessageTemplateResource` |
+| `MessageTemplateVersion` | `CrmMessageTemplateVersionResource` |
+| `TemplateDraftInput` | `StoreTemplateDraftRequest` |
+| `PublishTemplateInput` | `PublishTemplateVersionRequest` |
+| `TemplatePreviewInput` | `PreviewTemplateRequest` |
+| `MarketingLeadInput` | `StoreMarketingLeadRequest` (`engine.ts`) |
+| `UnsubscribeView` | `UnsubscribeResource` (`engine.ts`) |
+
+The panel re-export and `contactHelpers.ts` now import `ContactSegment`. `BookingSegment` is unchanged.
+
+### Leftovers
+
+Condition `value` did not collapse. The generated item is `number | boolean | string | string[] | number[]`. `event` and `within_days` are required on that item even when the JSON omits them. No second union was written.
+
+`StoreSegmentRequest.conditions` and `UpdateSegmentRequest.conditions` are `string[]`. The tree is checked in `withValidator`, not as item rules. `SegmentInput` and `SegmentUpdate` point at those schemas.
+
+`StoreMarketingLeadRequest.consent` is Laravel's `accepted` union (`"yes" | "on" | "1" | 1 | "true" | true`).
+
+`POST /api/engine/unsubscribe/{token}` has no request body, so there is no `UnsubscribeInput`.
+
+`UnsubscribeView.already_unsubscribed` is `string`. The resource PHPDoc is `bool`. The resource was left as it was.
+
+### Checks
+
+Layer `pnpm lint`, `pnpm typecheck`, `pnpm test` (35) and `pnpm build` passed. Panel, engine, and portal `pnpm typecheck` and `pnpm build` passed against the sibling layer.
+
+Fresh clone into `/tmp/anakata-fresh/{anakata-ui,anakata-panel,anakata-engine,anakata-portal}`, working trees overlaid (no `node_modules`). The ui clone is **0.15.0**. Panel, engine, and portal resolve the sibling layer, so they do not fetch `#v0.15.0`. `pnpm typecheck` and `pnpm build` passed in all four.
+
+- ui / panel / engine / portal: typecheck pass
+- ui / panel / engine / portal: build pass
+- **OVERLAY CLONE OK**
+
+The tag is not pushed. The after-push clone was not run. Repeat the clone after the commands below, checking out `anakata-ui` at `v0.15.0` with no overlay.
+
+### Git commands
+
+Do not run these in the agent. Explicit paths only. Run in this order.
+
+```bash
+# 1. anakata-api prelude
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  app/Http/Controllers/Crm/SegmentController.php \
+  app/Http/Controllers/Crm/TemplateController.php \
+  app/Http/Resources/Crm/AutomationResource.php \
+  app/Http/Resources/Crm/ContactResource.php \
+  app/Http/Resources/Crm/CrmJourneyEnrolmentResource.php \
+  app/Http/Resources/Crm/CrmJourneyResource.php \
+  app/Http/Resources/Crm/CrmMessageTemplateResource.php \
+  app/Http/Resources/Crm/CrmMessageTemplateVersionResource.php \
+  app/Http/Resources/Crm/SegmentResource.php \
+  app/Http/Resources/Crm/SegmentVocabularyResource.php \
+  tests/Feature/OpenApi/CrmResponseSchemasTest.php \
+  tests/Feature/OpenApi/EngineResponseSchemasTest.php \
+  docs/sprints/sprint-14/REPORT.md
+git commit -m "$(cat <<'EOF'
+Type the Sprint 14 segment, journey, and template responses.
+
+Scramble now names the nested step, send, and condition objects, and the audience enums.
+EOF
+)"
+```
+
+```bash
+# 2. anakata-ui — commit, then tag, then push HEAD and the tag
+cd /home/mohammad/Code/iconic/anakata/anakata-ui
+git add \
+  package.json \
+  CHANGELOG.md \
+  README.md \
+  app/types/api.d.ts \
+  app/types/crm.ts \
+  app/types/engine.ts \
+  app/types/index.ts
+git commit -m "$(cat <<'EOF'
+Regenerate API types for Sprint 14 audiences and journeys.
+
+The contact band is ContactSegment. Segment is the audience definition.
+EOF
+)"
+git tag v0.15.0
+git push origin HEAD
+git push origin v0.15.0
+```
+
+```bash
+# 3. pin the panel, the engine, and the portal
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  nuxt.config.ts \
+  README.md \
+  app/types/api.ts \
+  app/components/crm/contactHelpers.ts
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.15.0.
+
+The contact band type is ContactSegment.
+EOF
+)"
+
+cd /home/mohammad/Code/iconic/anakata/anakata-engine
+git add nuxt.config.ts README.md
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.15.0.
+EOF
+)"
+
+cd /home/mohammad/Code/iconic/anakata/anakata-portal
+git add nuxt.config.ts README.md
+git commit -m "$(cat <<'EOF'
+Pin the shared layer fallback to v0.15.0.
+EOF
+)"
+```

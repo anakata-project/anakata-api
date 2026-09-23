@@ -11,7 +11,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * @property array{
  *     data: array{
- *         fields: list<array<string, mixed>>,
+ *         fields: list<array{
+ *             field: string,
+ *             label: string,
+ *             operators: list<string>,
+ *             value: string,
+ *             values?: list<string>,
+ *             params?: list<array{name: string, type: string, values?: list<string>}>
+ *         }>,
  *         combinators: list<string>
  *     }
  * } $resource
@@ -24,7 +31,14 @@ class SegmentVocabularyResource extends JsonResource
     /**
      * @return array{
      *     data: array{
-     *         fields: list<array<string, mixed>>,
+     *         fields: list<array{
+     *             field: string,
+     *             label: string,
+     *             operators: list<string>,
+     *             value: string,
+     *             values?: list<string>,
+     *             params?: list<array{name: string, type: string, values?: list<string>}>
+     *         }>,
      *         combinators: list<string>
      *     }
      * }

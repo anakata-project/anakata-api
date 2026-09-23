@@ -221,4 +221,13 @@ test('engine OpenAPI schemas have properties', function (): void {
         $unsubscribePost['responses']['200']['content']['application/json']['schema'] ?? [],
         'UnsubscribeResource',
     );
+    expect($unsubscribePost['requestBody'] ?? null)->toBeNull();
+
+    expect($spec['components']['schemas']['StoreMarketingLeadRequest']['properties'] ?? null)->toHaveKeys([
+        'email',
+        'first_name',
+        'consent',
+        'version',
+        'session_id',
+    ]);
 });

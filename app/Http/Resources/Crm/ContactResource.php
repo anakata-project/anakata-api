@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Crm;
 
+use App\Enums\ContactSegment;
 use App\Models\Contact;
 use App\Support\Crm\AttributionTouch;
 use App\Support\Crm\ContactConsentSummary;
@@ -34,7 +35,7 @@ class ContactResource extends JsonResource
      *     first_touch: array{source?: string, medium?: string, campaign?: string, content?: string, term?: string, landing_path?: string, captured_at?: string}|null,
      *     last_touch: array{source?: string, medium?: string, campaign?: string, content?: string, term?: string, landing_path?: string, captured_at?: string}|null,
      *     lifetime_value: int,
-     *     segment: string,
+     *     segment: ContactSegment,
      *     lifecycle: string,
      *     nps: int|null,
      *     consent: array{marketing: bool, transactional: true},
@@ -88,7 +89,7 @@ class ContactResource extends JsonResource
             'first_touch' => AttributionTouch::from($this->first_touch),
             'last_touch' => AttributionTouch::from($this->last_touch),
             'lifetime_value' => (int) $this->getAttribute('lifetime_value'),
-            'segment' => (string) $this->getAttribute('segment'),
+            'segment' => $this->contactSegment(),
             'lifecycle' => (string) $this->getAttribute('lifecycle'),
             'nps' => $this->getAttribute('nps') === null ? null : (int) $this->getAttribute('nps'),
             'consent' => $consent,
@@ -104,6 +105,17 @@ class ContactResource extends JsonResource
         }
 
         return $payload;
+    }
+
+    /**
+     * The band is selected in SQL, not cast. Booking embeds omit that column;
+     * the string stays empty rather than becoming NEW.
+     *
+     * @scramble-return ContactSegment
+     */
+    private function contactSegment(): string
+    {
+        return (string) $this->getAttribute('segment');
     }
 
     private function nullableString(mixed $value): ?string

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Crm;
 use App\Actions\Crm\CreateTemplateDraft;
 use App\Actions\Crm\PublishTemplateVersion;
 use App\Actions\Crm\SendTemplateTest;
+use App\Enums\AlertNotificationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\PreviewTemplateRequest;
 use App\Http\Requests\Crm\PublishTemplateVersionRequest;
@@ -17,6 +18,7 @@ use App\Models\Booking;
 use App\Models\Contact;
 use App\Models\MessageTemplate;
 use App\Models\MessageTemplateVersion;
+use App\Models\TemplateTestSend;
 use App\Models\User;
 use App\Support\Templates\TemplateRenderer;
 use App\Support\Templates\TemplateVariableException;
@@ -108,9 +110,9 @@ final class TemplateController extends Controller
     }
 
     /**
-     * @return array{version: int, subject: string, status: string}
+     * @return array{version: int, subject: string, status: AlertNotificationStatus}
      */
-    #[DocumentedResponse(status: 200, type: 'array{version: int, subject: string, status: string}')]
+    #[DocumentedResponse(status: 200, type: 'array{version: int, subject: string, status: App\\Enums\\AlertNotificationStatus}')]
     public function testSend(PreviewTemplateRequest $request, MessageTemplate $template, SendTemplateTest $send): array
     {
         $this->authorize('testSend', $template);
@@ -122,8 +124,13 @@ final class TemplateController extends Controller
         return [
             'version' => $version->version,
             'subject' => (string) $row->getAttribute('rendered_subject'),
-            'status' => $row->status->value,
+            'status' => $this->testSendStatus($row),
         ];
+    }
+
+    private function testSendStatus(TemplateTestSend $row): AlertNotificationStatus
+    {
+        return $row->status;
     }
 
     private function version(MessageTemplate $template, int $number): MessageTemplateVersion
