@@ -10,10 +10,12 @@ use App\Http\Controllers\Engine\CountryController;
 use App\Http\Controllers\Engine\DepartureCabinController;
 use App\Http\Controllers\Engine\EngineEventsController;
 use App\Http\Controllers\Engine\FeedController;
+use App\Http\Controllers\Engine\MarketingLeadController;
 use App\Http\Controllers\Engine\PromoCheckController;
 use App\Http\Controllers\Engine\QuestionnaireController;
 use App\Http\Controllers\Engine\QuoteController;
 use App\Http\Controllers\Engine\SurveyController;
+use App\Http\Controllers\Engine\UnsubscribeController;
 use App\Http\Controllers\Engine\WaitlistController;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +32,7 @@ Route::post('checkout/{token}/extend', [CheckoutController::class, 'extend'])->m
 Route::get('checkout/{token}/status', [CheckoutController::class, 'status']);
 Route::delete('checkout/{token}', [CheckoutController::class, 'destroy']);
 Route::post('checkout/{token}/submit', [CheckoutController::class, 'submit'])->middleware('throttle:engine-checkout');
+Route::post('marketing-leads', [MarketingLeadController::class, 'store'])->middleware('throttle:engine-checkout');
 
 Route::post('waitlist', WaitlistController::class)->middleware('throttle:engine-waitlist');
 Route::post('charter-enquiries', CharterEnquiryController::class)->middleware('throttle:engine-charter');
@@ -46,4 +49,6 @@ Route::middleware(['throttle:engine-complete', 'noindex'])->group(function (): v
     Route::put('questionnaire/{token}/guests/{guest}', [QuestionnaireController::class, 'update'])->whereNumber('guest');
     Route::get('survey/{token}', [SurveyController::class, 'show']);
     Route::post('survey/{token}/guests/{guest}', [SurveyController::class, 'store'])->whereNumber('guest');
+    Route::get('unsubscribe/{token}', [UnsubscribeController::class, 'show']);
+    Route::post('unsubscribe/{token}', [UnsubscribeController::class, 'store']);
 });

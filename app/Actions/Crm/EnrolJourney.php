@@ -19,20 +19,21 @@ final class EnrolJourney extends Action
 {
     public function __construct(private readonly JourneyClock $clock) {}
 
-    public function handle(Journey $journey, Contact $contact, ?Booking $booking): JourneyEnrolment
+    public function handle(Journey $journey, Contact $contact, ?Booking $booking, string $branch = 'lead'): JourneyEnrolment
     {
         /** @var JourneyEnrolment $enrolment */
-        $enrolment = $this->transaction(function () use ($journey, $contact, $booking): JourneyEnrolment {
+        $enrolment = $this->transaction(function () use ($journey, $contact, $booking, $branch): JourneyEnrolment {
             $enrolment = JourneyEnrolment::query()->create([
                 'journey_id' => $journey->id,
                 'contact_id' => $contact->id,
                 'booking_id' => $booking?->id,
+                'branch' => $branch,
                 'position' => 1,
                 'status' => JourneyEnrolmentStatus::Active,
                 'enrolled_at' => now(),
             ]);
 
-            $first = $journey->steps()->orderBy('position')->first();
+            $first = $journey->steps()->where('branch', $branch)->orderBy('position')->first();
             $enrolment->next_due_at = $first instanceof JourneyStep
                 ? Carbon::instance($this->clock->dueAt($enrolment, $first))
                 : null;

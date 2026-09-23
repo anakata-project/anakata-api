@@ -93,19 +93,19 @@ final class JourneyController extends Controller
     {
         $counts = DB::table('journey_enrolments')
             ->where('status', JourneyEnrolmentStatus::Active->value)
-            ->selectRaw('journey_id, position, COUNT(*) as total')
-            ->groupBy('journey_id', 'position')
+            ->selectRaw('journey_id, branch, position, COUNT(*) as total')
+            ->groupBy('journey_id', 'branch', 'position')
             ->get();
 
         $lookup = [];
 
         foreach ($counts as $row) {
-            $lookup[$row->journey_id.'-'.$row->position] = (int) $row->total;
+            $lookup[$row->journey_id.'-'.$row->branch.'-'.$row->position] = (int) $row->total;
         }
 
         foreach ($journeys as $journey) {
             foreach ($journey->steps as $step) {
-                $step->setAttribute('active_count', $lookup[$journey->id.'-'.$step->position] ?? 0);
+                $step->setAttribute('active_count', $lookup[$journey->id.'-'.$step->branch.'-'.$step->position] ?? 0);
             }
         }
     }

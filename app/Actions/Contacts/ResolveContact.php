@@ -81,6 +81,7 @@ final class ResolveContact extends Action
         }
 
         $contact = $contact->currentSurvivor();
+        $contact->ensureUnsubscribeToken();
 
         if (self::createdFromInsertAffected($affected)) {
             History::record($contact, 'contact.created', after: $this->snapshot($contact));

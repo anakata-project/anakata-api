@@ -67,8 +67,8 @@ test('built rows resolve and not-built rows name the gap', function (): void {
     $built = AutomationCatalogue::built();
 
     expect($rows)->toHaveCount(58)
-        ->and($built)->toHaveCount(51)
-        ->and(count($rows) - count($built))->toBe(7);
+        ->and($built)->toHaveCount(54)
+        ->and(count($rows) - count($built))->toBe(4);
 
     foreach ($built as $row) {
         $location = $row->location;
@@ -176,7 +176,7 @@ test('the catalogue is readable with panel.crm and a switch needs rules.manage',
         'reason' => 'Stop the chase',
     ])->assertStatus(422)->assertJsonPath('message', AutomationCatalogue::REFUSAL);
 
-    $this->actingAs($admin)->patchJson('/api/crm/automations/cart_recovery_1', [
+    $this->actingAs($admin)->patchJson('/api/crm/automations/wire_instructions', [
         'enabled' => false,
         'reason' => 'Not sent yet',
     ])->assertStatus(422)->assertJsonPath('message', AutomationCatalogue::REFUSAL);

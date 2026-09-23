@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $journey_id
+ * @property string $branch
  * @property int $position
  * @property string $name
  * @property array<string, mixed> $delay
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'journey_id',
+    'branch',
     'position',
     'name',
     'delay',

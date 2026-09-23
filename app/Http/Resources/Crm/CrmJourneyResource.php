@@ -42,6 +42,7 @@ class CrmJourneyResource extends JsonResource
             'system' => $journey->system,
             'steps' => $journey->steps->map(fn (JourneyStep $step): array => [
                 'position' => $step->position,
+                'branch' => $step->branch,
                 'timing' => $step->timingLabel(),
                 'name' => $step->name,
                 'template_key' => $step->template_key,

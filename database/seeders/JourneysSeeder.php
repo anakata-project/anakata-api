@@ -10,12 +10,14 @@ use App\Enums\JourneySubject;
 use App\Models\Journey;
 use App\Models\JourneyStep;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class JourneysSeeder extends Seeder
 {
     public function run(): void
     {
         foreach ($this->definitions() as $definition) {
+            $key = $definition['key'];
             $steps = $definition['steps'];
             unset($definition['steps']);
 
@@ -25,6 +27,10 @@ class JourneysSeeder extends Seeder
             );
 
             if ($journey->steps()->exists()) {
+                if ($key === 'nurture_to_request') {
+                    $this->ensureCartSteps($journey);
+                }
+
                 continue;
             }
 
@@ -33,6 +39,10 @@ class JourneysSeeder extends Seeder
                     'journey_id' => $journey->id,
                     ...$step,
                 ]);
+            }
+
+            if ($key === 'nurture_to_request') {
+                $this->ensureCartSteps($journey);
             }
         }
     }
@@ -262,7 +272,7 @@ class JourneysSeeder extends Seeder
         ?array $keys,
         ?array $condition,
     ): array {
-        return [
+        $row = [
             'position' => $position,
             'name' => $name,
             'delay' => $delay,
@@ -272,5 +282,57 @@ class JourneysSeeder extends Seeder
             'catalogue_key' => $catalogueKey,
             'catalogue_keys' => $keys,
         ];
+
+        if ($this->hasBranchColumn()) {
+            $row['branch'] = 'lead';
+        }
+
+        return $row;
+    }
+
+    private function ensureCartSteps(Journey $journey): void
+    {
+        if (! $this->hasBranchColumn()) {
+            return;
+        }
+
+        $steps = [
+            [1, 'Cart recovery 1', 'cart_recovery_1', ['anchor' => 'enrolment', 'amount' => 24, 'unit' => 'hours']],
+            [2, 'Cart recovery 2', 'cart_recovery_2', ['anchor' => 'enrolment', 'amount' => 48, 'unit' => 'hours']],
+            [3, 'Cart recovery 3', 'cart_recovery_3', ['anchor' => 'enrolment', 'amount' => 7, 'unit' => 'days']],
+        ];
+
+        foreach ($steps as [$position, $name, $key, $delay]) {
+            $exists = JourneyStep::query()
+                ->where('journey_id', $journey->id)
+                ->where('template_key', $key)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $step = $this->step($position, $name, $key, $delay, JourneyStepAction::Send, $key, null, null);
+            $step['branch'] = 'abandoned_checkout';
+
+            JourneyStep::query()->create([
+                'journey_id' => $journey->id,
+                ...$step,
+            ]);
+        }
+    }
+
+    /**
+     * Information schema, not the schema builder. The journeys migration runs
+     * this seeder before the branch column exists, in the same process that
+     * adds the column afterwards.
+     */
+    private function hasBranchColumn(): bool
+    {
+        $row = DB::selectOne(
+            "select count(*) as present from information_schema.columns where table_schema = database() and table_name = 'journey_steps' and column_name = 'branch'",
+        );
+
+        return (int) ($row->present ?? 0) > 0;
     }
 }

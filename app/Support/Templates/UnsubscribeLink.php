@@ -8,10 +8,13 @@ use App\Models\Contact;
 
 final class UnsubscribeLink
 {
+    public static function token(Contact $contact): string
+    {
+        return hash_hmac('sha256', (string) $contact->id, (string) config('app.key'));
+    }
+
     public static function for(Contact $contact): string
     {
-        $token = hash_hmac('sha256', (string) $contact->id, (string) config('app.key'));
-
-        return rtrim((string) config('anakata.engine_url'), '/').'/unsubscribe/'.$token;
+        return rtrim((string) config('anakata.engine_url'), '/').'/unsubscribe/'.self::token($contact);
     }
 }

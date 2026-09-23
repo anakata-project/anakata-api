@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Contacts\ResolveContact;
 use App\Actions\Crm\RecordContactConsent;
 use App\Enums\BehaviouralEventName;
 use App\Enums\BookingStatus;
@@ -28,6 +29,7 @@ use App\Models\CrmTask;
 use App\Models\Deal;
 use App\Models\Delivery;
 use App\Models\Document;
+use App\Models\ErasureLog;
 use App\Models\Guest;
 use App\Models\Journey;
 use App\Models\JourneyEnrolment;
@@ -322,6 +324,115 @@ test('crm can list journeys, enrolments and toggle the active flag', function ()
     assertNoSensitiveFields($mine);
     expect($mine->json('data.0.journey_key'))->toBe('winback')
         ->and($mine->json('data.0.sends'))->toBeArray();
+});
+
+test('the abandoned checkout branch sends at 24 hours, 48 hours and day 7', function (): void {
+    activate('nurture_to_request');
+
+    $started = journeyContact();
+    BehaviouralEvent::factory()->create([
+        'contact_id' => $started->id,
+        'name' => BehaviouralEventName::BeginCheckout,
+    ]);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    expect(JourneyEnrolment::query()->where('contact_id', $started->id)->where('branch', 'abandoned_checkout')->count())->toBe(0);
+
+    $unticked = Contact::factory()->create();
+    BehaviouralEvent::factory()->create([
+        'contact_id' => $unticked->id,
+        'name' => BehaviouralEventName::AbandonCart,
+    ]);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    expect(enrolmentCount('nurture_to_request', $unticked))->toBe(0);
+
+    $contact = journeyContact();
+    BehaviouralEvent::factory()->create([
+        'contact_id' => $contact->id,
+        'name' => BehaviouralEventName::AbandonCart,
+    ]);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    $this->artisan('anakata:journeys')->assertSuccessful();
+
+    $enrolment = JourneyEnrolment::query()
+        ->where('contact_id', $contact->id)
+        ->where('branch', 'abandoned_checkout')
+        ->firstOrFail();
+
+    expect($enrolment->status)->toBe(JourneyEnrolmentStatus::Active)
+        ->and(JourneyEnrolment::query()->where('contact_id', $contact->id)->where('branch', 'lead')->count())->toBe(0)
+        ->and(Delivery::query()->count())->toBe(0);
+
+    travelToDue($enrolment);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    expect(Delivery::query()->count())->toBe(1)
+        ->and(Delivery::query()->value('subject'))->toBe('Can we help you plan your Galápagos expedition?')
+        ->and($enrolment->fresh()?->position)->toBe(2);
+
+    travelToDue($enrolment);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    expect(Delivery::query()->orderBy('id')->pluck('subject')->all())->toBe([
+        'Can we help you plan your Galápagos expedition?',
+        'Still dreaming of Galápagos? We are here to help.',
+    ])->and($enrolment->fresh()?->position)->toBe(3);
+
+    travelToDue($enrolment);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    $this->artisan('anakata:journeys')->assertSuccessful();
+
+    expect(Delivery::query()->orderBy('id')->pluck('subject')->all())->toBe([
+        'Can we help you plan your Galápagos expedition?',
+        'Still dreaming of Galápagos? We are here to help.',
+        'Can we help plan your trip?',
+    ])->and($enrolment->fresh()?->status)->toBe(JourneyEnrolmentStatus::Completed);
+
+    $stopped = journeyContact();
+    BehaviouralEvent::factory()->create([
+        'contact_id' => $stopped->id,
+        'name' => BehaviouralEventName::AbandonCart,
+    ]);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    $row = JourneyEnrolment::query()
+        ->where('contact_id', $stopped->id)
+        ->where('branch', 'abandoned_checkout')
+        ->firstOrFail();
+    travelToDue($row);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+    $sent = Delivery::query()->count();
+
+    grantMarketing($stopped, false);
+    travelToDue($row);
+    $this->artisan('anakata:journeys')->assertSuccessful();
+
+    expect($row->fresh()?->status)->toBe(JourneyEnrolmentStatus::Suppressed)
+        ->and($row->fresh()?->exit_reason)->toBe('Marketing consent withdrawn.')
+        ->and(Delivery::query()->count())->toBe($sent);
+});
+
+test('an erased email is not enrolled on a marketing journey and a transactional journey still enrols', function (): void {
+    $email = 'erased-again@anakata.test';
+    $gone = Contact::factory()->create(['email' => $email]);
+    ErasureLog::query()->create([
+        'contact_id' => $gone->id,
+        'email_sha256' => hash('sha256', $email),
+        'erased_at' => now(),
+    ]);
+    $gone->forceFill(['email' => null])->save();
+
+    $again = app(ResolveContact::class)->handle([
+        'name' => 'Returned',
+        'email' => $email,
+    ]);
+    grantMarketing($again, true);
+
+    activate('nurture_to_request');
+    JourneyEnrolment::onLeadCaptured($again);
+    expect(enrolmentCount('nurture_to_request', $again))->toBe(0);
+
+    activate('request_to_deposit');
+    $booking = journeyBooking($again, salesExecUser(), BookingStatus::Requested, '2028-02-06');
+    BookingCreated::dispatch($booking);
+
+    expect(enrolment('request_to_deposit', $again)->status)->toBe(JourneyEnrolmentStatus::Active);
 });
 
 function activate(string $key): void

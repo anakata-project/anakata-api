@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property int $contact_id
  * @property int|null $booking_id
  * @property int $booking_subject
+ * @property string $branch
  * @property int $position
  * @property Carbon|null $next_due_at
  * @property JourneyEnrolmentStatus $status
@@ -35,6 +36,7 @@ use Illuminate\Support\Carbon;
     'journey_id',
     'contact_id',
     'booking_id',
+    'branch',
     'position',
     'next_due_at',
     'status',

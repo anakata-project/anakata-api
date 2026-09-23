@@ -72,6 +72,8 @@ test('engine OpenAPI schemas have properties', function (): void {
         'EngineEventsAcceptedResource',
         'QuestionnaireResource',
         'SurveyResource',
+        'MarketingLeadResource',
+        'UnsubscribeResource',
     ] as $name) {
         engineOpenApiSchema($spec, $name);
     }
@@ -184,4 +186,39 @@ test('engine OpenAPI schemas have properties', function (): void {
 
     expect($spec['components']['schemas']['AcceptCharterProposalRequest']['properties'] ?? null)->toHaveKeys(['name', 'terms']);
     expect($spec['components']['schemas']['DeclineCharterProposalRequest']['properties'] ?? null)->toHaveKey('reason');
+
+    $lead = engineOpenApiSchema($spec, 'MarketingLeadResource');
+    expect($lead['properties'])->toHaveKey('accepted');
+    expect(array_keys($lead['properties']))->toBe(['accepted']);
+
+    $unsubscribe = engineOpenApiSchema($spec, 'UnsubscribeResource');
+    expect($unsubscribe['properties'])->toHaveKeys(['valid', 'already_unsubscribed']);
+    expect(array_keys($unsubscribe['properties']))->toBe(['valid', 'already_unsubscribed']);
+
+    $leadPath = $spec['paths']['/engine/marketing-leads']['post']
+        ?? $spec['paths']['/api/engine/marketing-leads']['post']
+        ?? null;
+    expect($leadPath)->toBeArray();
+    engineSchemaRef(
+        $leadPath['responses']['200']['content']['application/json']['schema'] ?? [],
+        'MarketingLeadResource',
+    );
+
+    $unsubscribePath = $spec['paths']['/engine/unsubscribe/{token}']['get']
+        ?? $spec['paths']['/api/engine/unsubscribe/{token}']['get']
+        ?? null;
+    expect($unsubscribePath)->toBeArray();
+    engineSchemaRef(
+        $unsubscribePath['responses']['200']['content']['application/json']['schema'] ?? [],
+        'UnsubscribeResource',
+    );
+
+    $unsubscribePost = $spec['paths']['/engine/unsubscribe/{token}']['post']
+        ?? $spec['paths']['/api/engine/unsubscribe/{token}']['post']
+        ?? null;
+    expect($unsubscribePost)->toBeArray();
+    engineSchemaRef(
+        $unsubscribePost['responses']['200']['content']['application/json']['schema'] ?? [],
+        'UnsubscribeResource',
+    );
 });

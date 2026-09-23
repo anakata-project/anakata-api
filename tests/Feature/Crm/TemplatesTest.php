@@ -50,7 +50,7 @@ test('templates list the published version and a draft is refused without the ru
 
     $welcome = collect($index->json('data'))->firstWhere('key', 'welcome_web_lead');
 
-    expect($index->json('data'))->toHaveCount(21)
+    expect($index->json('data'))->toHaveCount(24)
         ->and($welcome['kind'])->toBe('MARKETING')
         ->and($welcome['name'])->toBe('Welcome — your Galápagos begins here')
         ->and($welcome['published']['subject'])->toBe('Your Galápagos adventure begins here — Anakata')

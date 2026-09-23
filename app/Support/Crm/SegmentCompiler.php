@@ -317,7 +317,7 @@ final class SegmentCompiler
      */
     private static function erasure(array $item): array
     {
-        $sql = 'EXISTS (SELECT 1 FROM erasure_log WHERE erasure_log.contact_id = contacts.id)';
+        $sql = 'EXISTS (SELECT 1 FROM erasure_log WHERE erasure_log.contact_id = contacts.id OR SHA2(LOWER(TRIM(contacts.email)), 256) = erasure_log.email_sha256)';
 
         if ($item['value'] !== true) {
             $sql = 'NOT '.$sql;

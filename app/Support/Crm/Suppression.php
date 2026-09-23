@@ -37,7 +37,7 @@ final class Suppression
     public static function applies(Contact $contact): bool
     {
         return self::consentMissingOrWithdrawn($contact)
-            || ErasureLog::query()->where('contact_id', $contact->id)->exists()
+            || self::erased($contact)
             || self::hardBounced($contact);
     }
 
@@ -62,6 +62,23 @@ final class Suppression
             ->first();
 
         return ! $latest instanceof ContactConsent || ! $latest->granted;
+    }
+
+    private static function erased(Contact $contact): bool
+    {
+        $hash = is_string($contact->email) && trim($contact->email) !== ''
+            ? hash('sha256', (string) Contact::normalizeEmail($contact->email))
+            : null;
+
+        return ErasureLog::query()
+            ->where(function (Builder $query) use ($contact, $hash): void {
+                $query->where('contact_id', $contact->id);
+
+                if ($hash !== null) {
+                    $query->orWhere('email_sha256', $hash);
+                }
+            })
+            ->exists();
     }
 
     private static function hardBounced(Contact $contact): bool

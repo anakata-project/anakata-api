@@ -11,6 +11,7 @@ use App\Models\Concerns\SerializesDatesAsUtc;
 use App\Services\Config\CurrentConfig;
 use App\Support\Contacts\PhoneNumber;
 use App\Support\Crm\ContactDerived;
+use App\Support\Templates\UnsubscribeLink;
 use Database\Factories\ContactFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -34,6 +36,7 @@ use Illuminate\Support\Collection;
  * @property string|null $phone_e164
  * @property array<string, mixed>|null $first_touch
  * @property array<string, mixed>|null $last_touch
+ * @property string|null $unsubscribe_token
  * @property Carbon|null $engine_identified_at
  * @property int|null $merged_into_id
  * @property int|null $created_by
@@ -78,6 +81,46 @@ class Contact extends Model
             'last_touch' => 'array',
             'engine_identified_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Contact $contact): void {
+            $contact->ensureUnsubscribeToken();
+        });
+    }
+
+    public function ensureUnsubscribeToken(): ?string
+    {
+        if (! self::unsubscribeTokenColumnExists()) {
+            return null;
+        }
+
+        $token = UnsubscribeLink::token($this);
+
+        if ($this->unsubscribe_token === $token) {
+            return $token;
+        }
+
+        DB::table('contacts')->where('id', $this->id)->update([
+            'unsubscribe_token' => $token,
+        ]);
+        $this->unsubscribe_token = $token;
+
+        return $token;
+    }
+
+    /**
+     * Information schema, not the schema builder: that cache would stay false
+     * for the rest of a migrate that added the column later in the same process.
+     */
+    private static function unsubscribeTokenColumnExists(): bool
+    {
+        $row = DB::selectOne(
+            "select count(*) as present from information_schema.columns where table_schema = database() and table_name = 'contacts' and column_name = 'unsubscribe_token'",
+        );
+
+        return (int) ($row->present ?? 0) > 0;
     }
 
     public static function normalizeEmail(?string $email): ?string

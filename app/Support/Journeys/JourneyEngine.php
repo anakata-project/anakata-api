@@ -93,7 +93,25 @@ final class JourneyEngine
 
     public function onLeadCaptured(Contact $contact): void
     {
-        $this->enrol('nurture_to_request', $contact);
+        $this->enrol('nurture_to_request', $contact, null, 'lead');
+    }
+
+    public function exitUnsubscribed(Contact $contact): void
+    {
+        JourneyEnrolment::query()
+            ->where('contact_id', $contact->id)
+            ->where('status', JourneyEnrolmentStatus::Active)
+            ->whereHas('journey', fn ($query) => $query->where('kind', AutomationKind::Marketing))
+            ->orderBy('id')
+            ->each(function (JourneyEnrolment $enrolment): void {
+                $fresh = $enrolment->fresh();
+
+                if (! $fresh instanceof JourneyEnrolment || $fresh->status !== JourneyEnrolmentStatus::Active) {
+                    return;
+                }
+
+                $this->finish($fresh, JourneyEnrolmentStatus::Exited, 'unsubscribed', 'journey.exited');
+            });
     }
 
     public function onBookingCreated(BookingCreated $event): void
@@ -178,7 +196,7 @@ final class JourneyEngine
         $this->enrol('winback', $deal->contact, $deal->booking);
     }
 
-    public function enrol(string $key, Contact $contact, ?Booking $booking = null): ?JourneyEnrolment
+    public function enrol(string $key, Contact $contact, ?Booking $booking = null, string $branch = 'lead'): ?JourneyEnrolment
     {
         $journey = Journey::query()->where('key', $key)->first();
 
@@ -194,7 +212,7 @@ final class JourneyEngine
             return null;
         }
 
-        if ($journey->subject === JourneySubject::Contact && $this->contactEnrolled($journey, $contact)) {
+        if ($journey->subject === JourneySubject::Contact && $this->contactEnrolled($journey, $contact, $branch)) {
             return null;
         }
 
@@ -203,7 +221,7 @@ final class JourneyEngine
         }
 
         try {
-            $enrolment = $this->enrolments->handle($journey, $contact, $booking);
+            $enrolment = $this->enrolments->handle($journey, $contact, $booking, $branch);
 
             if ($journey->key === 'reengagement' && $this->isHighLtv($contact)) {
                 DB::transaction(function () use ($enrolment): void {
@@ -253,7 +271,7 @@ final class JourneyEngine
             ->pluck('contact_id');
 
         Contact::query()->whereKey($ids)->each(function (Contact $contact): void {
-            $this->enrol('nurture_to_request', $contact);
+            $this->enrol('nurture_to_request', $contact, null, 'abandoned_checkout');
         });
     }
 
@@ -330,7 +348,9 @@ final class JourneyEngine
     {
         $enrolment->load(['journey.steps', 'contact', 'booking.departure']);
         $journey = $enrolment->journey;
-        $step = $journey->steps->firstWhere('position', $enrolment->position);
+        $step = $journey->steps
+            ->where('branch', $enrolment->branch)
+            ->firstWhere('position', $enrolment->position);
 
         if (! $step instanceof JourneyStep) {
             $this->finish($enrolment, JourneyEnrolmentStatus::Completed, null, 'journey.completed');
@@ -581,7 +601,9 @@ final class JourneyEngine
             return;
         }
 
-        $next = $enrolment->journey->steps->firstWhere('position', $current->position + 1);
+        $next = $enrolment->journey->steps
+            ->where('branch', $enrolment->branch)
+            ->firstWhere('position', $current->position + 1);
 
         if (! $next instanceof JourneyStep) {
             $this->finish($enrolment, JourneyEnrolmentStatus::Completed, null, 'journey.completed');
@@ -739,11 +761,12 @@ final class JourneyEngine
             ->exists();
     }
 
-    private function contactEnrolled(Journey $journey, Contact $contact): bool
+    private function contactEnrolled(Journey $journey, Contact $contact, string $branch): bool
     {
         return JourneyEnrolment::query()
             ->where('journey_id', $journey->id)
             ->where('contact_id', $contact->id)
+            ->where('branch', $branch)
             ->exists();
     }
 

@@ -5,12 +5,15 @@ declare(strict_types=1);
 use App\Actions\Documents\PrepareIssueDocument;
 use App\Actions\Documents\SendDocument;
 use App\Enums\BookingStatus;
+use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
+use App\Enums\DeliveryTriggeredBy;
 use App\Enums\DocumentKind;
 use App\Jobs\SendDeliveryJob;
 use App\Mail\Documents\DocumentMail;
 use App\Models\Booking;
 use App\Models\ChangeHistory;
+use App\Models\Contact;
 use App\Models\Delivery;
 use App\Support\Automations\AutomationGate;
 use Database\Seeders\ConfigSeeder;
@@ -164,4 +167,81 @@ test('a transport that always fails ends FAILED after three attempts', function 
     expect($delivery->fresh()?->status)->toBe(DeliveryStatus::Failed);
     expect($delivery->fresh()?->error)->toBe('smtp down');
     expect(ChangeHistory::query()->where('event', 'document.send_failed')->count())->toBe(1);
+});
+
+test('a recipient-does-not-exist failure is a hard bounce once and a bare 550 stays failed', function (): void {
+    Queue::fake();
+    $actor = adminUser();
+    $booking = sendableBooking();
+    $document = app(PrepareIssueDocument::class)->handle($booking, DocumentKind::Invoice, actor: $actor);
+    $delivery = app(SendDocument::class)->handle($booking, $document, $actor);
+
+    $phase = 'hard';
+    Mail::shouldReceive('send')->andReturnUsing(function () use (&$phase): void {
+        if ($phase === 'hard') {
+            throw new TransportException('550 5.1.1 user unknown');
+        }
+
+        throw new TransportException('550 5.7.1 relay access denied');
+    });
+
+    $job = new SendDeliveryJob($delivery->id);
+    $job->handle(app(AutomationGate::class));
+
+    expect($delivery->fresh()?->status)->toBe(DeliveryStatus::HardBounce);
+    expect(ChangeHistory::query()->where('event', 'contact.suppressed')->count())->toBe(1);
+    expect(ChangeHistory::query()->where('event', 'contact.suppressed')->value('reason'))->toBe('HARD_BOUNCE');
+
+    $again = Delivery::factory()->create([
+        'booking_id' => $booking->id,
+        'document_id' => null,
+        'kind' => DeliveryKind::Journey,
+        'to' => [strtolower((string) $booking->contact->email)],
+        'status' => DeliveryStatus::Queued,
+        'triggered_by' => DeliveryTriggeredBy::System,
+    ]);
+
+    (new SendDeliveryJob($again->id))->handle(app(AutomationGate::class));
+
+    expect($again->fresh()?->status)->toBe(DeliveryStatus::HardBounce);
+    expect(ChangeHistory::query()->where('event', 'contact.suppressed')->count())->toBe(1);
+
+    $phase = 'soft';
+    $soft = Delivery::factory()->create([
+        'booking_id' => $booking->id,
+        'document_id' => null,
+        'kind' => DeliveryKind::Journey,
+        'to' => [strtolower((string) $booking->contact->email)],
+        'status' => DeliveryStatus::Queued,
+        'triggered_by' => DeliveryTriggeredBy::System,
+    ]);
+
+    $softJob = new SendDeliveryJob($soft->id);
+
+    try {
+        $softJob->handle(app(AutomationGate::class));
+    } catch (TransportException $exception) {
+        $softJob->failed($exception);
+    }
+
+    expect($soft->fresh()?->status)->toBe(DeliveryStatus::Failed);
+
+    $phase = 'hard';
+    $orphan = Contact::factory()->create(['email' => 'missing-box@anakata.test']);
+    $byAddress = Delivery::factory()->create([
+        'booking_id' => null,
+        'document_id' => null,
+        'kind' => DeliveryKind::Journey,
+        'to' => ['missing-box@anakata.test'],
+        'status' => DeliveryStatus::Queued,
+        'triggered_by' => DeliveryTriggeredBy::System,
+    ]);
+
+    (new SendDeliveryJob($byAddress->id))->handle(app(AutomationGate::class));
+
+    expect($byAddress->fresh()?->status)->toBe(DeliveryStatus::HardBounce);
+    expect(ChangeHistory::query()
+        ->where('event', 'contact.suppressed')
+        ->where('subject_id', $orphan->id)
+        ->count())->toBe(1);
 });

@@ -340,6 +340,7 @@ test('the public settings include extras due hours and consent versions', functi
         'insurance',
         'marketing',
         'analytics',
+        'checkout_marketing',
     ]);
     expect($json['settings']['legal']['consent_versions']['privacy'])->not->toBe('');
 });

@@ -11,6 +11,7 @@ enum ConsentCapturePoint: string
     case Staff = 'STAFF';
     case BookingLogBackfill = 'BOOKING_LOG_BACKFILL';
     case SubjectRequest = 'SUBJECT_REQUEST';
+    case Unsubscribe = 'UNSUBSCRIBE';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum ConsentCapturePoint: string
             self::Staff => 'Staff',
             self::BookingLogBackfill => 'Booking log backfill',
             self::SubjectRequest => 'Subject request',
+            self::Unsubscribe => 'Unsubscribe',
         };
     }
 }

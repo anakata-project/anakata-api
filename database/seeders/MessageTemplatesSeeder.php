@@ -34,6 +34,9 @@ class MessageTemplatesSeeder extends Seeder
         'arrival_instructions' => 'Almost time! Final instructions for your arrival in San Cristóbal',
         'reengagement_6_months' => 'Back to Galápagos? A new expedition awaits you',
         'winback' => 'Sorry we missed you — what changed?',
+        'cart_recovery_1' => 'Can we help you plan your Galápagos expedition?',
+        'cart_recovery_2' => 'Still dreaming of Galápagos? We are here to help.',
+        'cart_recovery_3' => 'Can we help plan your trip?',
     ];
 
     public function run(): void
@@ -44,8 +47,8 @@ class MessageTemplatesSeeder extends Seeder
             ->orderBy('id')
             ->get();
 
-        if ($steps->count() !== 21) {
-            throw new RuntimeException('Expected 21 journey send steps, found '.$steps->count().'.');
+        if (! in_array($steps->count(), [21, 24], true)) {
+            throw new RuntimeException('Expected 21 or 24 journey send steps, found '.$steps->count().'.');
         }
 
         foreach ($steps as $step) {

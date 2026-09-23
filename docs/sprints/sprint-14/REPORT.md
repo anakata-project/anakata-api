@@ -497,3 +497,142 @@ A published template is immutable, marketing copy must carry an unsubscribe link
 EOF
 )"
 ```
+
+## Task 05 · Lead capture, unsubscribe and cart recovery
+
+A checkout tick keeps an address. One click on the unsubscribe link withdraws marketing consent. Cart recovery is a second branch of the existing nurture journey, not a new journey and not the `abandoned_checkout` segment.
+
+### Checkout marketing version
+
+`legal.consent_versions.checkout_marketing` defaults to `v1 (pending LEG-002)`. The sentence itself stays pending LEG-002; the version string is the consent text id the engine tick must send. The feed already emits `consentVersions->toArray()`, so the key appears once the document has it.
+
+The registry row is `consent-checkout-marketing` (LEG-002, pending client, used in the engine checkout marketing tick). Fresh-seed counts are now tracked **91**, adjusted here **66**, other tabs **15**, locked **10**, differs / flagged **42**. `BR-01` and `tests/e2e/fixtures/reference-values.md` match that.
+
+### Lead capture
+
+`POST /api/engine/marketing-leads` (`throttle:engine-checkout`). Body: `email`, `first_name`, `consent` (must be true), `version`, optional `session_id`. `CaptureMarketingLead` writes nothing unless consent is accepted and `version` equals the published `checkout_marketing`.
+
+It resolves the contact, records MARKETING granted at capture point `ENGINE_FORM` with that version and the request IP, stitches the session when `session_id` is present, and enrols the nurture `lead` branch. The stitch is unchanged: it still records ANALYTICS granted at `ENGINE_BANNER` (M3). This call site is in addition to L7’s list (request, waitlist, charter enquiry, complete page). The action does not send the welcome.
+
+The response is always `{ "accepted": true }` for a new or existing address. No contact id.
+
+### Unsubscribe
+
+`contacts.unsubscribe_token` stores `hash_hmac('sha256', contact id, APP_KEY)`, the same token `UnsubscribeLink` puts in a marketing template. The raw insert in `ResolveContact` does not fire model events and the id does not exist until the row does, so the token is written immediately after the row is loaded. Eloquent creates set it too. Existing rows are backfilled. The token does not expire. Lookup checks the column and `hash_equals` against a recomputed HMAC.
+
+`GET` and `POST /api/engine/unsubscribe/{token}` sit with the other token routes (`throttle:engine-complete`, `noindex`). `PagePath` stores `/unsubscribe/{token}` as `/unsubscribe/[token]`.
+
+GET returns only `{ "valid": true, "already_unsubscribed": bool }`. Q7’s last clause wins over the task file’s “first name at most”: the payload has no name, booking, or address. An unknown token is 404 `{ "message": "This link is not valid." }`.
+
+POST is `UnsubscribeContact`. If the latest MARKETING row is already withdrawn, it returns `already_unsubscribed: true` and writes nothing. Otherwise it records MARKETING granted false, capture point `UNSUBSCRIBE`, version `checkout_marketing`, and exits every active marketing enrolment now with reason exactly `unsubscribed`. Suppression is that withdrawal. There is no second marker.
+
+### Cart recovery
+
+New migration, not an edit of task 03’s journeys migration. `journey_steps.branch` and `journey_enrolments.branch` default to `lead` and existing rows are backfilled to that. The step unique becomes `(journey_id, branch, position)`. The enrolment unique becomes `(journey_id, contact_id, booking_subject, branch)` with the explicit name `journey_enrolments_subject_branch_unique` (the default Laravel name would exceed MySQL’s 64 characters). `booking_subject` stays generated.
+
+Those old uniques were also the indexes behind the `journey_id` foreign keys, so the migration drops and restores those foreign keys around the swap.
+
+The walker and `EnrolJourney` stay inside one branch. `contactEnrolled` is per branch, so one person can hold the lead branch and the cart branch. `exitFor` still exits every active row for that journey and contact, so a booking exits both. CRM step counts are grouped by journey, branch and position.
+
+`lead` keeps the five existing steps. `abandoned_checkout` is three marketing sends from enrolment: 24 hours, 48 hours, 7 days. Subjects are the catalogue lines (`Can we help you plan your Galápagos expedition?`, `Still dreaming of Galápagos? We are here to help.`, `Can we help plan your trip?`). Bodies are one pending-client paragraph plus `{{unsubscribe_link}}`, approval `Sprint 14: initial journey template`. Copy stays pending the client.
+
+`cart_recovery_1/2/3` are built rows on `journey:nurture_to_request`. Catalogue total stays 58; built is 54; not built is 4.
+
+Enrolment is not `SegmentQuery` on the `abandoned_checkout` segment. That segment is still `begin_checkout` (at least one, within 14 days) and `booking_count` 0 within 14 days. It was not changed. The cart branch uses task 03’s population: a stitched `abandon_cart`, a granted MARKETING row, and no booking. `onLeadCaptured` still enrols `lead` only. A stitch from waitlist, charter, or the complete page without the tick does not enrol the cart branch.
+
+### Hard bounce
+
+`SendDeliveryJob` classifies the exception inside `handle()`, before a retry. SMTP `5.1.1`, or the phrases user unknown, user-unknown, mailbox not found, recipient rejected, or “does not exist”, sets that delivery to `HARD_BOUNCE` and returns. A bare `550` without those phrases is rethrown and stays the retry-then-`FAILED` path.
+
+The contact is the booking’s contact, or the normalised address in `to` when there is no booking. The first hard bounce for that contact writes one `contact.suppressed` history row, reason `HARD_BOUNCE`. A later hard bounce updates that delivery only. `Suppression::hardBounced` already treats any `HARD_BOUNCE` delivery as suppression.
+
+### Erasure hash
+
+`SegmentCompiler::erasure` and `Suppression::applies` now also match `SHA2(LOWER(TRIM(contacts.email)), 256) = erasure_log.email_sha256`. No bindings, so `Suppression::sql()` still refuses a compiled predicate that takes bindings. The `suppressed` segment is `Suppression::conditions()`, so it picks the hash up. A later `ResolveContact` on an erased address creates a new contact, and marketing enrolment and marketing segments refuse it.
+
+Transactional journeys still enrol. `enrol()` checks suppression only when the journey kind is marketing (Q2).
+
+### Deviations
+
+- `database/migrations/2026_09_21_200035_add_consent_versions_to_business_rules.php` is a merged migration. `ConfigPublisher` validates the raw array before `fromArray`, and `AddConsentVersionsMigrationTest` rebuilds `legal` from that migration’s closed `$defaults`. `checkout_marketing` was added to that list and nowhere else in the file. Without it, a fresh rebuild of `legal` fails validation.
+- `MessageTemplatesSeeder` accepts 21 or 24 send steps. Migration `2026_09_23_180001` runs it before the cart steps exist, so a hard count of 24 would fail a fresh migrate. The branch migration calls the seeder again after the three steps are inserted. A database that has finished migrating has 24 templates.
+
+### Tests
+
+`tests/Feature/Engine/MarketingLeadUnsubscribeTest.php`, the cart and erasure cases in `tests/Feature/Crm/JourneysTest.php`, the hard-bounce case in `tests/Feature/Documents/SendDocumentTest.php`, plus the config-verify, OpenAPI, catalogue, template-count and page-path updates.
+
+`composer check` inside the app container: 1318 tests passed, Pint passed, Larastan passed.
+
+`anakata:config-verify` failed on the app database before migrate (`business_rules v1: legal.consent_versions.checkout_marketing` required) and passed after (`business_rules v2: valid`).
+
+### Open questions
+
+None for this task. The checkout marketing sentence and the three cart bodies are still pending the client (LEG-002 / the sprint copy question).
+
+### Notes for later
+
+- The prototype’s CRM task above USD 15,000, and the sales-exec assignment at 48 hours, are not in this task.
+- Task 07 reads `checkout_marketing` from the feed. The sentence is not written here.
+- An erased address can still be enrolled on a transactional journey. That is Q2: suppression blocks marketing only.
+
+### Git
+
+Not run:
+
+```bash
+git add \
+  app/Actions/Contacts/ResolveContact.php \
+  app/Actions/Crm/EnrolJourney.php \
+  app/Actions/Engine/CaptureMarketingLead.php \
+  app/Actions/Engine/UnsubscribeContact.php \
+  app/Enums/ConsentCapturePoint.php \
+  app/Http/Controllers/Crm/JourneyController.php \
+  app/Http/Controllers/Engine/MarketingLeadController.php \
+  app/Http/Controllers/Engine/UnsubscribeController.php \
+  app/Http/Requests/Engine/StoreMarketingLeadRequest.php \
+  app/Http/Resources/Crm/CrmJourneyResource.php \
+  app/Http/Resources/Engine/EngineSettingsResource.php \
+  app/Http/Resources/Engine/MarketingLeadResource.php \
+  app/Http/Resources/Engine/UnsubscribeResource.php \
+  app/Jobs/SendDeliveryJob.php \
+  app/Models/Contact.php \
+  app/Models/JourneyEnrolment.php \
+  app/Models/JourneyStep.php \
+  app/Support/Automations/AutomationCatalogue.php \
+  app/Support/BusinessRules/Registry.php \
+  app/Support/Config/Documents/BusinessRulesDocument.php \
+  app/Support/Config/Documents/ConsentVersions.php \
+  app/Support/Crm/SegmentCompiler.php \
+  app/Support/Crm/Suppression.php \
+  app/Support/Deliveries/BounceClassifier.php \
+  app/Support/Engine/PagePath.php \
+  app/Support/Journeys/JourneyEngine.php \
+  app/Support/Templates/UnsubscribeLink.php \
+  database/migrations/2026_09_21_200035_add_consent_versions_to_business_rules.php \
+  database/migrations/2026_09_23_190001_add_checkout_marketing_consent_version_to_business_rules.php \
+  database/migrations/2026_09_23_190002_add_unsubscribe_token_to_contacts.php \
+  database/migrations/2026_09_23_190003_add_journey_branches.php \
+  database/seeders/JourneysSeeder.php \
+  database/seeders/MessageTemplatesSeeder.php \
+  docs/sprints/sprint-14/REPORT.md \
+  routes/api/engine.php \
+  tests/Feature/Config/AddCheckoutMarketingConsentVersionToBusinessRulesMigrationTest.php \
+  tests/Feature/Config/BusinessRulesEndpointsTest.php \
+  tests/Feature/Crm/AutomationsTest.php \
+  tests/Feature/Crm/JourneysTest.php \
+  tests/Feature/Crm/TemplatesTest.php \
+  tests/Feature/Documents/SendDocumentTest.php \
+  tests/Feature/Engine/EngineFeedTest.php \
+  tests/Feature/Engine/MarketingLeadUnsubscribeTest.php \
+  tests/Feature/OpenApi/EngineResponseSchemasTest.php \
+  tests/Unit/Engine/PagePathTest.php \
+  tests/e2e/fixtures/reference-values.md \
+  tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md
+
+git commit -m "$(cat <<'EOF'
+Keep a checkout address only with the tick, and let one click withdraw it.
+
+Cart recovery is a branch of nurture, a hard bounce suppresses once, and an erased address cannot be marketed again.
+EOF
+)"
+```

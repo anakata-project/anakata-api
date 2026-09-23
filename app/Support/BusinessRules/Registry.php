@@ -348,6 +348,8 @@ final class Registry
             'consent-privacy' => (string) data_get($document, 'legal.consent_versions.privacy'),
             'consent-insurance' => (string) data_get($document, 'legal.consent_versions.insurance'),
             'consent-marketing' => (string) data_get($document, 'legal.consent_versions.marketing'),
+            'consent-analytics' => (string) data_get($document, 'legal.consent_versions.analytics'),
+            'consent-checkout-marketing' => (string) data_get($document, 'legal.consent_versions.checkout_marketing'),
             'legal-entity-name' => (string) data_get($document, 'legal_entity.name'),
             'legal-entity-address' => implode(' · ', data_get($document, 'legal_entity.address_lines') ?? []),
             'legal-entity-email' => (string) data_get($document, 'legal_entity.email'),
@@ -1351,6 +1353,17 @@ final class Registry
                 BusinessRulesDocument::sourceDisplay('legal.consent_versions.analytics'),
                 data_get($initial, 'legal.consent_versions.analytics'),
                 'CRM consent register',
+            ),
+            self::here(
+                'consent-checkout-marketing',
+                $group,
+                'LEG-002',
+                'Checkout marketing consent version',
+                RuleStatus::PendingClient,
+                ['legal.consent_versions.checkout_marketing'],
+                BusinessRulesDocument::sourceDisplay('legal.consent_versions.checkout_marketing'),
+                data_get($initial, 'legal.consent_versions.checkout_marketing'),
+                'Engine checkout marketing tick',
             ),
         ];
     }

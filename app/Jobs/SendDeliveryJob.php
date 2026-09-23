@@ -10,10 +10,13 @@ use App\Enums\DeliveryTriggeredBy;
 use App\Events\DeliveryOutcomeRecorded;
 use App\Mail\Documents\DeliveryMailFactory;
 use App\Models\Booking;
+use App\Models\ChangeHistory;
+use App\Models\Contact;
 use App\Models\Delivery;
 use App\Models\User;
 use App\Support\Automations\AutomationCatalogue;
 use App\Support\Automations\AutomationGate;
+use App\Support\Deliveries\BounceClassifier;
 use App\Support\History\History;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -58,7 +61,17 @@ final class SendDeliveryJob implements ShouldQueue
 
         $pdfBytes = $this->pdfBytes($delivery);
 
-        Mail::send(DeliveryMailFactory::make($delivery, $pdfBytes));
+        try {
+            Mail::send(DeliveryMailFactory::make($delivery, $pdfBytes));
+        } catch (Throwable $exception) {
+            if (! BounceClassifier::isHard($exception)) {
+                throw $exception;
+            }
+
+            $this->recordHardBounce($delivery, $exception);
+
+            return;
+        }
 
         DB::transaction(function () use ($delivery): void {
             $fresh = Delivery::query()->findOrFail($delivery->id);
@@ -99,6 +112,71 @@ final class SendDeliveryJob implements ShouldQueue
             $this->writeHistory($fresh, sent: false);
             DeliveryOutcomeRecorded::dispatch($fresh);
         });
+    }
+
+    private function recordHardBounce(Delivery $delivery, Throwable $exception): void
+    {
+        DB::transaction(function () use ($delivery, $exception): void {
+            $fresh = Delivery::query()->with('booking')->findOrFail($delivery->id);
+
+            if (in_array($fresh->status, [DeliveryStatus::Sent, DeliveryStatus::HardBounce], true)) {
+                return;
+            }
+
+            $fresh->status = DeliveryStatus::HardBounce;
+            $fresh->error = $exception->getMessage();
+            $fresh->save();
+
+            $contact = $this->contactFor($fresh);
+
+            if (! $contact instanceof Contact) {
+                return;
+            }
+
+            $seen = ChangeHistory::query()
+                ->where('subject_type', $contact->getMorphClass())
+                ->where('subject_id', $contact->id)
+                ->where('event', 'contact.suppressed')
+                ->exists();
+
+            if ($seen) {
+                return;
+            }
+
+            History::record($contact, 'contact.suppressed', reason: 'HARD_BOUNCE', after: [
+                'reason' => 'HARD_BOUNCE',
+                'delivery_id' => $fresh->id,
+            ], system: true);
+        });
+    }
+
+    private function contactFor(Delivery $delivery): ?Contact
+    {
+        $booking = $delivery->booking;
+
+        if ($booking instanceof Booking) {
+            $contact = Contact::query()->find($booking->contact_id);
+
+            if ($contact instanceof Contact) {
+                return $contact;
+            }
+        }
+
+        foreach ($delivery->to as $address) {
+            $email = Contact::normalizeEmail($address);
+
+            if ($email === null) {
+                continue;
+            }
+
+            $contact = Contact::query()->whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
+
+            if ($contact instanceof Contact) {
+                return $contact;
+            }
+        }
+
+        return null;
     }
 
     private function pdfBytes(Delivery $delivery): ?string

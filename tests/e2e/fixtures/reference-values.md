@@ -73,6 +73,7 @@ Source: `BusinessRulesDocument::initial()`.
 | legal.consent_versions.privacy | v2026.1 (pending LEG-002) |
 | legal.consent_versions.insurance | OPS-005 v1 |
 | legal.consent_versions.marketing | v1 |
+| legal.consent_versions.checkout_marketing | v1 (pending LEG-002) |
 | legal_entity.name | PONTOS LLC (a limited liability company) |
 | legal_entity.address_lines | 430 Grand Bay Drive, Apt 1108 · Key Biscayne, FL 33149, United States |
 | legal_entity.email | info@anakata.co |
@@ -375,7 +376,7 @@ Source: Sprint 8 task 08 browser notes against the running feed. ⚠ UNVERIFIED 
 
 Suites from **USD 13,300**. Default search window NOV 2027—JAN 2028 · 2 adults.
 
-Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Current registry counts are in **Portal (Sprint 13)** (90 / 65 / 15 / 41). The Sprint 11 recount (83 / 58 / 15 / 10 / 36) is historical.
+Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Current registry counts are in **Portal (Sprint 13)** plus Sprint 14 `consent-checkout-marketing` (91 / 66 / 15 / 42). The Sprint 11 recount (83 / 58 / 15 / 10 / 36) and the Sprint 13 recount (90 / 65 / 15 / 41) are historical.
 
 ## CRM contacts (Sprint 9)
 
@@ -477,6 +478,6 @@ After reset the drawer says `No sales materials yet.` The portal Materials page 
 
 ### Registry
 
-`portal.invite_valid_days` is 14, status PENDING CLIENT (`BusinessRulesEndpointsTest`). Counts: tracked **90**, adjusted here **65**, set in other tabs **15**, differs / flagged **41**. Locked stays **10**. ⚠ UNVERIFIED — Pest, not a reset screen.
+`portal.invite_valid_days` is 14, status PENDING CLIENT (`BusinessRulesEndpointsTest`). Sprint 14 adds `consent-checkout-marketing` (PENDING CLIENT, LEG-002). Counts: tracked **91**, adjusted here **66**, set in other tabs **15**, differs / flagged **42**. Locked stays **10**. ⚠ UNVERIFIED — Pest, not a reset screen.
 
 
