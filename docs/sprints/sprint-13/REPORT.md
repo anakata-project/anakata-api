@@ -321,3 +321,56 @@ Record the portal app scaffold and sign-in.
 EOF
 )"
 ```
+
+## Task 07 · Rates, availability and materials
+
+Three signed-in pages. Every figure is a field from the portal API. The app does not subtract a commission, invent a label, or count cabins.
+
+**Rates** (`/rates`). `GET /api/portal/rates` supplies `year`, `suite_pp`, `owner_pp`, and `charter_week`. The table matches the RMS preview: years as columns, then Suite · per person, Owner's Suite · per person, Charter · per week. Each cell is `AnkMoney` on that integer. The line above is `NET RATES (PUBLIC − {pct}%) · PUBLIC PRICES NEVER SHOWN`, with `{pct}` from `GET /api/portal/me` (`agency.commission_pct`). The sign-in session does not carry that percent.
+
+**Availability** (`/availability`). `GET /api/portal/availability`. A month range becomes `from` (first day) and `to` (last day). Yacht and itinerary are the codes the API validates; a bad code is shown as the API's 422 sentences. Columns: `embark` (short date), `yacht`, `itinerary`, `label.text` on a pill, `net_rates.suite_pp`, `net_rates.owner_pp`. A cabin count appears only inside the API's label text. Request is a link to `/requests/new?departure_id=` when `label.code` is `AVAILABLE`, `LIMITED`, or `ONLY_N_LEFT`. `FULL` (including `FULL · WAITLIST`), `CLOSED`, `CHARTER`, `CHARTERED`, and `NOT_SHOWN` have no link. The form is task 08. The pager uses `meta.current_page`, `meta.last_page`, and `meta.total`, and only when `last_page` is greater than 1. Changing the filters returns to page 1.
+
+**Materials** (`/materials`). `GET /api/portal/sales-materials`: `title`, `kind` as sent, `size` with a `B` suffix, `version`, `updated`. An empty list shows `meta.note` and no table. A non-empty list omits the note. Download is `GET /api/portal/sales-materials/{id}/file` with the session cookie. `useApi().request` only returns JSON, so `downloadPortalFile` fetches that path as a blob and saves the `Content-Disposition` filename. A failure shows the API `message`. The link is never a storage URL.
+
+Loading is `…`. An `ApiError` shows its message, and a 422 shows the field sentences.
+
+**Browser** (dark and light, API on 8000, portal on 3002, signed in as Ada at Blue Latitude Travel, commission 10%). The 2027 Suite · per person cell is **USD 11,970**, the same integer `PortalPreview::for` returns for that agency (11,970), which is what the RMS preview table renders. Availability filtered to December 2027, yacht `ANAMARA`, itinerary `FEST` left two rows: 19 Dec `CHARTERED — NOT SHOWN` with no Request, and 26 Dec `AVAILABLE` linking to `/requests/new?departure_id=15`. The local departures have no `FULL` row (15 available, 1 chartered); the component test covers a `FULL` row having no Request. Downloads of Blue Latitude deck (this agency) and Shared fact sheet both succeeded. History on the agency records both as `portal.material_downloaded`, actor `Ada Agent (ada@portal.test)`, with the title, version, and material id. The agency drawer does not list that activity yet; task 09 does.
+
+**Quality.** `pnpm lint`, `typecheck`, `test` (23) and `build` passed. A fresh pair under `/tmp/anakata-portal-fresh` — `anakata-ui` from the local `v0.14.0` tag (`71d7131`), portal sources copied — typechecked and built. The GitHub pin was not fetched. That tag is still unpushed.
+
+### Git commands
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-portal
+git add \
+  app/assets/css/portal.css \
+  app/pages/availability.vue \
+  app/pages/materials.vue \
+  app/pages/rates.vue \
+  app/types/api.ts \
+  app/utils/authError.ts \
+  app/utils/availabilityLabel.ts \
+  app/utils/availabilityQuery.ts \
+  app/utils/downloadFile.ts \
+  app/utils/formatSize.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/components/portalRead.test.ts \
+  tests/unit/portalRead.test.ts
+git commit -m "$(cat <<'EOF'
+Show an agent's net rates, open weeks, and sales materials.
+
+Every figure is a portal API field. A file download goes through the API.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-13/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the portal rates, availability, and materials pages.
+EOF
+)"
+```
