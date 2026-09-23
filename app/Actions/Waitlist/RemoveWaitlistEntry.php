@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Actions\Waitlist;
 
 use App\Actions\Action;
+use App\Actions\Crm\CloseTask;
+use App\Models\CrmTask;
 use App\Models\User;
 use App\Models\WaitlistEntry;
 use App\Support\History\History;
+use App\Support\Waitlist\WaitlistOfferCopy;
 use Illuminate\Validation\ValidationException;
 
 final class RemoveWaitlistEntry extends Action
 {
+    public function __construct(private readonly CloseTask $closeTask) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -36,6 +41,12 @@ final class RemoveWaitlistEntry extends Action
             History::record($entry, 'waitlist.removed', after: [
                 'removed_by' => $actor->id,
             ], reason: $reason, actor: $actor);
+
+            $task = CrmTask::query()->where('idempotency_key', WaitlistOfferCopy::taskKey($entry))->first();
+
+            if ($task instanceof CrmTask) {
+                $this->closeTask->autoClose($task, 'the waitlist entry was removed');
+            }
 
             return $entry->refresh()->load(['departure.yacht', 'contact', 'removedBy']);
         });

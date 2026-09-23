@@ -8,12 +8,14 @@ use App\Enums\BookingAccessTokenPurpose;
 use App\Enums\DeliveryKind;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
+use App\Mail\Charter\CharterProposalMail;
 use App\Models\Booking;
 use App\Models\BookingAccessToken;
 use App\Models\Delivery;
 use App\Models\PaymentLink;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
+use App\Support\Waitlist\WaitlistOfferCopy;
 use Illuminate\Mail\Mailable;
 use InvalidArgumentException;
 
@@ -57,6 +59,8 @@ final class DeliveryMailFactory
                 $delivery->booking,
                 app(CurrentConfig::class)->businessRules()->nps->reviewUrl,
             ),
+            DeliveryKind::WaitlistOffer => WaitlistOfferCopy::mail($delivery),
+            DeliveryKind::CharterProposal => CharterProposalMail::forDelivery($delivery),
             default => self::documentMail($delivery, $pdfBytes),
         };
     }

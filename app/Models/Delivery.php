@@ -19,7 +19,7 @@ use LogicException;
 
 /**
  * @property int $id
- * @property int $booking_id
+ * @property int|null $booking_id
  * @property int|null $document_id
  * @property DeliveryKind $kind
  * @property string $idempotency_key
@@ -35,7 +35,7 @@ use LogicException;
  * @property int|null $updated_by
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property-read Booking $booking
+ * @property-read Booking|null $booking
  * @property-read Document|null $document
  */
 #[Fillable([

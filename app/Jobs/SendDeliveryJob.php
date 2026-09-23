@@ -8,6 +8,7 @@ use App\Enums\DeliveryStatus;
 use App\Enums\DeliveryTriggeredBy;
 use App\Events\DeliveryOutcomeRecorded;
 use App\Mail\Documents\DeliveryMailFactory;
+use App\Models\Booking;
 use App\Models\Delivery;
 use App\Models\User;
 use App\Support\History\History;
@@ -112,6 +113,12 @@ final class SendDeliveryJob implements ShouldQueue
 
     private function writeHistory(Delivery $delivery, bool $sent): void
     {
+        $booking = $delivery->booking;
+
+        if (! $booking instanceof Booking) {
+            return;
+        }
+
         $documentKind = $delivery->kind->isDocumentKind();
         $event = $sent
             ? ($documentKind ? 'document.sent' : 'payment_request.sent')
@@ -120,7 +127,7 @@ final class SendDeliveryJob implements ShouldQueue
         $system = $delivery->triggered_by === DeliveryTriggeredBy::System;
         $actor = $system ? null : User::query()->find($delivery->created_by);
 
-        History::record($delivery->booking, $event, after: [
+        History::record($booking, $event, after: [
             'kind' => $delivery->kind->value,
             'delivery_id' => $delivery->id,
             'status' => $delivery->status->value,

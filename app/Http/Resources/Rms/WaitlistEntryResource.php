@@ -24,11 +24,12 @@ class WaitlistEntryResource extends JsonResource
      *     id: int,
      *     contact: array{name: string, email: string|null},
      *     departure: array{id: int, date: string, yacht: array{code: string, name: string}, festive: bool},
-     *     cabin_category: string,
+     *     cabin_category: CabinCategory,
      *     cabin_type: string,
      *     position: int|null,
      *     since: string,
-     *     notified: array{at: string, channel: string, by: string}|null,
+     *     notified: array{at: string, channel: PreferredChannel, by: string}|null,
+     *     auto_notified: bool,
      *     cabin_available: bool,
      *     notes: string|null
      * }
@@ -44,7 +45,7 @@ class WaitlistEntryResource extends JsonResource
         $notifier = $this->notifiedBy;
         $notified = $this->notified_at === null ? null : [
             'at' => Iso::utc($this->notified_at),
-            'channel' => $channel instanceof PreferredChannel ? $channel->value : '',
+            'channel' => $channel instanceof PreferredChannel ? $channel : PreferredChannel::Email,
             'by' => $notifier instanceof User ? $notifier->name : '',
         ];
 
@@ -63,11 +64,12 @@ class WaitlistEntryResource extends JsonResource
                 ],
                 'festive' => $this->departure->festive,
             ],
-            'cabin_category' => $this->cabin_category->value,
+            'cabin_category' => $this->cabin_category,
             'cabin_type' => $this->cabin_category === CabinCategory::Owner ? "Owner's Suite" : 'Suite',
             'position' => is_int($position) ? $position : null,
             'since' => Iso::utc($this->created_at),
             'notified' => $notified,
+            'auto_notified' => (bool) ($this->notified_at !== null && $this->notified_by === null),
             'cabin_available' => $available,
             'notes' => $this->notes,
         ];

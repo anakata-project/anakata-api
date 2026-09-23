@@ -19,6 +19,8 @@ enum DeliveryKind: string
     case Questionnaire = 'QUESTIONNAIRE';
     case Survey = 'SURVEY';
     case ReviewRequest = 'REVIEW_REQUEST';
+    case WaitlistOffer = 'WAITLIST_OFFER';
+    case CharterProposal = 'CHARTER_PROPOSAL';
 
     public function label(): string
     {
@@ -36,6 +38,8 @@ enum DeliveryKind: string
             self::Questionnaire => 'Guest preferences questionnaire',
             self::Survey => 'Post-trip survey',
             self::ReviewRequest => 'Review request',
+            self::WaitlistOffer => 'Waitlist offer',
+            self::CharterProposal => 'Charter proposal',
         };
     }
 
@@ -48,6 +52,8 @@ enum DeliveryKind: string
             self::Questionnaire,
             self::Survey,
             self::ReviewRequest,
+            self::WaitlistOffer,
+            self::CharterProposal,
         ], true);
     }
 
@@ -71,7 +77,7 @@ enum DeliveryKind: string
             self::Voucher => DocumentKind::Voucher,
             self::Pretrip => DocumentKind::Pretrip,
             self::WireInstructions => DocumentKind::WireInstructions,
-            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire, self::Survey, self::ReviewRequest => null,
+            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire, self::Survey, self::ReviewRequest, self::WaitlistOffer, self::CharterProposal => null,
         };
     }
 
@@ -85,6 +91,7 @@ enum DeliveryKind: string
             DocumentKind::Voucher => self::Voucher,
             DocumentKind::Pretrip => self::Pretrip,
             DocumentKind::WireInstructions => self::WireInstructions,
+            DocumentKind::CharterProposal => self::CharterProposal,
         };
     }
 }

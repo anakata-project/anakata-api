@@ -51,6 +51,8 @@ final class DocumentMail extends Mailable
             DeliveryKind::Questionnaire => throw new InvalidArgumentException('A questionnaire is not a document.'),
             DeliveryKind::Survey => throw new InvalidArgumentException('A survey is not a document.'),
             DeliveryKind::ReviewRequest => throw new InvalidArgumentException('A review request is not a document.'),
+            DeliveryKind::WaitlistOffer => throw new InvalidArgumentException('A waitlist offer is not a document.'),
+            DeliveryKind::CharterProposal => throw new InvalidArgumentException('A charter proposal is not a booking document.'),
             default => 'mail.documents.invoice',
         };
 

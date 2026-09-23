@@ -28,6 +28,8 @@ final class DeliverySubject
             DeliveryKind::Questionnaire => 'Your preferences questionnaire — '.$ref,
             DeliveryKind::Survey => 'Your post-trip survey — '.$ref,
             DeliveryKind::ReviewRequest => 'Would you share a review? — '.$ref,
+            DeliveryKind::WaitlistOffer => 'A cabin is free',
+            DeliveryKind::CharterProposal => 'Your Anakata charter proposal',
         };
     }
 

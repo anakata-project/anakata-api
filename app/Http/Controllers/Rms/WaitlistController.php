@@ -20,6 +20,7 @@ use App\Services\Inventory\Availability;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 
 final class WaitlistController extends Controller
 {
@@ -125,19 +126,17 @@ final class WaitlistController extends Controller
             return [];
         }
 
-        $actives = WaitlistEntry::query()
-            ->active()
+        $rows = DB::table('waitlist_entries')
+            ->select('id')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY departure_id, cabin_category ORDER BY created_at, id) AS queue_position')
+            ->whereNull('removed_at')
             ->whereIn('departure_id', $departureIds)
-            ->orderBy('created_at')
-            ->orderBy('id')
             ->get();
 
         $ranks = [];
 
-        foreach ($actives->groupBy(fn (WaitlistEntry $entry): string => $entry->departure_id.'|'.$entry->cabin_category->value) as $group) {
-            foreach ($group->values() as $index => $entry) {
-                $ranks[$entry->id] = $index + 1;
-            }
+        foreach ($rows as $row) {
+            $ranks[(int) $row->id] = (int) $row->queue_position;
         }
 
         return $ranks;

@@ -17,6 +17,8 @@ enum TaskKind: string
     case SubjectRequest = 'SUBJECT_REQUEST';
     case PostTripCall = 'POST_TRIP_CALL';
     case NpsReply = 'NPS_REPLY';
+    case WaitlistFollowUp = 'WAITLIST_FOLLOW_UP';
+    case CharterDeposit = 'CHARTER_DEPOSIT';
 
     public function label(): string
     {
@@ -32,6 +34,8 @@ enum TaskKind: string
             self::SubjectRequest => 'Subject request',
             self::PostTripCall => 'Post-trip call',
             self::NpsReply => 'NPS reply',
+            self::WaitlistFollowUp => 'Waitlist follow-up',
+            self::CharterDeposit => 'Charter deposit',
         };
     }
 
@@ -49,6 +53,8 @@ enum TaskKind: string
             self::SubjectRequest => 'CRM · subject request',
             self::PostTripCall => 'RMS · MKT-006',
             self::NpsReply => 'RMS · NPS reply',
+            self::WaitlistFollowUp => 'RMS · waitlist offer + 2 business days',
+            self::CharterDeposit => 'RMS · charter deposit due',
         };
     }
 }
