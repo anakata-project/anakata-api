@@ -22,6 +22,7 @@ use App\Listeners\BumpEngineFeedVersion;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\ExpireWebCheckoutSession;
 use App\Listeners\MarkRequestHoldExpired;
+use App\Listeners\OfferWaitlistCabins;
 use App\Listeners\OpenDealOnBookingCreated;
 use App\Listeners\OpenDealOnCharterEnquiryReceived;
 use App\Listeners\RaiseAlertsOnBookingCreated;
@@ -67,6 +68,8 @@ use App\Models\Payment;
 use App\Models\PaymentLink;
 use App\Models\RateVersion;
 use App\Models\RefundRequest;
+use App\Models\ReportRun;
+use App\Models\ReportSubscription;
 use App\Models\Role;
 use App\Models\SubjectRequest;
 use App\Models\User;
@@ -237,6 +240,8 @@ class AppServiceProvider extends ServiceProvider
             'charter_enquiry' => CharterEnquiry::class,
             'document' => Document::class,
             'manifest' => Manifest::class,
+            'report_run' => ReportRun::class,
+            'report_subscription' => ReportSubscription::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
             'booking_request' => BookingRequest::class,
@@ -285,9 +290,12 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ConfigPublished::class, ClearCurrentConfigCache::class);
         Event::listen(ConfigPublished::class, BumpEngineFeedVersion::class);
         Event::listen(AvailabilityChanged::class, BumpEngineFeedVersion::class);
+        Event::listen(AvailabilityChanged::class, OfferWaitlistCabins::class);
         Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
+        Event::listen(HoldExpired::class, OfferWaitlistCabins::class);
         Event::listen(HoldExpired::class, ExpireWebCheckoutSession::class);
         Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
+        Event::listen(BookingStatusChanged::class, OfferWaitlistCabins::class);
         Event::listen(BookingCreated::class, OpenDealOnBookingCreated::class);
         Event::listen(BookingCreated::class, RaiseTasksOnBookingCreated::class);
         Event::listen(BookingCreated::class, RaiseAlertsOnBookingCreated::class);

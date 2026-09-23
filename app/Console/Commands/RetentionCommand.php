@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\GuestPreference;
 use App\Models\Manifest;
+use App\Models\ReportRun;
 use App\Models\SubjectRequest;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
@@ -130,11 +131,13 @@ final class RetentionCommand extends Command
 
         $exports = $this->expireExports($config, $dry);
         $manifests = $this->purgeManifests($rules->passportMonthsAfterCruise, $rules->medicalDaysAfterCruise, $today, $dry);
+        $reports = $this->purgeReports($config->businessRules()->reports->retentionDays, $dry);
 
         $verb = $dry ? 'Would change' : 'Changed';
         $this->info($verb.' '.$changedBookings.' booking(s): '.$passportGuests.' passport(s), '.$noteGuests.' note set(s), '.$preferenceRows.' preference row(s).');
         $this->info(($dry ? 'Would delete ' : 'Deleted ').$exports.' access export(s).');
         $this->info(($dry ? 'Would purge ' : 'Purged ').$manifests['captain'].' CAPTAIN file(s) and '.$manifests['dpng'].' DPNG file(s).');
+        $this->info(($dry ? 'Would purge ' : 'Purged ').$reports.' report file set(s).');
 
         return self::SUCCESS;
     }
@@ -289,5 +292,41 @@ final class RetentionCommand extends Command
             });
 
         return ['captain' => $captain, 'dpng' => $dpng];
+    }
+
+    private function purgeReports(int $days, bool $dry): int
+    {
+        $cutoff = BusinessTime::now()->subDays($days);
+        $count = 0;
+
+        ReportRun::query()
+            ->whereNull('purged_at')
+            ->whereNotNull('generated_at')
+            ->where('generated_at', '<=', $cutoff)
+            ->orderBy('id')
+            ->each(function (ReportRun $run) use ($dry, &$count): void {
+                $count++;
+
+                if ($dry) {
+                    return;
+                }
+
+                foreach (['csv_path', 'xlsx_path', 'pdf_path'] as $column) {
+                    $path = $run->getAttribute($column);
+
+                    if (is_string($path) && $path !== '') {
+                        Storage::disk('reports')->delete($path);
+                    }
+                }
+
+                $run->forceFill([
+                    'csv_path' => null,
+                    'xlsx_path' => null,
+                    'pdf_path' => null,
+                    'purged_at' => now(),
+                ])->save();
+            });
+
+        return $count;
     }
 }

@@ -14,6 +14,7 @@ final class BusinessRulesDocument extends ConfigDocument
 {
     /**
      * @param  list<CancellationBand>  $bands
+     * @param  list<CancellationBand>  $charterBands
      */
     public function __construct(
         public readonly CommissionRules $commission,
@@ -31,7 +32,10 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly DocumentsRules $documents,
         public readonly CrmRules $crm,
         public readonly PrivacyRules $privacy,
+        public readonly ReportsRules $reports,
+        public readonly CharterRules $charter,
         public readonly array $bands,
+        public readonly array $charterBands,
     ) {}
 
     /**
@@ -141,8 +145,20 @@ final class BusinessRulesDocument extends ConfigDocument
             'privacy' => [
                 'request_sla_days' => 30,
             ],
+            'reports' => [
+                'retention_days' => 90,
+            ],
+            'charter' => [
+                'deposit_business_days' => 5,
+                'proposal_valid_business_days' => 10,
+            ],
             'cancellation' => [
                 'bands' => [
+                    ['min_days' => 120, 'penalty_pct' => 5],
+                    ['min_days' => 90, 'penalty_pct' => 50],
+                    ['min_days' => 0, 'penalty_pct' => 100],
+                ],
+                'charter_bands' => [
                     ['min_days' => 120, 'penalty_pct' => 5],
                     ['min_days' => 90, 'penalty_pct' => 50],
                     ['min_days' => 0, 'penalty_pct' => 100],
@@ -173,6 +189,8 @@ final class BusinessRulesDocument extends ConfigDocument
         $crm = is_array($data['crm'] ?? null) ? $data['crm'] : [];
         $pipeline = is_array($crm['pipeline'] ?? null) ? $crm['pipeline'] : [];
         $privacy = is_array($data['privacy'] ?? null) ? $data['privacy'] : [];
+        $reports = is_array($data['reports'] ?? null) ? $data['reports'] : [];
+        $charter = is_array($data['charter'] ?? null) ? $data['charter'] : [];
         $cancellation = is_array($data['cancellation'] ?? null) ? $data['cancellation'] : [];
 
         $reminders = [];
@@ -198,6 +216,20 @@ final class BusinessRulesDocument extends ConfigDocument
         }
 
         usort($bands, fn (CancellationBand $a, CancellationBand $b): int => $b->minDays <=> $a->minDays);
+
+        $charterBands = [];
+        foreach ($cancellation['charter_bands'] ?? [] as $band) {
+            if (! is_array($band)) {
+                continue;
+            }
+
+            $charterBands[] = new CancellationBand(
+                (int) ($band['min_days'] ?? 0),
+                (int) ($band['penalty_pct'] ?? 0),
+            );
+        }
+
+        usort($charterBands, fn (CancellationBand $a, CancellationBand $b): int => $b->minDays <=> $a->minDays);
 
         return new self(
             new CommissionRules(
@@ -296,7 +328,15 @@ final class BusinessRulesDocument extends ConfigDocument
             new PrivacyRules(
                 (int) ($privacy['request_sla_days'] ?? 0),
             ),
+            new ReportsRules(
+                (int) ($reports['retention_days'] ?? 0),
+            ),
+            new CharterRules(
+                (int) ($charter['deposit_business_days'] ?? 0),
+                (int) ($charter['proposal_valid_business_days'] ?? 0),
+            ),
             $bands,
+            $charterBands,
         );
     }
 
@@ -317,7 +357,9 @@ final class BusinessRulesDocument extends ConfigDocument
      *     documents: array{pretrip_days_before: int, voucher_days_before: int},
      *     crm: array{segment_high_ltv: int, segment_mid_ltv: int, pipeline: array{sla_new_lead_business_hours: int, sla_qualifying_business_days: int, sla_negotiation_business_days: int, probability_new_lead: int, probability_qualifying: int, probability_quoted: int, probability_negotiation: int, probability_deposit_pending: int}},
      *     privacy: array{request_sla_days: int},
-     *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>}
+     *     reports: array{retention_days: int},
+     *     charter: array{deposit_business_days: int, proposal_valid_business_days: int},
+     *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>, charter_bands: list<array{min_days: int, penalty_pct: int}>}
      * }
      */
     public function toArray(): array
@@ -340,10 +382,16 @@ final class BusinessRulesDocument extends ConfigDocument
             'documents' => $this->documents->toArray(),
             'crm' => $this->crm->toArray(),
             'privacy' => $this->privacy->toArray(),
+            'reports' => $this->reports->toArray(),
+            'charter' => $this->charter->toArray(),
             'cancellation' => [
                 'bands' => array_map(
                     fn (CancellationBand $band): array => $band->toArray(),
                     $this->bands,
+                ),
+                'charter_bands' => array_map(
+                    fn (CancellationBand $band): array => $band->toArray(),
+                    $this->charterBands,
                 ),
             ],
         ];
@@ -402,6 +450,11 @@ final class BusinessRulesDocument extends ConfigDocument
             'retention.medical_days_after_cruise' => ['required', 'integer', 'min:1', 'max:3650'],
             'retention.behavioural_raw_months' => ['required', 'integer', 'min:1', 'max:120'],
             'retention.behavioural_unstitched_days' => ['required', 'integer', 'min:1', 'max:3650'],
+            'reports' => ['required', 'array'],
+            'reports.retention_days' => ['required', 'integer', 'min:1', 'max:3650'],
+            'charter' => ['required', 'array'],
+            'charter.deposit_business_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'charter.proposal_valid_business_days' => ['required', 'integer', 'min:1', 'max:60'],
             'legal' => ['required', 'array'],
             'legal.consent_versions' => ['required', 'array'],
             'legal.consent_versions.terms' => ['required', 'string', 'min:1', 'max:120'],
@@ -444,6 +497,9 @@ final class BusinessRulesDocument extends ConfigDocument
             'cancellation.bands' => ['required', 'array', 'min:1', 'max:6', new BusinessRulesConstraint('bands')],
             'cancellation.bands.*.min_days' => ['required', 'integer', 'min:0', 'max:999'],
             'cancellation.bands.*.penalty_pct' => ['required', 'integer', 'min:0', 'max:100'],
+            'cancellation.charter_bands' => ['required', 'array', 'min:1', 'max:6', new BusinessRulesConstraint('bands')],
+            'cancellation.charter_bands.*.min_days' => ['required', 'integer', 'min:0', 'max:999'],
+            'cancellation.charter_bands.*.penalty_pct' => ['required', 'integer', 'min:0', 'max:100'],
         ];
     }
 
@@ -488,6 +544,10 @@ final class BusinessRulesDocument extends ConfigDocument
             'retention.medical_days_after_cruise' => 'LEG-002 · Medical notes retention',
             'retention.behavioural_raw_months' => 'L6 · Behavioural events raw retention',
             'retention.behavioural_unstitched_days' => 'L6 · Unstitched anonymous events retention',
+            'reports.retention_days' => 'O2 · Generated report file retention',
+            'charter.deposit_business_days' => 'FIN-003 · Charter deposit due in business days',
+            'charter.proposal_valid_business_days' => 'O5 · Charter proposal validity',
+            'cancellation.charter_bands' => 'O6 · Charter cancellation penalty bands',
             'legal.consent_versions.terms' => 'LEG-001 · Terms & Conditions version',
             'legal.consent_versions.cancellation' => 'LEG-001 · Cancellation policy version',
             'legal.consent_versions.privacy' => 'LEG-002 · Privacy policy version',
@@ -529,6 +589,13 @@ final class BusinessRulesDocument extends ConfigDocument
     public function penaltyFor(int $daysBeforeDeparture): CancellationBand
     {
         $band = CancellationPenalty::bandFor($daysBeforeDeparture, $this->bands);
+
+        return new CancellationBand($band['min_days'], $band['penalty_pct']);
+    }
+
+    public function charterPenaltyFor(int $daysBeforeDeparture): CancellationBand
+    {
+        $band = CancellationPenalty::bandFor($daysBeforeDeparture, $this->charterBands);
 
         return new CancellationBand($band['min_days'], $band['penalty_pct']);
     }
@@ -623,6 +690,10 @@ final class BusinessRulesDocument extends ConfigDocument
             'retention.medical_days_after_cruise' => '90 days',
             'retention.behavioural_raw_months' => '24 months (PENDING CLIENT, L6 / doc 07 §8)',
             'retention.behavioural_unstitched_days' => '30 days (PENDING CLIENT, L6)',
+            'reports.retention_days' => '90 days (PENDING CLIENT, O2)',
+            'charter.deposit_business_days' => '5 business days (FIN-003)',
+            'charter.proposal_valid_business_days' => '10 business days (PENDING CLIENT, O5)',
+            'cancellation.charter_bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100% (PENDING CLIENT, O6, copies the cabin bands)',
             'legal.consent_versions.terms' => 'v2026.1 (text pending LEG-001)',
             'legal.consent_versions.cancellation' => 'v2026.1 (pending LEG-001)',
             'legal.consent_versions.privacy' => 'v2026.1 (pending LEG-002)',

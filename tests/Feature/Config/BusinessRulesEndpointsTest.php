@@ -41,13 +41,13 @@ test('an admin can view the document, registry and counts after a fresh seed', f
         ->assertJsonPath('document.commission.cap_pct', 12)
         ->assertJsonPath('published_by', null);
 
-    expect($response->json('registry'))->toHaveCount(85);
+    expect($response->json('registry'))->toHaveCount(89);
     expect($response->json('counts'))->toBe([
-        'all' => 85,
-        'here' => 60,
+        'all' => 89,
+        'here' => 64,
         'other_pages' => 15,
         'locked' => 10,
-        'differs_or_flagged' => 37,
+        'differs_or_flagged' => 40,
     ]);
 
     $confirmedHere = collect($response->json('registry'))

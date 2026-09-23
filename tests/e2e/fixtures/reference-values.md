@@ -100,12 +100,12 @@ Source: `EngineSettingsDocument::initial()` → `fees` (FIN-004).
 
 Source: `Registry::counts()` and `tests/Feature/Config/BusinessRulesEndpointsTest.php` (API JSON after Sprint 9). On-screen KPI and chip numbers are ⚠ UNVERIFIED — Pest counts, not a reset screen in this task.
 
-- **81** rows total. ⚠ UNVERIFIED — `BusinessRulesEndpointsTest` (`registry` count 81), not a reset screen.
-- After a fresh seed exactly **35** flagged (`counts.differs_or_flagged`). ⚠ UNVERIFIED — same Pest assertion.
-- Breakdown: `here` 56 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED — same Pest assertion.
-- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 83 / 58 / 15 / 10 / 36. ⚠ UNVERIFIED
+- **86** rows total. ⚠ UNVERIFIED — `BusinessRulesEndpointsTest` (`registry` count 86), not a reset screen.
+- After a fresh seed exactly **38** flagged (`counts.differs_or_flagged`). ⚠ UNVERIFIED — same Pest assertion.
+- Breakdown: `here` 61 · `other_pages` 15 · `locked` 10. ⚠ UNVERIFIED — same Pest assertion.
+- On-screen chips (i18n): All · Adjust here · Set in other tabs · Locked · Differs / flagged — counts 89 / 64 / 15 / 10 / 40. ⚠ UNVERIFIED
 
-Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). The remaining +2 `all` / `here` from 65 → 71 are already on the registry and are not extra flagged rows. Sprint 10 adds `consent-analytics` (PENDING CLIENT, LEG-002), eight `crm-pipeline-*` rows (PENDING CLIENT, M4) and `privacy-request-sla` (PENDING LEG-002, M7). Sprint 11 adds `captain-manifest` (CONFIRMED, N4) and `manifest-chase` (PENDING CLIENT, N5), which is why the counts are 83 / 58 / 15 / 10 / 36. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
+Sprint 9 flagged additions on top of the leftover 21: two L6 retention rows (PENDING LEGAL) and two L2 CRM segment thresholds (PENDING CLIENT). Sprint 10 adds `consent-analytics` (PENDING CLIENT, LEG-002), eight `crm-pipeline-*` rows (PENDING CLIENT, M4) and `privacy-request-sla` (PENDING LEG-002, M7). Sprint 11 adds `captain-manifest` (CONFIRMED, N4) and `manifest-chase` (PENDING CLIENT, N5). Sprint 12 adds `report-retention` (PENDING CLIENT, O2), `cancellation-charter-bands` (PENDING CLIENT, O6), `charter-deposit-business-days` (CONFIRMED, FIN-003) and `charter-proposal-valid-days` (PENDING CLIENT, O5), which is why the counts are 89 / 64 / 15 / 10 / 40. ⚠ UNVERIFIED — `Registry.php` + Pest, not a reset screen.
 
 Flagged rows:
 
@@ -116,6 +116,7 @@ Flagged rows:
 | medical retention | PENDING LEGAL | pending |
 | retention-behavioural-raw | PENDING LEGAL | L6 · Behavioural events raw retention |
 | retention-behavioural-unstitched | PENDING LEGAL | L6 · Unstitched anonymous events retention |
+| report-retention | PENDING CLIENT | O2 · Generated report file retention, 90 days |
 | crm-segment-high-ltv | PENDING CLIENT | L2 · HIGH above USD 20,000 |
 | crm-segment-mid-ltv | PENDING CLIENT | L2 · MID from USD 8,000 |
 | online-deposit advantage | PENDING CLIENT | pending |
