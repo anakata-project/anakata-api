@@ -144,3 +144,14 @@ The latest result for every P1 is [`runs/LEDGER.md`](../runs/LEDGER.md).
 | CAMP-01 | OPENING-27 redeemed and revenue match the sold bookings | sprint-10, crm | P1 | — | Carolina | [crm/CAMP-01-opening-27-redeemed.md](crm/CAMP-01-opening-27-redeemed.md) |
 | CAMP-02 | A UTM booking counts as first touch once it is sold | sprint-10, crm | P2 | — | Guest + Carolina | [crm/CAMP-02-utm-first-touch.md](crm/CAMP-02-utm-first-touch.md) |
 | DLV-01 | The delivery log matches the booking’s Documents tab | sprint-10, crm | P1 | — | Carolina | [crm/DLV-01-log-matches-documents-tab.md](crm/DLV-01-log-matches-documents-tab.md) |
+| PORT-01 | Invite, accept, then the drawer shows the last sign-in | sprint-13, portal | P1 | B16 | Carolina + new | [portal/PORT-01-invite-accept-sign-in.md](portal/PORT-01-invite-accept-sign-in.md) |
+| PORT-02 | Wrong password, lockout, reset, sign in again | sprint-13, portal | P1 | B16 | Ada Agent | [portal/PORT-02-lockout-and-reset.md](portal/PORT-02-lockout-and-reset.md) |
+| PORT-03 | Portal rates match the RMS preview, with no public price | sprint-13, portal | P1 | B16 | Ada + Carolina | [portal/PORT-03-rates-match-preview.md](portal/PORT-03-rates-match-preview.md) |
+| PORT-04 | This agency only, and no passenger detail | sprint-13, portal | P1 | B16 | Ada Agent | [portal/PORT-04-agency-scope.md](portal/PORT-04-agency-scope.md) |
+| PORT-05 | Publish a material, the agent downloads it, activity records it | sprint-13, portal | P1 | B16 | Carolina + Ada | [portal/PORT-05-publish-and-download-material.md](portal/PORT-05-publish-and-download-material.md) |
+| PORT-06 | Suspend ends the session; resume restores sign-in | sprint-13, portal | P1 | B16 | Carolina + Ada | [portal/PORT-06-suspend-and-resume.md](portal/PORT-06-suspend-and-resume.md) |
+| PREQ-01 | An available departure becomes a REQUESTED booking | sprint-13, portal | P1 | B17 | Ada + Lucía | [portal/PREQ-01-request-from-available.md](portal/PREQ-01-request-from-available.md) |
+| PREQ-02 | An over-cap agency's request is held | sprint-13, portal | P1 | B17 | Meridian agent + Carolina | [portal/PREQ-02-over-cap-on-hold.md](portal/PREQ-02-over-cap-on-hold.md) |
+| PREQ-03 | A departure that cannot be requested does not hold a cabin | sprint-13, portal | P1 | B17 | Ada Agent | [portal/PREQ-03-sold-out-refused.md](portal/PREQ-03-sold-out-refused.md) |
+| PREQ-04 | Portal activity names the user | sprint-13, portal | P2 | B17 | Carolina + Ada | [portal/PREQ-04-activity-names-the-user.md](portal/PREQ-04-activity-names-the-user.md) |
+| PORT-07 | Staff and agent sessions stay on their own apps | sprint-13, portal | P2 | B17 | Carolina + Ada | [portal/PORT-07-staff-and-agent-sessions.md](portal/PORT-07-staff-and-agent-sessions.md) |

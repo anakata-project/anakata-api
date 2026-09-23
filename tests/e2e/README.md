@@ -53,9 +53,16 @@ tests/e2e/bin/status.sh
 tests/e2e/bin/replay-stripe-checkout.sh ANK-2026-0022
 tests/e2e/bin/replay-stripe-checkout.sh ANK-R-2026-0043
 tests/e2e/bin/replay-stripe-checkout.sh --expired ANK-R-2026-0043
+tests/e2e/bin/setup.sh portal-user AG-002
+tests/e2e/bin/setup.sh portal-invite AG-001
+tests/e2e/bin/setup.sh portal-suspend AG-001
+tests/e2e/bin/setup.sh portal-resume AG-001
+tests/e2e/bin/setup.sh agency-over-cap AG-002
 ```
 
 `replay-stripe-checkout.sh` is the FakeStripe / empty-key path for PAY-05 (OPEN payment link) and WEB-08 / WEB-09 (engine Checkout Session). It posts `checkout.session.completed` twice (same event id), or `checkout.session.expired` with `--expired`. Test-mode cards only — never live mode.
+
+`setup.sh` calls existing agency and portal actions inside the `app` container. `portal-user` prints an accepted login (`password`). `portal-invite` prints the Mailpit accept URL and does not store the token in a scenario. `portal-suspend` and `portal-resume` use the reasons `E2E portal suspend` and `E2E portal resume`. `agency-over-cap` reads the commission cap and raises the agency only when it is not already above it. The invite mail is queued: Horizon must be running.
 
 ## 5. Agent rules
 

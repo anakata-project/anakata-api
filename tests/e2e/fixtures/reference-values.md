@@ -375,7 +375,7 @@ Source: Sprint 8 task 08 browser notes against the running feed. ⚠ UNVERIFIED 
 
 Suites from **USD 13,300**. Default search window NOV 2027—JAN 2028 · 2 adults.
 
-Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Sprint 11 recount is **83 / 58 / 15 / 10 / 36** (`captain-manifest` confirmed, `manifest-chase` pending client).
+Registry counts: Sprint 8 added `copy.online_deposit_advantage` / `online_deposit_perk` to engine settings (not the business-rules registry). Current registry counts are in **Portal (Sprint 13)** (90 / 65 / 15 / 41). The Sprint 11 recount (83 / 58 / 15 / 10 / 36) is historical.
 
 ## CRM contacts (Sprint 9)
 
@@ -427,4 +427,55 @@ Nothing in this section was read off a `reset.sh` screen in task 11. Amounts and
 - **Register counts** (`ConsentRegister`, not a reset screen). Transactional equals every not-merged contact. Marketing equals contacts whose latest register row is granted: `DemoConsentsSeeder` writes one I6 MARKETING row per confirmed-or-later booking except `ANK-2026-0007`, and the backfill copies those. Profiling, remarketing, WhatsApp and analytics are 0 until someone opts in. Do not copy the task 09 live counts. ⚠ UNVERIFIED — seeder + `ConsentRegister.php`.
 - **Deliveries.** `DemoDocumentsSeeder` marks issued invoices, summaries and settled receipts **SENT**. It does not seed FAILED or BLOCKED. ⚠ UNVERIFIED — seeder, not a reset screen.
 - **Sold statuses** for campaign measures: CONFIRMED, FULLY_PAID, ON_BOARD, COMPLETED, OVERDUE. REQUESTED does not count. ⚠ UNVERIFIED — `ContactDerived::soldStatuses()`, not a screen.
+
+## Portal (Sprint 13)
+
+Nothing in this section was read off a `reset.sh` screen. Net figures are `Agency::netOf` (`Rounding::halfUp`) on the seeded public bases. PORT-03 must match the RMS portal preview for the same agency. Those public bases must not appear on the portal.
+
+Public bases (`seed-data.json` `rates.base`): suite / owner's suite / charter.
+
+| Year | Suite pp | Owner pp | Charter week |
+|---|---|---|---|
+| 2027 | 13,300 | 25,000 | 199,500 |
+| 2028 | 13,965 | 26,250 | 209,475 |
+| 2029 | 14,663 | 27,563 | 219,949 |
+
+Blue Latitude Travel (AG-001, 10%):
+
+| Year | Suite pp | Owner pp | Charter week |
+|---|---|---|---|
+| 2027 | 11,970 | 22,500 | 179,550 |
+| 2028 | 12,569 | 23,625 | 188,528 |
+| 2029 | 13,197 | 24,807 | 197,954 |
+
+Meridian Voyages (AG-002, 15%):
+
+| Year | Suite pp | Owner pp | Charter week |
+|---|---|---|---|
+| 2027 | 11,305 | 21,250 | 169,575 |
+| 2028 | 11,870 | 22,313 | 178,054 |
+| 2029 | 12,464 | 23,429 | 186,957 |
+
+⚠ UNVERIFIED — `Rounding::halfUp` on the seeded bases, not a reset screen.
+
+### What each agency's portal shows after reset
+
+Blue Latitude (Ada). One booking. The RMS bookings list still abbreviates the client as `M. Castellanos`; the portal client is the lead guest's display name.
+
+| Reference | Departure | Client on the portal | Status | Net due | Next | Commission | Accrual |
+|---|---|---|---|---|---|---|---|
+| ANK-2026-0007 | 14 Nov 2027 ANAMARA | Mariana Castellanos | CONFIRMED | USD 19,140 | Deposit received | 10% · USD 2,328 | EARNED ON COMPLETION · payable 21 Dec 2027 |
+
+Net due is `balance × (100 − 10) / 100` on the list balance USD 21,267. Commission is 10% of the stored total 23,275. Payable date is the return date plus 30 days. ⚠ UNVERIFIED — `PortalPreview::netDue`, `Booking::commissionAmount`, `Accrual::status` / `payableDate`, not a reset screen.
+
+Meridian (no seeded login). Ada must not see this row. `ANK-2026-0021` is ON HOLD AGENCY, balance USD 26,600, net due USD 22,610, commission 15% · USD 3,990, accrual BLOCKED. ⚠ UNVERIFIED — same helpers.
+
+### Materials
+
+After reset the drawer says `No sales materials yet.` The portal Materials page shows the empty-list note `assets pending upload`. ⚠ UNVERIFIED — `agencies.materialsEmpty` and `PortalPreview::MATERIALS_NOTE`.
+
+### Registry
+
+`portal.invite_valid_days` is 14, status PENDING CLIENT (`BusinessRulesEndpointsTest`). Counts: tracked **90**, adjusted here **65**, set in other tabs **15**, differs / flagged **41**. Locked stays **10**. ⚠ UNVERIFIED — Pest, not a reset screen.
+
 

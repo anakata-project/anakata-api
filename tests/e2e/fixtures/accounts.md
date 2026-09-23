@@ -19,6 +19,8 @@ The agent site is not the staff panel. Sign in at `http://localhost:3002/login`.
 |---|---|---|---|
 | Ada Agent | ada@portal.test | Blue Latitude Travel | `password` |
 
+Meridian Voyages (AG-002) has no seeded portal login. PREQ-02 creates one with `tests/e2e/bin/setup.sh portal-user AG-002`. That command prints `e2e-portal-ag-002@portal.test` and the password `password`. `portal-invite` uses `e2e-invite-<reference>@portal.test` and leaves the invitation outstanding.
+
 ## What each should and should not see
 
 ### Carolina (Admin)

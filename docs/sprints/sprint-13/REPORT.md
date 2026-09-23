@@ -552,3 +552,50 @@ The harness starts it on port 3002, and the agencies seeder provides one accepte
 EOF
 )"
 ```
+
+## Task 11 · E2E scenarios, batches B16 and B17
+
+Scenarios and the setup helper are written. B16, B17, the revisited batches, and the ledger were not run. `bin/batch.sh`, `bin/gate.sh`, `bin/ledger.sh` and `RUN_PROMPT.md` are still absent on this branch (task 10), so `bin/batch.sh --check` was not run and the harness was not added.
+
+`tests/e2e/bin/setup.sh` calls existing actions inside the `app` container (`php artisan tinker`). `portal-user <AG-reference>` creates `e2e-portal-<reference>@portal.test`, invites, reads the accept link from Mailpit and accepts with password `password` (`AcceptAgencyInvitation`). It prints the email and does nothing further when that user is already active. `portal-invite` leaves `e2e-invite-<reference>@portal.test` outstanding and prints the accept URL. `portal-suspend` / `portal-resume` use `SuspendAgencyPortal` / `ResumeAgencyPortal` with reasons `E2E portal suspend` and `E2E portal resume`. `agency-over-cap` reads `commission.cap_pct` from `CurrentConfig` and calls `UpdateAgency` only when the agency is not already above the cap. The five commands are listed in `tests/e2e/README.md`. Horizon must be running for the invite mail.
+
+Fixtures: `accounts.md` records that Meridian has no seeded login. `reference-values.md` gains **Portal (Sprint 13)**: public bases, Blue Latitude and Meridian nets for 2027–2029 (`Agency::netOf`), what each portal shows for `ANK-2026-0007` and `ANK-2026-0021`, the empty materials note, and registry counts 90 / 65 / 15 / 41. Those figures are marked unverified. They were not read off a reset screen.
+
+Revisited: `PAY-12` now expects the approval toast `Agency approved. The portal invitation has been sent.` and the portal invite in Mailpit. Blue Latitude's drawer must show Ada `Active` with no last sign-in, portal access `Open`, empty materials and empty activity. The preview notice is unchanged. `BR-01` counts are 90 / 65 / 15 / 41, with portal invitation validity among the pending-client rows. `BR-02` differ KPI is 42, and reset returns it to 41. The publish sentence stays `12% → 15%`.
+
+New files, tag `sprint-13`, catalogue rows in `scenarios/INDEX.md`:
+
+| ID | Batch | Priority |
+|---|---|---|
+| PORT-01 … PORT-06 | B16 | P1 |
+| PREQ-01 … PREQ-03 | B17 | P1 |
+| PREQ-04, PORT-07 | B17 | P2 |
+
+Where the screen and an earlier sentence disagreed, the screen won. The portal accept page has no static “at least 8 characters” hint; a short password is refused with the validation sentence. Lockout text on the portal is the API body `Too Many Attempts.`, not the panel's `Too many attempts. Try again in a minute.` The portal client for `ANK-2026-0007` is `Mariana Castellanos` (lead-guest display name); the RMS list still says `M. Castellanos`. Availability From/To are month fields and the yacht box is the yacht code. The seed has no FULL departure, so PREQ-03's runnable refusal is `Cabin unavailable.` after asking for 20 suites. A chartered row may still be listed as `CHARTERED — NOT SHOWN` with no Request control.
+
+**Open questions, still unanswered.** An agent request does not hold a cabin (the default; `SubmitPortalRequest` does not claim). The portal shows engine availability labels, not cabin counts. Materials can be shared (`agency_id` null) or for one agency; the drawer upload is for the open agency, and who may upload a shared file is the `agencies.manage` permission. Invitation validity is 14 days, PENDING CLIENT (`portal.invite_valid_days`). Suspend is `agencies.manage` (Admin by default); whether a suspended agency's team still receives commission statements was not built as a change. The agent sees the lead guest's name and no other passenger detail. The portal hostname for real invitation links and CORS is not chosen; e2e uses `http://localhost:3002`.
+
+**Doc 06.** Item 7 (the agent portal) is what this sprint builds. The backlog items that remain are the ones P10 leaves for later, and none of them has a new sprint number here: agents paying through the portal (P10 only); cart recovery (doc 06 item 5); journeys, segments and automations (doc 06 item 6); Spanish for internal screens (doc 06 phase 5); an e-signature provider (doc 06 item 3, TEC-003).
+
+**Merge.** Intended ui tag `v0.14.0`. The drawer lines these scenarios read (last sign-in, who suspended) need the task 09 layer pin `v0.14.1`. There is no portal remote SHA to record. Do not run these commands in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  docs/sprints/sprint-13/REPORT.md \
+  tests/e2e/README.md \
+  tests/e2e/bin/setup.sh \
+  tests/e2e/fixtures/accounts.md \
+  tests/e2e/fixtures/reference-values.md \
+  tests/e2e/scenarios/INDEX.md \
+  tests/e2e/scenarios/config/BR-01-fresh-seed-registry.md \
+  tests/e2e/scenarios/config/BR-02-differ-reset-publish.md \
+  tests/e2e/scenarios/payments/PAY-12-b2b-agencies.md \
+  tests/e2e/scenarios/portal
+git commit -m "$(cat <<'EOF'
+Add the portal e2e scenarios for batches B16 and B17.
+
+The setup helper and the fixture numbers are in place. The batches were not walked.
+EOF
+)"
+```
