@@ -321,3 +321,77 @@ Pin anakata-ui v0.16.0.
 EOF
 )"
 ```
+
+## Task 05 · CRM Inbox
+
+Panel only. No API change. Types stay the `v0.16.0` aliases re-exported from `#anakata-ui/app/types`.
+
+### Page
+
+`/crm/sales/inbox` replaces the CRM catch-all for that URL. The nav item is sprint 15. B2B Partners stays `later`. `pageDecision` allows the path for `panel.crm`. A new case in `describe('seeded admin nav')` asserts that. The sprint 14 journeys case is unchanged.
+
+The list is the contacts table: `table.list`, `.crm-filters`, `.list-pager`. Server order is `last_message_at` desc. Filters are status (`OPEN` / `CLOSED` / all) and unread (all / unread only). A row shows the contact name, or the raw `from` in italic when `contact_id` is null, plus subject, preview, message count, status, and last message. An unread row has a coral inset bar and an Unread pill.
+
+The thread is a `USlideover`, the same shell as the journeys enrolments drawer. Messages stay oldest-first. `IN` sits left with a sand border, `OUT` sits right with a coral border. `body_html` goes in an `<iframe sandbox="">`, the same empty sandbox as template preview. Empty HTML falls back to `body_text` as text. `message_id` and `in_reply_to` are not shown.
+
+A matched name links to `/crm/sales/contacts?open={id}`. The contact drawer is not duplicated here.
+
+### Reply and link
+
+The composer is a plain textarea. `POST` body is `{ message }`. The returned conversation replaces the open thread, so the new `OUT` line appears without a second GET, and the composer clears. The list row takes the new preview, count, and unread flag from that payload.
+
+Unmatched rows have Link to contact on the row, and again in the drawer. Search is `GET /api/crm/contacts?q=` with the template picker's 300ms debounce. `POST …/link-contact` updates the row. If the response id differs (the shell was folded into an existing thread), the old row is removed and the survivor is kept. While the unread filter is on, a thread that becomes read drops off the list.
+
+### Permissions
+
+Reply and link are not behind `rules.manage`. `ConversationPolicy` allows every action for `panel.crm`, and the page follows that. Replying to a guest is not a business-rule change. This is a deliberate difference from journeys and templates.
+
+### Not built
+
+Compose-new and attachments stay out, as in Task 01. `PATCH { status }` exists and this page does not close or reopen a thread.
+
+### Checks
+
+`pnpm test` (49 files, 296 tests), `pnpm lint`, `pnpm typecheck`, and `pnpm build` passed against the sibling layer.
+
+Fresh clone against `github:anakata-project/anakata-ui#v0.16.0` was not run. Task 04 left that tag unpushed, so a clone with no sibling layer cannot fetch it. The pin in `nuxt.config.ts` is already `#v0.16.0`.
+
+### Browser
+
+Signed in as Carolina (Admin). The local database had no `conversations` table yet, so `php artisan migrate` applied `2026_09_23_200001_create_conversations_tables` only. No seed reset. Seed data does not insert conversations. Two messages were posted to Mailpit (a known contact and `stranger.inbox@example.com`) and `queue:work --once` ran the poll. The poll also stored older Mailpit mail (booking summary, welcome, portal invite) as unmatched threads.
+
+Dark theme, then light. List order was last message first. Unread rows showed the coral bar. Opening Cabin question cleared Unread on that row. The reply "The master cabin is free for that Sunday." appeared as `OUT`, the composer cleared, and the list preview and count (2) updated. Linking Unlinked hello to Anna Whitfield replaced the raw address with her name. Unmatched addresses stayed italic in both themes.
+
+### Git commands
+
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/assets/css/crm.css \
+  app/components/crm/ConversationDrawer.vue \
+  app/components/crm/ConversationLinkSearch.vue \
+  app/navigation/crm.ts \
+  app/pages/crm/sales/inbox.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/guards.test.ts
+git commit -m "$(cat <<'EOF'
+Add the CRM inbox list, thread, and contact link.
+
+Staff with panel access can read a thread, reply, and attach an unmatched message to a contact.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-15/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the CRM inbox page.
+
+EOF
+)"
+```
