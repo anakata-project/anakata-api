@@ -21,6 +21,7 @@ enum DeliveryKind: string
     case ReviewRequest = 'REVIEW_REQUEST';
     case WaitlistOffer = 'WAITLIST_OFFER';
     case CharterProposal = 'CHARTER_PROPOSAL';
+    case PortalInvite = 'PORTAL_INVITE';
 
     public function label(): string
     {
@@ -40,6 +41,7 @@ enum DeliveryKind: string
             self::ReviewRequest => 'Review request',
             self::WaitlistOffer => 'Waitlist offer',
             self::CharterProposal => 'Charter proposal',
+            self::PortalInvite => 'Portal invitation',
         };
     }
 
@@ -54,6 +56,7 @@ enum DeliveryKind: string
             self::ReviewRequest,
             self::WaitlistOffer,
             self::CharterProposal,
+            self::PortalInvite,
         ], true);
     }
 
@@ -77,7 +80,7 @@ enum DeliveryKind: string
             self::Voucher => DocumentKind::Voucher,
             self::Pretrip => DocumentKind::Pretrip,
             self::WireInstructions => DocumentKind::WireInstructions,
-            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire, self::Survey, self::ReviewRequest, self::WaitlistOffer, self::CharterProposal => null,
+            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire, self::Survey, self::ReviewRequest, self::WaitlistOffer, self::CharterProposal, self::PortalInvite => null,
         };
     }
 

@@ -6,10 +6,16 @@ namespace App\Support\Documents;
 
 use App\Enums\DeliveryKind;
 use App\Models\Document;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 final class DeliveryKey
 {
+    public static function forPortalInvite(int $agencyUserId, Carbon $sentAt): string
+    {
+        return 'portal-invite:'.$agencyUserId.':'.$sentAt->format('Y-m-d\TH:i:s.u');
+    }
+
     public static function forDocument(Document $document): string
     {
         $kind = DeliveryKind::fromDocument($document->kind);

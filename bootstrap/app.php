@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsurePortalSessionIsValid;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\GuardCrmAlertSection;
 use App\Http\Middleware\GuardCrmSensitiveData;
@@ -22,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('api')
                 ->prefix('api/auth')
                 ->group(base_path('routes/api/auth.php'));
+
+            Route::middleware('api')
+                ->prefix('api/portal')
+                ->group(base_path('routes/api/portal.php'));
 
             Route::middleware(['api', 'auth:sanctum', 'active', 'permission:panel.rms'])
                 ->prefix('api/rms')
@@ -67,6 +72,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'permission' => RequirePermission::class,
             'noindex' => NoindexResponse::class,
+            'portal.auth' => EnsurePortalSessionIsValid::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

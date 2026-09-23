@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AgencyUser;
 use App\Models\User;
 
 return [
@@ -42,6 +43,11 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'agency' => [
+            'driver' => 'session',
+            'provider' => 'agency_users',
+        ],
     ],
 
     /*
@@ -65,6 +71,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'agency_users' => [
+            'driver' => 'eloquent',
+            'model' => AgencyUser::class,
         ],
 
         // 'users' => [
@@ -104,6 +115,13 @@ return [
             'provider' => 'users',
             'table' => 'user_invitation_tokens',
             'expire' => 10080,
+            'throttle' => 60,
+        ],
+
+        'agency_users' => [
+            'provider' => 'agency_users',
+            'table' => 'agency_password_reset_tokens',
+            'expire' => 60,
             'throttle' => 60,
         ],
     ],

@@ -8,6 +8,8 @@ use App\Enums\PaymentKind;
 use App\Enums\PaymentStatus;
 use App\Enums\Permission;
 use App\Enums\SystemRole;
+use App\Models\Agency;
+use App\Models\AgencyUser;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Role;
@@ -67,6 +69,45 @@ function withPanelCsrf(): TestCase
         ...panelHeaders(),
         'X-CSRF-TOKEN' => csrf_token() ?: '',
     ]);
+}
+
+/**
+ * @return array<string, string>
+ */
+function portalHeaders(): array
+{
+    return [
+        'Origin' => 'http://localhost:3002',
+        'Referer' => 'http://localhost:3002/login',
+        'Accept' => 'application/json',
+    ];
+}
+
+function withPortalCsrf(): TestCase
+{
+    $test = test();
+    $test->withHeaders(portalHeaders())->get('/sanctum/csrf-cookie');
+
+    return $test->withHeaders([
+        ...portalHeaders(),
+        'X-CSRF-TOKEN' => csrf_token() ?: '',
+    ]);
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function approvedAgency(array $attributes = []): Agency
+{
+    return Agency::factory()->create($attributes);
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function agencyUser(array $attributes = [], ?Agency $agency = null): AgencyUser
+{
+    return AgencyUser::factory()->active()->for($agency ?? approvedAgency(), 'agency')->create($attributes);
 }
 
 function adminUser(array $attributes = []): User

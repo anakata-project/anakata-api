@@ -34,6 +34,7 @@ final class BusinessRulesDocument extends ConfigDocument
         public readonly PrivacyRules $privacy,
         public readonly ReportsRules $reports,
         public readonly CharterRules $charter,
+        public readonly PortalRules $portal,
         public readonly array $bands,
         public readonly array $charterBands,
     ) {}
@@ -152,6 +153,9 @@ final class BusinessRulesDocument extends ConfigDocument
                 'deposit_business_days' => 5,
                 'proposal_valid_business_days' => 10,
             ],
+            'portal' => [
+                'invite_valid_days' => 14,
+            ],
             'cancellation' => [
                 'bands' => [
                     ['min_days' => 120, 'penalty_pct' => 5],
@@ -191,6 +195,7 @@ final class BusinessRulesDocument extends ConfigDocument
         $privacy = is_array($data['privacy'] ?? null) ? $data['privacy'] : [];
         $reports = is_array($data['reports'] ?? null) ? $data['reports'] : [];
         $charter = is_array($data['charter'] ?? null) ? $data['charter'] : [];
+        $portal = is_array($data['portal'] ?? null) ? $data['portal'] : [];
         $cancellation = is_array($data['cancellation'] ?? null) ? $data['cancellation'] : [];
 
         $reminders = [];
@@ -335,6 +340,9 @@ final class BusinessRulesDocument extends ConfigDocument
                 (int) ($charter['deposit_business_days'] ?? 0),
                 (int) ($charter['proposal_valid_business_days'] ?? 0),
             ),
+            new PortalRules(
+                (int) ($portal['invite_valid_days'] ?? 0),
+            ),
             $bands,
             $charterBands,
         );
@@ -359,6 +367,7 @@ final class BusinessRulesDocument extends ConfigDocument
      *     privacy: array{request_sla_days: int},
      *     reports: array{retention_days: int},
      *     charter: array{deposit_business_days: int, proposal_valid_business_days: int},
+     *     portal: array{invite_valid_days: int},
      *     cancellation: array{bands: list<array{min_days: int, penalty_pct: int}>, charter_bands: list<array{min_days: int, penalty_pct: int}>}
      * }
      */
@@ -384,6 +393,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'privacy' => $this->privacy->toArray(),
             'reports' => $this->reports->toArray(),
             'charter' => $this->charter->toArray(),
+            'portal' => $this->portal->toArray(),
             'cancellation' => [
                 'bands' => array_map(
                     fn (CancellationBand $band): array => $band->toArray(),
@@ -455,6 +465,8 @@ final class BusinessRulesDocument extends ConfigDocument
             'charter' => ['required', 'array'],
             'charter.deposit_business_days' => ['required', 'integer', 'min:1', 'max:60'],
             'charter.proposal_valid_business_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'portal' => ['required', 'array'],
+            'portal.invite_valid_days' => ['required', 'integer', 'min:1', 'max:60'],
             'legal' => ['required', 'array'],
             'legal.consent_versions' => ['required', 'array'],
             'legal.consent_versions.terms' => ['required', 'string', 'min:1', 'max:120'],
@@ -547,6 +559,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'reports.retention_days' => 'O2 · Generated report file retention',
             'charter.deposit_business_days' => 'FIN-003 · Charter deposit due in business days',
             'charter.proposal_valid_business_days' => 'O5 · Charter proposal validity',
+            'portal.invite_valid_days' => '§5.5 · Portal invitation validity',
             'cancellation.charter_bands' => 'O6 · Charter cancellation penalty bands',
             'legal.consent_versions.terms' => 'LEG-001 · Terms & Conditions version',
             'legal.consent_versions.cancellation' => 'LEG-001 · Cancellation policy version',
@@ -693,6 +706,7 @@ final class BusinessRulesDocument extends ConfigDocument
             'reports.retention_days' => '90 days (PENDING CLIENT, O2)',
             'charter.deposit_business_days' => '5 business days (FIN-003)',
             'charter.proposal_valid_business_days' => '10 business days (PENDING CLIENT, O5)',
+            'portal.invite_valid_days' => '14 days (PENDING CLIENT, Sprint 13 task 01)',
             'cancellation.charter_bands' => '≥120 d 5% · 90–119 d 50% · 0–89 d 100% (PENDING CLIENT, O6, copies the cabin bands)',
             'legal.consent_versions.terms' => 'v2026.1 (text pending LEG-001)',
             'legal.consent_versions.cancellation' => 'v2026.1 (pending LEG-001)',

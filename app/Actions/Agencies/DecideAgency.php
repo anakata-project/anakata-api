@@ -15,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 final class DecideAgency extends Action
 {
+    public function __construct(private InviteAgencyUser $inviteAgencyUser) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -56,8 +58,19 @@ final class DecideAgency extends Action
                 'status' => $user->status->value,
             ])->values()->all();
 
+            $toInvite = $agency->users->filter(
+                fn (AgencyUser $user): bool => in_array($user->status, [
+                    AgencyUserStatus::InviteOnApproval,
+                    AgencyUserStatus::InviteOnPortalLaunch,
+                ], true),
+            );
+
             if ($decision === AgencyStatus::Approved) {
                 $agency->users()->update(['status' => AgencyUserStatus::InviteOnPortalLaunch->value]);
+
+                foreach ($toInvite as $user) {
+                    $this->inviteAgencyUser->handle($user->fresh() ?? $user, $actor);
+                }
             }
 
             $event = $decision === AgencyStatus::Approved ? 'agency.approved' : 'agency.rejected';

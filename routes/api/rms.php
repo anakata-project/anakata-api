@@ -212,6 +212,9 @@ Route::patch('agencies/{agency}/users/{user}', [AgencyController::class, 'update
 Route::get('agencies/{agency}', [AgencyController::class, 'show'])->whereNumber('agency');
 Route::patch('agencies/{agency}', [AgencyController::class, 'update'])->whereNumber('agency');
 Route::post('agencies/{agency}/decide', [AgencyController::class, 'decide'])->whereNumber('agency');
+Route::post('agencies/{agency}/portal/suspend', [AgencyController::class, 'suspendPortal'])->whereNumber('agency');
+Route::post('agencies/{agency}/portal/resume', [AgencyController::class, 'resumePortal'])->whereNumber('agency');
+Route::post('agencies/{agency}/users/{user}/invite', [AgencyController::class, 'inviteUser'])->whereNumber('agency')->whereNumber('user');
 
 Route::get('commissions', [CommissionController::class, 'index']);
 Route::post('commissions/{booking}/payout', [CommissionController::class, 'payout'])->whereNumber('booking');

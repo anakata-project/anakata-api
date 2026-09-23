@@ -22,6 +22,7 @@ return [
     'allowed_origins' => array_values(array_filter([
         env('FRONTEND_ENGINE_URL'),
         env('FRONTEND_PANEL_URL'),
+        env('FRONTEND_PORTAL_URL'),
     ])),
 
     'allowed_origins_patterns' => [],

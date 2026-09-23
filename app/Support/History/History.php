@@ -197,6 +197,7 @@ final class History
             'crm' => 'crm',
             'engine' => 'engine',
             'auth' => 'auth',
+            'portal' => 'portal',
             default => 'system',
         };
     }

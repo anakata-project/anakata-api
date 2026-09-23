@@ -30,6 +30,7 @@ final class DeliverySubject
             DeliveryKind::ReviewRequest => 'Would you share a review? — '.$ref,
             DeliveryKind::WaitlistOffer => 'A cabin is free',
             DeliveryKind::CharterProposal => 'Your Anakata charter proposal',
+            DeliveryKind::PortalInvite => 'Set your Anakata portal password',
         };
     }
 

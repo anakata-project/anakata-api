@@ -43,6 +43,15 @@ arch('privacy controllers are not used by the crm')
     ->expect('App\Http\Controllers\Crm')
     ->not->toUse('App\Http\Controllers\Privacy');
 
+arch('portal controllers do not use staff actions or staff auth')
+    ->expect('App\Http\Controllers\Portal')
+    ->not->toUse(['App\Actions\Auth', 'App\Http\Middleware\EnsureUserIsActive']);
+
+arch('staff controllers do not use portal auth')
+    ->expect('App\Http\Controllers')
+    ->not->toUse(['App\Actions\Portal', 'App\Http\Middleware\EnsurePortalSessionIsValid'])
+    ->ignoring('App\Http\Controllers\Portal');
+
 arch('models use HasAuditColumns')
     ->expect('App\Models')
     ->toUseTrait(HasAuditColumns::class)

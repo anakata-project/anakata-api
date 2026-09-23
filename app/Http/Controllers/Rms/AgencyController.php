@@ -6,15 +6,20 @@ namespace App\Http\Controllers\Rms;
 
 use App\Actions\Agencies\CreateAgencyUser;
 use App\Actions\Agencies\DecideAgency;
+use App\Actions\Agencies\InviteAgencyUser;
 use App\Actions\Agencies\RegisterAgency;
+use App\Actions\Agencies\ResumeAgencyPortal;
+use App\Actions\Agencies\SuspendAgencyPortal;
 use App\Actions\Agencies\UpdateAgency;
 use App\Actions\Agencies\UpdateAgencyUser;
 use App\Enums\AgencyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Rms\DecideAgencyRequest;
 use App\Http\Requests\Rms\IndexAgenciesRequest;
+use App\Http\Requests\Rms\ResumeAgencyPortalRequest;
 use App\Http\Requests\Rms\StoreAgencyRequest;
 use App\Http\Requests\Rms\StoreAgencyUserRequest;
+use App\Http\Requests\Rms\SuspendAgencyPortalRequest;
 use App\Http\Requests\Rms\UpdateAgencyRequest;
 use App\Http\Requests\Rms\UpdateAgencyUserRequest;
 use App\Http\Resources\Rms\AgencyPortalPreviewResource;
@@ -28,6 +33,7 @@ use App\Support\Commissions\CommissionKpis;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class AgencyController extends Controller
@@ -193,5 +199,50 @@ final class AgencyController extends Controller
         $this->authorize('viewPortalPreview', $agency);
 
         return new AgencyPortalPreviewResource($agency);
+    }
+
+    public function suspendPortal(SuspendAgencyPortalRequest $request, Agency $agency, SuspendAgencyPortal $action): AgencyResource
+    {
+        $this->authorize('managePortalAccess', $agency);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new AgencyResource($action->handle($agency, (string) $request->validated('reason'), $actor));
+    }
+
+    public function resumePortal(ResumeAgencyPortalRequest $request, Agency $agency, ResumeAgencyPortal $action): AgencyResource
+    {
+        $this->authorize('managePortalAccess', $agency);
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        return new AgencyResource($action->handle($agency, (string) $request->validated('reason'), $actor));
+    }
+
+    public function inviteUser(Request $request, Agency $agency, AgencyUser $user, InviteAgencyUser $action): JsonResponse
+    {
+        $this->authorize('manageUsers', $agency);
+
+        if ($user->agency_id !== $agency->id) {
+            abort(404);
+        }
+
+        $actor = $request->user();
+
+        if (! $actor instanceof User) {
+            abort(401);
+        }
+
+        $action->handle($user, $actor);
+
+        return response()->json(['message' => 'Invitation sent.']);
     }
 }

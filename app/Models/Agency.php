@@ -33,11 +33,15 @@ use Illuminate\Support\Collection;
  * @property Carbon|null $decided_at
  * @property int|null $decided_by
  * @property string|null $decision_reason
+ * @property Carbon|null $portal_suspended_at
+ * @property int|null $portal_suspended_by
+ * @property string|null $portal_suspend_reason
  * @property int|null $created_by
  * @property int|null $updated_by
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read User|null $decidedBy
+ * @property-read User|null $portalSuspendedBy
  * @property-read Collection<int, AgencyUser> $users
  * @property-read Collection<int, Booking> $bookings
  */
@@ -55,6 +59,9 @@ use Illuminate\Support\Collection;
     'decided_at',
     'decided_by',
     'decision_reason',
+    'portal_suspended_at',
+    'portal_suspended_by',
+    'portal_suspend_reason',
 ])]
 class Agency extends Model
 {
@@ -71,6 +78,7 @@ class Agency extends Model
             'status' => AgencyStatus::class,
             'requested_at' => 'datetime',
             'decided_at' => 'datetime',
+            'portal_suspended_at' => 'datetime',
         ];
     }
 
@@ -99,6 +107,14 @@ class Agency extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function portalSuspendedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'portal_suspended_by');
+    }
+
+    /**
      * @return MorphMany<ChangeHistory, $this>
      */
     public function history(): MorphMany
@@ -114,5 +130,10 @@ class Agency extends Model
     public function netOf(int $public): int
     {
         return Rounding::halfUp($public * (100 - $this->commission_pct) / 100);
+    }
+
+    public function isPortalSuspended(): bool
+    {
+        return $this->portal_suspended_at !== null;
     }
 }

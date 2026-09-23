@@ -8,6 +8,8 @@ return [
 
     'engine_url' => env('FRONTEND_ENGINE_URL', 'http://localhost:3000'),
 
+    'portal_url' => env('FRONTEND_PORTAL_URL', 'http://localhost:3002'),
+
     'business_timezone' => 'Pacific/Galapagos',
 
     'report_attachment_bytes' => 7_340_032,
