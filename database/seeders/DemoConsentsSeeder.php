@@ -30,7 +30,7 @@ final class DemoConsentsSeeder extends Seeder
 
             $ip = sprintf('73.%d.41.%d', ($booking->id + 12) % 256, $booking->total % 200);
 
-            foreach (ConsentDocument::cases() as $document) {
+            foreach (ConsentDocument::checklist() as $document) {
                 if ($document === ConsentDocument::Marketing && $booking->reference === 'ANK-2026-0007') {
                     continue;
                 }

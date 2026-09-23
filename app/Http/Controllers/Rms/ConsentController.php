@@ -39,7 +39,7 @@ final class ConsentController extends Controller
                 $versions,
                 $this->latestAccepted($booking, $document),
             ),
-            ConsentDocument::cases(),
+            ConsentDocument::checklist(),
         );
 
         return BookingConsentResource::collection($rows);

@@ -12,11 +12,14 @@ final class PagePath
 
     public const SURVEY_STORED = '/survey/[token]';
 
+    public const CHARTER_PROPOSAL_STORED = '/charter-proposal/[token]';
+
     /** @var array<string, string> */
     private const TOKEN_PREFIXES = [
         '/complete/' => self::COMPLETE_STORED,
         '/questionnaire/' => self::QUESTIONNAIRE_STORED,
         '/survey/' => self::SURVEY_STORED,
+        '/charter-proposal/' => self::CHARTER_PROPOSAL_STORED,
     ];
 
     public static function redact(?string $path): ?string

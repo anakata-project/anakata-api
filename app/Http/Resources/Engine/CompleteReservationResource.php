@@ -92,7 +92,7 @@ class CompleteReservationResource extends JsonResource
                         'required' => $document->required(),
                     ];
                 },
-                ConsentDocument::cases(),
+                ConsentDocument::checklist(),
             ),
             'amount_due' => $due->amount,
             'amount_due_kind' => $due->kind->value,

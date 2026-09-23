@@ -15,6 +15,8 @@ test('questionnaire and survey tokens are stored as placeholders', function (): 
     expect(PagePath::redact('/questionnaire/secret-token?utm_source=mail'))->toBe('/questionnaire/[token]');
     expect(PagePath::redact('/survey/secret-token#thanks'))->toBe('/survey/[token]');
     expect(PagePath::redact('/survey/secret-token?utm_source=mail'))->toBe('/survey/[token]');
+    expect(PagePath::redact('/charter-proposal/secret-token'))->toBe('/charter-proposal/[token]');
+    expect(PagePath::redact('/charter-proposal/secret-token?utm_source=mail'))->toBe('/charter-proposal/[token]');
 });
 
 test('ordinary paths keep the path and drop the query string', function (): void {
