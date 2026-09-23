@@ -979,3 +979,102 @@ Record the CRM journeys page.
 EOF
 )"
 ```
+
+## Task 09 · Segments and Automations
+
+Panel only. No API change and no `api.d.ts` edit. Types stay the `v0.15.0` aliases. `Segment`, `SegmentCondition`, `SegmentVocabulary`, `SegmentDimension`, `SegmentKind`, `SegmentInput`, `SegmentUpdate`, and `AutomationSwitchInput` are re-exported from the panel's `app/types/api.ts`.
+
+### Segments
+
+`/crm/marketing/segments` replaces the CRM catch-all. The nav item is sprint 14. `pageDecision` allows the path for `panel.crm`.
+
+`GET /api/crm/segments` supplies every card, in API order, with `key === 'suppressed'` pinned last and a warn border. A card shows name, `count`, the italic sentence, dimension tags (`axis` plus `label`), and `feeds`. Dimension colour follows the prototype: BEHAVIOUR `.dim.b`, INTEREST `.dim.i`, LOCATION `.dim.l`, PROFILE and PROMOTION `.dim.p`. An unknown axis is a plain `.dim`. `meta.message` shows when `meta.capped` is true. The panel does not count contacts.
+
+A card opens `GET /api/crm/segments/{key}/contacts` at `per_page` 50. A row loads `GET /api/crm/contacts/{id}` into the existing contact drawer. Type and lifecycle options for that drawer come from `GET /api/crm/contacts?per_page=1` `meta.filters`.
+
+New and Edit show only with `contacts.manage`. Edit is hidden when `system` is true. The builder reads `GET /api/crm/segments/vocabulary` and does not name a field itself. Combinators, operators, values, and params come from that payload. `in` sends a list, `age_range` sends two integers, `boolean` sends a boolean, and an unknown value kind stays a text input. Create sends `name`, `sentence`, `feeds`, `kind`, `dimensions`, and optional `active`. The server makes the key.
+
+`StoreSegmentRequest.conditions` and `UpdateSegmentRequest.conditions` are `string[]` on `v0.15.0`. The posted rule is `{ match, items }` built from the vocabulary row, with params omitted when that field does not list them. It is not cast through `SegmentInput` or `SegmentUpdate`, and it is not annotated as `Segment['conditions']`. There is no unsaved-count route. A dirty rule shows no number. After `POST` or `PATCH`, the returned `count` replaces the card.
+
+### Automations
+
+`/crm/engine/automations` replaces the catch-all. The nav item is sprint 14. `GET /api/crm/automations` stays in arrival order. Rows group by `section` as they arrive, and the heading is `section_label`. The panel does not list `a`–`g`.
+
+Each row shows name, quoted subject, trigger, timing, location, audience, and kind. `built === false` is grey and shows `not_built_note`, with no toggle. The toggle renders only when `switchable` is true and `can('rules.manage')`. Confirm needs a reason, then `PATCH /api/crm/automations/{key}` with `AutomationSwitchInput`. A disabled row shows `disabled_reason`, `disabled_by`, and `disabled_at`. A non-switchable row shows `locked_reason` and no toggle.
+
+`journey_key` links to `/crm/marketing/journeys#${journey_key}`. `alert_kind` links to `/crm/engine/alerts?kind=${alert_kind}`.
+
+### Companion edits
+
+The journeys card `<article>` now has `:id="journey.key"`, so the hash lands on the card.
+
+`AlertsInbox` reads `route.query.kind` only after `loadKinds()` has filled the section list, and only when that value is in `sectionKinds`. Any other query value is ignored. The list request waits until that decision, so the first load is not unfiltered and then filtered.
+
+### Checks
+
+`pnpm test` (49 files, 295 tests), `pnpm lint`, `pnpm typecheck`, and `pnpm build` passed against the sibling layer.
+
+Fresh clone of the panel with no sibling `anakata-ui` uses `github:anakata-project/anakata-ui#v0.15.0`. Fresh typecheck and build printed `FRESH_PANEL_OK`.
+
+`reset.sh` was not run. It targets compose project `anakata-e2e`. The browser pass used the running `anakata` stack.
+
+### Browser
+
+Signed in as Carolina (Admin). Dark, then light.
+
+Nine seeded cards, suppressed last. Holding — not paid showed 3, and its list said “3 contacts”. The first row opened the contact drawer for E. Harmon.
+
+New segment, vocabulary field Lifecycle, operator `eq`, value `GUEST`. Save returned count 0. The card “Task 09 check” sits above Suppressed and has Edit. That row is still in the dev database. The page has no delete.
+
+Automations rendered sections a–g from `section_label`. Four unbuilt rows (Wire instructions, Overdue — day 1, Escalation — manual review, High-value new lead) are grey, show `not_built_note`, and have no toggle. Welcome — partner approved shows `locked_reason` and no toggle. Welcome — web lead was turned off with reason “Task 09 browser check”; the row showed that reason and “Carolina M. · 23 Sep 2026, 10:03”. It was turned back on with reason “Task 09 check finished” and left enabled.
+
+The nurture journey link opens `/crm/marketing/journeys#nurture_to_request` on the article `nurture_to_request` (“Nurture to Request — D2C”). The SLA_BREACH link opens `/crm/engine/alerts?kind=SLA_BREACH` with the kind select set to `SLA_BREACH`.
+
+### Deviations
+
+The posted condition document is a plain object beside `SegmentInput` / `SegmentUpdate`, because those aliases type `conditions` as `string[]`.
+
+`AlertsInbox` loads kinds, applies a matching query kind, then loads the list. The previous boot started both requests together.
+
+### Notes for later
+
+“Task 09 check” (lifecycle equals GUEST, count 0) is a real segment on the dev database. Delete it by hand if it should not stay.
+
+### Git commands
+
+Do not run these in the agent.
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-panel
+git add \
+  app/assets/css/crm.css \
+  app/components/alerts/AlertsInbox.vue \
+  app/components/crm/SegmentContactsDrawer.vue \
+  app/components/crm/SegmentRuleModal.vue \
+  app/components/crm/audienceHelpers.ts \
+  app/navigation/crm.ts \
+  app/pages/crm/engine/automations.vue \
+  app/pages/crm/marketing/journeys.vue \
+  app/pages/crm/marketing/segments.vue \
+  app/types/api.ts \
+  eslint.config.mjs \
+  i18n/locales/en.json \
+  tests/unit/audienceHelpers.test.ts \
+  tests/unit/guards.test.ts
+git commit -m "$(cat <<'EOF'
+Add the CRM segments and automations pages.
+
+Staff can build a segment from the vocabulary and switch a catalogue message with a reason.
+EOF
+)"
+```
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add docs/sprints/sprint-14/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the CRM segments and automations pages.
+
+EOF
+)"
+```
