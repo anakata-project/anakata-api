@@ -402,6 +402,7 @@ Source: `routes/console.php` and `tests/Feature/Crm/SyncJobsTest.php`. On-screen
 | `inventory:release-expired-holds` | every minute (`* * * * *`) | — |
 | `engine:expire-stripe-checkouts` | every minute (`* * * * *`) | — |
 | `anakata:crm-tasks` | every five minutes (`*/5 * * * *`) | — |
+| `anakata:journeys` | every fifteen minutes (`*/15 * * * *`) | `Pacific/Galapagos` |
 | `anakata:alerts` | every five minutes (`*/5 * * * *`) | — |
 | `anakata:flag-overdue` | daily (`0 0 * * *`) | `Pacific/Galapagos` |
 | `anakata:retention` | daily | `Pacific/Galapagos` |

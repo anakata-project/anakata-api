@@ -31,6 +31,7 @@ use App\Models\CrmTask;
 use App\Models\Delivery;
 use App\Models\Document;
 use App\Models\Guest;
+use App\Models\Journey;
 use App\Models\Payment;
 use App\Models\Role;
 use App\Models\User;
@@ -65,9 +66,9 @@ test('built rows resolve and not-built rows name the gap', function (): void {
     $rows = AutomationCatalogue::all();
     $built = AutomationCatalogue::built();
 
-    expect($rows)->toHaveCount(46)
-        ->and($built)->toHaveCount(30)
-        ->and(count($rows) - count($built))->toBe(16);
+    expect($rows)->toHaveCount(58)
+        ->and($built)->toHaveCount(51)
+        ->and(count($rows) - count($built))->toBe(7);
 
     foreach ($built as $row) {
         $location = $row->location;
@@ -76,10 +77,14 @@ test('built rows resolve and not-built rows name the gap', function (): void {
             ? AlertKind::tryFrom(substr($location, 6))
             : null;
 
+        $journey = is_string($location) && str_starts_with($location, 'journey:')
+            && Journey::query()->where('key', substr($location, 8))->exists();
+
         expect(
             class_exists((string) $location)
             || in_array($location, $commands, true)
-            || $alert instanceof AlertKind,
+            || $alert instanceof AlertKind
+            || $journey,
         )->toBeTrue();
     }
 
@@ -131,9 +136,9 @@ test('the catalogue is readable with panel.crm and a switch needs rules.manage',
     $index = $this->actingAs($crm)->getJson('/api/crm/automations')->assertOk();
     assertNoSensitiveFields($index);
 
-    expect($index->json('data'))->toHaveCount(46)
+    expect($index->json('data'))->toHaveCount(58)
         ->and($index->json('data.0.key'))->toBe('welcome_web_lead')
-        ->and($index->json('data.0.built'))->toBeFalse()
+        ->and($index->json('data.0.built'))->toBeTrue()
         ->and($index->json('data.0.enabled'))->toBeTrue()
         ->and(collect($index->json('data'))->firstWhere('key', AutomationCatalogue::BALANCE_REMINDER_21)['switchable'])->toBeTrue()
         ->and(collect($index->json('data'))->firstWhere('key', AutomationCatalogue::DATA_CHASER)['switchable'])->toBeFalse();
@@ -171,7 +176,7 @@ test('the catalogue is readable with panel.crm and a switch needs rules.manage',
         'reason' => 'Stop the chase',
     ])->assertStatus(422)->assertJsonPath('message', AutomationCatalogue::REFUSAL);
 
-    $this->actingAs($admin)->patchJson('/api/crm/automations/welcome_web_lead', [
+    $this->actingAs($admin)->patchJson('/api/crm/automations/cart_recovery_1', [
         'enabled' => false,
         'reason' => 'Not sent yet',
     ])->assertStatus(422)->assertJsonPath('message', AutomationCatalogue::REFUSAL);

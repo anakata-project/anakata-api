@@ -19,6 +19,7 @@ enum TaskKind: string
     case NpsReply = 'NPS_REPLY';
     case WaitlistFollowUp = 'WAITLIST_FOLLOW_UP';
     case CharterDeposit = 'CHARTER_DEPOSIT';
+    case JourneyHandover = 'JOURNEY_HANDOVER';
 
     public function label(): string
     {
@@ -36,6 +37,7 @@ enum TaskKind: string
             self::NpsReply => 'NPS reply',
             self::WaitlistFollowUp => 'Waitlist follow-up',
             self::CharterDeposit => 'Charter deposit',
+            self::JourneyHandover => 'Journey handover',
         };
     }
 
@@ -55,6 +57,7 @@ enum TaskKind: string
             self::NpsReply => 'RMS · NPS reply',
             self::WaitlistFollowUp => 'RMS · waitlist offer + 2 business days',
             self::CharterDeposit => 'RMS · charter deposit due',
+            self::JourneyHandover => 'CRM · journey handover',
         };
     }
 }

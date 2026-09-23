@@ -250,3 +250,131 @@ A disabled message is blocked at the mail boundary, while flags, alerts, tasks a
 EOF
 )"
 ```
+
+## Task 03 · The journey engine
+
+Enrol, wait, send, and exit live in the CRM. A journey writes enrolments, sends, deliveries, timeline rows, and handover tasks. It does not write a booking, a payment, a guest, or a document.
+
+### Schema
+
+One migration, seeded in `up()` and again from `DatabaseSeeder`. All eight journeys are `system` and `active = false`, so a deploy does not email anyone.
+
+- `journeys`: key, name, goal, kind (`MARKETING` or `TRANSACTIONAL`), subject (`BOOKING` or `CONTACT`), trigger JSON (the list sentence is `trigger.line`), exit conditions, exit sentence, contract (null on marketing), active, system, audit columns.
+- `journey_steps`: position, name, delay JSON, template key (a string; the template table is task 04), optional condition, action (`send`, `pointer`, or `task`), catalogue key, and `catalogue_keys` when one step points at more than one row.
+- `journey_enrolments`: contact, optional booking, position, `next_due_at` (UTC), status (`ACTIVE`, `EXITED`, `SUPPRESSED`, `COMPLETED`), exit reason, enrolled at, exited at. `booking_subject` is `IFNULL(booking_id, 0)` and is unique with the journey and the contact. Contact-scoped journeys also refuse a second row in code, so a cruise re-engagement and a nurture-exhausted re-engagement cannot both exist for one person.
+- `journey_sends`: step, template key, catalogue key, optional delivery, sent at.
+
+Morph map: `journey`, `journey_enrolment`. History: `journey.enrolled`, `journey.exited`, `journey.suppressed`, `journey.completed`, `journey.updated`. `EnrolJourney` is the only insert. A second insert for the same subject returns the existing outcome and writes no second row.
+
+The booking foreign key is `RESTRICT` rather than `SET NULL`. MySQL will not set a column null when a stored generated column is computed from it. Bookings are soft-deleted, so the restrict does not fire on the normal delete path.
+
+### Calendar delays
+
+Delays are calendar time. A day or a month is anchored on Galápagos midnight (`BusinessTime`). An hour is that many clock hours after the anchor instant. `next_due_at` is stored UTC.
+
+An amount is an offset from an anchor (`enrolment`, `previous_step`, `departure`, `balance_due`, `reengagement`), not “N after the previous send” unless the anchor says so. Where the amount already exists as a rule, the due time reads `CurrentConfig::businessRules()`: `payments.balance_reminder_days` (21 and 7, before the balance due date), `payments.extras_due_hours` (72), `documents.pretrip_days_before` (45). Those numbers are not copied onto the step.
+
+### The eight journeys
+
+Counts on `GET /api/crm/journeys` are live `ACTIVE` enrolments at that position. Every response includes the suppression sentence. Marketing enrols only with marketing consent and no suppression. Transactional enrols anyway. The same check runs again before every step.
+
+| Key | Kind | Pointers | Other steps |
+|---|---|---|---|
+| `nurture_to_request` | MARKETING | none | Day 0, 2, 6, 12, 21 sends from enrolment. Day 0 is `welcome_web_lead`. |
+| `request_to_deposit` | TRANSACTIONAL | none | Hour 0 `request_acknowledgement`. Hour 4 handover task (the 24 h silence uses the same key, so it is raised once). Day 1 `deposit_link` does not open a Stripe session. Day 2 `hold_expiry_reminder`. |
+| `payment_calendar` | TRANSACTIONAL | all three | `balance_reminder_21`, `balance_reminder_7`, then `alert:OVERDUE_BALANCE` the day after the balance is due. No second copy, no auto-cancel. `overdue_client` stays not built. |
+| `extras_ancillaries` | TRANSACTIONAL | none | Day 7 `extras_offer`. T−60 `extras_second_window`. Closing send is `extras_due_hours` before departure. On board is a handover task, due at departure, and the exit waits until that task has run. |
+| `ready_to_depart` | TRANSACTIONAL | the first three | Pre-trip points at `pretrip` and `questionnaire` (`pretrip_days_before`). The chase points at `data_chaser` on the manifest chase date (FIT T−25, charter T−40), not the prototype’s T−30. The alert points at `alert:MANIFEST_DATA_OVERDUE` on the DPNG due date (FIT T−15, charter T−30). That is not T−21. The 21 in `balance_reminder_days` is days before the balance due date. T−14 sends `questionnaire_reminder` only while a questionnaire is incomplete. T−3 sends `arrival_instructions`. The exit sentence still quotes the prototype’s “ops alert at T−21”. The NPS survey is not a step. |
+| `reengagement` | MARKETING | none | Cruise completed, first send at return + 6 months, or nurture completed + 3 months. Month 6, 7, and 9. A HIGH LTV band raises one outreach task and sets `SUPPRESSED` (“HIGH-LTV personal outreach”) with no email. |
+| `b2b_partner_activation` | TRANSACTIONAL | Day 0 `portal_invite` | Day 7 and day 21 send. The contact is the CRM contact whose email matches the agency. If there is none, nobody is created and nobody is enrolled. |
+| `winback` | MARKETING | none | Day 1, day 30, month 6. Triggers: synchronous hold expiry, `CANCELLED` / `CANCELLED_POSTPAID`, or a deal stored as `LOST`. |
+
+The quarterly B2B step never completes. After the handover task it stays on that position and sets `next_due_at` three calendar months on. Its task key is `journey-handover:{enrolment}:{step}:{Y-m-d}`, so the next quarter can raise again. Every other step uses `journey:{enrolment}:{step}` (tasks: `journey-handover:{enrolment}:{step}`), so a replay cannot send it twice.
+
+### Re-check, and the hold listener
+
+`anakata:journeys` runs every fifteen minutes (`*/15 * * * *`, `Pacific/Galapagos`, `withoutOverlapping`, `onOneServer`, `RecordScheduledRuns`). Each run enrols anyone the sweep still owes, applies time-based exits, then takes due `ACTIVE` enrolments. For each, in one transaction: exit, then `active`, then marketing consent and suppression, then the step condition, then pointer, task, or send. A failed marketing check sets `SUPPRESSED` and does not send. The same withdrawal does not stop a transactional step. Turning `active` off refuses a new enrolment and leaves a current one where it is, with no send. A catalogue switch that is off records `automation.skipped` once and does not advance a send; a pointer still advances. No usable address blocks the delivery and still advances (J6).
+
+`SyncJourneys` is queued and runs after commit on `BookingCreated`, `BookingStatusChanged`, `PaymentSettled`, `AgencyApproved`, and `DealMarkedLost`. `SyncJourneysOnHoldExpired` is synchronous, registered after `MarkRequestHoldExpired`. `HoldExpired` is still dispatched inside the release transaction. A queued win-back listener could run before that commit.
+
+`JourneyEnrolment::onLeadCaptured()` is public and has no caller. Task 05 calls it. Nurture also enrols from a stitched `abandon_cart`.
+
+### Catalogue
+
+Nine rows that were missing are now built, with location `journey:{key}`: `welcome_web_lead`, `request_acknowledgement`, `deposit_link`, `extras_offer`, `extras_closing`, `questionnaire_reminder`, `arrival_instructions`, `reengagement_6_months`, `winback`. Twelve new switchable customer rows were added. The catalogue is 58 rows, 51 built, 7 not built. A `journey:` location counts as resolved when that journey key is seeded. `keyForDelivery` resolves a journey delivery through `journey_sends`, so a switch flipped after the job is queued still blocks inside `SendDeliveryJob`. `JourneyMail` uses the step name as subject and body. Task 04 replaces that body.
+
+### Tests
+
+`tests/Feature/Crm/JourneysTest.php` covers the eight triggers (a second firing does not insert another row, including win-back’s three sources and B2B’s two), the wait / one delivery / complete path, consent withdrawal, the nurture exit before a due send, a disabled send switch versus a pointer, an inactive journey, the request handover raised once, and one runner pass that leaves `bookings`, `payments`, `guests`, and `documents` with the same ids and `updated_at`. `composer check` inside the app container: 1305 tests passed, Pint passed, Larastan passed.
+
+### Open questions
+
+None for this task. Which journeys are switched on at go-live is still LEG-002, which is why the seed leaves them inactive.
+
+### Notes for later
+
+- Task 04 replaces `JourneyMail` and refuses an unpublished template.
+- Task 05 calls `onLeadCaptured` and must not send its own welcome. `welcome_web_lead` is the nurture day-0 send.
+- Cart recovery (task 05) is a separate sequence from nurture. Both can see `abandon_cart`.
+- “Re-enters nurture on engagement” is not built. Opens and clicks are not tracked (M9).
+- The ready-to-depart step order matches today’s rule numbers (45, then chase, then DPNG, then T−14, then T−3). If those rules are edited so the chase falls after T−14, the fixed order will no longer be chronological.
+
+### Git
+
+Not run:
+
+```bash
+git add \
+  app/Actions/Agencies/DecideAgency.php \
+  app/Actions/Crm/EnrolJourney.php \
+  app/Actions/Crm/MoveDealStage.php \
+  app/Actions/Crm/UpdateJourney.php \
+  app/Console/Commands/JourneysCommand.php \
+  app/Enums/DeliveryKind.php \
+  app/Enums/JourneyEnrolmentStatus.php \
+  app/Enums/JourneyStepAction.php \
+  app/Enums/JourneySubject.php \
+  app/Enums/TaskKind.php \
+  app/Events/AgencyApproved.php \
+  app/Events/DealMarkedLost.php \
+  app/Http/Controllers/Crm/JourneyController.php \
+  app/Http/Requests/Crm/UpdateJourneyRequest.php \
+  app/Http/Resources/Crm/CrmJourneyEnrolmentResource.php \
+  app/Http/Resources/Crm/CrmJourneyResource.php \
+  app/Jobs/SendDeliveryJob.php \
+  app/Listeners/SyncJourneys.php \
+  app/Listeners/SyncJourneysOnHoldExpired.php \
+  app/Mail/Documents/DeliveryMailFactory.php \
+  app/Mail/Documents/DocumentMail.php \
+  app/Mail/Journeys/JourneyMail.php \
+  app/Models/Journey.php \
+  app/Models/JourneyEnrolment.php \
+  app/Models/JourneySend.php \
+  app/Models/JourneyStep.php \
+  app/Policies/JourneyPolicy.php \
+  app/Providers/AppServiceProvider.php \
+  app/Support/Automations/AutomationCatalogue.php \
+  app/Support/Crm/ContactTimeline.php \
+  app/Support/Crm/EventCatalogue.php \
+  app/Support/Documents/DeliverySubject.php \
+  app/Support/Journeys/JourneyClock.php \
+  app/Support/Journeys/JourneyEngine.php \
+  app/Support/Schedule/AnakataSchedule.php \
+  database/migrations/2026_09_23_170001_create_journeys_tables.php \
+  database/seeders/DatabaseSeeder.php \
+  database/seeders/JourneysSeeder.php \
+  docs/sprints/sprint-14/REPORT.md \
+  resources/views/mail/journeys/step.blade.php \
+  routes/api/crm.php \
+  tests/Feature/Crm/AutomationsTest.php \
+  tests/Feature/Crm/JourneysTest.php \
+  tests/Feature/OpenApi/CrmResponseSchemasTest.php \
+  tests/e2e/fixtures/reference-values.md
+
+git commit -m "$(cat <<'EOF'
+Add the CRM journey engine that enrols, waits, and sends without writing a booking.
+
+Consent and suppression are checked again before every step, and the eight journeys stay inactive until someone turns them on.
+EOF
+)"
+```

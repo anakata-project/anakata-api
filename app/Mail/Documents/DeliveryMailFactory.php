@@ -9,6 +9,7 @@ use App\Enums\DeliveryKind;
 use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
 use App\Mail\Charter\CharterProposalMail;
+use App\Mail\Journeys\JourneyMail;
 use App\Models\Booking;
 use App\Models\BookingAccessToken;
 use App\Models\Delivery;
@@ -61,6 +62,7 @@ final class DeliveryMailFactory
             ),
             DeliveryKind::WaitlistOffer => WaitlistOfferCopy::mail($delivery),
             DeliveryKind::CharterProposal => CharterProposalMail::forDelivery($delivery),
+            DeliveryKind::Journey => new JourneyMail($delivery),
             default => self::documentMail($delivery, $pdfBytes),
         };
     }

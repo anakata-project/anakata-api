@@ -50,6 +50,15 @@ final class AnakataSchedule
         );
 
         RecordScheduledRuns::attach(
+            $schedule->command('anakata:journeys')
+                ->everyFifteenMinutes()
+                ->timezone(BusinessTime::zone())
+                ->withoutOverlapping()
+                ->onOneServer()
+                ->description('Advance CRM journeys that are due'),
+        );
+
+        RecordScheduledRuns::attach(
             $schedule->command('anakata:waitlist-notify')
                 ->everyFifteenMinutes()
                 ->timezone(BusinessTime::zone())

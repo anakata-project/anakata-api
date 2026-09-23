@@ -7,6 +7,7 @@ namespace App\Actions\Crm;
 use App\Actions\Action;
 use App\Enums\DealStage;
 use App\Enums\Permission;
+use App\Events\DealMarkedLost;
 use App\Models\Booking;
 use App\Models\Deal;
 use App\Models\Group;
@@ -79,6 +80,10 @@ final class MoveDealStage extends Action
                 'from' => $from?->value,
                 'to' => $stage->value,
             ], reason: $reason);
+
+            if ($stage === DealStage::Lost) {
+                DealMarkedLost::dispatch($deal);
+            }
 
             return $deal->refresh();
         });

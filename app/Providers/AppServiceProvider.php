@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Enums\ConfigKind;
 use App\Enums\Permission;
+use App\Events\AgencyApproved;
 use App\Events\AvailabilityChanged;
 use App\Events\BookingChargesChanged;
 use App\Events\BookingCreated;
@@ -13,6 +14,7 @@ use App\Events\BookingOverdueFlagged;
 use App\Events\BookingStatusChanged;
 use App\Events\CharterEnquiryReceived;
 use App\Events\ConfigPublished;
+use App\Events\DealMarkedLost;
 use App\Events\DeliveryOutcomeRecorded;
 use App\Events\HoldExpired;
 use App\Events\PaymentAwaitingWire;
@@ -39,6 +41,8 @@ use App\Listeners\RaiseTasksOnRefundRequested;
 use App\Listeners\SendOnBookingChargesChanged;
 use App\Listeners\SendOnBookingStatusChanged;
 use App\Listeners\SendOnPaymentSettled;
+use App\Listeners\SyncJourneys;
+use App\Listeners\SyncJourneysOnHoldExpired;
 use App\Models\Agency;
 use App\Models\Alert;
 use App\Models\AutomationSetting;
@@ -63,6 +67,8 @@ use App\Models\Group;
 use App\Models\Guest;
 use App\Models\InternalBlock;
 use App\Models\Itinerary;
+use App\Models\Journey;
+use App\Models\JourneyEnrolment;
 use App\Models\Manifest;
 use App\Models\Offer;
 use App\Models\Payment;
@@ -247,6 +253,8 @@ class AppServiceProvider extends ServiceProvider
             'report_subscription' => ReportSubscription::class,
             'sales_material' => SalesMaterial::class,
             'segment' => Segment::class,
+            'journey' => Journey::class,
+            'journey_enrolment' => JourneyEnrolment::class,
             'automation_setting' => AutomationSetting::class,
             'guest' => Guest::class,
             'consent' => Consent::class,
@@ -298,6 +306,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(AvailabilityChanged::class, BumpEngineFeedVersion::class);
         Event::listen(AvailabilityChanged::class, OfferWaitlistCabins::class);
         Event::listen(HoldExpired::class, MarkRequestHoldExpired::class);
+        Event::listen(HoldExpired::class, SyncJourneysOnHoldExpired::class);
         Event::listen(HoldExpired::class, OfferWaitlistCabins::class);
         Event::listen(HoldExpired::class, ExpireWebCheckoutSession::class);
         Event::listen(BookingStatusChanged::class, SendOnBookingStatusChanged::class);
@@ -305,16 +314,21 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(BookingCreated::class, OpenDealOnBookingCreated::class);
         Event::listen(BookingCreated::class, RaiseTasksOnBookingCreated::class);
         Event::listen(BookingCreated::class, RaiseAlertsOnBookingCreated::class);
+        Event::listen(BookingCreated::class, SyncJourneys::class);
         Event::listen(CharterEnquiryReceived::class, OpenDealOnCharterEnquiryReceived::class);
         Event::listen(CharterEnquiryReceived::class, RaiseTasksOnCharterEnquiry::class);
         Event::listen(BookingStatusChanged::class, RaiseTasksOnBookingStatusChanged::class);
         Event::listen(BookingStatusChanged::class, RaiseAlertsOnBookingStatusChanged::class);
+        Event::listen(BookingStatusChanged::class, SyncJourneys::class);
         Event::listen(BookingOverdueFlagged::class, RaiseAlertsOnBookingOverdueFlagged::class);
         Event::listen(RefundRequested::class, RaiseTasksOnRefundRequested::class);
         Event::listen(PaymentAwaitingWire::class, RaiseTasksOnPaymentAwaitingWire::class);
         Event::listen(PaymentAwaitingWire::class, RaiseAlertsOnPaymentAwaitingWire::class);
         Event::listen(PaymentSettled::class, SendOnPaymentSettled::class);
         Event::listen(PaymentSettled::class, RaiseAlertsOnPaymentSettled::class);
+        Event::listen(PaymentSettled::class, SyncJourneys::class);
+        Event::listen(AgencyApproved::class, SyncJourneys::class);
+        Event::listen(DealMarkedLost::class, SyncJourneys::class);
         Event::listen(DeliveryOutcomeRecorded::class, RaiseAlertsOnDeliveryOutcome::class);
         Event::listen(BookingChargesChanged::class, SendOnBookingChargesChanged::class);
 

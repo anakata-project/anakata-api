@@ -11,6 +11,7 @@ use App\Http\Controllers\Crm\ContactTimelineController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\Crm\DeliveryController;
 use App\Http\Controllers\Crm\EngineActivityController;
+use App\Http\Controllers\Crm\JourneyController;
 use App\Http\Controllers\Crm\SegmentController;
 use App\Http\Controllers\Crm\SyncController;
 use App\Http\Controllers\Crm\TaskController;
@@ -24,6 +25,11 @@ Route::patch('tasks/{task}', [TaskController::class, 'update']);
 Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);
 Route::post('tasks/{task}/cancel', [TaskController::class, 'cancel']);
 Route::post('contacts/{contact}/activities', [TaskController::class, 'storeActivity']);
+
+Route::get('journeys', [JourneyController::class, 'index']);
+Route::get('journeys/{journey}/enrolments', [JourneyController::class, 'enrolments']);
+Route::patch('journeys/{journey}', [JourneyController::class, 'update']);
+Route::get('contacts/{contact}/journeys', [JourneyController::class, 'forContact']);
 
 Route::get('automations', [AutomationController::class, 'index']);
 Route::patch('automations/{key}', [AutomationController::class, 'update'])->where('key', '[A-Za-z0-9:_-]+');

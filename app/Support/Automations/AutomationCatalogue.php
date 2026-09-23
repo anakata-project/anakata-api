@@ -17,6 +17,7 @@ use App\Jobs\SendPortalInviteMail;
 use App\Listeners\SendOnBookingStatusChanged;
 use App\Listeners\SendOnPaymentSettled;
 use App\Models\Delivery;
+use App\Models\JourneySend;
 use App\Support\Alerts\AlertRegistry;
 use App\Support\Reports\ReportMailer;
 
@@ -86,14 +87,21 @@ final class AutomationCatalogue
     public static function all(): array
     {
         return [
-            self::missing('welcome_web_lead', 'a', 'Welcome — web lead', 'Your Galápagos adventure begins here — Anakata', 'A web lead is captured.', 'Immediate.', 'Sprint 14 task 05. No welcome email is sent today.'),
+            self::row('welcome_web_lead', 'a', 'Welcome — web lead', 'Your Galápagos adventure begins here — Anakata', 'A web lead is captured.', 'Day 0 of nurture_to_request.', 'journey:nurture_to_request', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'nurture_to_request'),
+            self::row('nurture_story', 'a', 'Nurture — sixteen guests', 'Sixteen guests, never more', 'Two days after a nurture enrolment.', 'Day 2 of nurture_to_request.', 'journey:nurture_to_request', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'nurture_to_request'),
+            self::row('nurture_itinerary', 'a', 'Nurture — itinerary spotlight', 'Itinerary spotlight', 'Six days after a nurture enrolment.', 'Day 6 of nurture_to_request.', 'journey:nurture_to_request', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'nurture_to_request'),
+            self::row('nurture_call', 'a', 'Nurture — expedition call', 'A 15-minute expedition call', 'Twelve days after a nurture enrolment.', 'Day 12 of nurture_to_request.', 'journey:nurture_to_request', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'nurture_to_request'),
+            self::row('nurture_concierge', 'a', 'Nurture — concierge note', 'A note from the concierge', 'Twenty-one days after a nurture enrolment.', 'Day 21 of nurture_to_request.', 'journey:nurture_to_request', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'nurture_to_request'),
+            self::row('partner_positioning', 'a', 'Partner positioning', 'Selling Anakata', 'Seven days after an agency is approved.', 'Day 7 of b2b_partner_activation.', 'journey:b2b_partner_activation', AutomationAudience::Customer, true, journeyKey: 'b2b_partner_activation'),
+            self::row('partner_incentive', 'a', 'Partner incentive', 'Your first Anakata booking', 'Twenty-one days after an agency is approved.', 'Day 21 of b2b_partner_activation.', 'journey:b2b_partner_activation', AutomationAudience::Customer, true, journeyKey: 'b2b_partner_activation'),
             self::row('portal_invite', 'a', 'Welcome — partner approved', 'Set your Anakata portal password', 'An agency user is invited.', 'Immediate. The accept link is the only copy of the token.', SendPortalInviteMail::class, AutomationAudience::Customer, false),
             self::missing('cart_recovery_1', 'a', 'Cart recovery 1', 'Can we help you plan your Galápagos expedition?', 'Checkout was abandoned and no request was submitted.', '24 hours.', 'Sprint 14 task 05 (Q6). An address is kept only when the person asks.'),
             self::missing('cart_recovery_2', 'a', 'Cart recovery 2', 'Still dreaming of Galápagos? We are here to help.', 'Still no request after the first cart email.', '48 hours after the first email.', 'Sprint 14 task 05 (Q6).'),
             self::missing('cart_recovery_3', 'a', 'Cart recovery 3', 'Can we help plan your trip?', 'Still no request.', 'Day 7.', 'Sprint 14 task 05 (Q6).'),
 
-            self::missing('request_acknowledgement', 'b', 'Request acknowledgement', 'We have received your booking — [ID]', 'A booking is created in REQUESTED.', 'Immediate.', 'J7 sends documents when the booking is confirmed, not when it is requested.'),
-            self::missing('deposit_link', 'b', 'Deposit link', 'Complete your reservation — [ID]', 'A quote is accepted.', 'Within 4 hours.', 'Staff send the payment link from the RMS. Nothing sends it on a timer.'),
+            self::row('request_acknowledgement', 'b', 'Request acknowledgement', 'We have received your booking — [ID]', 'A booking is created in REQUESTED.', 'Hour 0 of request_to_deposit.', 'journey:request_to_deposit', AutomationAudience::Customer, true, journeyKey: 'request_to_deposit'),
+            self::row('deposit_link', 'b', 'Deposit link', 'Complete your reservation — [ID]', 'A request has been held for a day.', 'Day 1 of request_to_deposit. This step does not open a Stripe session.', 'journey:request_to_deposit', AutomationAudience::Customer, true, journeyKey: 'request_to_deposit'),
+            self::row('hold_expiry_reminder', 'b', 'Hold expiry reminder', 'Your cabin hold', 'A request has been held for two days.', 'Day 2 of request_to_deposit.', 'journey:request_to_deposit', AutomationAudience::Customer, true, journeyKey: 'request_to_deposit'),
             self::row('booking_confirmation', 'b', 'Booking confirmation', 'Booking confirmation & invoice — {reference}', 'The booking reaches CONFIRMED.', 'Immediate. The invoice PDF is issued, then this email.', SendOnBookingStatusChanged::class, AutomationAudience::Customer, true),
             self::row('booking_summary', 'b', 'Booking summary', 'Your Anakata booking summary — {reference}', 'The booking reaches CONFIRMED.', 'Immediate, with the confirmation. The summary PDF is issued, then this email.', SendOnBookingStatusChanged::class, AutomationAudience::Customer, true),
             self::missing('wire_instructions', 'b', 'Wire instructions', 'Wire transfer instructions — [ID]', 'The payment method is a wire.', 'Immediate.', 'Staff send wire instructions from the RMS. Nothing sends them on a timer.'),
@@ -107,20 +115,25 @@ final class AutomationCatalogue
             self::missing('overdue_client', 'c', 'Overdue — day 1', 'Overdue payment — action required — [ID]', 'The cruise balance is past its due date.', 'Day 1.', 'No client overdue email. The flag, the OVERDUE_BALANCE alert and the overdue task are separate rows.'),
             self::missing('escalation_review', 'c', 'Escalation — manual review', '[ESCALATION] Non-payment review required — [ID]', 'An overdue balance waits for a person.', 'After the escalation window.', 'OPS-007 is a person\'s decision. No escalation email is sent.'),
 
-            self::missing('extras_offer', 'd', 'Extras offer', 'Curated additions to your Galápagos expedition — Anakata', 'A booking has been confirmed for 7 days.', 'Once.', 'Sprint 14 task 03. No extras offer email is sent.'),
-            self::missing('extras_closing', 'd', 'Extras closing notice', 'Last call for additions — [ID]', 'Departure is inside the extras window.', 'payments.extras_due_hours before departure.', 'Sprint 14 task 03. No extras closing email is sent.'),
+            self::row('extras_offer', 'd', 'Extras offer', 'Curated additions to your Galápagos expedition — Anakata', 'A booking has been confirmed for 7 days.', 'Day 7 of extras_ancillaries.', 'journey:extras_ancillaries', AutomationAudience::Customer, true, journeyKey: 'extras_ancillaries'),
+            self::row('extras_second_window', 'd', 'Extras second window', 'Pre and post travel, if you would like it', 'Sixty calendar days before departure.', 'T−60 of extras_ancillaries.', 'journey:extras_ancillaries', AutomationAudience::Customer, true, journeyKey: 'extras_ancillaries'),
+            self::row('extras_closing', 'd', 'Extras closing notice', 'Last call for additions — [ID]', 'Departure is inside the extras window.', 'payments.extras_due_hours before departure.', 'journey:extras_ancillaries', AutomationAudience::Customer, true, journeyKey: 'extras_ancillaries'),
 
             self::row('pretrip', 'e', 'Pre-trip package', 'Your expedition itinerary — {reference}', 'Departure is inside documents.pretrip_days_before and the booking is confirmed or later.', 'anakata:documents-due. The itinerary PDF is issued, then this email.', 'anakata:documents-due', AutomationAudience::Customer, true),
             self::row('questionnaire', 'e', 'Preferences questionnaire', 'Your preferences questionnaire — {reference}', 'The same pre-trip date, for each guest the plan still owes a questionnaire.', 'anakata:documents-due. One send, not a later reminder.', 'anakata:documents-due', AutomationAudience::Customer, true),
-            self::missing('questionnaire_reminder', 'e', 'Questionnaire reminder', '14 days to go — complete your questionnaire', 'The pre-trip questionnaire is still incomplete.', 'T−14.', 'Only one questionnaire send exists, on the pre-trip date.'),
+            self::row('questionnaire_reminder', 'e', 'Questionnaire reminder', '14 days to go — complete your questionnaire', 'The pre-trip questionnaire is still incomplete.', 'T−14 of ready_to_depart, only while a questionnaire is incomplete.', 'journey:ready_to_depart', AutomationAudience::Customer, true, journeyKey: 'ready_to_depart'),
             self::row('data_chaser', 'e', 'Passport chase', 'Passenger details needed — {reference}', 'A departure is past its DPNG due date with incomplete passenger data.', 'anakata:manifests-due. The chase is the rule (N5).', SendDataChaser::class, AutomationAudience::Customer, false),
             self::row('voucher', 'e', 'Transfer voucher', 'Transfer voucher — {reference}', 'A contracted transfer extra and departure is inside documents.voucher_days_before.', 'anakata:documents-due. The voucher PDF is issued, then this email.', 'anakata:documents-due', AutomationAudience::Customer, true),
-            self::missing('arrival_instructions', 'e', 'Arrival instructions', 'Almost time! Final instructions for your arrival in San Cristóbal', 'The booking is FULLY_PAID and departure is in 3 days.', 'T−3.', 'Not sent. The transfer voucher is the T−7 document, a separate row.'),
+            self::row('arrival_instructions', 'e', 'Arrival instructions', 'Almost time! Final instructions for your arrival in San Cristóbal', 'Departure is three days away.', 'T−3 of ready_to_depart.', 'journey:ready_to_depart', AutomationAudience::Customer, true, journeyKey: 'ready_to_depart'),
 
             self::row('survey', 'f', 'NPS survey', 'Your post-trip survey — {reference}', 'The cruise is completed and nps.survey_hours_after_return have passed.', 'anakata:nps-survey. Transactional, about the cruise they took.', 'anakata:nps-survey', AutomationAudience::Customer, true),
             self::row('review_request', 'f', 'Public review request', 'Would you share a review? — {reference}', 'A post-trip score is at least nps.review_request_from and the guest is the contact.', 'When the score is recorded. Marketing: ConsentGate is checked as well, and always.', RecordGuestResponse::class, AutomationAudience::Customer, true, AutomationKind::Marketing),
-            self::missing('reengagement_6_months', 'f', 'Re-engagement — 6 months', 'Back to Galápagos? A new expedition awaits you', 'Six months after the cruise, with no active booking.', 'Once.', 'Sprint 14 task 03.'),
-            self::missing('winback', 'f', 'Win-back', 'Sorry we missed you — what changed?', 'A hold expired or a booking was cancelled.', 'Day 1, day 30, month 6.', 'Sprint 14 task 03.'),
+            self::row('reengagement_6_months', 'f', 'Re-engagement — 6 months', 'Back to Galápagos? A new expedition awaits you', 'Six months after the cruise, with no active booking.', 'Month 6 of reengagement.', 'journey:reengagement', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'reengagement'),
+            self::row('reengagement_month_7', 'f', 'Re-engagement — month 7', 'Owner\'s Suite early access', 'Seven months after the cruise, with no active booking.', 'Month 7 of reengagement.', 'journey:reengagement', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'reengagement'),
+            self::row('reengagement_month_9', 'f', 'Re-engagement — month 9', 'Bring your people', 'Nine months after the cruise, with no active booking.', 'Month 9 of reengagement.', 'journey:reengagement', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'reengagement'),
+            self::row('winback', 'f', 'Win-back', 'Sorry we missed you — what changed?', 'A hold expired, a booking was cancelled, or a deal was marked lost.', 'Day 1 of winback.', 'journey:winback', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'winback'),
+            self::row('winback_day_30', 'f', 'Win-back — day 30', 'Alternative departures', 'Thirty days after a lost or expired enquiry.', 'Day 30 of winback.', 'journey:winback', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'winback'),
+            self::row('winback_month_6', 'f', 'Win-back — month 6', 'A new season', 'Six months after a lost or expired enquiry.', 'Month 6 of winback.', 'journey:winback', AutomationAudience::Customer, true, AutomationKind::Marketing, journeyKey: 'winback'),
 
             self::missing('high_value_lead', 'g', 'High-value new lead', '[ALERT] High-value new lead — [Name] — [Country] — USD [Est.]', 'A high-value lead or a charter enquiry.', 'Immediate.', 'No alert kind. The charter enquiry email is its own row.'),
             ...self::alerts(),
@@ -158,6 +171,12 @@ final class AutomationCatalogue
 
     public static function keyForDelivery(Delivery $delivery): ?string
     {
+        if ($delivery->kind === DeliveryKind::Journey) {
+            $key = JourneySend::query()->where('delivery_id', $delivery->id)->value('catalogue_key');
+
+            return is_string($key) && $key !== '' ? $key : null;
+        }
+
         if ($delivery->kind === DeliveryKind::Reminder) {
             $days = self::reminderSlot($delivery->idempotency_key);
 
@@ -272,6 +291,7 @@ final class AutomationCatalogue
         bool $switchable,
         AutomationKind $kind = AutomationKind::Transactional,
         ?string $alertKind = null,
+        ?string $journeyKey = null,
     ): AutomationDefinition {
         return new AutomationDefinition(
             key: $key,
@@ -289,7 +309,7 @@ final class AutomationCatalogue
             built: true,
             notBuiltNote: null,
             alertKind: $alertKind,
-            journeyKey: null,
+            journeyKey: $journeyKey,
         );
     }
 

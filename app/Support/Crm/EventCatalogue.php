@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Crm;
 
+use App\Actions\Agencies\DecideAgency;
 use App\Actions\Bookings\CreateBookingRequest;
 use App\Actions\Bookings\CreateReservation;
 use App\Actions\Bookings\MoveBooking;
@@ -11,6 +12,7 @@ use App\Actions\Bookings\TransitionBooking;
 use App\Actions\Charter\CreateCharterEnquiry;
 use App\Actions\Checkout\SubmitEngineCheckout;
 use App\Actions\Contacts\StitchEngineIdentity;
+use App\Actions\Crm\MoveDealStage;
 use App\Actions\Documents\SendDocument;
 use App\Actions\Documents\SendPaymentRequest;
 use App\Actions\Engine\IngestBehaviouralEvents;
@@ -26,6 +28,7 @@ use App\Actions\Payments\SettleGatewayPayment;
 use App\Actions\Refunds\CreateRefundRequest;
 use App\Console\Commands\FlagOverdueCommand;
 use App\Enums\BehaviouralEventName;
+use App\Events\AgencyApproved;
 use App\Events\AvailabilityChanged;
 use App\Events\BookingChargesChanged;
 use App\Events\BookingCreated;
@@ -33,6 +36,7 @@ use App\Events\BookingOverdueFlagged;
 use App\Events\BookingStatusChanged;
 use App\Events\CharterEnquiryReceived;
 use App\Events\ConfigPublished;
+use App\Events\DealMarkedLost;
 use App\Events\DeliveryOutcomeRecorded;
 use App\Events\HoldExpired;
 use App\Events\PaymentAwaitingWire;
@@ -59,6 +63,8 @@ use App\Listeners\RaiseTasksOnRefundRequested;
 use App\Listeners\SendOnBookingChargesChanged;
 use App\Listeners\SendOnBookingStatusChanged;
 use App\Listeners\SendOnPaymentSettled;
+use App\Listeners\SyncJourneys;
+use App\Listeners\SyncJourneysOnHoldExpired;
 use App\Services\Config\ConfigPublisher;
 use App\Services\Inventory\ClaimService;
 
@@ -152,6 +158,7 @@ final class EventCatalogue
                     self::short(OpenDealOnBookingCreated::class),
                     self::short(RaiseTasksOnBookingCreated::class),
                     self::short(RaiseAlertsOnBookingCreated::class),
+                    self::short(SyncJourneys::class),
                 ],
             ],
             [
@@ -183,6 +190,7 @@ final class EventCatalogue
                     self::short(SendOnBookingStatusChanged::class),
                     self::short(RaiseTasksOnBookingStatusChanged::class),
                     self::short(RaiseAlertsOnBookingStatusChanged::class),
+                    self::short(SyncJourneys::class),
                 ],
             ],
             [
@@ -196,6 +204,7 @@ final class EventCatalogue
                 'listeners' => [
                     self::short(SendOnPaymentSettled::class),
                     self::short(RaiseAlertsOnPaymentSettled::class),
+                    self::short(SyncJourneys::class),
                 ],
             ],
             [
@@ -249,8 +258,21 @@ final class EventCatalogue
                 'producer' => self::short(ClaimService::class),
                 'listeners' => [
                     self::short(MarkRequestHoldExpired::class),
+                    self::short(SyncJourneysOnHoldExpired::class),
                     self::short(ExpireWebCheckoutSession::class),
                 ],
+            ],
+            [
+                'class' => AgencyApproved::class,
+                'name' => 'AgencyApproved',
+                'producer' => self::short(DecideAgency::class),
+                'listeners' => [self::short(SyncJourneys::class)],
+            ],
+            [
+                'class' => DealMarkedLost::class,
+                'name' => 'DealMarkedLost',
+                'producer' => self::short(MoveDealStage::class),
+                'listeners' => [self::short(SyncJourneys::class)],
             ],
         ];
     }

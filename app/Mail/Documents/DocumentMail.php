@@ -53,6 +53,7 @@ final class DocumentMail extends Mailable
             DeliveryKind::ReviewRequest => throw new InvalidArgumentException('A review request is not a document.'),
             DeliveryKind::WaitlistOffer => throw new InvalidArgumentException('A waitlist offer is not a document.'),
             DeliveryKind::CharterProposal => throw new InvalidArgumentException('A charter proposal is not a booking document.'),
+            DeliveryKind::Journey => throw new InvalidArgumentException('A journey message is not a document.'),
             default => 'mail.documents.invoice',
         };
 

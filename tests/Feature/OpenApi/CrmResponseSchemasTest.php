@@ -75,6 +75,8 @@ test('crm OpenAPI schemas have properties', function (): void {
         'TaskListResource',
         'ContactActivityResource',
         'SubjectRequestResource',
+        'CrmJourneyResource',
+        'CrmJourneyEnrolmentResource',
         'CrmSegmentResource',
         'CrmSegmentVocabularyResource',
         'CampaignIndexResource',

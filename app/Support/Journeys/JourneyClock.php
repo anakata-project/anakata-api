@@ -1,0 +1,156 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Journeys;
+
+use App\Models\Booking;
+use App\Models\JourneyEnrolment;
+use App\Models\JourneyStep;
+use App\Services\Config\CurrentConfig;
+use App\Support\BusinessTime;
+use App\Support\Manifests\ManifestDue;
+use App\Support\Manifests\ManifestRoster;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
+
+final class JourneyClock
+{
+    public function __construct(private readonly CurrentConfig $config) {}
+
+    public function dueAt(JourneyEnrolment $enrolment, JourneyStep $step): CarbonImmutable
+    {
+        $delay = $step->delay;
+        $rule = is_string($delay['rule'] ?? null) ? $delay['rule'] : null;
+
+        if ($rule !== null) {
+            return $this->fromRule($enrolment, $rule, (int) ($delay['slot'] ?? 0));
+        }
+
+        $anchor = is_string($delay['anchor'] ?? null) ? $delay['anchor'] : 'enrolment';
+        $amount = (int) ($delay['amount'] ?? 0);
+        $unit = is_string($delay['unit'] ?? null) ? $delay['unit'] : 'days';
+
+        if ($anchor === 'reengagement') {
+            return $this->reengagement($enrolment, $amount);
+        }
+
+        return $this->shift($this->anchor($enrolment, $anchor), $amount, $unit);
+    }
+
+    private function fromRule(JourneyEnrolment $enrolment, string $rule, int $slot): CarbonImmutable
+    {
+        $booking = $this->booking($enrolment);
+        $rules = $this->config->businessRules();
+
+        if ($rule === 'balance_reminder') {
+            $days = $rules->payments->balanceReminderDays[$slot] ?? 0;
+
+            return $this->balanceDue($booking)->subDays($days);
+        }
+
+        if ($rule === 'balance_due_plus_day') {
+            return $this->balanceDue($booking)->addDays(1);
+        }
+
+        if ($rule === 'extras_due_hours') {
+            return $this->departureDay($booking)->subHours($rules->payments->extrasDueHours);
+        }
+
+        if ($rule === 'pretrip_days_before') {
+            return $this->departureDay($booking)->subDays($rules->documents->pretripDaysBefore);
+        }
+
+        $manifest = ManifestDue::forDeparture(
+            $booking->departure,
+            ManifestRoster::passengers($booking->departure),
+        );
+        $date = $rule === 'dpng_due' ? $manifest->dpng : $manifest->chase;
+
+        return BusinessTime::calendarDay($date)->utc();
+    }
+
+    private function reengagement(JourneyEnrolment $enrolment, int $months): CarbonImmutable
+    {
+        if ($enrolment->booking_id !== null) {
+            return $this->shift($this->returnDay($this->booking($enrolment)), $months, 'months');
+        }
+
+        return $this->shift($this->instant($enrolment->enrolled_at), $months - 6, 'months');
+    }
+
+    private function anchor(JourneyEnrolment $enrolment, string $anchor): CarbonImmutable
+    {
+        if ($anchor === 'previous_step') {
+            $sent = $enrolment->sends()->orderByDesc('id')->value('sent_at');
+
+            if ($sent instanceof CarbonInterface) {
+                return $this->instant($sent);
+            }
+
+            if (is_string($sent) && $sent !== '') {
+                return CarbonImmutable::parse($sent)->utc();
+            }
+
+            return $this->instant($enrolment->enrolled_at);
+        }
+
+        if ($anchor === 'departure') {
+            return $this->departureDay($this->booking($enrolment));
+        }
+
+        if ($anchor === 'balance_due') {
+            return $this->balanceDue($this->booking($enrolment));
+        }
+
+        return $this->instant($enrolment->enrolled_at);
+    }
+
+    private function shift(CarbonImmutable $anchor, int $amount, string $unit): CarbonImmutable
+    {
+        if ($unit === 'hours') {
+            return $anchor->addHours($amount);
+        }
+
+        $local = BusinessTime::toBusiness($anchor)->startOfDay();
+        $shifted = $unit === 'months' ? $local->addMonths($amount) : $local->addDays($amount);
+
+        return $shifted->utc();
+    }
+
+    private function booking(JourneyEnrolment $enrolment): Booking
+    {
+        $enrolment->loadMissing('booking.departure.itinerary');
+        $booking = $enrolment->booking;
+
+        if (! $booking instanceof Booking) {
+            throw new \RuntimeException('This journey step needs the enrolment booking.');
+        }
+
+        return $booking;
+    }
+
+    private function departureDay(Booking $booking): CarbonImmutable
+    {
+        $booking->loadMissing('departure');
+
+        return BusinessTime::calendarDay($booking->departure->date->toDateString());
+    }
+
+    private function returnDay(Booking $booking): CarbonImmutable
+    {
+        $booking->loadMissing('departure.itinerary');
+
+        return BusinessTime::calendarDay($booking->departure->returnDate()->toDateString());
+    }
+
+    private function balanceDue(Booking $booking): CarbonImmutable
+    {
+        return BusinessTime::calendarDay($booking->balanceDueDate()->toDateString());
+    }
+
+    private function instant(CarbonInterface $at): CarbonImmutable
+    {
+        return CarbonImmutable::instance($at)->utc();
+    }
+}

@@ -22,6 +22,7 @@ enum DeliveryKind: string
     case WaitlistOffer = 'WAITLIST_OFFER';
     case CharterProposal = 'CHARTER_PROPOSAL';
     case PortalInvite = 'PORTAL_INVITE';
+    case Journey = 'JOURNEY';
 
     public function label(): string
     {
@@ -42,6 +43,7 @@ enum DeliveryKind: string
             self::WaitlistOffer => 'Waitlist offer',
             self::CharterProposal => 'Charter proposal',
             self::PortalInvite => 'Portal invitation',
+            self::Journey => 'Journey message',
         };
     }
 
@@ -57,6 +59,7 @@ enum DeliveryKind: string
             self::WaitlistOffer,
             self::CharterProposal,
             self::PortalInvite,
+            self::Journey,
         ], true);
     }
 
@@ -80,7 +83,7 @@ enum DeliveryKind: string
             self::Voucher => DocumentKind::Voucher,
             self::Pretrip => DocumentKind::Pretrip,
             self::WireInstructions => DocumentKind::WireInstructions,
-            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire, self::Survey, self::ReviewRequest, self::WaitlistOffer, self::CharterProposal, self::PortalInvite => null,
+            self::Reminder, self::PaymentLink, self::DataChaser, self::Questionnaire, self::Survey, self::ReviewRequest, self::WaitlistOffer, self::CharterProposal, self::PortalInvite, self::Journey => null,
         };
     }
 

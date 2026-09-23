@@ -47,7 +47,8 @@ final class ContactTimeline
             ->unionAll(self::deals($contact->id))
             ->unionAll(self::tasks($contact->id))
             ->unionAll(self::activities($contact->id))
-            ->unionAll(self::subjectRequests($contact->id));
+            ->unionAll(self::subjectRequests($contact->id))
+            ->unionAll(self::journeys($contact->id));
 
         /** @var Paginator<int, object> $rows */
         $rows = DB::query()
@@ -329,6 +330,37 @@ final class ContactTimeline
             ]);
     }
 
+    private static function journeys(int $contactId): Builder
+    {
+        $enrolments = DB::table('journey_enrolments')
+            ->join('journeys', 'journeys.id', '=', 'journey_enrolments.journey_id')
+            ->where('journey_enrolments.contact_id', $contactId)
+            ->select([
+                DB::raw('journey_enrolments.enrolled_at as `at`'),
+                DB::raw("'journey' as kind"),
+                DB::raw("JSON_OBJECT('event', 'enrolled', 'name', journeys.name, 'status', journey_enrolments.status) as payload"),
+                DB::raw('CAST(NULL AS CHAR) as link_type'),
+                DB::raw('CAST(NULL AS UNSIGNED) as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('journey-enrol-', journey_enrolments.id) as sort_key"),
+            ]);
+
+        $sends = DB::table('journey_sends')
+            ->join('journey_enrolments', 'journey_enrolments.id', '=', 'journey_sends.journey_enrolment_id')
+            ->where('journey_enrolments.contact_id', $contactId)
+            ->select([
+                DB::raw('journey_sends.sent_at as `at`'),
+                DB::raw("'journey' as kind"),
+                DB::raw("JSON_OBJECT('event', 'sent', 'template_key', journey_sends.template_key, 'catalogue_key', journey_sends.catalogue_key, 'delivery_id', journey_sends.delivery_id) as payload"),
+                DB::raw('CAST(NULL AS CHAR) as link_type'),
+                DB::raw('CAST(NULL AS UNSIGNED) as link_id'),
+                DB::raw('CAST(NULL AS CHAR) as link_reference'),
+                DB::raw("CONCAT('journey-send-', journey_sends.id) as sort_key"),
+            ]);
+
+        return $enrolments->unionAll($sends);
+    }
+
     /**
      * @return array{
      *     at: string,
@@ -354,6 +386,7 @@ final class ContactTimeline
             'subject_request' => self::subjectRequestCopy($payload),
             'behavioural' => self::behaviouralCopy($payload),
             'merge' => self::mergeCopy($payload),
+            'journey' => self::journeyCopy($payload),
             default => ['Event', ''],
         };
 
@@ -395,6 +428,26 @@ final class ContactTimeline
         }
 
         return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: string, 1: string}
+     */
+    private static function journeyCopy(array $payload): array
+    {
+        $event = is_string($payload['event'] ?? null) ? $payload['event'] : '';
+
+        if ($event === 'sent') {
+            $template = is_string($payload['template_key'] ?? null) ? $payload['template_key'] : 'message';
+
+            return ['Journey message', $template];
+        }
+
+        $name = is_string($payload['name'] ?? null) ? $payload['name'] : 'Journey';
+        $status = is_string($payload['status'] ?? null) ? $payload['status'] : '';
+
+        return ['Enrolled in '.$name, $status];
     }
 
     /**

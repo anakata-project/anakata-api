@@ -31,6 +31,7 @@ final class DeliverySubject
             DeliveryKind::WaitlistOffer => 'A cabin is free',
             DeliveryKind::CharterProposal => 'Your Anakata charter proposal',
             DeliveryKind::PortalInvite => 'Set your Anakata portal password',
+            DeliveryKind::Journey => 'A note from Anakata — '.$ref,
         };
     }
 

@@ -7,6 +7,7 @@ namespace App\Actions\Agencies;
 use App\Actions\Action;
 use App\Enums\AgencyStatus;
 use App\Enums\AgencyUserStatus;
+use App\Events\AgencyApproved;
 use App\Models\Agency;
 use App\Models\AgencyUser;
 use App\Models\User;
@@ -91,6 +92,10 @@ final class DecideAgency extends Action
                 'status' => $decision->value,
                 'users' => $usersAfter,
             ], reason: $reason !== '' ? $reason : null, actor: $actor);
+
+            if ($decision === AgencyStatus::Approved) {
+                AgencyApproved::dispatch($agency);
+            }
 
             return $agency->fresh(['users', 'decidedBy', 'bookings']) ?? $agency;
         });

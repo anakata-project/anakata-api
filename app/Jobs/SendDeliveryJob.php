@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Enums\DeliveryKind;
 use App\Enums\DeliveryStatus;
 use App\Enums\DeliveryTriggeredBy;
 use App\Events\DeliveryOutcomeRecorded;
@@ -123,6 +124,10 @@ final class SendDeliveryJob implements ShouldQueue
 
     private function writeHistory(Delivery $delivery, bool $sent): void
     {
+        if ($delivery->kind === DeliveryKind::Journey) {
+            return;
+        }
+
         $booking = $delivery->booking;
 
         if (! $booking instanceof Booking) {
