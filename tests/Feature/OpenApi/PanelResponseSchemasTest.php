@@ -957,3 +957,50 @@ function sprint11SchemaRef(array $node): string
 
     return '';
 }
+
+test('sprint 12 report, metric, waitlist and charter schemas name their enums', function (): void {
+    Gate::define('viewApiDocs', fn (): bool => true);
+
+    $response = $this->withoutMiddleware(RestrictedDocsAccess::class)
+        ->getJson('/docs/api.json')
+        ->assertOk();
+
+    /** @var array<string, mixed> $spec */
+    $spec = $response->json();
+
+    $metrics = openApiSchema($spec, 'MetricsResource');
+    expect($metrics['properties'])->toHaveKeys(['window', 'scope', 'metrics']);
+    $metricBody = $metrics['properties']['metrics']['properties'] ?? [];
+    expect($metricBody)->toHaveKey('occupancy');
+    $definition = $metricBody['occupancy']['properties']['definition']['properties'] ?? [];
+    expect($definition)->toHaveKeys(['sentence', 'filters_on', 'excludes']);
+
+    $definitionRow = openApiSchema($spec, 'ReportDefinitionResource');
+    expect($definitionRow['properties'])->toHaveKeys(['key', 'title', 'sentence', 'permission', 'formats', 'allowed']);
+
+    $run = openApiSchema($spec, 'ReportRunResource');
+    expect($run['properties'])->toHaveKeys(['status', 'formats', 'window_from', 'window_to']);
+    expect(sprint11SchemaRef($run['properties']['status']))->toContain('ReportRunStatus');
+
+    $subscription = openApiSchema($spec, 'ReportSubscriptionResource');
+    expect(sprint11SchemaRef($subscription['properties']['cadence']))->toContain('ReportCadence');
+
+    $waitlist = openApiSchema($spec, 'WaitlistEntryResource');
+    expect($waitlist['properties'])->toHaveKeys(['auto_notified', 'position']);
+    expect(sprint11SchemaRef($waitlist['properties']['cabin_category']))->toContain('CabinCategory');
+
+    $enquiry = openApiSchema($spec, 'CharterEnquiryResource');
+    expect($enquiry['properties'])->toHaveKeys(['proposal', 'sla_breached', 'booking']);
+    expect(sprint11SchemaRef($enquiry['properties']['status']))->toContain('CharterEnquiryStatus');
+
+    foreach (['ReportRunStatus', 'ReportCadence', 'CharterEnquiryStatus', 'CharterProposalState'] as $enum) {
+        $schema = $spec['components']['schemas'][$enum] ?? null;
+        expect($schema)->toBeArray();
+        expect($schema['enum'] ?? [])->not->toBeEmpty();
+    }
+
+    expect($spec['components']['schemas']['StoreReportRunRequest']['properties'] ?? null)->not->toBeEmpty();
+    expect($spec['components']['schemas']['UpdateReportSubscriptionRequest']['properties'] ?? null)->toHaveKey('active');
+    expect($spec['components']['schemas']['UpdateCharterEnquiryRequest']['properties'] ?? null)->toHaveKeys(['status', 'reason']);
+    expect($spec['components']['schemas']['IssueCharterProposalRequest']['properties'] ?? null)->toHaveKey('reason');
+});
