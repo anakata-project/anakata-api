@@ -157,3 +157,49 @@ Add the CRM B2B partner read model.
 EOF
 )"
 ```
+
+## Task 03 · Portal-initiated payment links
+
+`CreatePaymentLink::handle()` takes a staff `User`. The portal authenticates an `AgencyUser` on the `agency` guard, so that action cannot be the portal door. `CreatePortalPaymentLink` is a second door onto the same Stripe call.
+
+The shared work (booking-status guard, open-link guard, amount guard, `StripeGateway::createPaymentLink`, `PaymentLink` insert) lives in `IssuePaymentLink`. `CreatePaymentLink` still records `payment_link.created` with the staff user. The portal action does not call `CreatePaymentLink`.
+
+### Ownership
+
+The action throws `AuthorizationException` unless `bookings.agency_id` is set and equals the agency user's `agency_id`. Another agency's booking and a D2C booking (`agency_id` null) are 403. An unknown id stays the route's 404. This is the same `agency_id` filter `PortalBookingController::index` already uses.
+
+The body is `{ kind }` only (`DEPOSIT` or `BALANCE`). An `amount` in the body is not a validated field, and the action passes only `kind` into the issuer, so the amount is always `depositAmount()` or `balanceFresh()`.
+
+A second open link of the same kind is 422 on `kind`, the same refusal `CreatePaymentLink` already returns. The task text also said "return the existing link". Sprint 5's staff test refuses the duplicate. The portal matches that.
+
+### History
+
+`change_history.actor_id` is a foreign key to `users`. `History::record()` types its actor as `?User`. An `AgencyUser` cannot be that actor, and no migration was added. The portal row uses `actorLabel` `{name} via portal`, `actor_id` null, and `agency_user_id` in context. `source` is already `portal` for `/api/portal/...`.
+
+`payment_links.created_by` is the same staff foreign key. The action switches the default auth driver to `web` for the transaction (the `SubmitPortalRequest` pattern) so `HasAuditColumns` does not write the agency user id into `created_by`. The column stays null. The RMS booking history timeline already prints `actor_label`, so a portal link shows `{name} via portal` and a staff link stays the staff name. The payments tab does not label a creator. No panel change.
+
+### Settlement
+
+`ProcessStripeEvent` loads the link by `stripe_id`. A portal-created link settles through the existing webhook. That pipeline was not edited. Cancelling a link stays `CancelPaymentLink` (staff only).
+
+### Git
+
+Not run:
+
+```bash
+git add \
+  app/Actions/Payments/CreatePaymentLink.php \
+  app/Actions/Payments/CreatePortalPaymentLink.php \
+  app/Actions/Payments/IssuePaymentLink.php \
+  app/Http/Controllers/Portal/PortalBookingController.php \
+  app/Http/Requests/Portal/CreatePortalPaymentLinkRequest.php \
+  docs/sprints/sprint-15/REPORT.md \
+  routes/api/portal.php \
+  tests/Feature/Portal/PortalPaymentLinkTest.php
+
+git commit -m "$(cat <<'EOF'
+Let an agency user open a payment link for their own booking.
+
+EOF
+)"
+```
