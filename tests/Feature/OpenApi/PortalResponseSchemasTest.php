@@ -131,9 +131,18 @@ test('portal OpenAPI schemas have properties and name their enums', function ():
     expect($net['suite_pp']['type'] ?? null)->toBe('integer');
     expect($net['owner_pp']['type'] ?? null)->toBe('integer');
 
-    portalSchemaRef(portalOpenApiSchema($spec, 'PortalBookingResource')['properties']['status'], 'BookingStatus');
+    $portalBooking = portalOpenApiSchema($spec, 'PortalBookingResource');
+    portalSchemaRef($portalBooking['properties']['status'], 'BookingStatus');
+    expect($portalBooking['properties']['id']['type'] ?? null)->toBe('integer');
+    expect($portalBooking['properties']['open_payment_kinds']['type'] ?? null)->toBe('array');
+
     portalSchemaRef(portalOpenApiSchema($spec, 'PortalCommissionResource')['properties']['status'], 'CommissionAccrualStatus');
-    portalSchemaRef(portalOpenApiSchema($spec, 'PortalRequestResource')['properties']['status'], 'BookingStatus');
+
+    $portalRequest = portalOpenApiSchema($spec, 'PortalRequestResource');
+    portalSchemaRef($portalRequest['properties']['status'], 'BookingStatus');
+    expect($portalRequest['properties']['id']['type'] ?? null)->toBe('integer');
+    expect($portalRequest['properties'])->toHaveKey('payment_state');
+    expect($portalRequest['properties']['open_payment_kinds']['type'] ?? null)->toBe('array');
 
     $created = portalOpenApiSchema($spec, 'PortalRequestCreatedResource');
     portalSchemaRef($created['properties']['status'], 'BookingStatus');

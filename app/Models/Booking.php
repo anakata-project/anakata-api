@@ -10,6 +10,7 @@ use App\Enums\BookingStatus;
 use App\Enums\BookingType;
 use App\Enums\ChannelOfOrigin;
 use App\Enums\MainChannel;
+use App\Enums\PaymentLinkStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\Permission;
 use App\Enums\PngCategory;
@@ -746,6 +747,25 @@ class Booking extends Model
             $balance >= $this->total => 'Awaiting deposit',
             default => 'Deposit received',
         };
+    }
+
+    /**
+     * Kinds of payment links that are still open. An already loaded
+     * paymentLinks relation is reused so a list does not query per row.
+     *
+     * @return list<string>
+     */
+    public function openPaymentKinds(): array
+    {
+        $links = $this->relationLoaded('paymentLinks')
+            ? $this->paymentLinks
+            : $this->paymentLinks()->where('status', PaymentLinkStatus::Open)->get();
+
+        return $links
+            ->filter(fn (PaymentLink $link): bool => $link->status === PaymentLinkStatus::Open)
+            ->map(fn (PaymentLink $link): string => $link->kind->value)
+            ->values()
+            ->all();
     }
 
     public function commissionAmount(): int

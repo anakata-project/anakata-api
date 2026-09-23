@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Portal;
 
 use App\Actions\Payments\CreatePortalPaymentLink;
+use App\Enums\PaymentLinkStatus;
 use App\Http\Requests\Portal\CreatePortalPaymentLinkRequest;
 use App\Http\Resources\Portal\PortalBookingResource;
 use App\Http\Resources\Rms\PaymentLinkResource;
@@ -23,7 +24,12 @@ final class PortalBookingController extends PortalController
 
         $bookings = Booking::query()
             ->where('agency_id', $agency->id)
-            ->with(['departure.itinerary', 'contact', 'guests'])
+            ->with([
+                'departure.itinerary',
+                'contact',
+                'guests',
+                'paymentLinks' => fn ($query) => $query->where('status', PaymentLinkStatus::Open),
+            ])
             ->withChargesSummary()
             ->withLedgerAggregates()
             ->orderByDesc('id')

@@ -20,10 +20,13 @@ class PortalRequestResource extends JsonResource
 
     /**
      * @return array{
+     *     id: int,
      *     reference: string|null,
      *     status: BookingStatus,
      *     lead_guest: string,
-     *     next: string
+     *     next: string,
+     *     payment_state: string,
+     *     open_payment_kinds: list<string>
      * }
      */
     public function toArray(Request $request): array
@@ -31,10 +34,13 @@ class PortalRequestResource extends JsonResource
         $this->resource->loadMissing(['contact', 'guests']);
 
         return [
+            'id' => $this->id,
             'reference' => $this->displayReference(),
             'status' => $this->bookingStatus(),
             'lead_guest' => PortalPreview::leadGuestName($this->resource),
             'next' => PortalRequestWords::forBooking($this->resource),
+            'payment_state' => $this->resource->paymentStateWords(),
+            'open_payment_kinds' => $this->resource->openPaymentKinds(),
         ];
     }
 

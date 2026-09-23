@@ -7,6 +7,7 @@ use App\Enums\PaymentKind;
 use App\Enums\PaymentLinkStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\BookingRequest;
 use App\Models\ChangeHistory;
 use App\Models\Payment;
 use App\Models\PaymentLink;
@@ -16,6 +17,7 @@ use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\Bookings\ReservationFixtures;
 
 beforeEach(function (): void {
     $this->seed(RolesSeeder::class);
@@ -244,6 +246,68 @@ test('an unsigned portal session cannot open a payment link', function (): void 
         ->assertUnauthorized();
 
     expect(PaymentLink::query()->count())->toBe(0);
+});
+
+test('portal lists name the booking id and only open payment kinds for this agency', function (): void {
+    $agency = approvedAgency();
+    $other = approvedAgency();
+    $user = agencyUser([], $agency);
+    $booking = pendingCabin([
+        'agency_id' => $agency->id,
+        'reference' => 'ANK-2026-1510',
+        'departure' => ReservationFixtures::anamaraDeparture('2027-11-07'),
+    ]);
+    $theirs = pendingCabin([
+        'agency_id' => $other->id,
+        'reference' => 'ANK-2026-1511',
+        'departure' => ReservationFixtures::anamaraDeparture('2027-11-14'),
+    ]);
+    $requestBooking = pendingCabin([
+        'agency_id' => $agency->id,
+        'reference' => null,
+        'request_reference' => 'ANK-R-2026-1512',
+        'status' => BookingStatus::Requested,
+        'departure' => ReservationFixtures::anamaraDeparture('2027-11-21'),
+    ]);
+    BookingRequest::factory()->create(['booking_id' => $requestBooking->id]);
+
+    PaymentLink::factory()->create([
+        'booking_id' => $booking->id,
+        'kind' => PaymentKind::Deposit,
+        'status' => PaymentLinkStatus::Open,
+    ]);
+    PaymentLink::factory()->create([
+        'booking_id' => $booking->id,
+        'kind' => PaymentKind::Balance,
+        'status' => PaymentLinkStatus::Paid,
+    ]);
+    PaymentLink::factory()->create([
+        'booking_id' => $theirs->id,
+        'kind' => PaymentKind::Deposit,
+        'status' => PaymentLinkStatus::Open,
+    ]);
+
+    $listed = $this->actingAs($user, 'agency')
+        ->withHeaders(portalHeaders())
+        ->getJson('/api/portal/bookings')
+        ->assertOk();
+
+    $row = collect($listed->json('data'))->firstWhere('reference', 'ANK-2026-1510');
+    expect($row)->toBeArray()
+        ->and($row['id'])->toBe($booking->id)
+        ->and($row['open_payment_kinds'])->toBe([PaymentKind::Deposit->value])
+        ->and(collect($listed->json('data'))->pluck('id')->all())->not->toContain($theirs->id)
+        ->and(collect($listed->json('data'))->pluck('reference')->all())->not->toContain('ANK-2026-1511');
+
+    $requests = $this->actingAs($user, 'agency')
+        ->withHeaders(portalHeaders())
+        ->getJson('/api/portal/requests')
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $requestBooking->id)
+        ->assertJsonPath('data.0.payment_state', 'Awaiting deposit')
+        ->assertJsonPath('data.0.open_payment_kinds', []);
+
+    expect(collect($requests->json('data'))->pluck('id')->all())->not->toContain($theirs->id);
 });
 
 test('an unknown booking id is not found', function (): void {

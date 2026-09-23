@@ -124,7 +124,17 @@ test('a portal request matches an engine request and freezes the agency commissi
         ->assertJsonPath('data.0.lead_guest', 'Elena Guest')
         ->assertJsonPath('data.0.next', $response->json('message'));
 
-    expect(array_keys($listed->json('data.0')))->toBe(['reference', 'status', 'lead_guest', 'next']);
+    expect(array_keys($listed->json('data.0')))->toBe([
+        'id',
+        'reference',
+        'status',
+        'lead_guest',
+        'next',
+        'payment_state',
+        'open_payment_kinds',
+    ]);
+    expect($listed->json('data.0.id'))->toBe($booking->id);
+    expect($listed->json('data.0.open_payment_kinds'))->toBe([]);
 
     asStaff();
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Portal;
 
 use App\Actions\Portal\SubmitPortalRequest;
+use App\Enums\PaymentLinkStatus;
 use App\Http\Requests\Portal\StorePortalRequestRequest;
 use App\Http\Resources\Portal\PortalRequestCreatedResource;
 use App\Http\Resources\Portal\PortalRequestResource;
@@ -23,7 +24,14 @@ final class PortalRequestController extends PortalController
         $bookings = Booking::query()
             ->where('agency_id', $agency->id)
             ->whereHas('bookingRequest')
-            ->with(['contact', 'guests', 'bookingRequest'])
+            ->with([
+                'contact',
+                'guests',
+                'bookingRequest',
+                'paymentLinks' => fn ($query) => $query->where('status', PaymentLinkStatus::Open),
+            ])
+            ->withChargesSummary()
+            ->withLedgerAggregates()
             ->orderByDesc('id')
             ->paginate($perPage);
 

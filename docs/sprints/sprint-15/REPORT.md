@@ -474,3 +474,99 @@ Record the CRM B2B Partners page.
 EOF
 )"
 ```
+
+## Task 07 · Portal Pay Now
+
+An agent can start a deposit or balance payment from their own request or booking. The portal opens Stripe's hosted page. It never collects card data.
+
+### Portal inventory
+
+`anakata-portal` is a Nuxt 4 SPA on port 3002 (`ssr: false`). It extends the sibling `anakata-ui` layer, and falls back to `github:anakata-project/anakata-ui#v0.16.0` when that sibling is absent. Scripts are `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. Pages call `useApi().request`. Types are re-exported from `#anakata-ui/app/types` in `app/types/api.ts`. Session state is `usePortalSession`. `auth.global` sends a signed-out visitor to `/login`. There is no per-booking permission helper. The lists are already this agency's rows.
+
+Pages: `/login`, `/forgot`, `/accept`, `/reset-password`, `/`, `/rates`, `/availability`, `/requests`, `/requests/new`, `/bookings`, `/commissions`, `/materials`. There is no `[reference].vue`. A booking opens a `USlideover` (`data-booking-drawer`) on `/bookings`. `/requests` was a table only. Copy is English (`i18n/locales/en.json`). There was no Stripe code and no shared payment component in `anakata-ui`.
+
+### Why the lists changed
+
+`POST /api/portal/bookings/{booking}/payment-link` takes a numeric booking id. `PortalBookingResource` and `PortalRequestResource` returned `reference` and not `id`, and neither said whether a link was already open. The button could not be addressed or hidden.
+
+Both resources now include `id` and `open_payment_kinds` (values of links with status `OPEN`). The request resource also includes `payment_state`, the same three sentences as bookings. Both indexes eager-load open payment links. The request index also uses `withChargesSummary()` and `withLedgerAggregates()`, which the booking index already used, so `paymentStateWords()` does not query per row. `Booking::openPaymentKinds()` reuses a loaded relation. No new route. Cancel stays staff-only. Stripe success and cancel URLs are unchanged.
+
+A second open link of the same kind is still 422. The button is hidden when that kind is already in `open_payment_kinds`, so the agent is not sent into that refusal on the normal path.
+
+### Pay Now
+
+`portalPayKind` returns one kind, or nothing:
+
+- `CANCELLED`, `CANCELLED_POSTPAID`, and `RELEASED` show nothing.
+- `Awaiting deposit` without an open `DEPOSIT` link shows Pay deposit.
+- `Deposit received` without an open `BALANCE` link shows Pay balance.
+- `Paid in full` shows nothing.
+
+`PortalPayButton` posts `{ kind }` and calls `window.location.assign` on `PaymentLink.url`. A 422 or 403 is shown with `portalPageMessages()`. There is no Stripe.js, no card field, and no cancel action. The booking slideover and a new request slideover (`data-request-drawer`) both use that button. The portal does not poll. Status updates when `/bookings` or `/requests` loads again.
+
+`PaymentLink` and `PortalPaymentLinkInput` are re-exported from the portal's `app/types/api.ts`. `api.d.ts` went from 18374 lines to 18380. No `anakata-ui` tag. The github pin `#v0.16.0` does not include `id` or `open_payment_kinds` until a later release. Local typecheck uses the sibling layer.
+
+### Checks
+
+Pint on the touched PHP passed. Larastan on those files reported no errors. `php artisan test` passed for the new list assertion, the portal request key list, the OpenAPI schema test, and the bookings list query-count test.
+
+Portal `pnpm lint`, `pnpm test` (42), `pnpm typecheck`, and `pnpm build` passed.
+
+### Browser
+
+The dev server was already signed in as Browser Check (Blue Latitude). No seed reset.
+
+`/bookings` showed a REQUESTED row (Task Guest, awaiting deposit) and `ANK-2026-0007` (CONFIRMED, deposit received). The first drawer said Pay deposit. The confirmed drawer said Pay balance. The drawer had no `input` and no `iframe`. Pay deposit left the portal for `https://buy.stripe.com/test/plink_test_001`, the fake gateway's hosted URL. After reload, that request no longer showed Pay deposit. `ANK-2026-0007` still showed Pay balance. `/requests` opened `ANK-R-2026-0043` in the new drawer and hid Pay, because that row is the same booking and the link is now open. No other agency's reference was on either list.
+
+That check wrote one open deposit link (`plink_test_001`) on the Task Guest booking in the local database.
+
+### Git
+
+Not run:
+
+```bash
+# anakata-api
+git add \
+  app/Http/Controllers/Portal/PortalBookingController.php \
+  app/Http/Controllers/Portal/PortalRequestController.php \
+  app/Http/Resources/Portal/PortalBookingResource.php \
+  app/Http/Resources/Portal/PortalRequestResource.php \
+  app/Models/Booking.php \
+  docs/sprints/sprint-15/REPORT.md \
+  tests/Feature/OpenApi/PortalResponseSchemasTest.php \
+  tests/Feature/Portal/PortalPaymentLinkTest.php \
+  tests/Feature/Portal/PortalRequestsTest.php
+git commit -m "$(cat <<'EOF'
+Expose booking id and open payment kinds on the portal lists.
+
+The pay route needs the id, and the portal hides Pay when that kind is already open.
+EOF
+)"
+
+# anakata-ui
+git add \
+  app/types/api.d.ts \
+  app/types/portal.ts
+git commit -m "$(cat <<'EOF'
+Regenerate portal list types for pay.
+
+EOF
+)"
+
+# anakata-portal
+git add \
+  app/components/PortalPayButton.vue \
+  app/pages/bookings.vue \
+  app/pages/requests/index.vue \
+  app/types/api.ts \
+  app/utils/portalPay.ts \
+  i18n/locales/en.json \
+  tests/components/portalBusiness.test.ts \
+  tests/unit/portalPay.test.ts
+git commit -m "$(cat <<'EOF'
+Let an agent start a hosted deposit or balance payment.
+
+The portal posts the existing payment-link route and opens the returned URL. It does not collect card data.
+EOF
+)"
+```

@@ -19,18 +19,21 @@ class PortalBookingResource extends JsonResource
 
     /**
      * @return array{
+     *     id: int,
      *     reference: string|null,
      *     departure_date: string,
      *     itinerary: string,
      *     status: BookingStatus,
      *     lead_guest: string,
      *     net_due: int,
-     *     payment_state: string
+     *     payment_state: string,
+     *     open_payment_kinds: list<string>
      * }
      */
     public function toArray(Request $request): array
     {
         return [
+            'id' => $this->id,
             'reference' => $this->reference,
             'departure_date' => $this->departure->date->toDateString(),
             'itinerary' => $this->departure->itinerary->code,
@@ -38,6 +41,7 @@ class PortalBookingResource extends JsonResource
             'lead_guest' => PortalPreview::leadGuestName($this->resource),
             'net_due' => PortalPreview::netDue($this->resource),
             'payment_state' => $this->resource->paymentStateWords(),
+            'open_payment_kinds' => $this->resource->openPaymentKinds(),
         ];
     }
 
