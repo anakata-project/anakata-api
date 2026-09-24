@@ -646,3 +646,142 @@ Record the panel Spanish locale.
 EOF
 )"
 ```
+
+## Task 09 · E2E scenarios, batch B20
+
+Scenario files, two helpers, one seed row, and the catalogue. **B20 was not run.** No `bin/batch.sh`, no `ledger.sh`, no Pest, no browser walk.
+
+### Heads when this task was written
+
+| Repo | HEAD |
+|---|---|
+| anakata-api | `911e87f88be3d69ba03c8cdca9b7cbead2a6f17f` |
+| anakata-ui | `275a80c4e17e46b0af0855bfd97304e4b5b4efd5` |
+| anakata-panel | `f38d2a53cc8929f40f875dfd5db598cc1641029d` |
+| anakata-engine | `ac37c6d9a853f155257719c134e669c3a6b09614` |
+| anakata-portal | `16db30c96b78d6e6de18bd3ed0912a3b6cfb78c6` |
+
+These are the commits at write time. Sprint 15 work above them may still be uncommitted.
+
+### Helpers
+
+`tests/e2e/bin/setup.sh`:
+
+- `inject-inbound-email <email@anakata.test> <subject> <body>` posts to Mailpit `POST /api/v1/send` (the store `MailpitMailbox` reads), then runs `PollInboxJob::handle()` once. It refuses any from-address that does not end `@anakata.test`. It does not wait for the scheduler and it does not call Graph. It prints `conversation_id`, `contact_id`, `unread`, and `message_id`.
+- `portal-pay <reference> <DEPOSIT|BALANCE>` calls `CreatePortalPaymentLink` as Ada (`ada@portal.test`). It prints `url` and `status`. Another agency's booking throws `AuthorizationException` (`This booking is not available to your agency.`). The helper dies and inserts no link.
+
+### Seed
+
+`DemoAgenciesSeeder` calls `ResolveContact` for every `seed-data.json` agency and does not dispatch `AgencyApproved`. No seeded agency was the no-contact case. `seedUnmatchedAgency()` adds `AG-004` Unmatched B2B, `nobody-b2b@anakata.test`, `PENDING`, outside that loop, with no `AgencyApproved`. Commission `10` and payment terms `30 days post-cruise · wire` are copied from AG-001 so the non-null columns are filled. The agency sequence floor is 4.
+
+No active `b2b_partner_activation` enrolment was added. `JourneysSeeder` leaves that journey inactive, and `JourneyEngine::enrol()` returns null until it is on. Seeding an enrolment would break the Sprint 14 fresh-seed contract (all eight journeys inactive). `B2B-04` turns the journey on, then approves Andes Luxe Travel (`AG-003`), which is the real `AgencyApproved` path.
+
+### Scenarios
+
+Batch **B20**. Tag `sprint-15`. `LOCALE-01` is P2. The rest are P1.
+
+| ID | File |
+|---|---|
+| INBOX-01 | `tests/e2e/scenarios/crm/INBOX-01-matched-unread.md` |
+| INBOX-02 | `tests/e2e/scenarios/crm/INBOX-02-reply-threads.md` |
+| INBOX-03 | `tests/e2e/scenarios/crm/INBOX-03-link-unmatched.md` |
+| B2B-04 | `tests/e2e/scenarios/crm/B2B-04-activation-matches-drawer.md` |
+| B2B-05 | `tests/e2e/scenarios/crm/B2B-05-no-contact.md` |
+| PORTAL-PAY-01 | `tests/e2e/scenarios/portal/PORTAL-PAY-01-deposit-settles.md` |
+| PORTAL-PAY-02 | `tests/e2e/scenarios/portal/PORTAL-PAY-02-other-agency-refused.md` |
+| LOCALE-01 | `tests/e2e/scenarios/panel/LOCALE-01-spanish-persists.md` |
+
+Counts and sentences are cited in `tests/e2e/fixtures/reference-values.md` under **Sprint 15**. Rows are in `tests/e2e/scenarios/INDEX.md`. The sprint README lists the ids.
+
+### Git
+
+Not run:
+
+```bash
+cd /home/mohammad/Code/iconic/anakata/anakata-api
+git add \
+  database/seeders/DemoAgenciesSeeder.php \
+  docs/sprints/sprint-15/README.md \
+  docs/sprints/sprint-15/REPORT.md \
+  tests/e2e/README.md \
+  tests/e2e/bin/setup.sh \
+  tests/e2e/fixtures/reference-values.md \
+  tests/e2e/scenarios/INDEX.md \
+  tests/e2e/scenarios/crm/INBOX-01-matched-unread.md \
+  tests/e2e/scenarios/crm/INBOX-02-reply-threads.md \
+  tests/e2e/scenarios/crm/INBOX-03-link-unmatched.md \
+  tests/e2e/scenarios/crm/B2B-04-activation-matches-drawer.md \
+  tests/e2e/scenarios/crm/B2B-05-no-contact.md \
+  tests/e2e/scenarios/panel/LOCALE-01-spanish-persists.md \
+  tests/e2e/scenarios/portal/PORTAL-PAY-01-deposit-settles.md \
+  tests/e2e/scenarios/portal/PORTAL-PAY-02-other-agency-refused.md
+git commit -m "$(cat <<'EOF'
+Add Sprint 15 e2e scenarios for the inbox, B2B partners, and portal pay.
+
+Batch B20 is written and not run. The no-contact agency is a local seed row.
+EOF
+)"
+```
+
+## Sprint 15 summary
+
+### Done
+
+- Inbound mail is polled from Mailpit (Graph when keys exist). Conversations and messages, contact match without creating a contact, staff reply on the existing mailer.
+- CRM inbox: list, thread, reply, link.
+- CRM B2B partners: read-only list and drawer from agencies, contacts, ledger figures, deals, and `b2b_partner_activation`.
+- Portal payment links: `CreatePortalPaymentLink` for the agency's own booking. Pay deposit / Pay balance on the portal slideovers. Settlement is the existing Stripe path.
+- Types released as `anakata-ui` `v0.16.0` (tag not pushed). Panel, engine, and portal pins say `#v0.16.0`.
+- Panel Spanish, cookie `anakata_panel_locale`. Engine and portal copy stay English.
+
+### Open questions
+
+- **Webhook vs poll.** Production mail is SMTP. There is no public HTTPS callback and no Graph subscription to renew. Inbound is `anakata:inbox-poll` (Mailpit locally, Graph only when `GRAPH_*` keys exist). Production inbound stays dark until TEC-002 keys exist. No IMAP.
+- **Producing partners.** The prototype count has no rule. Revenue and commission accrued stay the RMS ledger figures. The list has no `meta.kpis`. This waits on a business definition of producing.
+- **Portal shape (Task 07).** `anakata-portal` is a Nuxt 4 SPA on port 3002. Pay lives on the booking slideover and the request slideover. There is no `[reference].vue`. List resources gained `id` and `open_payment_kinds`. Those fields are in the sibling layer types and are not in the pushed `v0.16.0` pin until a later release.
+- **Dates and money.** `useDates()` and `useMoney()` stay en-US. They are shared with the engine and the portal. Spanish is panel chrome only. `crmPrivacy.notice` and `crmPrivacy.pending` stay English (pending client legal text).
+
+### Still unbuilt
+
+Go-live readiness is unplanned: infrastructure, backups, monitoring, data migration, runbooks. This sprint does not touch it.
+
+Also still out: attachments, compose-new, a Graph webhook, IMAP, WhatsApp (TEC-005), Graph send, and Spanish on the engine or the portal.
+
+### Merge commands
+
+Not run. Per repo, in task order. Each block is the command already printed in that task, then Task 09.
+
+**anakata-api**
+
+1. Task 01 — inbox schema, poll, reply.
+2. Task 02 — B2B read model.
+3. Task 03 — `CreatePortalPaymentLink`.
+4. Task 04 — schema types on the resources.
+5. Task 05 — report only.
+6. Task 06 — report only.
+7. Task 07 — portal list `id` and `open_payment_kinds`.
+8. Task 08 — report only.
+9. Task 09 — the `git add` / `git commit` in the Task 09 section above.
+
+**anakata-ui**
+
+1. Task 04 — release `v0.16.0`, then `git tag v0.16.0`, `git push origin HEAD`, `git push origin v0.16.0`.
+2. Task 07 — regenerate portal list types. No new tag.
+
+**anakata-panel**
+
+1. Task 04 — pin `#v0.16.0` (`README.md`, `nuxt.config.ts`).
+2. Task 05 — inbox page.
+3. Task 06 — B2B Partners page.
+4. Task 08 — Spanish locale.
+
+**anakata-engine**
+
+1. Task 04 — pin `#v0.16.0` (`README.md`, `nuxt.config.ts`).
+
+**anakata-portal**
+
+1. Task 04 — pin `#v0.16.0` (`README.md`, `nuxt.config.ts`).
+2. Task 07 — Pay Now button, request drawer, portal pay helper.
+
+The file lists for tasks 01–08 are in those sections. Do not squash them into one commit per repo if the history of this sprint is meant to stay one commit per task.

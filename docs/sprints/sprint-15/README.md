@@ -37,3 +37,7 @@ Confirmed directly against `anakata-api`, `anakata-panel`, `anakata-ui`, and `an
 | 9 | anakata-api / anakata-panel | E2E scenarios |
 
 Each task appends its section to `docs/sprints/sprint-15/REPORT.md` in `anakata-api`, in order, the same convention every prior sprint follows.
+
+## E2E scenarios this sprint adds (task 09)
+
+`INBOX-01`, `INBOX-02`, `INBOX-03`, `B2B-04`, `B2B-05`, `PORTAL-PAY-01`, `PORTAL-PAY-02`, `LOCALE-01`, batch B20. P1 is every id except `LOCALE-01`. B20 was not run.

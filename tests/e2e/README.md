@@ -61,6 +61,8 @@ tests/e2e/bin/setup.sh agency-over-cap AG-002
 tests/e2e/bin/setup.sh journey-due 1
 tests/e2e/bin/setup.sh abandoned-checkout e2e.cart@anakata.test
 tests/e2e/bin/setup.sh hard-bounce ANK-2026-0018
+tests/e2e/bin/setup.sh inject-inbound-email whitfield.anna@anakata.test "Cabin question" "Is the master cabin free?"
+tests/e2e/bin/setup.sh portal-pay ANK-R-2026-0043 DEPOSIT
 ```
 
 `replay-stripe-checkout.sh` is the FakeStripe / empty-key path for PAY-05 (OPEN payment link) and WEB-08 / WEB-09 (engine Checkout Session). It posts `checkout.session.completed` twice (same event id), or `checkout.session.expired` with `--expired`. Test-mode cards only — never live mode.
@@ -68,6 +70,8 @@ tests/e2e/bin/setup.sh hard-bounce ANK-2026-0018
 `setup.sh` calls existing agency and portal actions inside the `app` container. `portal-user` prints an accepted login (`password`). `portal-invite` prints the Mailpit accept URL and does not store the token in a scenario. `portal-suspend` and `portal-resume` use the reasons `E2E portal suspend` and `E2E portal resume`. `agency-over-cap` reads the commission cap and raises the agency only when it is not already above it. The invite mail is queued: Horizon must be running.
 
 `journey-due` sets that enrolment's `next_due_at` one minute in the past, runs `php artisan anakata:journeys` once, and prints status, position, branch, and the latest `template_version`. One call advances only steps that are already due after the move. `abandoned-checkout` accepts only `@anakata.test`. It turns Nurture on, captures the lead (which stitches the session and enrols the `lead` branch), records one `abandon_cart`, then runs `anakata:journeys` so the `abandoned_checkout` branch enrols. It refuses an address that already has a booking. `hard-bounce` takes that contact's email or an `ANK-` booking reference. Seeded A. Fontaine has no email, so pass `ANK-2026-0018`. It issues or reuses the invoice, queues a resend with the queue faked, and calls `SendDeliveryJob::handle` while `Mail::send` throws `550 5.1.1 user unknown`. Nothing is delivered. Horizon must not also send that delivery.
+
+`inject-inbound-email` accepts only `@anakata.test`. It posts the message to Mailpit, then runs `PollInboxJob` once. It does not wait for the scheduler and it does not call Graph. It prints `conversation_id`, `contact_id` (null when unmatched), `unread`, and `message_id`. `portal-pay` calls `CreatePortalPaymentLink` as Ada (`ada@portal.test`) and prints `url` and `status`. A booking that is not AG-001 makes the helper die and creates no link. The reply mail from the inbox is queued: Horizon must be running before `mail-find.sh` can see it.
 
 ## 5. Agent rules
 

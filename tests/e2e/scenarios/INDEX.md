@@ -168,3 +168,11 @@ The latest result for every P1 is [`runs/LEDGER.md`](../runs/LEDGER.md).
 | UNSUB-01 | The unsubscribe link withdraws, suppresses, and exits | sprint-14, crm | P1 | B19 | Guest + Carolina | [crm/UNSUB-01-link-withdraws.md](crm/UNSUB-01-link-withdraws.md) |
 | CART-01 | A ticked checkout abandon keeps the contact and enrols recovery | sprint-14, crm | P1 | B19 | Guest + Carolina | [crm/CART-01-tick-and-abandon.md](crm/CART-01-tick-and-abandon.md) |
 | CART-02 | Abandon without the tick stores nothing | sprint-14, crm | P1 | B19 | Guest | [crm/CART-02-abandon-without-tick.md](crm/CART-02-abandon-without-tick.md) |
+| INBOX-01 | An inbound email from a known contact lands unread | sprint-15, crm | P1 | B20 | Carolina | [crm/INBOX-01-matched-unread.md](crm/INBOX-01-matched-unread.md) |
+| INBOX-02 | A staff reply is threaded to the inbound message | sprint-15, crm | P1 | B20 | Carolina | [crm/INBOX-02-reply-threads.md](crm/INBOX-02-reply-threads.md) |
+| INBOX-03 | An unmatched inbound email can be linked to a contact | sprint-15, crm | P1 | B20 | Carolina | [crm/INBOX-03-link-unmatched.md](crm/INBOX-03-link-unmatched.md) |
+| B2B-04 | An activation enrolment matches the journeys drawer | sprint-15, crm | P1 | B20 | Carolina | [crm/B2B-04-activation-matches-drawer.md](crm/B2B-04-activation-matches-drawer.md) |
+| B2B-05 | An agency with no CRM contact shows the no-enrolment sentence | sprint-15, crm | P1 | B20 | Carolina | [crm/B2B-05-no-contact.md](crm/B2B-05-no-contact.md) |
+| PORTAL-PAY-01 | An agent deposit link settles like a staff link | sprint-15, portal | P1 | B20 | Ada Agent + Carolina | [portal/PORTAL-PAY-01-deposit-settles.md](portal/PORTAL-PAY-01-deposit-settles.md) |
+| PORTAL-PAY-02 | Another agency's booking cannot be paid | sprint-15, portal | P1 | B20 | Ada Agent | [portal/PORTAL-PAY-02-other-agency-refused.md](portal/PORTAL-PAY-02-other-agency-refused.md) |
+| LOCALE-01 | Spanish panel chrome persists, then English returns | sprint-15, panel | P2 | B20 | Carolina | [panel/LOCALE-01-spanish-persists.md](panel/LOCALE-01-spanish-persists.md) |

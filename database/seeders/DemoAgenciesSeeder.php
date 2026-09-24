@@ -55,8 +55,9 @@ final class DemoAgenciesSeeder extends Seeder
             $this->seedAcceptedPortalUser();
             $this->attachApprovedBooking();
             $this->seedBlockedBooking();
+            $this->seedUnmatchedAgency();
 
-            app(ReferenceService::class)->ensureAtLeast(ReferenceType::Agency, 3);
+            app(ReferenceService::class)->ensureAtLeast(ReferenceType::Agency, 4);
             app(ReferenceService::class)->ensureAtLeast(ReferenceType::Booking, 21, 2026);
         });
     }
@@ -270,6 +271,30 @@ final class DemoAgenciesSeeder extends Seeder
             'commission_pct' => $agency->commission_pct,
             'cap_pct' => $cap,
         ], system: true);
+    }
+
+    /**
+     * B2B-05. Stays off the ResolveContact loop and does not dispatch AgencyApproved.
+     * Email match is the only CRM link. A row in seed-data.json would create a contact.
+     */
+    private function seedUnmatchedAgency(): void
+    {
+        Agency::query()->firstOrCreate(
+            ['reference' => 'AG-004'],
+            [
+                'name' => 'Unmatched B2B',
+                'contact' => 'Unmatched B2B',
+                'email' => 'nobody-b2b@anakata.test',
+                'country' => null,
+                'network' => null,
+                'commission_pct' => 10,
+                'payment_terms' => '30 days post-cruise · wire',
+                'status' => AgencyStatus::Pending,
+                'requested_at' => now(),
+                'decided_at' => null,
+                'decided_by' => null,
+            ],
+        );
     }
 
     private function carolina(): ?User

@@ -9,6 +9,8 @@
 #   setup.sh journey-due <enrolment-id>
 #   setup.sh abandoned-checkout <email@anakata.test>
 #   setup.sh hard-bounce <email|ANK-reference>
+#   setup.sh inject-inbound-email <email@anakata.test> <subject> <body>
+#   setup.sh portal-pay <ANK-or-ANK-R-reference> <DEPOSIT|BALANCE>
 set -euo pipefail
 
 # shellcheck source=./_lib.sh
@@ -18,7 +20,7 @@ PASSWORD="password"
 ACTOR_EMAIL="carolina@anakata.test"
 
 usage() {
-  die "usage: setup.sh portal-user|portal-invite|portal-suspend|portal-resume|agency-over-cap <AG-reference> | journey-due <enrolment-id> | abandoned-checkout <email@anakata.test> | hard-bounce <email|ANK-reference>"
+  die "usage: setup.sh portal-user|portal-invite|portal-suspend|portal-resume|agency-over-cap <AG-reference> | journey-due <enrolment-id> | abandoned-checkout <email@anakata.test> | hard-bounce <email|ANK-reference> | inject-inbound-email <email@anakata.test> <subject> <body> | portal-pay <ANK-or-ANK-R-reference> <DEPOSIT|BALANCE>"
 }
 
 run_tinker() {
@@ -575,6 +577,111 @@ PHP
   printf '%s\n' "${line}"
 }
 
+cmd_inject_inbound_email() {
+  local email subject body subject_b64 body_b64 code output line
+  email="$(require_anakata_email "${1:-}")"
+  subject="${2:-}"
+  body="${3:-}"
+  if [ -z "${subject}" ] || [ -z "${body}" ]; then
+    die "usage: setup.sh inject-inbound-email <email@anakata.test> <subject> <body>"
+  fi
+  subject_b64="$(printf '%s' "${subject}" | base64 | tr -d '\n')"
+  body_b64="$(printf '%s' "${body}" | base64 | tr -d '\n')"
+  code="$(cat <<PHP
+\$email = '${email}';
+\$subject = base64_decode('${subject_b64}');
+\$body = base64_decode('${body_b64}');
+\$to = (string) config('mail.from.address');
+if (\$to === '') {
+    \$to = 'inbox@anakata.test';
+}
+\$base = rtrim((string) config('anakata.inbox.mailpit_url'), '/');
+Illuminate\\Support\\Facades\\Http::acceptJson()->post(\$base.'/api/v1/send', [
+    'From' => ['Email' => \$email, 'Name' => \$email],
+    'To' => [['Email' => \$to]],
+    'Subject' => \$subject,
+    'Text' => \$body,
+])->throw();
+app(App\\Jobs\\PollInboxJob::class)->handle(
+    app(App\\Support\\Mail\\MailboxReader::class),
+    app(App\\Actions\\Crm\\CaptureInboundMessage::class),
+);
+\$message = App\\Models\\Message::query()
+    ->where('from', \$email)
+    ->where('subject', \$subject)
+    ->latest('id')
+    ->first();
+if (! \$message instanceof App\\Models\\Message) {
+    echo "E2E_JSON:".json_encode(['error' => 'injected message was not stored'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$message->load('conversation');
+echo "E2E_JSON:".json_encode([
+    'conversation_id' => \$message->conversation_id,
+    'contact_id' => \$message->conversation->contact_id,
+    'unread' => (bool) \$message->conversation->unread,
+    'message_id' => \$message->message_id,
+], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "inject-inbound-email failed: ${line:-no E2E_JSON}"
+  fi
+  printf '%s\n' "${line}"
+}
+
+cmd_portal_pay() {
+  local reference kind code output line
+  reference="${1:-}"
+  kind="${2:-}"
+  if ! printf '%s' "${reference}" | grep -Eq '^ANK-(R-)?[0-9]{4}-[0-9]+$'; then
+    die "reference must look like ANK-2026-0007 or ANK-R-2026-0043"
+  fi
+  if ! printf '%s' "${kind}" | grep -Eq '^(DEPOSIT|BALANCE)$'; then
+    die "kind must be DEPOSIT or BALANCE"
+  fi
+  code="$(cat <<PHP
+\$reference = '${reference}';
+\$kind = '${kind}';
+\$actor = App\\Models\\AgencyUser::query()->where('email', 'ada@portal.test')->first();
+if (! \$actor instanceof App\\Models\\AgencyUser) {
+    echo "E2E_JSON:".json_encode(['error' => 'missing ada@portal.test'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+\$booking = App\\Models\\Booking::query()
+    ->where('reference', \$reference)
+    ->orWhere('request_reference', \$reference)
+    ->first();
+if (! \$booking instanceof App\\Models\\Booking) {
+    echo "E2E_JSON:".json_encode(['error' => 'unknown reference ${reference}'], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+try {
+    \$link = app(App\\Actions\\Payments\\CreatePortalPaymentLink::class)->handle(\$booking, ['kind' => \$kind], \$actor);
+} catch (Illuminate\\Auth\\Access\\AuthorizationException \$exception) {
+    echo "E2E_JSON:".json_encode(['error' => \$exception->getMessage()], JSON_UNESCAPED_SLASHES)."\\n";
+    return;
+}
+echo "E2E_JSON:".json_encode([
+    'reference' => \$booking->reference ?? \$booking->request_reference,
+    'url' => \$link->url,
+    'status' => \$link->status->value,
+    'id' => \$link->id,
+], JSON_UNESCAPED_SLASHES)."\\n";
+PHP
+)"
+  output="$(run_tinker "${code}")"
+  printf '%s\n' "${output}"
+  line="$(json_line "${output}")"
+  if [ -z "${line}" ] || printf '%s' "${line}" | grep -q '"error"'; then
+    die "portal-pay failed: ${line:-no E2E_JSON}"
+  fi
+  printf '%s\n' "${line}"
+}
+
 command="${1:-}"
 shift || true
 
@@ -587,5 +694,7 @@ case "${command}" in
   journey-due) cmd_journey_due "${1:-}" ;;
   abandoned-checkout) cmd_abandoned_checkout "${1:-}" ;;
   hard-bounce) cmd_hard_bounce "${1:-}" ;;
+  inject-inbound-email) cmd_inject_inbound_email "${1:-}" "${2:-}" "${3:-}" ;;
+  portal-pay) cmd_portal_pay "${1:-}" "${2:-}" ;;
   *) usage ;;
 esac

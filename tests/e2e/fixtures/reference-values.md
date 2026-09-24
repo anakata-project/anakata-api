@@ -534,4 +534,52 @@ Not built, grey, `not_built_note`, no toggle:
 
 `balance_reminder_21` is switchable. Name: Balance reminder — 21 days.
 
+## Sprint 15 · inbox, B2B partners, portal pay, Spanish
+
+Nothing in this section was read off a reset screen. Heads when this section was written:
+
+| Repo | HEAD |
+|---|---|
+| anakata-api | `911e87f88be3d69ba03c8cdca9b7cbead2a6f17f` |
+| anakata-ui | `275a80c4e17e46b0af0855bfd97304e4b5b4efd5` |
+| anakata-panel | `f38d2a53cc8929f40f875dfd5db598cc1641029d` |
+| anakata-engine | `ac37c6d9a853f155257719c134e669c3a6b09614` |
+| anakata-portal | `16db30c96b78d6e6de18bd3ed0912a3b6cfb78c6` |
+
+### Inbox
+
+No seeder inserts `conversations` or `messages`. A fresh reset has an empty inbox.
+
+Matched sender: Anna Whitfield, `whitfield.anna@anakata.test` (`DemoRequestsSeeder::seedWaitlist`). Unlinked sender used by the scenarios: `unlinked.inbox@anakata.test`. That address is not in the seed. `inject-inbound-email` refuses any from-address that does not end `@anakata.test`.
+
+Opening a thread marks it read. Timeline kind is `conversation.message`. Title is `Email received` for `IN` and `Reply sent` for `OUT`. Detail is the subject (`ContactTimeline`).
+
+A reply sets `In-Reply-To` to the inbound `message_id`, subject `Re: ` plus the conversation subject, and history `conversation.replied`. It does not write `deliveries` (`SendConversationReply`).
+
+### B2B partners
+
+`b2b_partner_activation` is seeded inactive (`JourneysSeeder`). `JourneyEngine::enrol()` returns null while the journey is inactive. Step 1 name is `Welcome + rate agreement and materials`. The turn-on confirm quotes the contract `The approved agency agreement.`
+
+`DemoAgenciesSeeder` calls `ResolveContact` for every `seed-data.json` agency and does not dispatch `AgencyApproved`. After reset, AG-001, AG-002, and AG-003 have a CRM contact and no enrolment. The journey cell is `CRM contact matched. b2b_partner_activation is not enrolled.` (`crmB2b.notEnrolled`).
+
+AG-004 `Unmatched B2B`, email `nobody-b2b@anakata.test`, status `PENDING`, is inserted by `seedUnmatchedAgency()` with no `ResolveContact` and no `AgencyApproved`. Commission `10` and payment terms `30 days post-cruise · wire` are copied from AG-001 so the non-null columns are filled. The CRM row must show `B2bPartnerResource::NO_CONTACT_NOTE`: `No CRM contact matches this agency, so b2b_partner_activation was not enrolled.`
+
+Approving AG-003 (Andes Luxe Travel, PENDING, contact P. Ibáñez) after the journey is on dispatches `AgencyApproved` and enrols. That enrolment is not in the fresh seed.
+
+### Portal pay
+
+Ada Agent, `ada@portal.test`, agency AG-001. Password `password`.
+
+`ANK-2026-0007` is CONFIRMED and the deposit is already received. The portal button on that row is Pay balance, not Pay deposit.
+
+`ANK-2026-0021` belongs to AG-002. Ada's lists do not include it. `CreatePortalPaymentLink` throws `AuthorizationException` with `This booking is not available to your agency.` The HTTP route returns 403.
+
+The next request reference on a fresh reset, when this scenario is the first new request, is `ANK-R-2026-0043` (same sequence fact as PREQ-01). A portal deposit payment settles to `PaymentStatus::Settled` and the booking becomes `CONFIRMED` (`PortalPaymentLinkTest`). History actor label is `Ada Agent via portal`. `payment_links.created_by` stays null.
+
+### Spanish
+
+Cookie `anakata_panel_locale`. Default locale stays `en`. Dates and money stay en-US (`useDates`, `useMoney`). `crmPrivacy.notice` and `crmPrivacy.pending` stay the English legal text in `es.json`. Status pills that print an API code stay that code.
+
+Spot-check strings from `es.json`: nav `Bandeja — Correo · WhatsApp`, `Socios B2B`, inbox title `Bandeja de entrada`, B2B title `Socios B2B`, RMS nav `Calendario`, calendar empty state `No hay salidas en este intervalo de fechas.`, sign-out `Cerrar sesión`.
+
 
