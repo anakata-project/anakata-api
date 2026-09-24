@@ -570,3 +570,79 @@ The portal posts the existing payment-link route and opens the returned URL. It 
 EOF
 )"
 ```
+
+## Task 08 · Panel Spanish locale
+
+Staff can read the panel in Spanish. The booking engine and the portal were not changed. Guest and agent copy stays English.
+
+### Locale
+
+`anakata-panel` registers `es` next to the existing `en` entry. `@nuxtjs/i18n` is still not listed in the panel modules. `strategy` and `defaultLocale` stay on the layer (`no_prefix`, `en`). `detectBrowserLanguage` is off, so a Spanish browser does not switch the panel by itself.
+
+`fallbackLocale` is not a field on the panel `i18n` block in `@nuxtjs/i18n` 10. It is set in `i18n/i18n.config.ts`, and `usePanelLocale()` sets it to `en` at runtime so the layer's `theme.*` keys still resolve. Those three strings stay English (`◐ Light`, `◑ Dark`, `Toggle colour mode`). They are not in the panel `en.json`, so the parity test does not cover them.
+
+`html lang` is set from the active locale in the switcher. `setLocale` alone left `lang` on `en`.
+
+### Copy
+
+`i18n/locales/es.json` has every key in `en.json`, including `shell.localeAria`. Interpolation tokens match. Two values stay English because they are pending client legal text:
+
+- `crmPrivacy.notice`
+- `crmPrivacy.pending`
+
+Ordinary "pending" UI is translated. Email subjects, message bodies, partner names, and other API text are not. Inbox subjects stayed in the language they were sent. Status pills that print the API code (`OPEN`, `PENDING`, `APPROVED`) stay that code.
+
+### Switcher
+
+`ShellLocaleSwitch` sits immediately before `AnkThemeToggle` in the signed-in topbar and on the auth layout. Labels are `EN` and `ES`. The choice is the cookie `anakata_panel_locale` (one year, `SameSite=Lax`). No API field.
+
+Checked in the browser, dark and light: login, RMS calendar, `/crm/sales/inbox`, `/crm/sales/b2b-partners`. Chrome is Spanish. A reload keeps Spanish. Dates stay `23 Sep 2026`. Money stays `USD 46,550`.
+
+### Dates and money
+
+`useDates()` and `useMoney()` stay en-US. Both live in `anakata-ui` and are shared with the engine and the portal. Changing them would change guest and agent screens. Spanish is panel chrome only.
+
+### Tests
+
+`tests/unit/localeParity.test.ts` fails if a key exists in only one file, or if a `{token}` set differs. `tests/components/LocaleSwitch.test.ts` switches `shell.signOut` to "Cerrar sesión" without changing the route, then restores `es` from the cookie after the locale is set back to `en`.
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test` (300), and `pnpm build` passed. No `anakata-ui` release. The panel still prefers `../anakata-ui` when that folder exists.
+
+### Note for Task 09
+
+Default locale is still `en`. A scenario that leaves `anakata_panel_locale=es` will see Spanish on the next load.
+
+### Git
+
+Not run:
+
+```bash
+# anakata-panel
+git add \
+  app/assets/css/shell.css \
+  app/components/shell/LocaleSwitch.vue \
+  app/composables/usePanelLocale.ts \
+  app/layouts/auth.vue \
+  app/layouts/default.vue \
+  eslint.config.mjs \
+  i18n/i18n.config.ts \
+  i18n/locales/en.json \
+  i18n/locales/es.json \
+  nuxt.config.ts \
+  tests/components/LocaleSwitch.test.ts \
+  tests/unit/localeParity.test.ts
+git commit -m "$(cat <<'EOF'
+Add a Spanish locale to the staff panel.
+
+Staff can switch language in the topbar. The choice stays in a cookie. Dates and money stay en-US.
+EOF
+)"
+
+# anakata-api
+git add docs/sprints/sprint-15/REPORT.md
+git commit -m "$(cat <<'EOF'
+Record the panel Spanish locale.
+
+EOF
+)"
+```
