@@ -316,7 +316,7 @@ Refund Approvals after reset: `0 refunds · all dates` · `No refund requests in
 | ANK-R-2026-0042 | 28 Nov 2027 ANAMARA (DEP-007) | Suite 05 | Mateo | 50 h ago | L. Moreau |
 
 SLA on screen after reset: 0041 **19h**, 0042 **SLA BREACH — 26h**. ⚠ UNVERIFIED — task 09 browser at one clock time; seeder is relative to `now()`.
-Hold remaining on both rows: **45 business hours**. ⚠ UNVERIFIED — task 09 browser note (5 long-lead days × 540 min displayed as hours because &lt; 72 h).
+Hold remaining is live. Long-lead expiry is 18:00 Galápagos on the 5th business day after the submission day (that day does not count), shown in hours while under 72. 0041 (5 h ago) still reads **45 business hours** before that day's 09:00 open. 0042 (50 h ago) is the remainder, not 45 — **27 business hours** on a weekday morning before 09:00 when submission was the evening two calendar days earlier (Thu + Fri + the following Mon). The hour count moves as business time elapses.
 
 ### Waitlist
 
