@@ -34,6 +34,29 @@ class QuoteReservationRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'cabins.*.adults' => 'adults',
+            'cabins.*.children' => 'children',
+            'cabins.*.cabin_code' => 'cabin',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'cabins.*.adults.required' => 'At least 1 adult is required.',
+            'cabins.*.adults.integer' => 'At least 1 adult is required.',
+        ];
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $after): void {

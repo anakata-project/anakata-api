@@ -38,6 +38,21 @@ test('the eight reference prices come through the quote endpoint', function (arr
     'Charter festive' => [[['adults' => 8, 'children' => 0]], 'CHARTER', true, 211500, 42300],
 ]);
 
+test('a missing adult count uses the party message', function (): void {
+    $departure = ReservationFixtures::anamaraDeparture();
+
+    $this->actingAs(managerUser())
+        ->postJson('/api/rms/bookings/quote', [
+            'departure_id' => $departure->id,
+            'type' => 'CABIN',
+            'cabins' => [['cabin_code' => 'S1', 'children' => 0]],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'cabins.0.adults' => 'At least 1 adult is required.',
+        ]);
+});
+
 test('party errors and the child warning appear on the cabin', function (): void {
     $departure = ReservationFixtures::anamaraDeparture();
 
