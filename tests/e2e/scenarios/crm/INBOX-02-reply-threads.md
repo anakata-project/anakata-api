@@ -13,8 +13,8 @@ A reply goes to the original sender through the local mailer. The stored outboun
    ```bash
    tests/e2e/bin/setup.sh inject-inbound-email whitfield.anna@anakata.test "E2E inbox reply" "Can you hold Suite 03?"
    ```
-2. Keep the printed `message_id`. Open `http://localhost:3001/crm/sales/inbox` and open the row `E2E inbox reply`.
-3. In the composer, type `The suite is free for that Sunday.` Click **Send reply**.
+2. Keep the printed `message_id`. Open `http://localhost:3001/crm/sales/inbox` and open the conversation whose preview is `Can you hold Suite 03?`. The thread header subject is `E2E inbox reply`.
+3. In the composer, type `The suite is free for that Sunday.` Click **Send**.
 4. From `anakata-api` run `tests/e2e/bin/mail-find.sh --to whitfield.anna@anakata.test --subject "Re: E2E inbox reply"`.
 
 ## Expected

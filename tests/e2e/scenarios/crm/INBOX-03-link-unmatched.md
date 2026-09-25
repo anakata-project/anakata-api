@@ -14,7 +14,7 @@ An address with no contact stays unlinked. Linking does not create a contact. Af
    tests/e2e/bin/setup.sh inject-inbound-email unlinked.inbox@anakata.test "E2E inbox unlinked" "Hello from an address you do not have."
    ```
 2. Confirm the printed `contact_id` is null. Open `http://localhost:3001/crm/sales/inbox`.
-3. On the `E2E inbox unlinked` row, click **Link to contact**. Search `Whitfield`. Choose Anna Whitfield.
+3. Open the conversation whose preview is `Hello from an address you do not have.`. In the thread header, click **Link to contact**. Search `Whitfield`. Choose Anna Whitfield.
 4. Open `http://localhost:3001/crm/sales/contacts?open=<Anna's id>` and read the timeline. Use the contacts search if the id is not already known. Anna's email is `whitfield.anna@anakata.test`.
 
 ## Expected

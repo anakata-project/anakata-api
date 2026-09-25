@@ -14,14 +14,14 @@ Polled mail from a seeded contact opens a thread on that contact. The inbox show
    tests/e2e/bin/setup.sh inject-inbound-email whitfield.anna@anakata.test "E2E inbox matched" "Is the master cabin free on that Sunday?"
    ```
 2. Read `contact_id`, `conversation_id`, `unread`, and `message_id` from the printed JSON.
-3. Open `http://localhost:3001/crm/sales/inbox`. Find the row whose subject is `E2E inbox matched`.
-4. Open that row.
+3. Open `http://localhost:3001/crm/sales/inbox`. Find the conversation whose preview is `Is the master cabin free on that Sunday?`.
+4. Open that conversation.
 5. Open `http://localhost:3001/crm/sales/contacts?open=<contact_id>` and read the timeline.
 
 ## Expected
 - [ ] E1 · The helper prints `unread` true and a non-null `contact_id`.
-- [ ] E2 · The inbox row shows Anna Whitfield, subject `E2E inbox matched`, status `OPEN`, and the Unread pill (`crmInbox.unreadOnly`).
-- [ ] E3 · After the thread opens, that row no longer shows the Unread pill.
+- [ ] E2 · The conversation row shows Anna Whitfield, the message preview, an EMAIL tag, and a coral unread dot. The thread header shows subject `E2E inbox matched` and status `OPEN`.
+- [ ] E3 · After the thread opens, that row no longer shows the unread dot.
 - [ ] E4 · The contact timeline has one line whose kind is `conversation.message`, title is `Email received`, and detail is `E2E inbox matched`.
 
 ## Cross-checks
