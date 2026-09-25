@@ -8,6 +8,7 @@ use App\Actions\Checkout\CreateCheckoutSession;
 use App\Actions\Checkout\ExtendCheckoutSession;
 use App\Actions\Checkout\OpenStripeCheckout;
 use App\Actions\Checkout\ReleaseCheckoutSession;
+use App\Actions\Checkout\SettlePaidEngineCheckout;
 use App\Actions\Checkout\SubmitEngineCheckout;
 use App\Enums\CheckoutPath;
 use App\Exceptions\CabinUnavailableException;
@@ -64,7 +65,7 @@ final class CheckoutController extends Controller
     }
 
     #[DocumentedResponse(status: 200, type: CheckoutStatusResource::class)]
-    public function status(string $token): CheckoutStatusResource
+    public function status(string $token, SettlePaidEngineCheckout $settle): CheckoutStatusResource
     {
         $session = CheckoutSession::findByToken($token);
 
@@ -72,7 +73,9 @@ final class CheckoutController extends Controller
             abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
-        return new CheckoutStatusResource($session);
+        $settle->handle($session);
+
+        return new CheckoutStatusResource($session->fresh() ?? $session);
     }
 
     public function destroy(string $token, ReleaseCheckoutSession $action): Response

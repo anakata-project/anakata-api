@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Checkout\FallBackOnlineDeposit;
+use App\Actions\Checkout\SettlePaidEngineCheckout;
 use App\Enums\CheckoutPath;
 use App\Enums\CheckoutSessionStatus;
 use App\Models\CheckoutSession;
@@ -19,14 +20,12 @@ final class ExpireStripeCheckoutsCommand extends Command
 
     protected $description = 'Remove the online-deposit advantage when Stripe reports the checkout session expired';
 
-    public function handle(StripeGateway $stripe, FallBackOnlineDeposit $fallback): int
+    public function handle(StripeGateway $stripe, FallBackOnlineDeposit $fallback, SettlePaidEngineCheckout $settle): int
     {
         $candidates = CheckoutSession::query()
             ->where('status', CheckoutSessionStatus::Submitted)
             ->where('path', CheckoutPath::PayDeposit)
             ->whereNotNull('stripe_checkout_session_id')
-            ->whereNotNull('stripe_expires_at')
-            ->where('stripe_expires_at', '<', now())
             ->get();
 
         $expired = 0;
@@ -45,10 +44,12 @@ final class ExpireStripeCheckoutsCommand extends Command
             }
 
             if ($retrieved->status === 'complete') {
+                $settle->apply($session, $retrieved);
+
                 continue;
             }
 
-            if ($retrieved->status !== 'expired') {
+            if ($retrieved->status !== 'expired' || $session->stripe_expires_at === null || $session->stripe_expires_at->isFuture()) {
                 continue;
             }
 

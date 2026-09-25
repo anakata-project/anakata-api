@@ -291,7 +291,7 @@ test('fallback on stripe expired removes only the advantage and promo lines', fu
     expect($history?->after['online_deposit'] ?? null)->toBeFalse();
 });
 
-test('the minute command does not strip the advantage when stripe is complete', function (): void {
+test('the minute command confirms a checkout stripe reports complete', function (): void {
     Mail::fake();
     $departure = checkoutWestDeparture();
     $created = createCheckoutHold($departure);
@@ -316,7 +316,8 @@ test('the minute command does not strip the advantage when stripe is complete', 
     $this->artisan('engine:expire-stripe-checkouts')->assertSuccessful();
 
     expect($booking->fresh()?->online_deposit)->toBeTrue();
-    expect($booking->fresh()?->status)->toBe(BookingStatus::Requested);
+    expect($booking->fresh()?->status)->toBe(BookingStatus::Confirmed);
+    expect(Payment::query()->where('booking_id', $booking->id)->count())->toBe(1);
 
     postEngineStripeEvent([
         'id' => 'evt_late_complete',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Rms;
 
 use App\Actions\Bookings\TransitionBooking;
+use App\Actions\Checkout\SettlePaidEngineCheckout;
 use App\Enums\BookingStatus;
 use App\Enums\Permission;
 use App\Exceptions\CabinUnavailableException;
@@ -27,9 +28,10 @@ final class RequestController extends Controller
         status: 200,
         type: 'array{data: list<App\\Http\\Resources\\Rms\\BookingRequestResource>, meta: array{rules: array{near_term_business_hours: int, long_lead_business_days: int, near_term_max_days: int, response_hours: int, business_day_minutes: int, cabin_deposit_pct: int}}}',
     )]
-    public function index(IndexRequestsRequest $request): AnonymousResourceCollection
+    public function index(IndexRequestsRequest $request, SettlePaidEngineCheckout $settle): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Booking::class);
+        $settle->outstanding();
 
         $actor = $request->user();
 
