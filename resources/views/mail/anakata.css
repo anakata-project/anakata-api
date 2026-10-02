@@ -1,0 +1,234 @@
+body,
+body *:not(html):not(style):not(br):not(tr):not(code) {
+    box-sizing: border-box;
+    font-family: Georgia, 'Times New Roman', serif;
+    position: relative;
+}
+
+body {
+    -webkit-text-size-adjust: none;
+    background-color: #EFEDDD;
+    color: #202B26;
+    height: 100%;
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+    width: 100% !important;
+}
+
+p,
+ul,
+ol,
+blockquote {
+    line-height: 1.5;
+    text-align: start;
+}
+
+a {
+    color: #202B26;
+}
+
+a img {
+    border: none;
+}
+
+h1 {
+    color: #202B26;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 26px;
+    font-weight: normal;
+    letter-spacing: 0.01em;
+    margin-top: 0;
+    text-align: start;
+}
+
+h2 {
+    color: #202B26;
+    font-size: 16px;
+    font-weight: normal;
+    margin-top: 0;
+    text-align: start;
+}
+
+p {
+    font-size: 16px;
+    line-height: 1.55em;
+    margin-top: 0;
+    text-align: left;
+}
+
+p.sub {
+    font-size: 12px;
+}
+
+img {
+    max-width: 100%;
+}
+
+.wrapper {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    background-color: #EFEDDD;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.content {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.header {
+    padding: 28px 0 18px;
+    text-align: center;
+}
+
+.header a {
+    color: #202B26;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 13px;
+    font-weight: normal;
+    letter-spacing: 0.28em;
+    text-decoration: none;
+}
+
+.body {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    background-color: #EFEDDD;
+    border-bottom: 1px solid #EFEDDD;
+    border-top: 1px solid #EFEDDD;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.inner-body {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 570px;
+    background-color: #FAF9F0;
+    border: 1px solid #D9D4BC;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0 auto;
+    padding: 0;
+    width: 570px;
+}
+
+.inner-body a {
+    word-break: break-all;
+}
+
+.subcopy {
+    border-top: 1px solid #D9D4BC;
+    margin-top: 28px;
+    padding-top: 18px;
+}
+
+.subcopy p {
+    color: rgba(32, 43, 38, 0.62);
+    font-size: 13px;
+}
+
+.footer {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 570px;
+    margin: 0 auto;
+    padding: 0;
+    text-align: center;
+    width: 570px;
+}
+
+.footer p {
+    color: rgba(32, 43, 38, 0.52);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-align: center;
+}
+
+.footer a {
+    color: rgba(32, 43, 38, 0.52);
+    text-decoration: underline;
+}
+
+.content-cell {
+    max-width: 100vw;
+    padding: 36px 40px;
+}
+
+.action {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 28px auto;
+    padding: 0;
+    text-align: center;
+    width: 100%;
+    float: unset;
+}
+
+.inner-body a.button {
+    word-break: normal;
+}
+
+.button {
+    -webkit-text-size-adjust: none;
+    border-radius: 0;
+    color: #F2F1E1;
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    overflow: hidden;
+    text-decoration: none;
+    text-transform: uppercase;
+    word-break: normal;
+}
+
+.button-blue,
+.button-primary {
+    background-color: #202B26;
+    border-bottom: 14px solid #202B26;
+    border-left: 28px solid #202B26;
+    border-right: 28px solid #202B26;
+    border-top: 14px solid #202B26;
+    color: #F2F1E1;
+}
+
+.panel {
+    border-left: #E85646 solid 3px;
+    margin: 22px 0 8px;
+}
+
+.panel-content {
+    background-color: #F6F4E6;
+    color: #202B26;
+    padding: 14px 16px;
+}
+
+.panel-content p {
+    color: #202B26;
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+
+.panel-item {
+    padding: 0;
+}
+
+.panel-item p:last-of-type {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.break-all {
+    word-break: break-all;
+}

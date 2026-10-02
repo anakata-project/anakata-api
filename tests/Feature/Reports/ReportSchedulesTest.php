@@ -6,13 +6,13 @@ use App\Enums\AlertKind;
 use App\Enums\AlertNotificationStatus;
 use App\Enums\Permission;
 use App\Enums\ReportRunStatus;
-use App\Mail\Reports\ReportMail;
 use App\Models\Alert;
 use App\Models\ReportRun;
 use App\Models\ReportRunNotification;
 use App\Models\ReportSubscription;
 use App\Models\Role;
 use App\Models\User;
+use App\Notifications\ReportReady;
 use App\Services\Config\CurrentConfig;
 use App\Support\BusinessTime;
 use App\Support\Metrics\CommercialMetrics;
@@ -24,8 +24,9 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\InventorySeeder;
 use Database\Seeders\RolesSeeder;
-use Illuminate\Mail\PendingMail;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Notifications\ChannelManager;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function (): void {
     $this->seed(RolesSeeder::class);
@@ -39,7 +40,7 @@ afterEach(function (): void {
 });
 
 test('each cadence fires at its Galápagos moment, catches up once, and does not repeat', function (): void {
-    Mail::fake();
+    Notification::fake();
     $reader = reportReader();
 
     $daily = onlyReport('commercial-summary');
@@ -57,11 +58,11 @@ test('each cadence fires at its Galápagos moment, catches up once, and does not
         ->and($run?->parameters['source'])->toBe('schedule')
         ->and($run?->requested_by)->toBeNull()
         ->and($run?->subscription_id)->toBe($daily->id);
-    Mail::assertSent(ReportMail::class, fn (ReportMail $mail): bool => $mail->hasTo($reader->email));
+    Notification::assertSentTo($reader, ReportReady::class);
 
     $this->artisan('anakata:reports-send')->assertSuccessful();
     expect(ReportRun::query()->where('definition_key', 'commercial-summary')->count())->toBe(1);
-    Mail::assertSentCount(1);
+    Notification::assertCount(1);
 
     atGalapagos('2027-11-09 07:00:00');
     $this->artisan('anakata:reports-send')->assertSuccessful();
@@ -114,20 +115,20 @@ test('each cadence fires at its Galápagos moment, catches up once, and does not
 });
 
 test('recipients follow the permission held at send time', function (): void {
-    Mail::fake();
+    Notification::fake();
     onlyReport('commercial-summary');
     $first = reportReader(['email' => 'first-report@anakata.test']);
     atGalapagos('2027-11-08 08:00:00');
     $this->artisan('anakata:reports-send')->assertSuccessful();
-    Mail::assertSent(ReportMail::class, fn (ReportMail $mail): bool => $mail->hasTo($first->email));
+    Notification::assertSentTo($first, ReportReady::class);
 
     $first->role->forceFill(['permissions' => [Permission::PanelCrm]])->save();
     $second = reportReader(['email' => 'second-report@anakata.test']);
-    Mail::fake();
+    Notification::fake();
     atGalapagos('2027-11-09 08:00:00');
     $this->artisan('anakata:reports-send')->assertSuccessful();
-    Mail::assertSent(ReportMail::class, fn (ReportMail $mail): bool => $mail->hasTo($second->email));
-    Mail::assertNotSent(ReportMail::class, fn (ReportMail $mail): bool => $mail->hasTo($first->email));
+    Notification::assertSentTo($second, ReportReady::class);
+    Notification::assertNotSentTo($first, ReportReady::class);
 });
 
 test('a failed generation raises a warning that a later run resolves, and a failed send retries once', function (): void {
@@ -157,21 +158,17 @@ test('a failed generation raises a warning that a later run resolves, and a fail
 
     ReportSubscription::query()->update(['active' => false]);
     onlyReport('occupancy');
-    $sends = 0;
-    Mail::shouldReceive('to')->andReturnUsing(function () use (&$sends) {
-        $sends++;
-        $pending = Mockery::mock(PendingMail::class);
-        $pending->shouldReceive('send')->andThrow(new RuntimeException('mailbox down'));
-
-        return $pending;
-    });
+    FailingMailChannel::$sends = 0;
+    $manager = $this->app->make(ChannelManager::class);
+    $manager->forgetDrivers();
+    $manager->extend('mail', fn (): FailingMailChannel => new FailingMailChannel);
     atGalapagos('2027-11-08 09:00:00');
     $this->artisan('anakata:reports-send')->assertSuccessful();
     $note = ReportRunNotification::query()->whereHas(
         'run',
         fn ($query) => $query->where('definition_key', 'occupancy'),
     )->first();
-    expect($sends)->toBe(1)
+    expect(FailingMailChannel::$sends)->toBe(1)
         ->and($note?->status)->toBe(AlertNotificationStatus::Failed)
         ->and($note?->attempts)->toBe(1);
 
@@ -180,17 +177,17 @@ test('a failed generation raises a warning that a later run resolves, and a fail
         'run',
         fn ($query) => $query->where('definition_key', 'occupancy'),
     )->first();
-    expect($sends)->toBe(2)
+    expect(FailingMailChannel::$sends)->toBe(2)
         ->and($occupancyNote?->attempts)->toBe(2)
         ->and($occupancyNote?->status)->toBe(AlertNotificationStatus::Failed);
 
     $this->artisan('anakata:reports-send')->assertSuccessful();
-    expect($sends)->toBe(2)
+    expect(FailingMailChannel::$sends)->toBe(2)
         ->and(ReportRun::query()->where('definition_key', 'occupancy')->count())->toBe(1);
 });
 
 test('subscriptions are listed to panel.rms, changed with rules.manage, and run-now is manual', function (): void {
-    Mail::fake();
+    Notification::fake();
     $desk = reportReader();
     $this->actingAs($desk)->getJson('/api/rms/reports/subscriptions')->assertOk()->assertJsonCount(4, 'data');
     $commercial = ReportSubscription::query()->where('definition_key', 'commercial-summary')->firstOrFail();
@@ -222,12 +219,42 @@ test('subscriptions are listed to panel.rms, changed with rules.manage, and run-
         ->and($created->json('data.parameters.period'))->toBe('2027-11')
         ->and($created->json('data.requested_by'))->toBe($admin->id)
         ->and($created->json('data.status'))->toBe('READY');
-    Mail::assertSent(ReportMail::class, fn (ReportMail $mail): bool => $mail->hasTo($admin->email));
+    Notification::assertSentTo($admin, ReportReady::class);
 
     atGalapagos('2027-11-01 08:00:00');
     $this->artisan('anakata:reports-send')->assertSuccessful();
     expect(ReportRun::query()->where('definition_key', 'pipeline-summary')->count())->toBe(1);
-    Mail::assertSentCount(2);
+    Notification::assertCount(2);
+});
+
+test('the report notification is a branded mail-builder message', function (): void {
+    Storage::fake('reports');
+    Storage::disk('reports')->put('pipeline-summary.pdf', 'pdf-bytes');
+    $reader = reportReader();
+
+    $notification = new ReportReady(
+        subject: 'Pipeline summary 2026-09-01 to 2026-09-30',
+        title: 'Pipeline summary',
+        sentence: 'Collected, pending, overdue and scheduled cash for the window, from Payments & Revenue.',
+        window: '2026-09-01 to 2026-09-30',
+        rows: 4,
+        url: 'https://anakata-panel.engine-c.com/rms/reports/runs/9',
+        attachmentPath: 'pipeline-summary.pdf',
+        attachmentName: 'pipeline-summary.pdf',
+    );
+
+    $mail = $notification->toMail($reader);
+    $html = (string) $mail->render();
+
+    expect($mail->subject)->toBe('Pipeline summary 2026-09-01 to 2026-09-30')
+        ->and($mail->actionText)->toBe('Open in the panel')
+        ->and($mail->rawAttachments)->toHaveCount(1)
+        ->and($html)->toContain('ANAKATA')
+        ->and($html)->toContain('Pipeline summary')
+        ->and($html)->toContain('2026-09-01 to 2026-09-30')
+        ->and($html)->toContain('Open in the panel')
+        ->and($html)->toContain('#202B26')
+        ->and($html)->not->toContain('notification-logo');
 });
 
 function onlyReport(string $key): ReportSubscription
@@ -262,6 +289,18 @@ function reportReader(array $attributes = []): User
 final class ScheduleFail
 {
     public static bool $on = false;
+}
+
+final class FailingMailChannel
+{
+    public static int $sends = 0;
+
+    public function send(mixed $notifiable, mixed $notification): void
+    {
+        self::$sends++;
+
+        throw new RuntimeException('mailbox down');
+    }
 }
 
 final class FlakyReportQueries extends ReportQueries

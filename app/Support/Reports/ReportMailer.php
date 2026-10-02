@@ -8,13 +8,12 @@ use App\Enums\AlertNotificationStatus;
 use App\Enums\Permission;
 use App\Enums\ReportFormat;
 use App\Enums\UserStatus;
-use App\Mail\Reports\ReportMail;
 use App\Models\ReportRun;
 use App\Models\ReportRunNotification;
 use App\Models\User;
+use App\Notifications\ReportReady;
 use App\Support\Automations\AutomationCatalogue;
 use App\Support\Automations\AutomationGate;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
@@ -85,12 +84,15 @@ final class ReportMailer
         [$path, $name] = $this->attachment($run);
 
         try {
-            Mail::to($user->email)->send(new ReportMail(
-                $definition->title.' '.$run->window_from->toDateString().' to '.$run->window_to->toDateString(),
-                $this->sentence($run),
-                $url,
-                $path,
-                $name,
+            $user->notify(new ReportReady(
+                subject: $definition->title.' '.$run->window_from->toDateString().' to '.$run->window_to->toDateString(),
+                title: $definition->title,
+                sentence: $definition->sentence,
+                window: $run->window_from->toDateString().' to '.$run->window_to->toDateString(),
+                rows: $run->rows,
+                url: $url,
+                attachmentPath: $path,
+                attachmentName: $name,
             ));
             $this->store($run, $user, $existing, AlertNotificationStatus::Sent, null, now(), $attempts);
         } catch (Throwable $exception) {
@@ -120,13 +122,6 @@ final class ReportMailer
         }
 
         return [null, null];
-    }
-
-    private function sentence(ReportRun $run): string
-    {
-        $definition = ReportDefinitions::get($run->definition_key);
-
-        return $definition->sentence.' '.$run->window_from->toDateString().' to '.$run->window_to->toDateString().'. '.$run->rows.' rows.';
     }
 
     private function store(
