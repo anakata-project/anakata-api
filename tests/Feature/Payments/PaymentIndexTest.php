@@ -326,6 +326,32 @@ test('pending_payment lists owing bookings and excludes requested and paid-off',
     expect($ids)->not->toContain($requested->id, $paid->id);
 });
 
+test('pending payments list newest bookings first regardless of departure', function (): void {
+    $admin = adminUser();
+    $earlyDeparture = ReservationFixtures::anamaraDeparture('2027-07-18');
+    $laterDeparture = ReservationFixtures::anamaraDeparture('2027-08-29');
+
+    $older = pendingCabin([
+        'departure' => $earlyDeparture,
+        'owner_id' => $admin->id,
+        'reference' => 'ANK-2026-0701',
+        'created_at' => '2026-01-01 12:00:00',
+    ]);
+    $newer = pendingCabin([
+        'departure' => $laterDeparture,
+        'cabin_id' => $laterDeparture->yacht->cabins->firstWhere('code', 'S2')?->id,
+        'owner_id' => $admin->id,
+        'reference' => 'ANK-2026-0702',
+        'created_at' => '2026-09-01 12:00:00',
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/rms/bookings?pending_payment=1')
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $newer->id)
+        ->assertJsonPath('data.1.id', $older->id);
+});
+
 test('a role without panel.rms cannot list payments', function (): void {
     $role = Role::factory()->create([
         'permissions' => [Permission::PanelCrm],

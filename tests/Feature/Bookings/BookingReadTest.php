@@ -188,6 +188,31 @@ test('groups filter by departure date from and to', function (): void {
         ->assertJsonPath('data.0.id', $decGroup->id);
 });
 
+test('bookings are listed newest created first regardless of departure', function (): void {
+    $earlyDeparture = ReservationFixtures::anamaraDeparture('2027-11-07');
+    $laterDeparture = ReservationFixtures::anamaraDeparture('2027-12-19');
+    $admin = adminUser();
+
+    $older = Booking::factory()->create([
+        'departure_id' => $earlyDeparture->id,
+        'cabin_id' => $earlyDeparture->yacht->cabins->firstWhere('code', 'S1')?->id,
+        'owner_id' => $admin->id,
+        'created_at' => '2026-01-01 12:00:00',
+    ]);
+    $newer = Booking::factory()->create([
+        'departure_id' => $laterDeparture->id,
+        'cabin_id' => $laterDeparture->yacht->cabins->firstWhere('code', 'S1')?->id,
+        'owner_id' => $admin->id,
+        'created_at' => '2026-09-01 12:00:00',
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/rms/bookings')
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $newer->id)
+        ->assertJsonPath('data.1.id', $older->id);
+});
+
 test('booking owners lists active panel.rms users to records.act_on_any', function (): void {
     $carolina = adminUser(['name' => 'Carolina M.']);
     $mateo = managerUser(['name' => 'Mateo R.']);

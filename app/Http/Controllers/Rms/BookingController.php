@@ -120,8 +120,8 @@ final class BookingController extends Controller
                 'bookingRequest',
                 'activeClaims',
             ])
-            ->orderBy('departures.date')
-            ->orderBy('bookings.reference')
+            ->orderByDesc('bookings.created_at')
+            ->orderByDesc('bookings.id')
             ->paginate($perPage);
 
         return BookingResource::collection($bookings)->additional([
