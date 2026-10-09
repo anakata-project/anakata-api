@@ -14,7 +14,7 @@ An expired HOLD frees the cabin and never cancels the request (G9). Confirm afte
    `COMPOSE_PROJECT_NAME=anakata-e2e docker compose exec app sh -c "php artisan inventory:expire-hold ANK-R-2026-0041"`
 
    (Same as `docker compose exec app sh -c "php artisan inventory:expire-hold ANK-R-2026-0041"` when `COMPOSE_PROJECT_NAME` is already `anakata-e2e`.)
-3. Reload Booking Requests. Read the 0041 hold cell. Open Calendar Year 2027, ANAMARA Suite 04 on `21 Nov 2027`.
+3. Reload Booking Requests. Read the 0041 hold cell. Open the calendar, set From `2027-01-01` and To `2027-12-31`, ANAMARA Suite 04 on `21 Nov 2027`.
 4. On 0041 click `Confirm · send deposit link` and confirm.
 
 ## Expected

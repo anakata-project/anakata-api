@@ -10,8 +10,8 @@ Contacts In is the commercial view of who is travelling. Value is `charges_total
 ## Steps
 1. Sign in as Carolina. Open `http://localhost:3001/rms/commercial/contacts-in`. Date range stays **All dates**.
 2. Read **Contacts from bookings & requests** and **Guests by nationality — top 10 (§9.1)**.
-3. Click preset `Year 2026`. Read both panels.
-4. Click preset `Year 2027`. Read both panels. Click Harrison & Whitfield (ANK-2026-0003) to open the booking panel.
+3. Set From `2026-01-01` and To `2026-12-31`. Read both panels.
+4. Set From `2027-01-01` and To `2027-12-31`. Read both panels. Click Harrison & Whitfield (ANK-2026-0003) to open the booking panel.
 
 ## Expected
 - [ ] E1 · Date-range line `14 contacts · all dates`. Rows include Harrison & Whitfield (`ANK-2026-0003`), The Brandt Family (`ANK-2026-0005`), L. Moreau with pill `TRAVEL ADVISOR` (`ANK-R-2026-0042`), Vandermeer Charter (`ANK-2026-0012`). ⚠ UNVERIFIED — task 09 browser after reset.

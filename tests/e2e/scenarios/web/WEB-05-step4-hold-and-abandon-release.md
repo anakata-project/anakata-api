@@ -11,9 +11,9 @@ Web checkout holds take real inventory (K5). Abandoning must free the cabin or t
 ## Steps
 1. **Guest.** Walk 2 adults, Nov 2027–Jan 2028, Western Realm, **7 Nov 2027 · ANAMARA**, `Select cabins — continue`.
 2. On `/book/cabins` pick **Suite 03** (S01/S02 are `.taken`). Click `Next — your details`. This `POST /api/engine/checkout` holds the cabin.
-3. **Carolina.** Open `http://localhost:3001/rms/reservations/calendar`. Date range **Year 2027**. Read ANAMARA Suite 03 on `7 Nov 2027`.
+3. **Carolina.** Open `http://localhost:3001/rms/reservations/calendar`. Set From `2027-01-01` and To `2027-12-31`. Read ANAMARA Suite 03 on `7 Nov 2027`.
 4. **Guest.** Leave the flow: click `Back to trip details` (or `Back to cabins` then back to trip). Do not submit step 5. Confirm the guest is off `/book/details`.
-5. Carolina: refresh Calendar Year 2027. Read the same cell.
+5. Carolina: refresh the calendar (From `2027-01-01`, To `2027-12-31`). Read the same cell.
 
 ## Expected
 - [ ] E1 · After step 2, guest is on `/book/details`. Suite 01 and 02 stay unclickable.

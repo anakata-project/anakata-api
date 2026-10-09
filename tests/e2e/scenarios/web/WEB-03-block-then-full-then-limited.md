@@ -14,7 +14,7 @@ K4: a cabin blocked or held in the RMS must change the engine label within 30 se
 3. Guest: wait until the 7 Nov ANATIVA row updates (revalidate ≤ 15 s, or hide/show the tab). At most 30 s. Record the new label / cabin count.
 4. Carolina: same departure — block the remaining eight cabins (Suite 02–08 and Owner's Suite) on 7 Nov ANATIVA. New block or extend; reason **Fam trip**.
 5. Guest: wait ≤ 30 s. The 7 Nov ANATIVA row is `FULL · WAITLIST`. Actions are **Waitlist** and **Contact us**, never **Select**.
-6. Carolina: open `/rms/booking-engine/departures` or Calendar Year 2027. **21 Nov 2027 ANAMARA** (DEP-005) already has Owner sold (ANK-2026-0009) and Suite 04 held (ANK-R-2026-0041). Block every remaining **free** cabin on that departure (Suites 01–03 and 05–08).
+6. Carolina: open `/rms/booking-engine/departures` or the calendar with From `2027-01-01` and To `2027-12-31`. **21 Nov 2027 ANAMARA** (DEP-005) already has Owner sold (ANK-2026-0009) and Suite 04 held (ANK-R-2026-0041). Block every remaining **free** cabin on that departure (Suites 01–03 and 05–08).
 7. Guest: expand **Western Realm**, find **21 Nov 2027 · ANAMARA**. Wait ≤ 30 s.
 
 ## Expected

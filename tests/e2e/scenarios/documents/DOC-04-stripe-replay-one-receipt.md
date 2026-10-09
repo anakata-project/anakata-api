@@ -9,7 +9,7 @@
 Doc 07 rule 6 / J5: a replayed `payment.received` must not send a second receipt. The deposit that confirms the booking still sends invoice + summary once.
 
 ## Steps
-1. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/calendar`. Date range **Year 2027**. Confirm ANATIVA Suite 01 on `7 Nov 2027` shows `·`. If it does not, **stop**.
+1. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/calendar`. Set From `2027-01-01` and To `2027-12-31`. Confirm ANATIVA Suite 01 on `7 Nov 2027` shows `·`. If it does not, **stop**.
 2. Open `/rms/reservations/bookings`. `＋ New reservation`. Type **CABIN (FIT / Group)**. Guest `E2E Doc04`, email `e2e.doc04@anakata.test`, phone `+1 555 0404`, preferred **EMAIL**. Main channel **D2C**, origin **Hotel Booking Engine**. Departure `7 Nov 2027` · ANATIVA. Adults `2`. Cabin **Suite 01**. Payment method for deposit stays **Card — payment link**. `Create reservation`. `Done`.
 3. On the new booking (ANK-2026-0022) open **Payments**. If no OPEN deposit link, click `Create deposit link`.
 4. Clear Mailpit: `curl -sS -X DELETE http://localhost:8025/api/v1/messages`.

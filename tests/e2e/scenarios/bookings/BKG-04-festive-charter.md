@@ -8,12 +8,12 @@
 A festive week charter must take all nine cabins at the festive charter total. ANAMARA 19 Dec is already the seeded charter.
 
 ## Steps
-1. Run `tests/e2e/bin/reset.sh`. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/calendar`. Date range **Year 2027**. Confirm every ANATIVA cabin on `19 Dec 2027` shows `·` (Available). If any does not, **stop** — the reset did not apply.
+1. Run `tests/e2e/bin/reset.sh`. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/calendar`. Set From `2027-01-01` and To `2027-12-31`. Confirm every ANATIVA cabin on `19 Dec 2027` shows `·` (Available). If any does not, **stop** — the reset did not apply.
 2. Open `/rms/reservations/bookings`. `＋ New reservation`. Type **CHARTER (full yacht)**.
 3. Guest `E2E Festive Charter`, email `e2e.bkg04@anakata.test`, phone `+1 555 0404`, preferred **EMAIL**. Main channel **D2C**, origin **Email**.
 4. Departure `19 Dec 2027` · ANATIVA (the festive suffix is ` · FESTIVE (+supplement, discounts blocked)`). Adults may stay at the default. Cabin pickers stay hidden.
 5. Read the price box and the charter notice. Payment method for deposit stays **Card — payment link**. `Create reservation`.
-6. Success pane, then `Done` (toast fires on Done). Open Calendar Year 2027, ANATIVA 19 Dec.
+6. Success pane, then `Done` (toast fires on Done). Open the calendar, set From `2027-01-01` and To `2027-12-31`, ANATIVA 19 Dec.
 
 ## Expected
 - [ ] E1 · After step 1 all nine ANATIVA cells on 19 Dec are `·`. Do not continue if they are not.

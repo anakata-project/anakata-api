@@ -8,7 +8,7 @@
 Several cabins on one departure must create one GRP and one booking per cabin, with the lead guest as coordinator.
 
 ## Steps
-1. Run `tests/e2e/bin/reset.sh`. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/calendar`. Date range **Year 2027**. Confirm ANATIVA Suite 03, Suite 04 and Suite 05 on `21 Nov 2027` each show `·` (Available). If any does not, **stop** — the reset did not apply.
+1. Run `tests/e2e/bin/reset.sh`. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/calendar`. Set From `2027-01-01` and To `2027-12-31`. Confirm ANATIVA Suite 03, Suite 04 and Suite 05 on `21 Nov 2027` each show `·` (Available). If any does not, **stop** — the reset did not apply.
 2. Open `/rms/reservations/bookings`. `＋ New reservation`. Type **CABIN (FIT / Group)**.
 3. Lead guest `Mira Lead`, email `e2e.bkg03@anakata.test`, phone `+1 555 0303`, preferred **EMAIL**. Main channel **D2C**, origin **Email**.
 4. Departure `21 Nov 2027` · ANATIVA. First cabin Suite 03, 2 adults. `＋ Add another cabin` → Suite 04, 2 adults. Add Suite 05, 2 adults. Group name `E2E three cabin`.

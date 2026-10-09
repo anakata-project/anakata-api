@@ -12,7 +12,7 @@ Sales Exec can read inventory and must not see write controls. The API also refu
 2. Open `http://localhost:3001/rms/booking-engine/itineraries`. Open the WEST card.
 3. Open `http://localhost:3001/rms/booking-engine/departures`. Read the toolbar and a status select. Open DEP-001.
 4. Open `http://localhost:3001/rms/operations/blocks`. Read the toolbar and BLK-001.
-5. Open `/rms/reservations/calendar` and `/rms/reservations/yacht-layout`. Set **Year 2027** on both.
+5. Open `/rms/reservations/calendar` and `/rms/reservations/yacht-layout`. Set From `2027-01-01` and To `2027-12-31` on both.
 
 ## Expected
 - [ ] E1 · Itineraries: no `＋ New itinerary`. Drawer notice `Sales Exec role: view only. Itinerary content is managed by Admin / Manager.` Fieldset disabled. Close only (no Save / Hide / Delete; History hidden).

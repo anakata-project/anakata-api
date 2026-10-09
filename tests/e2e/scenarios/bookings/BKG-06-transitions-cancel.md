@@ -11,7 +11,7 @@ A CONFIRMED booking may only move to FULLY_PAID or CANCELLED. Cancel needs a rea
 1. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/bookings`. Open ANK-2026-0003 (Harrison & Whitfield). Overview tab.
 2. Read **Status transitions (only legal moves shown)** and Delete. Read Paid / Balance due / Deposit.
 3. Click `→ CANCELLED`. In the modal titled `Status CONFIRMED → CANCELLED`, leave Reason empty — `Record` stays disabled. Type `E2E cancel 0003`. `Record`.
-4. Open History. Open Calendar Year 2027, ANAMARA Suite 01 on `7 Nov 2027`. Open `/rms/operations/refunds`.
+4. Open History. Open the calendar, set From `2027-01-01` and To `2027-12-31`, ANAMARA Suite 01 on `7 Nov 2027`. Open `/rms/operations/refunds`.
 
 ## Expected
 - [ ] E1 · Legal buttons only: `→ FULLY PAID` and `→ CANCELLED`. `Delete (admin only)` is enabled (Carolina). No `→ ON BOARD` / `→ COMPLETED` / `→ RELEASED`. Paid `USD 2,660`. Balance due `USD 23,940 · due 10 Jul 2027`. Deposit `Deposit 10% · USD 2,660 ✓`.

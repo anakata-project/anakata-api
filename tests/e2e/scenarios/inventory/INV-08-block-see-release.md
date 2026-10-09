@@ -10,8 +10,8 @@ An internal block is the first real claim holder. Calendar and layout must show 
 ## Steps
 1. Sign in as `mateo@anakata.test` / `password`. Header `MATEO R. — MANAGER`. Open `http://localhost:3001/rms/operations/blocks`. Active list shows `BLK-001` (ANAMARA · Suite 07–08 · 14 Nov 2027, Created by `System`).
 2. Click `＋ New block`. Yacht **ANATIVA**. Tick departures `7 Nov 2027 · Northern Passage` and `14 Nov 2027 · Western Realm` (each shows `9 free`). Tick Suite 01, Suite 02, Suite 03. Reason **Fam trip**. `Create block`.
-3. Open `/rms/reservations/calendar`. Set Date range to **Year 2027**. Read ANATIVA Suite 01–03 on 7 Nov and 14 Nov.
-4. Open `/rms/reservations/yacht-layout`, Year 2027, pick `7 Nov 2027`, then `14 Nov 2027`.
+3. Open `/rms/reservations/calendar`. Set From `2027-01-01` and To `2027-12-31`. Read ANATIVA Suite 01–03 on 7 Nov and 14 Nov.
+4. Open `/rms/reservations/yacht-layout`, set From `2027-01-01` and To `2027-12-31`, pick `7 Nov 2027`, then `14 Nov 2027`.
 5. Return to `/rms/operations/blocks`. On the BLK-002 row click `Release`. Confirm `Release BLK-002` (note optional). Switch the status chip to **Released**. Open the BLK-002 drawer → **History**.
 
 ## Expected
