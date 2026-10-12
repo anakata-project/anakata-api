@@ -12,7 +12,7 @@ The request SLA is a task. Releasing the hold closes that task. Nothing cancels 
 2. **Lucía** (`lucia@anakata.test`). Open `http://localhost:3001/crm/sales/tasks`. Find the **Request response** task for that contact.
 3. Read the due time.
 4. In the RMS, release that request with a reason. Reload **Tasks** after Horizon has processed the status job. The close is `RaiseTasksOnBookingStatusChanged`, not the five-minute sweep. If Horizon is down, that is **ENV**, not a missing close.
-5. Open `http://localhost:3001/crm/sales/pipeline` and find that contact’s deal.
+5. Open `http://localhost:3001/rms/deals?view=board` and find that contact’s deal.
 
 ## Expected
 - [ ] E1 · Exactly one open **Request response** task for that request. Due is 24 business hours after the request (`sla.response_hours`, seed 24). ⚠ UNVERIFIED — `TaskDue::responseHours`, not a reset clock.

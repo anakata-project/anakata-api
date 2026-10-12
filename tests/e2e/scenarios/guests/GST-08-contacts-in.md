@@ -8,7 +8,7 @@
 Contacts In is the commercial view of who is travelling. Value is `charges_total` (I9). Unnamed padded slots must not appear. The date range must narrow **both** the list and the nationality bars.
 
 ## Steps
-1. Sign in as Carolina. Open `http://localhost:3001/rms/commercial/contacts-in`. Date range stays **All dates**.
+1. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/bookings?view=contacts-in`. Date range stays **All dates**.
 2. Read **Contacts from bookings & requests** and **Guests by nationality — top 10 (§9.1)**.
 3. Set From `2026-01-01` and To `2026-12-31`. Read both panels.
 4. Set From `2027-01-01` and To `2027-12-31`. Read both panels. Click Harrison & Whitfield (ANK-2026-0003) to open the booking panel.
@@ -21,4 +21,4 @@ Contacts In is the commercial view of who is travelling. Value is `charges_total
 - [ ] E5 · A row opens the existing booking panel (ANK-2026-0003).
 
 ## Notes
-`GET /api/rms/contacts-in` + `/nationalities`. Named guests only (`Guest::scopeNamed`). Seeded Lucía still has `bookings.view_all`, so 🔒 may not show on her rows as Admin. Contacts In stays the RMS commercial list; CRM people are `/crm/sales/contacts` (CRM-01).
+`GET /api/rms/contacts-in` + `/nationalities`. Named guests only (`Guest::scopeNamed`). Seeded Lucía still has `bookings.view_all`, so 🔒 may not show on her rows as Admin. Contacts in is a view on the Bookings page; CRM people are `/crm/sales/contacts` (CRM-01).

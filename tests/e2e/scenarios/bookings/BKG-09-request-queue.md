@@ -8,7 +8,7 @@
 The two seeded requests must show a live SLA. Confirm claims the cabin as PENDING_PAYMENT. Release needs a reason and frees the cabin without auto-cancelling a *different* request (OPS-007).
 
 ## Steps
-1. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/booking-requests`. Date range **All dates**.
+1. Sign in as Carolina. Open `http://localhost:3001/rms/reservations/bookings?view=requests`. Date range **All dates**.
 2. Read the badge, both seeded rows (hold remaining and Contact SLA), and the **Charter enquiries** panel below the queue.
 3. On ANK-R-2026-0041 click `Confirm · send deposit link`. Confirm modal: read the body. The leftover sentence `The deposit link is sent when payments arrive (Sprint 5).` is still on screen (do not invent a new sentence). Submit `Confirm · send deposit link`.
 4. On ANK-R-2026-0042 click `Release`. Modal `Release this request's cabin hold`, reason `E2E release 0042`. `Record`.

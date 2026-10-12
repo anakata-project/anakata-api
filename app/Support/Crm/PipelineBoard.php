@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Support\Crm;
 
 use App\Enums\DealStage;
-use App\Enums\DealType;
-use App\Enums\Permission;
 use App\Models\User;
 use App\Services\Config\CurrentConfig;
 use App\Support\Payments\PaymentsKpis;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 final class PipelineBoard
@@ -43,38 +40,15 @@ final class PipelineBoard
             if (! $stage instanceof DealStage) {
                 continue;
             }
-            $value = (int) $row->value_amount;
-            $entered = CarbonImmutable::parse((string) $row->stage_entered_at);
-            $slaState = $stage->isOpen()
-                ? DealSla::assess($stage, $entered, CarbonImmutable::now(), $rules)
-                : null;
-            $bound = $row->booking_id !== null || $row->group_id !== null;
-            $ownerId = $row->owner_id !== null ? (int) $row->owner_id : null;
 
-            $columns[$stage->value]['total'] += $value;
+            $card = DealCard::fromRow($row, $actor);
+            $columns[$stage->value]['total'] += $card['value'];
 
             if ($stage->weightsForecast()) {
-                $columns[$stage->value]['weighted_total'] += DealProbabilities::weighted($value, $stage, $rules->crm->pipeline);
+                $columns[$stage->value]['weighted_total'] += DealProbabilities::weighted($card['value'], $stage, $rules->crm->pipeline);
             }
 
-            $columns[$stage->value]['deals'][] = [
-                'id' => (int) $row->id,
-                'title' => (string) $row->title,
-                'contact' => [
-                    'id' => (int) $row->contact_id,
-                    'name' => (string) $row->contact_name,
-                ],
-                'type' => (string) $row->type,
-                'owner' => $ownerId === null ? null : [
-                    'id' => $ownerId,
-                    'name' => (string) $row->owner_name,
-                ],
-                'value' => $value,
-                'value_label' => (string) $row->value_label,
-                'sla_state' => $slaState,
-                'booking' => self::cardBooking($row),
-                'may_move' => self::mayMove($actor, $ownerId, $bound),
-            ];
+            $columns[$stage->value]['deals'][] = $card;
         }
 
         return [
@@ -127,89 +101,14 @@ final class PipelineBoard
     }
 
     /**
-     * @param  array{owner?: string|null, type?: string|null, q?: string|null}  $filters
+     * @param  array{owner?: string|null, type?: string|null, q?: string|null, stage?: string|null}  $filters
      * @return list<object>
      */
     private static function rows(User $actor, array $filters): array
     {
-        $query = DB::table('deals')
-            ->join('contacts', 'contacts.id', '=', 'deals.contact_id')
-            ->leftJoin('users', 'users.id', '=', 'deals.owner_id')
-            ->select([
-                'deals.id',
-                'deals.title',
-                'deals.type',
-                'deals.owner_id',
-                'deals.contact_id',
-                'deals.booking_id',
-                'deals.group_id',
-                'deals.stage_entered_at',
-                'contacts.name as contact_name',
-                'users.name as owner_name',
-            ])
-            ->selectRaw('('.DealStages::stageSql().') as projected_stage')
-            ->selectRaw('('.DealStages::valueSql().') as value_amount')
-            ->selectRaw('('.DealStages::valueLabelSql().') as value_label')
-            ->selectRaw(DealStages::bookingColumnSql('COALESCE(bookings.reference, bookings.request_reference)').' as booking_reference')
-            ->selectRaw(DealStages::bookingColumnSql('bookings.status').' as booking_status')
-            ->selectRaw(DealStages::bookingColumnSql('departures.date').' as departure_date')
-            ->orderBy('deals.id');
-
-        $owner = $filters['owner'] ?? null;
-
-        if ($owner === 'me') {
-            $query->where('deals.owner_id', $actor->id);
-        } elseif ($owner === 'unassigned') {
-            $query->whereNull('deals.owner_id');
-        } elseif (is_string($owner) && ctype_digit($owner)) {
-            $query->where('deals.owner_id', (int) $owner);
-        }
-
-        $type = $filters['type'] ?? null;
-
-        if (is_string($type) && DealType::tryFrom($type) instanceof DealType) {
-            $query->where('deals.type', $type);
-        }
-
-        $q = isset($filters['q']) ? trim((string) $filters['q']) : '';
-
-        if ($q !== '') {
-            $like = '%'.$q.'%';
-            $query->where(function ($inner) use ($like): void {
-                $inner->where('deals.title', 'like', $like)
-                    ->orWhere('contacts.name', 'like', $like);
-            });
-        }
-
-        return $query->get()->all();
-    }
-
-    /**
-     * @return array{reference: string, status: string, departure_date: string}|null
-     */
-    private static function cardBooking(object $row): ?array
-    {
-        $reference = is_string($row->booking_reference ?? null) ? $row->booking_reference : '';
-
-        if ($reference === '') {
-            return null;
-        }
-
-        $date = $row->departure_date ?? null;
-
-        return [
-            'reference' => $reference,
-            'status' => is_string($row->booking_status ?? null) ? $row->booking_status : '',
-            'departure_date' => is_string($date) ? substr($date, 0, 10) : '',
-        ];
-    }
-
-    private static function mayMove(User $actor, ?int $ownerId, bool $bound): bool
-    {
-        if ($bound || $ownerId === null || ! $actor->hasPermission(Permission::PipelineMoveStage)) {
-            return false;
-        }
-
-        return $ownerId === $actor->id || $actor->hasPermission(Permission::RecordsActOnAny);
+        return DealQuery::filtered($actor, $filters)
+            ->orderBy('deals.id')
+            ->get()
+            ->all();
     }
 }

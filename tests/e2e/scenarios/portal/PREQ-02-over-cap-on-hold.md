@@ -14,7 +14,7 @@ A request from an agency above the commission cap is ON_HOLD_AGENCY. It raises t
 2. Run `tests/e2e/bin/setup.sh portal-user AG-002`. Sign in on `http://localhost:3002/login` with the printed email and `password`.
 3. As Carolina, note the calendar cell for 5 Dec 2027 ANAMARA.
 4. As the Meridian user, open Availability. From `2027-12`, To `2027-12`, yacht `ANAMARA`. On **5 Dec 2027**, if the label is `AVAILABLE`, click `Request`. One suite, 1 adult. Client `E2E Meridian Guest`, email `e2e-preq02@portal.test`. Tick `The client of record is the end guest.` Send.
-5. As Carolina, find the new reference on `http://localhost:3001/rms/reservations/bookings` (All dates). Open `http://localhost:3001/rms/operations/alerts` and `http://localhost:3001/crm/sales/tasks` (kind **Commission cap**). Open `http://localhost:3001/rms/reservations/booking-requests`.
+5. As Carolina, find the new reference on `http://localhost:3001/rms/reservations/bookings` (All dates). Open `http://localhost:3001/rms/operations/alerts` and `http://localhost:3001/crm/sales/tasks` (kind **Commission cap**). Open `http://localhost:3001/rms/reservations/bookings?view=requests`.
 6. Re-read the 5 Dec calendar cell.
 
 ## Expected

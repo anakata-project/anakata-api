@@ -14,7 +14,7 @@ An agency user can open a deposit link for their own request. Paying it uses the
 2. On **7 Nov 2027** ANAMARA, click `Request`. Category `Suite`. One cabin, 1 adult, 0 children. Client name `E2E Pay`. Client email `e2e-pay01@portal.test`. Tick `The client of record is the end guest.` Click `Send request`.
 3. Open `http://localhost:3002/requests`. Open the new request (`data-request-drawer`). Click **Pay deposit**.
 4. Do not enter a card. Leave the hosted page. From `anakata-api` run `tests/e2e/bin/replay-stripe-checkout.sh ANK-R-2026-0043`.
-5. **Carolina**, separate context. Open the booking from `http://localhost:3001/rms/reservations/booking-requests` or the bookings list for `ANK-R-2026-0043`. Read status, the payments tab, and the history timeline.
+5. **Carolina**, separate context. Open the booking from `http://localhost:3001/rms/reservations/bookings?view=requests` or the bookings list for `ANK-R-2026-0043`. Read status, the payments tab, and the history timeline.
 
 ## Expected
 - [ ] E1 · On a fresh reset the new reference is `ANK-R-2026-0043`. The request drawer shows **Pay deposit** and no card field.

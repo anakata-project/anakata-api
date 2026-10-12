@@ -14,7 +14,7 @@ Refusal must record nothing and store no session identifier. The booking request
 3. Same walkthrough as CRM-05 / WEB-07 to `/book/details` (2 adults, 7 Nov 2027 ANAMARA, Suite 03). Browse an itinerary and a departure row.
 4. Contact: First `E2E`, Last `Crm06`, Email `e2e.crm06@anakata.test`, phone `+1 650 253 0006`, preferred **Email**. Guests, fees and declarations as CRM-05.
 5. **Option 1 · Book now, pay later.** `Send booking request`. Read `/book/confirmation`.
-6. **Carolina.** Open `http://localhost:3001/rms/reservations/booking-requests`. Date range **All dates**. Open the new `ANK-R-` row (**ANK-R-2026-0043**).
+6. **Carolina.** Open `http://localhost:3001/rms/reservations/bookings?view=requests`. Date range **All dates**. Open the new `ANK-R-` row (**ANK-R-2026-0043**).
 7. Open `http://localhost:3001/crm/sales/contacts`. Search `e2e.crm06@anakata.test`. Open the drawer. Read the timeline. Open Activity and confirm no new anonymous stream for this browse. An anonymous name is plain text, not a button. A named contact on that page is a button that opens `/crm/sales/contacts?open={contact_id}`.
 
 ## Expected

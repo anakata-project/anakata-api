@@ -71,6 +71,7 @@ Route::post('conversations/{conversation}/link-contact', [ConversationController
 
 Route::get('pipeline', [DealController::class, 'pipeline']);
 Route::get('pipeline/stage-map', [DealController::class, 'stageMap']);
+Route::get('deals', [DealController::class, 'index']);
 Route::post('deals', [DealController::class, 'store']);
 Route::get('deals/{deal}', [DealController::class, 'show']);
 Route::post('deals/{deal}/assign', [DealController::class, 'assign']);

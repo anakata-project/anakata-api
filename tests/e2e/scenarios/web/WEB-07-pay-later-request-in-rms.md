@@ -16,7 +16,7 @@ Option 1 must land as a request the team can follow up — nationalities, fee ch
 5. Declarations: tick **Privacy policy** and **Travel insurance declaration**. **Terms & Conditions** and **Cancellation policy** show `accepted with the deposit link` and are not required.
 6. **Option 1 · Book now, pay later.** `Send booking request`.
 7. Read `/book/confirmation`.
-8. **Carolina.** Open `http://localhost:3001/rms/reservations/booking-requests`. Date range **All dates**. Open the new `ANK-R-` row (next after seed is **ANK-R-2026-0043**). Read SLA, party, guests, fee flags, consents.
+8. **Carolina.** Open `http://localhost:3001/rms/reservations/bookings?view=requests`. Date range **All dates**. Open the new `ANK-R-` row (next after seed is **ANK-R-2026-0043**). Read SLA, party, guests, fee flags, consents.
 
 ## Expected
 - [ ] E1 · Confirmation: `Request received` / `We have received your booking`. Reference `ANK-R-2026-0043`. Lead names `e2e.web07@anakata.test`. First confirmation card interpolates 24 hours. ⚠ UNVERIFIED — i18n `confirm.request*` + task 09 browser.

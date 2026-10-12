@@ -86,7 +86,7 @@ The latest result for every P1 is [`runs/LEDGER.md`](../runs/LEDGER.md).
 | GST-05 | Passport expiring before the return date | sprint-6, guests | P2 | — | Carolina | [guests/GST-05-passport-expiry-before-return.md](guests/GST-05-passport-expiry-before-return.md) |
 | GST-06 | Record a missing consent; row is append-only | sprint-6, guests | P1 | B6 | Carolina | [guests/GST-06-record-missing-consent.md](guests/GST-06-record-missing-consent.md) |
 | GST-07 | Add up to the cabin limit; remove an empty non-lead | sprint-6, guests | P2 | — | Carolina | [guests/GST-07-cabin-limit-remove-empty.md](guests/GST-07-cabin-limit-remove-empty.md) |
-| GST-08 | Contacts In list, nationality top ten, date range | sprint-6, guests | P2 | — | Carolina | [guests/GST-08-contacts-in.md](guests/GST-08-contacts-in.md) |
+| GST-08 | Bookings Contacts in view, nationality top ten, date range | sprint-6, guests | P2 | — | Carolina | [guests/GST-08-contacts-in.md](guests/GST-08-contacts-in.md) |
 | EXT-01 | Add flights × 2 on a CONFIRMED booking | sprint-6, extras | P1 | B6 | Carolina | [extras/EXT-01-add-flights-confirmed.md](extras/EXT-01-add-flights-confirmed.md) |
 | EXT-02 | Switch PNG collection on; pending guest shows pending data | sprint-6, extras | P1 | B6 | Carolina | [extras/EXT-02-png-collection-pending.md](extras/EXT-02-png-collection-pending.md) |
 | EXT-03 | FULLY PAID booking gains an extra | sprint-6, extras | P2 | — | Carolina | [extras/EXT-03-fully-paid-gains-extra.md](extras/EXT-03-fully-paid-gains-extra.md) |

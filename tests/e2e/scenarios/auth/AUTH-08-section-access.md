@@ -16,7 +16,7 @@ The panel must hide what the role cannot use, and the route guard must bounce fo
 
 ## Expected
 - [ ] E1 · CFO has no section switch and no **＋ New Reservation**.
-- [ ] E2 · CFO at `/crm/sales/pipeline` is sent to `/rms/reservations/calendar`.
+- [ ] E2 · CFO at `/crm/sales/pipeline` is sent to `/rms/reservations/calendar`. A user with CRM continues to `/rms/deals?view=board`.
 - [ ] E3 · Mateo at `/rms/admin/business-rules` is sent to `/rms/reservations/calendar` and a toast reads `You don't have permission to do that.`
 - [ ] E4 · Lucía at `/rms/admin/business-rules` gets the same redirect and toast.
 - [ ] E5 · Lucía at `/rms/admin/permissions` gets the same redirect and toast.

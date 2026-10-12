@@ -13,7 +13,7 @@ A portal request on an available departure creates a REQUESTED booking for that 
 2. In another context, sign in as Ada. Open `http://localhost:3002/availability`. Set From `2027-11`, To `2027-11`, yacht `ANAMARA` (the yacht code), and click `Show`.
 3. On **7 Nov 2027** ANAMARA, confirm the availability label is `AVAILABLE` and click `Request`.
 4. Category `Suite`. Leave a single cabin, 1 adult, 0 children. Client name `E2E Guest`. Client email `e2e-preq01@portal.test`. Tick `The client of record is the end guest.` Click `Send request`.
-5. As Lucía, open `http://localhost:3001/rms/reservations/booking-requests` and find the new reference. Open that booking and read the agency and the frozen commission.
+5. As Lucía, open `http://localhost:3001/rms/reservations/bookings?view=requests` and find the new reference. Open that booking and read the agency and the frozen commission.
 6. Return to the calendar cell from step 1.
 
 ## Expected

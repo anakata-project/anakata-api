@@ -199,3 +199,10 @@ Decisions taken by the development team at the start of the build. They sit **ab
 | Q8 | **Journey content is versioned and previewed, never improvised.** A step's subject and body are a template version, English (doc 06), with a fixed set of variables the API resolves. Publishing a new version leaves the old one; a send records the version it used, so any message can be reconstructed. There is no rich-text editor in this sprint: templates are simple, structured text with a preview. |
 | Q9 | **Journeys never write a booking.** They send, enrol, exit and write to the contact timeline. Anything a journey would want to change in the RMS — a status, a hold, a price — is a task for a person (M6), as it is everywhere else. |
 | Q10 | **What Sprint 14 does not build.** The shared inbox (email-first, WhatsApp pending TEC-005), agents paying through the portal, Spanish for internal screens and an e-signature provider stay later. So does any use of a paid audience platform: audiences are built here, and pushing them to Meta or Google is a separate decision with its own consent question. |
+
+## R · 12 Oct 2026 — one Bookings page, Deals in the RMS
+
+| # | Decision |
+|---|---|
+| R1 | **Booking Requests, Bookings and Contacts In are one page.** They read the same `bookings` rows. The panel shows them as views of `/rms/reservations/bookings` (`?view=all`, `requests`, `contacts-in`) with one date range. The old URLs redirect. The open-requests badge sits on Bookings. The prototype's three sidebar items are no longer the reference for navigation. The three API endpoints stay; there is no new write path. |
+| R2 | **The pipeline board moves to an RMS Deals page.** `/rms/deals` has a table and a board (`?view=table` or `board`) over the same deal filters. The table is `GET /api/crm/deals`, paginated, and uses the same query as the board. The board stays `GET /api/crm/pipeline`. Stage moves stay `MoveDealStage`. The page calls `/api/crm/*`, so it needs `panel.crm` as well as `panel.rms`. `/crm/sales/pipeline` and `/crm/pipeline` redirect to the board. The CRM home is `/crm/sales/tasks`. The CRM prototype's Pipeline screen is no longer a separate page. |

@@ -15,7 +15,8 @@ Dark is the default. Light must stay readable: no invisible text, no white boxes
    - `/rms/commercial/rates`
    - `/rms/booking-engine/settings`
    - `/rms/admin/business-rules`
-   - `/crm/sales/pipeline`
+   - `/rms/deals?view=board`
+   - `/rms/reservations/bookings?view=requests`
 2. On each panel page, toggle the header theme control (sun + Light, or moon + Dark). On `/login` the control is still `◐ Light` / `◑ Dark`.
 3. Also open `http://localhost:3000/` and toggle if the engine exposes the same control (`◐ Light` / `◑ Dark`).
 

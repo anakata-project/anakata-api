@@ -13,19 +13,24 @@ use App\Enums\DealType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\AssignDealRequest;
 use App\Http\Requests\Crm\BindDealRequest;
+use App\Http\Requests\Crm\IndexDealsRequest;
 use App\Http\Requests\Crm\MoveDealStageRequest;
 use App\Http\Requests\Crm\StoreDealRequest;
+use App\Http\Resources\Crm\DealListResource;
 use App\Http\Resources\Crm\DealResource;
 use App\Http\Resources\Crm\PipelineResource;
 use App\Http\Resources\Crm\StageMapResource;
 use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\User;
+use App\Support\Crm\DealCard;
 use App\Support\Crm\DealDrawer;
+use App\Support\Crm\DealQuery;
 use App\Support\Crm\DealStageMap;
 use App\Support\Crm\PipelineBoard;
 use Dedoc\Scramble\Attributes\Response as DocumentedResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class DealController extends Controller
 {
@@ -45,6 +50,31 @@ final class DealController extends Controller
             'type' => is_string($type) ? $type : null,
             'q' => is_string($q) ? $q : null,
         ]));
+    }
+
+    public function index(IndexDealsRequest $request): AnonymousResourceCollection
+    {
+        $this->authorize('viewAny', Deal::class);
+        /** @var User $actor */
+        $actor = $request->user();
+        $validated = $request->validated();
+
+        $paginator = DealQuery::filtered($actor, [
+            'owner' => isset($validated['owner']) ? (string) $validated['owner'] : null,
+            'type' => isset($validated['type']) ? (string) $validated['type'] : null,
+            'q' => isset($validated['q']) ? (string) $validated['q'] : null,
+            'stage' => isset($validated['stage']) ? (string) $validated['stage'] : null,
+        ])
+            ->orderBy('deals.id')
+            ->paginate($request->integer('per_page', 50));
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(
+                fn (object $row): array => DealCard::listRow($row, $actor),
+            ),
+        );
+
+        return DealListResource::collection($paginator);
     }
 
     public function stageMap(): StageMapResource

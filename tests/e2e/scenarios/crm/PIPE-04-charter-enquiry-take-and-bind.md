@@ -9,7 +9,7 @@ A charter enquiry is a deal before it is a booking. Binding is a person, after t
 
 ## Steps
 1. **Guest.** Submit a charter enquiry (OFF-04). Use a new email `e2e.pipe04@anakata.test`.
-2. **Carolina.** Open `http://localhost:3001/crm/sales/pipeline`. Filter **Unassigned**. Open the new charter deal.
+2. **Carolina.** Open `http://localhost:3001/rms/deals?view=board`. Filter **Unassigned**. Open the new charter deal.
 3. **Take** it.
 4. In the RMS, create the charter booking for that contact (the existing charter create path). Return to the deal. **Bind to booking** and choose that booking.
 
