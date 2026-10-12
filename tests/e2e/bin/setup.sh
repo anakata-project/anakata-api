@@ -595,26 +595,18 @@ cmd_inject_inbound_email() {
 if (\$to === '') {
     \$to = 'inbox@anakata.test';
 }
-\$base = rtrim((string) config('anakata.inbox.mailpit_url'), '/');
-Illuminate\\Support\\Facades\\Http::acceptJson()->post(\$base.'/api/v1/send', [
-    'From' => ['Email' => \$email, 'Name' => \$email],
-    'To' => [['Email' => \$to]],
-    'Subject' => \$subject,
-    'Text' => \$body,
-])->throw();
-app(App\\Jobs\\PollInboxJob::class)->handle(
-    app(App\\Support\\Mail\\MailboxReader::class),
-    app(App\\Actions\\Crm\\CaptureInboundMessage::class),
+\$mail = App\\Support\\Mail\\InboundMessages::make(
+    messageIdHeader: null,
+    from: \$email,
+    to: [\$to],
+    subject: \$subject,
+    bodyHtml: '',
+    bodyText: \$body,
+    inReplyTo: null,
+    referenceHeaders: [],
+    sentAt: Carbon\\CarbonImmutable::now('UTC'),
 );
-\$message = App\\Models\\Message::query()
-    ->where('from', \$email)
-    ->where('subject', \$subject)
-    ->latest('id')
-    ->first();
-if (! \$message instanceof App\\Models\\Message) {
-    echo "E2E_JSON:".json_encode(['error' => 'injected message was not stored'], JSON_UNESCAPED_SLASHES)."\\n";
-    return;
-}
+\$message = app(App\\Actions\\Crm\\CaptureInboundMessage::class)->handle(\$mail);
 \$message->load('conversation');
 echo "E2E_JSON:".json_encode([
     'conversation_id' => \$message->conversation_id,

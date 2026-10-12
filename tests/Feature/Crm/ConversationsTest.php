@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Crm\CaptureInboundMessage;
 use App\Enums\MessageDirection;
-use App\Jobs\PollInboxJob;
 use App\Mail\Crm\ConversationReplyMail;
 use App\Models\ChangeHistory;
 use App\Models\Contact;
@@ -16,10 +15,6 @@ use App\Support\Mail\InboundMail;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConfigSeeder;
 use Database\Seeders\RolesSeeder;
-use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Mime\Email;
 
@@ -332,114 +327,6 @@ test('a linked message is one timeline line and does not copy the body', functio
         ->assertOk();
     expect(collect($again->json('data'))->pluck('detail'))->not->toContain('Secret subject')
         ->and($stranger->conversation->contact_id)->toBeNull();
-});
-
-test('mailpit polling captures a message once and strips the quoted reply', function (): void {
-    Contact::factory()->create(['email' => 'guest@example.com']);
-    Http::fake(function (Request $request) {
-        $url = $request->url();
-
-        if (str_contains($url, '/api/v1/message/')) {
-            return Http::response([
-                'ID' => 'mp-1',
-                'MessageID' => '<poll@guest.test>',
-                'From' => ['Address' => 'guest@example.com', 'Name' => 'Guest'],
-                'To' => [['Address' => 'hello@example.com']],
-                'Subject' => 'Re: Cabins',
-                'HTML' => '<p>Hi there</p><blockquote>old line</blockquote>',
-                'Text' => "Hi there\n\nOn Mon, 1 Jan 2026 Guest wrote:\n> old line",
-                'Date' => '2026-09-23T12:00:00Z',
-                'Headers' => [
-                    'Message-ID' => ['<poll@guest.test>'],
-                ],
-            ]);
-        }
-
-        if (str_contains($url, '/api/v1/messages')) {
-            return Http::response([
-                'messages' => [[
-                    'ID' => 'mp-1',
-                    'MessageID' => '<poll@guest.test>',
-                    'From' => ['Address' => 'guest@example.com'],
-                    'To' => [['Address' => 'hello@example.com']],
-                    'Subject' => 'Re: Cabins',
-                    'Created' => '2026-09-23T12:00:00Z',
-                ]],
-            ]);
-        }
-
-        return Http::response('unexpected '.$url, 500);
-    });
-
-    app()->call([new PollInboxJob, 'handle']);
-    app()->call([new PollInboxJob, 'handle']);
-
-    $message = Message::query()->where('message_id', '<poll@guest.test>')->first();
-    expect(Message::query()->count())->toBe(1)
-        ->and($message)->not->toBeNull()
-        ->and($message->body_text)->toBe('Hi there')
-        ->and($message->body_html)->toContain('old line')
-        ->and($message->conversation->contact?->email)->toBe('guest@example.com')
-        ->and($message->conversation->subject)->toBe('Cabins')
-        ->and($message->conversation->unread)->toBeTrue();
-});
-
-test('graph polling reads the inbox and empty keys skip the poll', function (): void {
-    config([
-        'anakata.inbox.driver' => 'graph',
-        'services.graph.tenant' => 'tenant',
-        'services.graph.client_id' => 'client',
-        'services.graph.client_secret' => 'secret',
-        'services.graph.mailbox' => 'hello@example.com',
-    ]);
-
-    Http::fake(function (Request $request) {
-        $url = $request->url();
-
-        if (str_contains($url, 'oauth2/v2.0/token')) {
-            return Http::response(['access_token' => 'token', 'expires_in' => 3600]);
-        }
-
-        if (str_contains($url, 'mailFolders/inbox/messages')) {
-            return Http::response([
-                'value' => [[
-                    'internetMessageId' => '<graph@guest.test>',
-                    'subject' => 'Graph hello',
-                    'receivedDateTime' => '2026-09-23T12:00:00Z',
-                    'from' => ['emailAddress' => ['address' => 'graph-guest@example.com']],
-                    'toRecipients' => [['emailAddress' => ['address' => 'hello@example.com']]],
-                    'body' => ['contentType' => 'html', 'content' => '<p>From graph</p>'],
-                    'internetMessageHeaders' => [
-                        ['name' => 'In-Reply-To', 'value' => '<none@guest.test>'],
-                    ],
-                ]],
-            ]);
-        }
-
-        return Http::response('unexpected '.$url, 500);
-    });
-
-    app()->call([new PollInboxJob, 'handle']);
-
-    expect(Message::query()->where('message_id', '<graph@guest.test>')->exists())->toBeTrue()
-        ->and(Message::query()->count())->toBe(1);
-
-    config([
-        'anakata.inbox.driver' => 'graph',
-        'services.graph.tenant' => '',
-        'services.graph.client_id' => '',
-        'services.graph.client_secret' => '',
-        'services.graph.mailbox' => '',
-    ]);
-    Bus::fake();
-    $this->artisan('anakata:inbox-poll')->assertSuccessful()->expectsOutputToContain('Graph keys are empty');
-    Bus::assertNothingDispatched();
-});
-
-test('the inbox poll is scheduled every minute', function (): void {
-    Artisan::call('schedule:list');
-
-    expect(Artisan::output())->toContain('anakata:inbox-poll');
 });
 
 function inboxMail(

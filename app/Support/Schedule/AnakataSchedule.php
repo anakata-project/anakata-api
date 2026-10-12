@@ -23,14 +23,6 @@ final class AnakataSchedule
         );
 
         RecordScheduledRuns::attach(
-            $schedule->command('anakata:inbox-poll')
-                ->everyMinute()
-                ->withoutOverlapping()
-                ->onOneServer()
-                ->description('Poll the mailbox for inbound CRM mail'),
-        );
-
-        RecordScheduledRuns::attach(
             $schedule->command('engine:expire-stripe-checkouts')
                 ->everyMinute()
                 ->withoutOverlapping(),
