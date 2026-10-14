@@ -176,3 +176,4 @@ The latest result for every P1 is [`runs/LEDGER.md`](../runs/LEDGER.md).
 | PORTAL-PAY-01 | An agent deposit link settles like a staff link | sprint-15, portal | P1 | B20 | Ada Agent + Carolina | [portal/PORTAL-PAY-01-deposit-settles.md](portal/PORTAL-PAY-01-deposit-settles.md) |
 | PORTAL-PAY-02 | Another agency's booking cannot be paid | sprint-15, portal | P1 | B20 | Ada Agent | [portal/PORTAL-PAY-02-other-agency-refused.md](portal/PORTAL-PAY-02-other-agency-refused.md) |
 | LOCALE-01 | Spanish panel chrome persists, then English returns | sprint-15, panel | P2 | B20 | Carolina | [panel/LOCALE-01-spanish-persists.md](panel/LOCALE-01-spanish-persists.md) |
+| COPILOT-01 | The copilot opens from Deals and keeps a conversation | sprint-16, copilot, panel | P2 | B21 | Carolina | [panel/COPILOT-01-open-from-deals.md](panel/COPILOT-01-open-from-deals.md) |

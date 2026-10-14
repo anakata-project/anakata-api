@@ -206,3 +206,11 @@ Decisions taken by the development team at the start of the build. They sit **ab
 |---|---|
 | R1 | **Booking Requests, Bookings and Contacts In are one page.** They read the same `bookings` rows. The panel shows them as views of `/rms/reservations/bookings` (`?view=all`, `requests`, `contacts-in`) with one date range. The old URLs redirect. The open-requests badge sits on Bookings. The prototype's three sidebar items are no longer the reference for navigation. The three API endpoints stay; there is no new write path. |
 | R2 | **The pipeline board moves to an RMS Deals page.** `/rms/deals` has a table and a board (`?view=table` or `board`) over the same deal filters. The table is `GET /api/crm/deals`, paginated, and uses the same query as the board. The board stays `GET /api/crm/pipeline`. Stage moves stay `MoveDealStage`. The page calls `/api/crm/*`, so it needs `panel.crm` as well as `panel.rms`. `/crm/sales/pipeline` and `/crm/pipeline` redirect to the board. The CRM home is `/crm/sales/tasks`. The CRM prototype's Pipeline screen is no longer a separate page. |
+
+## S · 14 Oct 2026 — staff copilot
+
+| # | Decision |
+|---|---|
+| S1 | **The staff copilot reads widely and writes CRM only.** It may search contacts, deals, tasks, bookings, departures, offers, payments, charter enquiries, and agencies, each gated by the same policy the panel uses. It may create or update a contact, raise a manual task, log a contact activity, create an unbound deal, and move an unbound deal's stage. It does not take payments, refunds, or commissions, and it does not cancel or change a booking (OPS-007). Every write waits for the operator to approve it, and the action still checks the operator's permission. |
+| S2 | **The key is environment, not a settings page.** `ANTHROPIC_API_KEY` and an optional `AI_COPILOT_MODEL`. There is no provider account table. |
+| S3 | **Transport is a queued turn plus Reverb.** K4 still forbids websockets on the public booking feed. The copilot is staff-only: the turn runs on the `ai` queue and streams to a private `copilot.{id}` channel. Passport, medical, dietary, accessibility, date of birth, and nationality are never included in a tool result. |

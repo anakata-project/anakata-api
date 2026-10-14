@@ -31,6 +31,7 @@ enum SystemRole: string
             self::Manager => collect([
                 Permission::PanelRms,
                 Permission::PanelCrm,
+                Permission::CopilotUse,
                 Permission::BookingsViewAll,
                 Permission::BookingsCreate,
                 Permission::BookingsChangeStatus,
@@ -54,6 +55,7 @@ enum SystemRole: string
             self::SalesExec => collect([
                 Permission::PanelRms,
                 Permission::PanelCrm,
+                Permission::CopilotUse,
                 Permission::BookingsViewAll,
                 Permission::BookingsCreate,
                 Permission::BookingsChangeStatus,

@@ -51,7 +51,15 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware(['api', 'throttle:stripe-webhook'])
                 ->prefix('api/stripe')
                 ->group(base_path('routes/api/stripe.php'));
+
+            Route::middleware(['api', 'auth:sanctum', 'active', 'permission:copilot.use'])
+                ->prefix('api/copilot')
+                ->group(base_path('routes/api/copilot.php'));
         },
+    )
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['prefix' => 'api', 'middleware' => ['api', 'auth:sanctum', 'active', 'permission:copilot.use']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();

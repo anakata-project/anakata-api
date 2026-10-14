@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\SensitiveFields;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -186,6 +187,12 @@ final class History
 
     private static function source(): string
     {
+        $override = Context::get('history_source');
+
+        if (is_string($override) && $override !== '') {
+            return $override;
+        }
+
         $segments = explode('/', request()->path());
 
         if ($segments[0] !== 'api') {

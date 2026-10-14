@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\ChangeHistory;
 use App\Models\Concerns\HasAuditColumns;
 use App\Models\Concerns\SerializesDatesAsUtc;
+use App\Models\CopilotConversation;
 use App\Models\ReferenceSequence;
 use App\Models\StripeEvent;
 use App\Services\Stripe\StripeSdkGateway;
@@ -39,6 +40,17 @@ arch('crm controllers do not use money or booking write paths')
         'App\Support\GuestExperience',
     ]);
 
+arch('copilot does not write money, bookings, or documents')
+    ->expect('App\Ai')
+    ->not->toUse([
+        'App\Actions\Bookings',
+        'App\Actions\Payments',
+        'App\Actions\Refunds',
+        'App\Actions\Commissions',
+        'App\Actions\Documents',
+        'App\Services\Pricing',
+    ]);
+
 arch('privacy controllers are not used by the crm')
     ->expect('App\Http\Controllers\Crm')
     ->not->toUse('App\Http\Controllers\Privacy');
@@ -62,6 +74,8 @@ arch('models use HasAuditColumns')
         // Infrastructure counter: no audit columns and no history.
         ReferenceSequence::class,
         StripeEvent::class,
+        // SDK conversation row. Ownership is participant_id, not audit columns.
+        CopilotConversation::class,
     ]);
 
 arch('models serialize dates as UTC')
@@ -71,6 +85,7 @@ arch('models serialize dates as UTC')
         HasAuditColumns::class,
         SerializesDatesAsUtc::class,
         StripeEvent::class,
+        CopilotConversation::class,
     ]);
 
 arch('only the Stripe SDK wrapper imports Stripe classes')

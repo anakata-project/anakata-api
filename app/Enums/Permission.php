@@ -14,6 +14,7 @@ enum Permission: string
 {
     case PanelRms = 'panel.rms';
     case PanelCrm = 'panel.crm';
+    case CopilotUse = 'copilot.use';
 
     case UsersManage = 'users.manage';
     case RolesManage = 'roles.manage';
@@ -68,6 +69,7 @@ enum Permission: string
         return match ($this) {
             self::PanelRms => 'Access RMS',
             self::PanelCrm => 'Access CRM',
+            self::CopilotUse => 'Use the copilot',
             self::UsersManage => 'Manage users',
             self::RolesManage => 'Manage roles',
             self::RecordsActOnAny => 'Act on any record',
@@ -114,6 +116,7 @@ enum Permission: string
         return match ($this) {
             self::PanelRms,
             self::PanelCrm => 'sections',
+            self::CopilotUse => 'copilot',
             self::UsersManage,
             self::RolesManage,
             self::RecordsActOnAny => 'admin',
@@ -164,6 +167,7 @@ enum Permission: string
     {
         return match ($group) {
             'sections' => 'Sections',
+            'copilot' => 'Copilot',
             'admin' => 'Admin',
             'bookings' => 'Bookings',
             'requests' => 'Requests',

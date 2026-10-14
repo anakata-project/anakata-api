@@ -20,6 +20,8 @@ use App\Events\HoldExpired;
 use App\Events\PaymentAwaitingWire;
 use App\Events\PaymentSettled;
 use App\Events\RefundRequested;
+use App\Listeners\BroadcastCopilotFailed;
+use App\Listeners\BroadcastCopilotToolInvoking;
 use App\Listeners\BumpEngineFeedVersion;
 use App\Listeners\ClearCurrentConfigCache;
 use App\Listeners\ExpireWebCheckoutSession;
@@ -92,6 +94,7 @@ use App\Services\Config\CurrentConfig;
 use App\Services\Stripe\FakeStripeGateway;
 use App\Services\Stripe\StripeGateway;
 use App\Services\Stripe\StripeSdkGateway;
+use App\Support\Ai\CopilotConversationStore;
 use App\Support\Config\Documents\BusinessRulesDocument;
 use App\Support\Config\Documents\EngineSettingsDocument;
 use App\Support\Config\Documents\ExtrasDocument;
@@ -111,6 +114,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
@@ -119,6 +123,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Events\InvokingTool;
 use Laravel\Telescope\TelescopeServiceProvider as TelescopePackageServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -210,6 +216,12 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth-email', function (Request $request): Limit {
             return Limit::perMinute(6)->by($request->ip() ?? 'unknown');
+        });
+
+        RateLimiter::for('copilot-messages', function (Request $request): Limit {
+            $user = $request->user();
+
+            return Limit::perMinute(30)->by($user instanceof User ? (string) $user->id : (string) $request->ip());
         });
 
         RateLimiter::for('stripe-webhook', function (Request $request): Limit {
@@ -309,6 +321,10 @@ class AppServiceProvider extends ServiceProvider
             ExtrasDocument::initial(),
         );
 
+        $this->app->singleton(ConversationStore::class, fn (): CopilotConversationStore => new CopilotConversationStore(
+            config('ai.conversations.connection'),
+        ));
+
         foreach (Permission::cases() as $permission) {
             Gate::define($permission->value, fn (User $user): bool => $user->hasPermission($permission));
         }
@@ -317,6 +333,8 @@ class AppServiceProvider extends ServiceProvider
 
         Date::serializeUsing(fn (DateTimeInterface $date): string => Iso::utc($date));
 
+        Event::listen(InvokingTool::class, [BroadcastCopilotToolInvoking::class, 'handle']);
+        Event::listen(JobFailed::class, [BroadcastCopilotFailed::class, 'handle']);
         Event::listen(ConfigPublished::class, ClearCurrentConfigCache::class);
         Event::listen(ConfigPublished::class, BumpEngineFeedVersion::class);
         Event::listen(AvailabilityChanged::class, BumpEngineFeedVersion::class);

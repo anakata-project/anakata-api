@@ -9,6 +9,7 @@ test('manager default permissions match the sprint list', function (): void {
     expect(SystemRole::Manager->defaultPermissions()->map->value->all())->toBe([
         Permission::PanelRms->value,
         Permission::PanelCrm->value,
+        Permission::CopilotUse->value,
         Permission::BookingsViewAll->value,
         Permission::BookingsCreate->value,
         Permission::BookingsChangeStatus->value,
@@ -35,6 +36,7 @@ test('sales exec default permissions match the sprint list', function (): void {
     expect(SystemRole::SalesExec->defaultPermissions()->map->value->all())->toBe([
         Permission::PanelRms->value,
         Permission::PanelCrm->value,
+        Permission::CopilotUse->value,
         Permission::BookingsViewAll->value,
         Permission::BookingsCreate->value,
         Permission::BookingsChangeStatus->value,
