@@ -29,7 +29,7 @@ services:
       - "traefik.http.routers.anakata-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.anakata-api.service=anakata-api"
       - "traefik.http.services.anakata-api.loadbalancer.server.port=80"
-      - "traefik.http.routers.anakata-ws.rule=Host(`ws.anakata-rms-api.engine-c.com`)"
+      - "traefik.http.routers.anakata-ws.rule=Host(`anakata-rms-ws.engine-c.com`)"
       - "traefik.http.routers.anakata-ws.entrypoints=web,websecure"
       - "traefik.http.routers.anakata-ws.tls=true"
       - "traefik.http.routers.anakata-ws.tls.certresolver=letsencrypt"
