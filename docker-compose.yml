@@ -106,7 +106,6 @@ networks:
   traefik-network:
     external: true
   mysql-network:
-    external: true
   anakata-net:
 
 volumes:
