@@ -15,11 +15,34 @@ final class DocumentHtml
     {
         $html = view(DocumentView::name($kind), ['snapshot' => $snapshot])->render();
 
-        if (! $inlineFonts) {
+        if (! $inlineFonts || ! str_contains($html, '/* DOCUMENT_FONTS */')) {
             return $html;
         }
 
-        return str_replace('/* DOCUMENT_FONTS */', self::fontFaceCss(), $html);
+        return str_replace(
+            ['/* DOCUMENT_FONTS */', '</style>', '<body>'],
+            [self::fontFaceCss(), self::screenCss().'</style>', '<body class="is-screen">'],
+            $html,
+        );
+    }
+
+    private static function screenCss(): string
+    {
+        return <<<'CSS'
+        body.is-screen { background: #E4E1D2; }
+        body.is-screen .paper { box-sizing: border-box; width: 100%; max-width: 100%; margin: 0; background: #FAF9F0; padding: 28px 32px 40px; }
+        body.is-screen table { width: 100%; max-width: 100%; }
+        body.is-screen td,
+        body.is-screen th,
+        body.is-screen .dtitle,
+        body.is-screen .dsub,
+        body.is-screen .dnote { overflow-wrap: anywhere; }
+        @media print {
+            body.is-screen { background: #fff; }
+            body.is-screen .paper { max-width: none; padding: 0; background: #fff; }
+        }
+
+        CSS;
     }
 
     private static function fontFaceCss(): string

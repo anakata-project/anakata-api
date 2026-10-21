@@ -20,6 +20,7 @@ use App\Models\Document;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Documents\DocumentHtml;
+use App\Services\Documents\PdfRenderer;
 use App\Support\Documents\DeliveryKey;
 use App\Support\Documents\DocumentPlan;
 use App\Support\Documents\Snapshots\SnapshotFactory;
@@ -86,6 +87,44 @@ final class DocumentController extends Controller
         return response(DocumentHtml::render(DocumentKind::Receipt, $snapshot, true), 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
         ]);
+    }
+
+    public function previewFile(Booking $booking, DocumentKind $kind, PdfRenderer $pdf): Response
+    {
+        $this->authorize('view', $booking);
+
+        if ($kind === DocumentKind::Receipt) {
+            throw ValidationException::withMessages([
+                'kind' => ['Preview a receipt at /receipts/{payment}/file.'],
+            ]);
+        }
+
+        return $this->pdfResponse(
+            $pdf->render(DocumentHtml::render(
+                $kind,
+                SnapshotFactory::build($booking, $kind, null, false),
+                false,
+            )),
+            $kind->value.'.pdf',
+        );
+    }
+
+    public function receiptFile(Booking $booking, Payment $payment, PdfRenderer $pdf): Response
+    {
+        $this->authorize('view', $booking);
+
+        if ((int) $payment->booking_id !== (int) $booking->id) {
+            abort(404);
+        }
+
+        return $this->pdfResponse(
+            $pdf->render(DocumentHtml::render(
+                DocumentKind::Receipt,
+                SnapshotFactory::build($booking, DocumentKind::Receipt, $payment, false),
+                false,
+            )),
+            'RECEIPT.pdf',
+        );
     }
 
     #[DocumentedResponse(status: 201, type: DocumentResource::class)]
@@ -172,9 +211,14 @@ final class DocumentController extends Controller
             abort(404);
         }
 
+        return $this->pdfResponse($bytes, $document->kind->value.'-v'.$document->version.'.pdf');
+    }
+
+    private function pdfResponse(string $bytes, string $filename): Response
+    {
         return response($bytes, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$document->kind->value.'-v'.$document->version.'.pdf"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 }

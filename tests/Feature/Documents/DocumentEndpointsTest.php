@@ -127,11 +127,19 @@ test('own-records blocks issue and allows preview when the viewer can see the bo
         ->assertOk();
 
     $this->actingAs($lucia)
+        ->get('/api/rms/bookings/'.$booking->id.'/documents/INVOICE/file')
+        ->assertOk();
+
+    $this->actingAs($lucia)
         ->postJson('/api/rms/bookings/'.$booking->id.'/documents/INVOICE/issue')
         ->assertForbidden();
 
     $this->actingAs($mateo)
         ->get('/api/rms/bookings/'.$booking->id.'/documents/INVOICE/html')
+        ->assertOk();
+
+    $this->actingAs($mateo)
+        ->get('/api/rms/bookings/'.$booking->id.'/documents/INVOICE/file')
         ->assertOk();
 });
 
@@ -142,6 +150,7 @@ test('html endpoints inline fonts and the PDF renderer does not', function (): v
     $pdfHtml = DocumentHtml::render(DocumentKind::Summary, $snapshot, false);
 
     expect($pdfHtml)->not->toContain('data:font/ttf;base64');
+    expect($pdfHtml)->not->toContain('is-screen');
 
     $browser = $this->actingAs($actor)
         ->get('/api/rms/bookings/'.$booking->id.'/documents/SUMMARY/html')
@@ -150,6 +159,25 @@ test('html endpoints inline fonts and the PDF renderer does not', function (): v
     expect($browser)->toContain('data:font/ttf;base64');
     expect($browser)->toContain('font-family: "Archivo"');
     expect($browser)->toContain('font-family: "IBM Plex Mono"');
+    expect($browser)->toContain('is-screen');
+});
+
+test('a preview pdf is rendered on request and not stored', function (): void {
+    $actor = adminUser();
+    $booking = endpointBooking($actor->id);
+
+    $file = $this->actingAs($actor)
+        ->get('/api/rms/bookings/'.$booking->id.'/documents/VOUCHER/file')
+        ->assertOk();
+    expect($file->headers->get('content-type'))->toBe('application/pdf');
+    expect($file->headers->get('content-disposition'))->toContain('attachment; filename="VOUCHER.pdf"');
+    expect($file->getContent())->toStartWith('%PDF');
+    expect(Storage::disk('documents')->allFiles())->toBe([]);
+
+    $this->actingAs($actor)
+        ->get('/api/rms/bookings/'.$booking->id.'/documents/RECEIPT/file')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('kind');
 });
 
 test('a receipt can be previewed and issued for a settled positive payment', function (): void {
@@ -167,6 +195,14 @@ test('a receipt can be previewed and issued for a settled positive payment', fun
         ->get('/api/rms/bookings/'.$booking->id.'/receipts/'.$payment->id.'/html')
         ->assertOk()
         ->assertSee('PAYMENT CONFIRMATION', false);
+
+    $file = $this->actingAs($actor)
+        ->get('/api/rms/bookings/'.$booking->id.'/receipts/'.$payment->id.'/file')
+        ->assertOk();
+    expect($file->headers->get('content-type'))->toBe('application/pdf');
+    expect($file->headers->get('content-disposition'))->toContain('attachment; filename="RECEIPT.pdf"');
+    expect($file->getContent())->toStartWith('%PDF');
+    expect(Storage::disk('documents')->allFiles())->toBe([]);
 
     $this->actingAs($actor)
         ->postJson('/api/rms/bookings/'.$booking->id.'/documents/RECEIPT/issue', [

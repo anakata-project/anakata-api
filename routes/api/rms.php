@@ -159,8 +159,10 @@ Route::post('bookings/{booking}/complete-link', CompleteLinkController::class)->
 Route::get('bookings/{booking}/documents', [DocumentController::class, 'index'])->whereNumber('booking');
 Route::get('bookings/{booking}/documents/plan', [DocumentController::class, 'plan'])->whereNumber('booking');
 Route::get('bookings/{booking}/documents/{kind}/html', [DocumentController::class, 'html'])->whereNumber('booking');
+Route::get('bookings/{booking}/documents/{kind}/file', [DocumentController::class, 'previewFile'])->whereNumber('booking');
 Route::post('bookings/{booking}/documents/{kind}/issue', [DocumentController::class, 'issue'])->whereNumber('booking');
 Route::get('bookings/{booking}/receipts/{payment}/html', [DocumentController::class, 'receiptHtml'])->whereNumber('booking')->whereNumber('payment');
+Route::get('bookings/{booking}/receipts/{payment}/file', [DocumentController::class, 'receiptFile'])->whereNumber('booking')->whereNumber('payment');
 Route::get('bookings/{booking}/deliveries', [DeliveryController::class, 'index'])->whereNumber('booking');
 Route::post('bookings/{booking}/wire-instructions/send', [DeliveryController::class, 'sendWire'])->whereNumber('booking');
 Route::get('documents', [ClientDocumentController::class, 'index']);
